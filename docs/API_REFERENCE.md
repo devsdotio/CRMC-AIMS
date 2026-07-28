@@ -78,6 +78,8 @@ Once annotated, the spec is available at `/api/docs`.
 
 | Method | Path | Purpose |
 |---|---|---|
+| GET | `/api/docs` | Swagger UI for interactive API documentation |
+| GET | `/api/health` | Health check endpoint |
 | GET | `/api/assets` | List assets |
 | POST | `/api/assets` | Create a new coded asset |
 | GET | `/api/assets/:id` | Get a single asset |
