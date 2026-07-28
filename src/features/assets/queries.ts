@@ -2,9 +2,18 @@ import { asc, eq } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { assets } from "@/features/assets/schema";
+import type { AssetStatus } from "@/features/assets/types";
 
-export async function listAssets() {
+export async function listAssets(status?: AssetStatus) {
   const db = getDb();
+
+  if (status) {
+    return db
+      .select()
+      .from(assets)
+      .where(eq(assets.status, status))
+      .orderBy(asc(assets.createdAt));
+  }
 
   return db.select().from(assets).orderBy(asc(assets.createdAt));
 }

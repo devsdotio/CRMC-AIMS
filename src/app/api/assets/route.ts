@@ -2,7 +2,21 @@ import { NextResponse } from "next/server";
 
 import { createAsset } from "@/features/assets/actions";
 import { listAssets } from "@/features/assets/queries";
-import type { CreateAssetInput } from "@/features/assets/types";
+import type { AssetStatus, CreateAssetInput } from "@/features/assets/types";
+
+const allowedStatuses: AssetStatus[] = ["available", "borrowed", "under_repair"];
+
+function parseStatusQuery(value: string | null): AssetStatus | undefined {
+  if (value === null || value.trim().length === 0) {
+    return undefined;
+  }
+
+  if (!allowedStatuses.includes(value as AssetStatus)) {
+    throw new Error("VALIDATION:status query is invalid.");
+  }
+
+  return value as AssetStatus;
+}
 
 /**
  * @swagger
@@ -10,9 +24,19 @@ import type { CreateAssetInput } from "@/features/assets/types";
  *   get:
  *     summary: List all coded assets
  *     tags: [Assets]
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: [available, borrowed, under_repair]
+ *         description: Filter by current asset status
  *     responses:
  *       200:
  *         description: List of assets
+ *       400:
+ *         description: Invalid query parameter
  *         content:
  *           application/json:
  *             schema:
@@ -41,11 +65,20 @@ import type { CreateAssetInput } from "@/features/assets/types";
  *                         type: string
  *                         format: date-time
  */
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const data = await listAssets();
+    const url = new URL(request.url);
+    const status = parseStatusQuery(url.searchParams.get("status"));
+    const data = await listAssets(status);
     return NextResponse.json({ data });
   } catch (error) {
+    if (error instanceof Error && error.message.startsWith("VALIDATION:")) {
+      return NextResponse.json(
+        { error: error.message.replace("VALIDATION:", "").trim() },
+        { status: 400 }
+      );
+    }
+
     const message = error instanceof Error ? error.message : "Failed to list assets.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
