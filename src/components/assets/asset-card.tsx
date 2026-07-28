@@ -1,0 +1,111 @@
+"use client";
+
+import { QrCode, User, MapPin, Tag } from "lucide-react";
+import { cn } from "@/lib/utils";
+import type { Asset, AssetCategory, AssetStatus } from "./types";
+
+export interface AssetCardProps {
+  asset: Asset;
+  onSelect: (asset: Asset) => void;
+  onScanQR: (asset: Asset) => void;
+}
+
+const CATEGORY_STYLES: Record<AssetCategory, { bg: string; text: string; label: string }> = {
+  transport: { bg: "bg-category-transport-bg", text: "text-category-transport-text", label: "Transport" },
+  computing: { bg: "bg-category-computing-bg", text: "text-category-computing-text", label: "Computing" },
+  av:        { bg: "bg-category-av-bg",        text: "text-category-av-text",        label: "AV Equipment" },
+  furniture: { bg: "bg-category-furniture-bg", text: "text-category-furniture-text", label: "Furniture" },
+};
+
+const STATUS_STYLES: Record<AssetStatus, { bg: string; text: string; label: string }> = {
+  active:         { bg: "bg-status-active-bg/20",     text: "text-status-active-text font-bold",      label: "Active" },
+  needs_repair:   { bg: "bg-status-repair-bg/20",     text: "text-status-repair-text font-bold",      label: "Needs Repair" },
+  out_of_service: { bg: "bg-status-outofservice-bg/20", text: "text-status-outofservice-text font-bold", label: "Out of Service" },
+  retired:        { bg: "bg-status-retired-bg/20",    text: "text-status-retired-text font-bold",     label: "Retired" },
+};
+
+export function AssetCard({ asset, onSelect, onScanQR }: AssetCardProps) {
+  const categoryMeta = CATEGORY_STYLES[asset.category];
+  const statusMeta = STATUS_STYLES[asset.status];
+
+  return (
+    <div
+      onClick={() => onSelect(asset)}
+      tabIndex={0}
+      role="button"
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect(asset);
+        }
+      }}
+      className={cn(
+        "group relative flex flex-col rounded-xl border border-border bg-bg overflow-hidden transition-all duration-200 cursor-pointer",
+        "hover:shadow-md hover:border-primary/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      )}
+    >
+      {/* Top Banner: Asset Code & Status Badge */}
+      <div className="flex items-center justify-between p-3.5 border-b border-border bg-bg-subtle/50">
+        <span className="font-mono text-xs font-bold text-text bg-bg px-2 py-0.5 rounded border border-border">
+          {asset.assetCode}
+        </span>
+        <span className={cn("px-2.5 py-0.5 rounded-full text-[11px] font-bold", statusMeta.bg, statusMeta.text)}>
+          {statusMeta.label}
+        </span>
+      </div>
+
+      {/* Card Content Body */}
+      <div className="p-4 flex flex-col gap-3 flex-1">
+        {/* Category Pill */}
+        <div>
+          <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider", categoryMeta.bg, categoryMeta.text)}>
+            <Tag className="h-2.5 w-2.5" />
+            {categoryMeta.label}
+          </span>
+        </div>
+
+        {/* Asset Name */}
+        <h3 className="text-sm font-bold text-text leading-snug line-clamp-2 group-hover:text-accent transition-colors">
+          {asset.name}
+        </h3>
+
+        {/* Location & Holder Info */}
+        <div className="mt-auto space-y-1.5 pt-3 border-t border-border/60 text-xs text-text-secondary">
+          <div className="flex items-center gap-1.5 truncate">
+            <MapPin className="h-3.5 w-3.5 shrink-0 text-text-secondary/70" />
+            <span className="truncate">{asset.location}</span>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <User className="h-3.5 w-3.5 shrink-0 text-text-secondary/70" />
+            {asset.currentHolder ? (
+              <span className="font-semibold text-text truncate">
+                Holder: {asset.currentHolder}
+              </span>
+            ) : (
+              <span className="font-semibold text-status-active-text">
+                Available in Stock
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Card Footer: Quick QR Scan Trigger */}
+      <div className="px-4 py-2.5 bg-bg-subtle border-t border-border flex items-center justify-between">
+        <span className="text-[11px] text-text-secondary">Click for details</span>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onScanQR(asset);
+          }}
+          aria-label={`View QR code for ${asset.assetCode}`}
+          className="p-1 rounded text-text-secondary hover:text-text hover:bg-border transition-colors cursor-pointer"
+        >
+          <QrCode className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  );
+}

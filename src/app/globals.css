@@ -81,10 +81,10 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --background: #F2F3F7;
+  --foreground: #1B2140;
+  --card: #FFFFFF;
+  --card-foreground: #1B2140;
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
   --primary: oklch(0.205 0 0);
@@ -209,6 +209,58 @@
   --category-av-text: #FFB4AB;
   --category-furniture-bg: #3E1B29;
   --category-furniture-text: #F0A8C4;
+}
+
+.light, [data-theme="light"] {
+  --background: #F2F3F7;
+  --foreground: #1B2140;
+  --card: #FFFFFF;
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+
+  /* Brand base */
+  --color-primary: #1B2140;
+  --color-primary-foreground: #FFFFFF;
+  --color-accent: #FF4E45;
+  --color-accent-foreground: #FFFFFF;
+  --color-bg: #FFFFFF;
+  --color-bg-subtle: #F2F3F7;
+  --color-border: #E3E5EC;
+  --color-text: #1B2140;
+  --color-text-secondary: #5A5F73;
+
+  /* Status tags */
+  --status-active-bg: #2ECC71;
+  --status-active-text: #0B3D20;
+  --status-repair-bg: #FFB020;
+  --status-repair-text: #4A2E00;
+  --status-outofservice-bg: #FF4E45;
+  --status-outofservice-text: #FFFFFF;
+  --status-retired-bg: #9AA0AC;
+  --status-retired-text: #FFFFFF;
+
+  /* Category tags */
+  --category-transport-bg: #E9EAF3;
+  --category-transport-text: #1B2140;
+  --category-computing-bg: #E6F1FB;
+  --category-computing-text: #0C447C;
+  --category-av-bg: #FFEDEB;
+  --category-av-text: #B23A32;
+  --category-furniture-bg: #FBEAF0;
+  --category-furniture-text: #72243E;
 }
 
 @media (prefers-color-scheme: dark) {
