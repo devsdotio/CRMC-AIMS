@@ -94,7 +94,7 @@ export function QRCodeDisplay({
         <span className="font-mono text-sm font-bold text-text tracking-wider block bg-bg-subtle px-3 py-1 rounded border border-border">
           {assetCode}
         </span>
-        <p className="text-[11px] text-text-secondary truncate max-w-[200px]" title={assetName}>
+        <p className="text-[11px] text-text-secondary truncate max-w-50" title={assetName}>
           {assetName}
         </p>
       </div>

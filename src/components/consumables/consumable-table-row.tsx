@@ -55,7 +55,7 @@ export function ConsumableTableRow({
       </td>
 
       {/* Stock Level Bar Column */}
-      <td className="px-3 py-3.5 min-w-[200px]">
+      <td className="px-3 py-3.5 min-w-50">
         <StockLevelBar
           currentQty={item.currentQty}
           minThreshold={item.minThreshold}

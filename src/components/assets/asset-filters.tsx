@@ -59,7 +59,7 @@ export function AssetFilters({
       {/* Row 1: Search & Sort */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         {/* Search input */}
-        <div className="relative flex-1 min-w-[240px] max-w-md">
+        <div className="relative flex-1 min-w-60 max-w-md">
           <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-text-secondary">
             <Search className="h-4 w-4" />
           </span>
