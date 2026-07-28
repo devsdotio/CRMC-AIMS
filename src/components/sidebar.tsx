@@ -12,14 +12,12 @@ import {
   Boxes,
   Wrench,
   Users,
-  FileBarChart,
   Settings,
   ChevronLeft,
   ChevronRight,
   LogOut,
   User,
   ChevronsUpDown,
-  Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -90,7 +88,6 @@ export default function Sidebar({
       label: "Administration",
       items: [
         { name: "Users & Roles", href: "/users", icon: Users },
-        { name: "Reports", href: "/reports", icon: FileBarChart },
         { name: "Settings", href: "/settings", icon: Settings },
       ],
     },
@@ -205,21 +202,7 @@ export default function Sidebar({
         </Link>
       </div>
 
-      {/* Quick search affordance (visual only — wire up to your command palette) */}
-      {!isCollapsed && (
-        <div className="px-3 pt-3 shrink-0">
-          <button
-            type="button"
-            className="flex w-full items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/40 hover:bg-white/8 hover:text-white/60 transition-colors"
-          >
-            <Search className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">Search…</span>
-            <kbd className="ml-auto rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] font-medium text-white/40">
-              ⌘K
-            </kbd>
-          </button>
-        </div>
-      )}
+
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-3 space-y-4 overflow-y-auto overflow-x-hidden min-h-0">
@@ -281,13 +264,13 @@ export default function Sidebar({
         </AnimatePresence>
       </div>
 
-      {/* Collapse toggle */}
+      {/* Collapse toggle — absolutely positioned on the right edge of the sidebar, vertically centered */}
       <button
         onClick={handleToggle}
         aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
         className={cn(
-          "absolute top-16 -right-3 hidden md:flex items-center justify-center w-6 h-6 rounded-full",
-          "bg-primary border border-white/10 text-white shadow-md cursor-pointer z-40",
+          "absolute top-1/2 -translate-y-1/2 -right-3 hidden md:flex items-center justify-center w-6 h-6 rounded-full",
+          "bg-primary border border-white/20 text-white shadow-md cursor-pointer z-40",
           "hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
         )}
       >
