@@ -13,3 +13,15 @@ export type CreateAssetInput = {
 	condition: string;
 	status?: AssetStatus;
 };
+
+export type UpdateAssetInput = Partial<CreateAssetInput>;
+
+export type ReleaseAssetInput = {
+	expectedReturnAt?: string;
+	borrowerName?: string;
+};
+
+export type ReturnAssetInput = {
+	condition: string;
+	status?: Exclude<AssetStatus, "borrowed">;
+};

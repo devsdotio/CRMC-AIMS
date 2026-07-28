@@ -6,7 +6,7 @@ export function getApiDocs() {
     definition: {
       openapi: "3.0.0",
       info: {
-        title: "CRMC Property Custodian Inventory API",
+        title: "CRMC-AIMS",
         version: "1.0.0",
         description:
           "API for tracking coded assets and consumables in the CRMC custodian workflow.",

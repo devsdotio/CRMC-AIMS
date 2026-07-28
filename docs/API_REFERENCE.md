@@ -83,6 +83,8 @@ Once annotated, the spec is available at `/api/docs`.
 | GET | `/api/assets` | List assets |
 | POST | `/api/assets` | Create a new coded asset |
 | GET | `/api/assets/:id` | Get a single asset |
+| PATCH | `/api/assets/:id` | Update an existing coded asset |
+| DELETE | `/api/assets/:id` | Delete a coded asset |
 | POST | `/api/assets/:id/release` | Scan/release an asset to a borrower |
 | POST | `/api/assets/:id/return` | Scan an asset back in, log condition |
 | GET | `/api/consumables` | List consumables + stock levels |
