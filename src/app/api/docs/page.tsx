@@ -1,10 +1,7 @@
-import { getApiDocs } from "@/lib/swagger";
-import ReactSwagger from "./react-swagger";
+import SwaggerStandalone from "./swagger-standalone";
 
 export const dynamic = "force-dynamic";
 
 export default function ApiDocsPage() {
-  const spec = getApiDocs();
-
-  return <ReactSwagger spec={spec} />;
+  return <SwaggerStandalone specUrl="/api/docs/spec" />;
 }
