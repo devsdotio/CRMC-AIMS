@@ -1,12 +1,142 @@
 import { AssetRepository } from "@/features/assets/repository";
+import type { AssetRecord } from "@/features/assets/repository";
 import { ConflictError, NotFoundError } from "@/features/assets/errors";
 import type {
   Asset,
+  AssetCategory,
   AssetStatus,
   CreateAssetInput,
   ReturnAssetInput,
   UpdateAssetInput,
 } from "@/features/assets/types";
+import {
+  parseAssetMetadata,
+  serializeAssetMetadata,
+} from "@/features/assets/repository";
+
+type DbAssetStatus = AssetRecord["status"];
+
+function mapUiStatusToDbStatus(status: AssetStatus): DbAssetStatus {
+  if (status === "active") {
+    return "available";
+  }
+
+  return "under_repair";
+}
+
+function mapDbStatusToUiStatus(status: DbAssetStatus): AssetStatus {
+  if (status === "under_repair") {
+    return "needs_repair";
+  }
+
+  return "active";
+}
+
+function normalizeUiCategory(category: string): AssetCategory {
+  const normalized = category.trim().toLowerCase();
+
+  if (normalized === "transport") {
+    return "transport";
+  }
+
+  if (normalized === "av") {
+    return "av";
+  }
+
+  if (normalized === "furniture") {
+    return "furniture";
+  }
+
+  return "computing";
+}
+
+function mapUiStatusFilterToDbStatuses(status?: AssetStatus): DbAssetStatus[] | undefined {
+  if (!status) {
+    return undefined;
+  }
+
+  if (status === "active") {
+    return ["available", "borrowed"];
+  }
+
+  return ["under_repair"];
+}
+
+function toUiAsset(record: AssetRecord): Asset {
+  const metadata = parseAssetMetadata(record.condition);
+
+  const lastUpdated =
+    typeof metadata.lastUpdated === "string"
+      ? metadata.lastUpdated
+      : record.createdAt.toISOString().split("T")[0];
+
+  return {
+    id: record.id,
+    assetCode: record.code,
+    name: record.name,
+    category: normalizeUiCategory(record.category),
+    status: mapDbStatusToUiStatus(record.status),
+    serialNumber: metadata.serialNumber,
+    location: metadata.location ?? "Unassigned Location",
+    currentHolder:
+      record.status === "borrowed" ? metadata.currentHolder ?? "Checked Out" : metadata.currentHolder,
+    department: metadata.department,
+    purchaseDate: metadata.purchaseDate,
+    value: metadata.value,
+    imageUrl: metadata.imageUrl,
+    notes: metadata.notes,
+    lastUpdated,
+    maintenanceHistory: metadata.maintenanceHistory ?? [],
+  };
+}
+
+function buildMetadataFromCreateInput(input: CreateAssetInput) {
+  return {
+    serialNumber: input.serialNumber,
+    location: input.location,
+    currentHolder: input.currentHolder,
+    department: input.department,
+    purchaseDate: input.purchaseDate,
+    value: input.value,
+    imageUrl: input.imageUrl,
+    notes: input.notes,
+    maintenanceHistory: [],
+    lastUpdated: new Date().toISOString().split("T")[0],
+  };
+}
+
+function buildMetadataUpdate(input: UpdateAssetInput) {
+  const metadataUpdate: Partial<CreateAssetInput> = {};
+
+  if (input.serialNumber !== undefined) {
+    metadataUpdate.serialNumber = input.serialNumber;
+  }
+  if (input.location !== undefined) {
+    metadataUpdate.location = input.location;
+  }
+  if (input.currentHolder !== undefined) {
+    metadataUpdate.currentHolder = input.currentHolder;
+  }
+  if (input.department !== undefined) {
+    metadataUpdate.department = input.department;
+  }
+  if (input.purchaseDate !== undefined) {
+    metadataUpdate.purchaseDate = input.purchaseDate;
+  }
+  if (input.value !== undefined) {
+    metadataUpdate.value = input.value;
+  }
+  if (input.imageUrl !== undefined) {
+    metadataUpdate.imageUrl = input.imageUrl;
+  }
+  if (input.notes !== undefined) {
+    metadataUpdate.notes = input.notes;
+  }
+
+  metadataUpdate.lastUpdated = new Date().toISOString().split("T")[0];
+
+  return metadataUpdate;
+}
 
 function isPgUniqueViolation(error: unknown): boolean {
   return (
@@ -21,7 +151,11 @@ export class AssetService {
   constructor(private readonly assetRepository = new AssetRepository()) {}
 
   async listAssets(filters?: { status?: AssetStatus }): Promise<Asset[]> {
-    return this.assetRepository.findMany(filters);
+    const records = await this.assetRepository.findMany({
+      statuses: mapUiStatusFilterToDbStatuses(filters?.status),
+    });
+
+    return records.map(toUiAsset);
   }
 
   async getAssetById(id: string): Promise<Asset> {
@@ -31,12 +165,20 @@ export class AssetService {
       throw new NotFoundError("Asset not found.");
     }
 
-    return asset;
+    return toUiAsset(asset);
   }
 
   async createAsset(input: CreateAssetInput): Promise<Asset> {
     try {
-      return await this.assetRepository.create(input);
+      const created = await this.assetRepository.create({
+        code: input.assetCode,
+        name: input.name,
+        category: input.category,
+        status: mapUiStatusToDbStatus(input.status),
+        condition: serializeAssetMetadata(buildMetadataFromCreateInput(input)),
+      });
+
+      return toUiAsset(created);
     } catch (error) {
       if (isPgUniqueViolation(error)) {
         throw new ConflictError("Asset code already exists.");
@@ -48,13 +190,37 @@ export class AssetService {
 
   async updateAsset(id: string, input: UpdateAssetInput): Promise<Asset> {
     try {
-      const updatedAsset = await this.assetRepository.updateById(id, input);
+      const dbUpdatePayload: {
+        code?: string;
+        name?: string;
+        category?: string;
+        status?: DbAssetStatus;
+      } = {};
 
-      if (!updatedAsset) {
+      if (input.assetCode !== undefined) {
+        dbUpdatePayload.code = input.assetCode;
+      }
+      if (input.name !== undefined) {
+        dbUpdatePayload.name = input.name;
+      }
+      if (input.category !== undefined) {
+        dbUpdatePayload.category = input.category;
+      }
+      if (input.status !== undefined) {
+        dbUpdatePayload.status = mapUiStatusToDbStatus(input.status);
+      }
+
+      const updatedAsset = await this.assetRepository.updateById(id, dbUpdatePayload);
+
+      await this.assetRepository.updateMetadataById(id, buildMetadataUpdate(input));
+
+      const hydratedAsset = await this.assetRepository.findById(id);
+
+      if (!updatedAsset || !hydratedAsset) {
         throw new NotFoundError("Asset not found.");
       }
 
-      return updatedAsset;
+      return toUiAsset(hydratedAsset);
     } catch (error) {
       if (isPgUniqueViolation(error)) {
         throw new ConflictError("Asset code already exists.");
@@ -89,7 +255,7 @@ export class AssetService {
       throw new NotFoundError("Asset not found.");
     }
 
-    return updatedAsset;
+    return toUiAsset(updatedAsset);
   }
 
   async returnAsset(id: string, input: ReturnAssetInput): Promise<Asset> {
@@ -104,14 +270,20 @@ export class AssetService {
     }
 
     const updatedAsset = await this.assetRepository.updateById(id, {
-      condition: input.condition,
-      status: input.status ?? "available",
+      status: mapUiStatusToDbStatus(input.status ?? "active"),
     });
 
-    if (!updatedAsset) {
+    await this.assetRepository.updateMetadataById(id, {
+      notes: input.condition,
+      lastUpdated: new Date().toISOString().split("T")[0],
+    });
+
+    const hydratedAsset = await this.assetRepository.findById(id);
+
+    if (!updatedAsset || !hydratedAsset) {
       throw new NotFoundError("Asset not found.");
     }
 
-    return updatedAsset;
+    return toUiAsset(hydratedAsset);
   }
 }

@@ -54,17 +54,32 @@ export async function GET(
  *           schema:
  *             type: object
  *             properties:
- *               code:
+ *               assetCode:
  *                 type: string
  *               name:
  *                 type: string
  *               category:
  *                 type: string
- *               condition:
+ *                 enum: [transport, computing, av, furniture]
+ *               location:
+ *                 type: string
+ *               serialNumber:
+ *                 type: string
+ *               currentHolder:
+ *                 type: string
+ *               department:
+ *                 type: string
+ *               purchaseDate:
+ *                 type: string
+ *               value:
+ *                 type: number
+ *               imageUrl:
+ *                 type: string
+ *               notes:
  *                 type: string
  *               status:
  *                 type: string
- *                 enum: [available, borrowed, under_repair]
+ *                 enum: [active, needs_repair, out_of_service, retired]
  *     responses:
  *       200:
  *         description: Asset updated successfully

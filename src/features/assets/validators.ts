@@ -6,7 +6,14 @@ import type {
 } from "@/features/assets/types";
 import { ValidationError } from "@/features/assets/errors";
 
-const allowedStatuses: AssetStatus[] = ["available", "borrowed", "under_repair"];
+const allowedStatuses: AssetStatus[] = [
+  "active",
+  "needs_repair",
+  "out_of_service",
+  "retired",
+];
+const allowedCategories = ["transport", "computing", "av", "furniture"] as const;
+type AssetCategoryInput = (typeof allowedCategories)[number];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -28,6 +35,44 @@ function parseStatus(value: unknown, fieldName = "status"): AssetStatus {
   return value as AssetStatus;
 }
 
+function parseCategory(value: unknown, fieldName = "category"): AssetCategoryInput {
+  if (typeof value !== "string") {
+    throw new ValidationError(`${fieldName} is invalid.`);
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (!allowedCategories.includes(normalized as AssetCategoryInput)) {
+    throw new ValidationError(`${fieldName} is invalid.`);
+  }
+
+  return normalized as AssetCategoryInput;
+}
+
+function parseOptionalString(value: unknown): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (typeof value !== "string") {
+    throw new ValidationError("Optional text fields must be strings.");
+  }
+
+  const normalized = value.trim();
+  return normalized.length === 0 ? undefined : normalized;
+}
+
+function parseOptionalNumber(value: unknown): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (typeof value !== "number" || Number.isNaN(value)) {
+    throw new ValidationError("value must be a number.");
+  }
+
+  return value;
+}
+
 export function parseAssetId(id: unknown): string {
   return requireNonEmptyString(id, "id");
 }
@@ -45,14 +90,21 @@ export function parseCreateAssetInput(input: unknown): CreateAssetInput {
     throw new ValidationError("Request body must be an object.");
   }
 
-  const status = input.status === undefined ? "available" : parseStatus(input.status);
+  const status = input.status === undefined ? "active" : parseStatus(input.status);
 
   return {
-    code: requireNonEmptyString(input.code, "code"),
+    assetCode: requireNonEmptyString(input.assetCode, "assetCode"),
     name: requireNonEmptyString(input.name, "name"),
-    category: requireNonEmptyString(input.category, "category"),
-    condition: requireNonEmptyString(input.condition, "condition"),
+    category: parseCategory(input.category),
     status,
+    location: requireNonEmptyString(input.location, "location"),
+    serialNumber: parseOptionalString(input.serialNumber),
+    currentHolder: parseOptionalString(input.currentHolder),
+    department: parseOptionalString(input.department),
+    purchaseDate: parseOptionalString(input.purchaseDate),
+    value: parseOptionalNumber(input.value),
+    imageUrl: parseOptionalString(input.imageUrl),
+    notes: parseOptionalString(input.notes),
   };
 }
 
@@ -62,17 +114,27 @@ export function parseUpdateAssetInput(input: unknown): UpdateAssetInput {
   }
 
   const payload: UpdateAssetInput = {
-    code: input.code === undefined ? undefined : requireNonEmptyString(input.code, "code"),
+    assetCode:
+      input.assetCode === undefined
+        ? undefined
+        : requireNonEmptyString(input.assetCode, "assetCode"),
     name: input.name === undefined ? undefined : requireNonEmptyString(input.name, "name"),
     category:
       input.category === undefined
         ? undefined
-        : requireNonEmptyString(input.category, "category"),
-    condition:
-      input.condition === undefined
-        ? undefined
-        : requireNonEmptyString(input.condition, "condition"),
+        : parseCategory(input.category),
     status: input.status === undefined ? undefined : parseStatus(input.status),
+    location:
+      input.location === undefined
+        ? undefined
+        : requireNonEmptyString(input.location, "location"),
+    serialNumber: parseOptionalString(input.serialNumber),
+    currentHolder: parseOptionalString(input.currentHolder),
+    department: parseOptionalString(input.department),
+    purchaseDate: parseOptionalString(input.purchaseDate),
+    value: parseOptionalNumber(input.value),
+    imageUrl: parseOptionalString(input.imageUrl),
+    notes: parseOptionalString(input.notes),
   };
 
   const hasUpdateField = Object.values(payload).some((value) => value !== undefined);
@@ -94,10 +156,6 @@ export function parseReturnAssetInput(input: unknown): ReturnAssetInput {
 
   if (statusValue !== undefined) {
     const parsedStatus = parseStatus(statusValue);
-
-    if (parsedStatus === "borrowed") {
-      throw new ValidationError("status is invalid for return.");
-    }
 
     status = parsedStatus;
   }

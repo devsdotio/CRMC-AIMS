@@ -29,8 +29,8 @@ import {
  *                 example: Good - cleaned and complete
  *               status:
  *                 type: string
- *                 enum: [available, under_repair]
- *                 description: Set to under_repair when returned with issues
+ *                 enum: [active, needs_repair, out_of_service, retired]
+ *                 description: Defaults to active when omitted
  *     responses:
  *       200:
  *         description: Asset returned successfully

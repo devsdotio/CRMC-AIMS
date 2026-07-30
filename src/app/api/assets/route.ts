@@ -15,7 +15,7 @@ import {
  *         required: false
  *         schema:
  *           type: string
- *           enum: [available, borrowed, under_repair]
+ *           enum: [active, needs_repair, out_of_service, retired]
  *         description: Filter by current asset status
  *     responses:
  *       200:
@@ -35,20 +35,38 @@ import {
  *                       id:
  *                         type: string
  *                         format: uuid
- *                       code:
+ *                       assetCode:
  *                         type: string
  *                       name:
  *                         type: string
  *                       category:
  *                         type: string
- *                       condition:
- *                         type: string
+ *                         enum: [transport, computing, av, furniture]
  *                       status:
  *                         type: string
- *                         enum: [available, borrowed, under_repair]
- *                       createdAt:
+ *                         enum: [active, needs_repair, out_of_service, retired]
+ *                       location:
  *                         type: string
- *                         format: date-time
+ *                       serialNumber:
+ *                         type: string
+ *                       currentHolder:
+ *                         type: string
+ *                       department:
+ *                         type: string
+ *                       purchaseDate:
+ *                         type: string
+ *                       value:
+ *                         type: number
+ *                       imageUrl:
+ *                         type: string
+ *                       notes:
+ *                         type: string
+ *                       lastUpdated:
+ *                         type: string
+ *                       maintenanceHistory:
+ *                         type: array
+ *                         items:
+ *                           type: object
  */
 export async function GET(request: Request) {
   try {
@@ -70,24 +88,38 @@ export async function GET(request: Request) {
  *         application/json:
  *           schema:
  *             type: object
- *             required: [code, name, category, condition]
+ *             required: [assetCode, name, category, status, location]
  *             properties:
- *               code:
+ *               assetCode:
  *                 type: string
- *                 example: QR-ASSET-0001
+ *                 example: AV-031
  *               name:
  *                 type: string
  *                 example: Portable ECG Monitor
  *               category:
  *                 type: string
- *                 example: Medical Equipment
- *               condition:
- *                 type: string
- *                 example: Good
+ *                 enum: [transport, computing, av, furniture]
  *               status:
  *                 type: string
- *                 enum: [available, borrowed, under_repair]
- *                 example: available
+ *                 enum: [active, needs_repair, out_of_service, retired]
+ *                 example: active
+ *               location:
+ *                 type: string
+ *                 example: IT Office - Room 302
+ *               serialNumber:
+ *                 type: string
+ *               currentHolder:
+ *                 type: string
+ *               department:
+ *                 type: string
+ *               purchaseDate:
+ *                 type: string
+ *               value:
+ *                 type: number
+ *               imageUrl:
+ *                 type: string
+ *               notes:
+ *                 type: string
  *     responses:
  *       201:
  *         description: Asset created successfully

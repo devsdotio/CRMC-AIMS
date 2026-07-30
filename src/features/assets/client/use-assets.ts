@@ -8,8 +8,6 @@ import {
   type UseQueryResult,
 } from "@tanstack/react-query";
 
-import type { Asset as UiAsset } from "@/components/assets/types";
-import { mapBackendAssetToUiAsset } from "@/features/assets/client/adapters";
 import { assetsApi } from "@/features/assets/client/assets-api";
 import { assetQueryKeys } from "@/features/assets/client/query-keys";
 import type {
@@ -24,14 +22,6 @@ export function useAssetsQuery(status?: AssetStatus): UseQueryResult<Asset[], Er
   return useQuery({
     queryKey: assetQueryKeys.list(status),
     queryFn: () => assetsApi.listAssets(status),
-  });
-}
-
-export function useAssetsUiQuery(status?: AssetStatus): UseQueryResult<UiAsset[], Error> {
-  return useQuery({
-    queryKey: assetQueryKeys.list(status),
-    queryFn: () => assetsApi.listAssets(status),
-    select: (assets) => assets.map(mapBackendAssetToUiAsset),
   });
 }
 
