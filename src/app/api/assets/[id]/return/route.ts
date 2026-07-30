@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
-
-import { returnAsset } from "@/features/assets/actions";
-import type { ReturnAssetInput } from "@/features/assets/types";
+import {
+  assetController,
+  handleAssetControllerError,
+} from "@/features/assets/controller";
 
 /**
  * @swagger
@@ -47,30 +47,9 @@ export async function POST(
 ) {
   try {
     const { id } = await context.params;
-    const body = (await request.json()) as ReturnAssetInput;
-    const data = await returnAsset(id, body);
-
-    if (!data) {
-      return NextResponse.json({ error: "Asset not found." }, { status: 404 });
-    }
-
-    return NextResponse.json({ data });
+    const body = await request.json();
+    return await assetController.returnAsset(id, body);
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith("VALIDATION:")) {
-      return NextResponse.json(
-        { error: error.message.replace("VALIDATION:", "").trim() },
-        { status: 400 }
-      );
-    }
-
-    if (error instanceof Error && error.message.startsWith("CONFLICT:")) {
-      return NextResponse.json(
-        { error: error.message.replace("CONFLICT:", "").trim() },
-        { status: 409 }
-      );
-    }
-
-    const message = error instanceof Error ? error.message : "Failed to return asset.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleAssetControllerError(error);
   }
 }

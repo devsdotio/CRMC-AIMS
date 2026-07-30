@@ -1,22 +1,7 @@
-import { NextResponse } from "next/server";
-
-import { createAsset } from "@/features/assets/actions";
-import { listAssets } from "@/features/assets/queries";
-import type { AssetStatus, CreateAssetInput } from "@/features/assets/types";
-
-const allowedStatuses: AssetStatus[] = ["available", "borrowed", "under_repair"];
-
-function parseStatusQuery(value: string | null): AssetStatus | undefined {
-  if (value === null || value.trim().length === 0) {
-    return undefined;
-  }
-
-  if (!allowedStatuses.includes(value as AssetStatus)) {
-    throw new Error("VALIDATION:status query is invalid.");
-  }
-
-  return value as AssetStatus;
-}
+import {
+  assetController,
+  handleAssetControllerError,
+} from "@/features/assets/controller";
 
 /**
  * @swagger
@@ -67,20 +52,9 @@ function parseStatusQuery(value: string | null): AssetStatus | undefined {
  */
 export async function GET(request: Request) {
   try {
-    const url = new URL(request.url);
-    const status = parseStatusQuery(url.searchParams.get("status"));
-    const data = await listAssets(status);
-    return NextResponse.json({ data });
+    return await assetController.listAssets(request);
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith("VALIDATION:")) {
-      return NextResponse.json(
-        { error: error.message.replace("VALIDATION:", "").trim() },
-        { status: 400 }
-      );
-    }
-
-    const message = error instanceof Error ? error.message : "Failed to list assets.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleAssetControllerError(error);
   }
 }
 
@@ -124,27 +98,9 @@ export async function GET(request: Request) {
  */
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as CreateAssetInput;
-    const created = await createAsset(body);
-    return NextResponse.json({ data: created }, { status: 201 });
+    const body = await request.json();
+    return await assetController.createAsset(body);
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith("VALIDATION:")) {
-      return NextResponse.json(
-        { error: error.message.replace("VALIDATION:", "").trim() },
-        { status: 400 }
-      );
-    }
-
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      String((error as { code: unknown }).code) === "23505"
-    ) {
-      return NextResponse.json({ error: "Asset code already exists." }, { status: 409 });
-    }
-
-    const message = error instanceof Error ? error.message : "Failed to create asset.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleAssetControllerError(error);
   }
 }
