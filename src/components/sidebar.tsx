@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -43,6 +43,7 @@ interface SidebarProps {
   overdueCount?: number;
   userName?: string;
   userEmail?: string;
+  onLogout?: () => void;
 }
 
 export default function Sidebar({
@@ -53,11 +54,22 @@ export default function Sidebar({
   overdueCount = 0,
   userName = "Demo User",
   userEmail = "user@crmc.gov",
+  onLogout,
 }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
+
+  const handleLogout = () => {
+    setUserMenuOpen(false);
+    if (onLogout) {
+      onLogout();
+    } else {
+      router.push("/sign-in");
+    }
+  };
 
   // Close the user menu on outside click
   useEffect(() => {
@@ -257,7 +269,11 @@ export default function Sidebar({
                 isCollapsed ? "left-full ml-2 w-44" : "left-3 right-3"
               )}
             >
-              <button className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm text-white/70 hover:bg-white/6 hover:text-white transition-colors">
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm text-white/70 hover:bg-white/6 hover:text-white transition-colors cursor-pointer"
+              >
                 <LogOut className="w-4 h-4" />
                 Log out
               </button>
