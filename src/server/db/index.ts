@@ -1,28 +1,25 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
+import * as schema from "./schema";
 
-import * as schema from "@/db/schema";
+const connectionString = process.env.DATABASE_URL;
 
-let dbInstance: ReturnType<typeof drizzle<typeof schema>> | null = null;
-
-export function getDb() {
-	if (dbInstance) {
-		return dbInstance;
-	}
-
-	const connectionString = process.env.DATABASE_URL;
-
-	if (!connectionString) {
-		throw new Error("DATABASE_URL is not configured.");
-	}
-
-	const queryClient = postgres(connectionString, {
-		max: 1,
-		prepare: false,
-	});
-
-	dbInstance = drizzle(queryClient, { schema });
-	return dbInstance;
+if (!connectionString) {
+  throw new Error(
+    "DATABASE_URL is not set. Add it to your environment (.env / .env.local)."
+  );
 }
 
-export type Db = ReturnType<typeof getDb>;
+/**
+ * A single shared postgres-js client for the whole server runtime.
+ *
+ * `max: 1` is a safe default for serverless/edge-adjacent Next.js
+ * deployments (e.g. Vercel) where each function instance should hold a
+ * small connection footprint. Raise this if running as a long-lived
+ * Node server.
+ */
+const client = postgres(connectionString, { max: 1 });
+
+export const db = drizzle(client, { schema });
+
+export { schema };
