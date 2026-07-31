@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { Plus, QrCode, Package } from "lucide-react";
+import { Plus } from "lucide-react";
 import type { Asset, ViewMode, AssetFilterState } from "@/components/assets/types";
 import { INITIAL_MOCK_ASSETS } from "@/components/assets/mock-data";
 import { AssetFilters } from "@/components/assets/asset-filters";
@@ -10,7 +10,6 @@ import { AssetGrid } from "@/components/assets/asset-grid";
 import { AssetTable } from "@/components/assets/asset-table";
 import { AssetDetailPanel } from "@/components/assets/asset-detail-panel";
 import { AddEditAssetDialog } from "@/components/assets/add-edit-asset-dialog";
-import { QRScanDialog } from "@/components/assets/qr-scan-dialog";
 
 export default function AssetsPage() {
   const [assets, setAssets] = useState<Asset[]>(INITIAL_MOCK_ASSETS);
@@ -32,7 +31,6 @@ export default function AssetsPage() {
     isOpen: false,
     asset: null,
   });
-  const [qrScanOpen, setQrScanOpen] = useState(false);
 
   // Initial load simulation
   useEffect(() => {
@@ -150,19 +148,8 @@ export default function AssetsPage() {
     }
   };
 
-  const handleResolveQRScan = (scannedCode: string) => {
-    const found = assets.find(
-      (a) => a.assetCode.toUpperCase() === scannedCode.toUpperCase()
-    );
-    if (found) {
-      setSelectedAsset(found);
-    } else {
-      alert(`No asset found with code "${scannedCode}".`);
-    }
-  };
-
   return (
-    <div className="h-full flex flex-col min-h-0 overflow-hidden bg-bg-subtle" data-theme="light">
+    <div className="h-full flex flex-col min-h-0 overflow-hidden bg-bg-subtle rounded-md" data-theme="light">
       {/* ── Top Header Bar ────────────────────────────────────────────── */}
       <div className="px-4 md:px-6 pt-5 pb-3 bg-bg shrink-0 flex flex-wrap items-center justify-between gap-4 border-b border-border">
         <div>
@@ -181,15 +168,6 @@ export default function AssetsPage() {
 
         {/* Top Header Actions */}
         <div className="flex items-center gap-2.5">
-          <button
-            type="button"
-            onClick={() => setQrScanOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-border bg-bg text-text hover:border-primary transition-colors cursor-pointer"
-          >
-            <QrCode className="h-4 w-4" />
-            <span className="hidden sm:inline">Scan Tag</span>
-          </button>
-
           <button
             type="button"
             onClick={() => setAddEditState({ isOpen: true, asset: null })}
@@ -219,14 +197,12 @@ export default function AssetsPage() {
             assets={filteredAssets}
             loading={isLoading}
             onSelect={setSelectedAsset}
-            onScanQR={(asset) => setSelectedAsset(asset)}
           />
         ) : (
           <AssetTable
             assets={filteredAssets}
             loading={isLoading}
             onSelect={setSelectedAsset}
-            onScanQR={(asset) => setSelectedAsset(asset)}
           />
         )}
       </main>
@@ -249,13 +225,6 @@ export default function AssetsPage() {
         initialAsset={addEditState.asset}
         onClose={() => setAddEditState({ isOpen: false, asset: null })}
         onSave={handleSaveAsset}
-      />
-
-      {/* ── QR Scanner Dialog ─────────────────────────────────────────── */}
-      <QRScanDialog
-        isOpen={qrScanOpen}
-        onClose={() => setQrScanOpen(false)}
-        onResolve={handleResolveQRScan}
       />
     </div>
   );

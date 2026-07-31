@@ -1,13 +1,12 @@
 "use client";
 
-import { QrCode, Tag, ExternalLink } from "lucide-react";
+import { Tag, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Asset, AssetCategory, AssetStatus } from "./types";
 
 export interface AssetTableRowProps {
   asset: Asset;
   onSelect: (asset: Asset) => void;
-  onScanQR: (asset: Asset) => void;
 }
 
 const CATEGORY_STYLES: Record<AssetCategory, { bg: string; text: string; label: string }> = {
@@ -24,7 +23,7 @@ const STATUS_STYLES: Record<AssetStatus, { bg: string; text: string; label: stri
   retired:        { bg: "bg-status-retired-bg/20",    text: "text-status-retired-text font-bold",     label: "Retired" },
 };
 
-export function AssetTableRow({ asset, onSelect, onScanQR }: AssetTableRowProps) {
+export function AssetTableRow({ asset, onSelect }: AssetTableRowProps) {
   const categoryMeta = CATEGORY_STYLES[asset.category];
   const statusMeta = STATUS_STYLES[asset.status];
 
@@ -112,15 +111,6 @@ export function AssetTableRow({ asset, onSelect, onScanQR }: AssetTableRowProps)
       {/* Actions */}
       <td className="px-5 py-3.5 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-end gap-1.5">
-          <button
-            type="button"
-            onClick={() => onScanQR(asset)}
-            aria-label={`View QR code for ${asset.assetCode}`}
-            className="inline-flex items-center gap-1 p-1.5 rounded-md border border-border bg-bg text-text-secondary hover:text-text hover:bg-bg-subtle transition-colors cursor-pointer"
-          >
-            <QrCode className="h-3.5 w-3.5" />
-            <span className="sr-only">QR</span>
-          </button>
           <button
             type="button"
             onClick={() => onSelect(asset)}

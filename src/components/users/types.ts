@@ -2,7 +2,7 @@
  * Shared TypeScript interfaces and predefined role definitions for Users & Roles feature.
  */
 
-export type UserRole = "admin" | "staff" | "viewer";
+export type UserRole = "admin" | "staff" | "borrower";
 
 export type UserStatus = "active" | "deactivated";
 
@@ -23,9 +23,9 @@ export const ROLE_DEFINITIONS: Record<UserRole, RoleDefinition> = {
     description: "Day-to-day operations — approve/reject borrow requests, release/return assets, manage consumables, flag/resolve maintenance.",
     badgeStyle: "outlined",
   },
-  viewer: {
-    title: "Viewer",
-    description: "Read-only — can view dashboard, assets, logs, reports, but cannot approve, edit, or create anything.",
+  borrower: {
+    title: "Borrower / Requester",
+    description: "Request access — submit borrow requests for equipment, request consumable stock, and track personal request status.",
     badgeStyle: "muted",
   },
 };

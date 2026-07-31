@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, ArrowUpFromLine, User, Package, Calendar, QrCode, Check } from "lucide-react";
+import { X, ArrowUpFromLine, User, Package, Calendar, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BorrowLogRecord } from "./types";
 
@@ -16,14 +16,12 @@ export interface ReleaseAssetDialogProps {
     dueDate: string;
     notes?: string;
   }) => void;
-  onTriggerScanQR: () => void;
 }
 
 export function ReleaseAssetDialog({
   isOpen,
   onClose,
   onConfirmRelease,
-  onTriggerScanQR,
 }: ReleaseAssetDialogProps) {
   const [borrowerName, setBorrowerName] = useState("");
   const [department, setDepartment] = useState("IT");
@@ -137,14 +135,6 @@ export function ReleaseAssetDialog({
               <label htmlFor="release-asset-code" className="text-xs font-bold text-text">
                 Asset Tag Code <span className="text-accent">*</span>
               </label>
-              <button
-                type="button"
-                onClick={onTriggerScanQR}
-                className="inline-flex items-center gap-1 text-xs font-semibold text-accent hover:underline cursor-pointer"
-              >
-                <QrCode className="h-3.5 w-3.5" />
-                Scan Tag
-              </button>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <input

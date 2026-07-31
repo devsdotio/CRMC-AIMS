@@ -58,7 +58,7 @@ export function UserFilters({
               <option value="all">All System Roles</option>
               <option value="admin">Admin</option>
               <option value="staff">Staff</option>
-              <option value="viewer">Viewer</option>
+              <option value="borrower">Borrower / Requester</option>
             </select>
           </div>
 
