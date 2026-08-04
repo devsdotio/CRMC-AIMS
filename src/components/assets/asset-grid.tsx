@@ -8,7 +8,6 @@ export interface AssetGridProps {
   assets: Asset[];
   loading?: boolean;
   onSelect: (asset: Asset) => void;
-  onScanQR: (asset: Asset) => void;
 }
 
 // ─── Matched Skeleton Card for Grid View ─────────────────────────────────────
@@ -41,7 +40,6 @@ export function AssetGrid({
   assets,
   loading = false,
   onSelect,
-  onScanQR,
 }: AssetGridProps) {
   if (loading) {
     return (
@@ -76,7 +74,6 @@ export function AssetGrid({
           key={asset.id}
           asset={asset}
           onSelect={onSelect}
-          onScanQR={onScanQR}
         />
       ))}
     </div>

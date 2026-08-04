@@ -8,7 +8,6 @@ export interface AssetTableProps {
   assets: Asset[];
   loading?: boolean;
   onSelect: (asset: Asset) => void;
-  onScanQR: (asset: Asset) => void;
 }
 
 // ─── Matched Skeleton Row for Table View ─────────────────────────────────────
@@ -50,7 +49,6 @@ export function AssetTable({
   assets,
   loading = false,
   onSelect,
-  onScanQR,
 }: AssetTableProps) {
   if (loading) {
     return (
@@ -113,7 +111,6 @@ export function AssetTable({
               key={asset.id}
               asset={asset}
               onSelect={onSelect}
-              onScanQR={onScanQR}
             />
           ))}
         </tbody>

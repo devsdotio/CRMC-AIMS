@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { ArrowUpFromLine, QrCode } from "lucide-react";
+import { ArrowUpFromLine } from "lucide-react";
 import type { BorrowLogRecord, LogTabFilter, BorrowLogFilterState, ReturnCondition } from "@/components/borrow-log/types";
 import { INITIAL_MOCK_LOGS } from "@/components/borrow-log/mock-data";
 import { BorrowLogTabs } from "@/components/borrow-log/borrow-log-tabs";
@@ -10,7 +10,6 @@ import { BorrowLogList } from "@/components/borrow-log/borrow-log-list";
 import { BorrowLogDetailPanel } from "@/components/borrow-log/borrow-log-detail-panel";
 import { ReleaseAssetDialog } from "@/components/borrow-log/release-asset-dialog";
 import { ReturnAssetDialog } from "@/components/borrow-log/return-asset-dialog";
-import { QRScanDialog } from "@/components/assets/qr-scan-dialog";
 
 export default function BorrowLogPage() {
   const [records, setRecords] = useState<BorrowLogRecord[]>(INITIAL_MOCK_LOGS);
@@ -29,7 +28,6 @@ export default function BorrowLogPage() {
   const [selectedRecord, setSelectedRecord] = useState<BorrowLogRecord | null>(null);
   const [releaseDialogOpen, setReleaseDialogOpen] = useState(false);
   const [returnDialogRecord, setReturnDialogRecord] = useState<BorrowLogRecord | null>(null);
-  const [qrScanOpen, setQrScanOpen] = useState(false);
 
   // Simulate initial load
   useEffect(() => {
@@ -59,7 +57,7 @@ export default function BorrowLogPage() {
         return false;
       }
 
-      // 2. Search Query (Borrower, Asset Code, Asset Name, LOG Code)
+      // 2. Search Query
       if (filters.searchQuery.trim()) {
         const query = filters.searchQuery.toLowerCase();
         const matchBorrower = rec.borrowerName.toLowerCase().includes(query);
@@ -130,7 +128,7 @@ export default function BorrowLogPage() {
       logCode: `LOG-2026-${Math.floor(1000 + Math.random() * 9000)}`,
       requestCode: `REQ-2026-${Math.floor(1000 + Math.random() * 9000)}`,
       borrowerName: releaseData.borrowerName,
-      borrowerEmail: `${releaseData.borrowerName.toLowerCase().replace(" ", ".")}@crmc.gov.ph`,
+      borrowerEmail: `${releaseData.borrowerName.toLowerCase().replace(/\s+/g, ".")}@crmc.gov.ph`,
       borrowerPhone: "+63 917 555 0000",
       department: releaseData.department,
       assetCode: releaseData.assetCode,
@@ -216,27 +214,18 @@ export default function BorrowLogPage() {
           ? {
               ...prev,
               status: "returned",
+              returnedAt: new Date().toISOString(),
               conditionOnReturn: condition,
               conditionNotes: notes,
+              receivedBy: "Dave Custodio (Custodian)",
             }
           : null
       );
     }
   };
 
-  const handleResolveQRScan = (scannedCode: string) => {
-    const found = records.find(
-      (r) => r.assetCode.toUpperCase() === scannedCode.toUpperCase()
-    );
-    if (found) {
-      setSelectedRecord(found);
-    } else {
-      alert(`No checkout log record found matching asset tag "${scannedCode}".`);
-    }
-  };
-
   return (
-    <div className="h-full flex flex-col min-h-0 overflow-hidden bg-bg-subtle" data-theme="light">
+    <div className="h-full flex flex-col min-h-0 overflow-hidden bg-bg-subtle rounded-md" data-theme="light">
       {/* ── Top Header Banner ────────────────────────────────────────── */}
       <div className="px-4 md:px-6 pt-5 pb-3 bg-bg shrink-0 flex flex-wrap items-center justify-between gap-4 border-b border-border">
         <div>
@@ -255,15 +244,6 @@ export default function BorrowLogPage() {
 
         {/* Top Header Actions */}
         <div className="flex items-center gap-2.5">
-          <button
-            type="button"
-            onClick={() => setQrScanOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-border bg-bg text-text hover:border-primary transition-colors cursor-pointer"
-          >
-            <QrCode className="h-4 w-4" />
-            <span className="hidden sm:inline">Scan Tag</span>
-          </button>
-
           <button
             type="button"
             onClick={() => setReleaseDialogOpen(true)}
@@ -319,10 +299,6 @@ export default function BorrowLogPage() {
         isOpen={releaseDialogOpen}
         onClose={() => setReleaseDialogOpen(false)}
         onConfirmRelease={handleConfirmRelease}
-        onTriggerScanQR={() => {
-          setReleaseDialogOpen(false);
-          setQrScanOpen(true);
-        }}
       />
 
       {/* ── Return Asset Dialog ──────────────────────────────────────── */}
@@ -331,15 +307,6 @@ export default function BorrowLogPage() {
         isOpen={Boolean(returnDialogRecord)}
         onClose={() => setReturnDialogRecord(null)}
         onConfirmReturn={handleConfirmReturn}
-      />
-
-      {/* ── Reused QR Scanner Dialog ────────────────────────────────── */}
-      <QRScanDialog
-        isOpen={qrScanOpen}
-        onClose={() => setQrScanOpen(false)}
-        onResolve={handleResolveQRScan}
-        title="Scan Asset Tag for Checkout Lookup"
-        subtitle="Point camera at physical tag or enter code to locate active checkout log"
       />
     </div>
   );

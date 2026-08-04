@@ -101,7 +101,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="h-full flex flex-col min-h-0 overflow-hidden bg-bg-subtle">
+    <div className="h-full flex flex-col min-h-0 overflow-hidden bg-bg-subtle rounded-md" data-theme="light">
       {/* ── Page Header Banner ─────────────────────────────────────────── */}
       <div className="px-4 md:px-6 pt-5 pb-3 bg-bg shrink-0 border-b border-border">
         <h1 className="text-xl font-bold tracking-tight text-text">Settings</h1>

@@ -117,7 +117,7 @@ export default function UsersPage() {
   };
 
   return (
-    <div className="h-full flex flex-col min-h-0 overflow-hidden bg-bg-subtle" data-theme="light">
+    <div className="h-full flex flex-col min-h-0 overflow-hidden bg-bg-subtle rounded-md" data-theme="light">
       {/* ── Top Header Banner ────────────────────────────────────────── */}
       <div className="px-4 md:px-6 pt-5 pb-3 bg-bg shrink-0 flex flex-wrap items-center justify-between gap-4 border-b border-border">
         <div>
@@ -130,7 +130,7 @@ export default function UsersPage() {
             </span>
           </div>
           <p className="text-xs text-text-secondary mt-0.5">
-            Manage staff accounts and predefined access boundaries (Admin, Staff, Viewer).
+            Manage staff accounts and predefined access boundaries (Admin, Staff, Borrower / Requester).
           </p>
         </div>
 

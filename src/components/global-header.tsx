@@ -50,7 +50,7 @@ const ROUTE_MAP: Record<string, RouteMeta> = {
     category: "Operations",
   },
   "/consumables": {
-    title: "Consumables Inventory",
+    title: "Inventory",
     subtitle: "Monitor stock quantities and minimum threshold alerts",
     category: "Operations",
   },
