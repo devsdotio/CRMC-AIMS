@@ -1,33 +1,29 @@
 /**
- * These arrays are the single source of truth for the asset enums on the
- * application side. They must stay in sync with the Postgres enums defined
- * in `src/server/db/schema/assets.ts`.
- *
- * Kept as readonly tuples so Zod and TypeScript can both narrow to the
- * exact literal union instead of `string`.
+ * Single source of truth for asset enums on the app side.
+ * Must match `src/server/db/schema/assets.ts` and
+ * `src/components/assets/types.ts`.
  */
 
-export const ASSET_TYPES = ["CONSUMABLE", "ASSIGNABLE", "BORROWABLE"] as const;
+export const ASSET_CATEGORIES = [
+  "transport",
+  "computing",
+  "av",
+  "furniture",
+] as const;
 
 export const ASSET_STATUSES = [
-  "AVAILABLE",
-  "ASSIGNED",
-  "BORROWED",
-  "ARCHIVED",
+  "active",
+  "needs_repair",
+  "out_of_service",
+  "retired",
 ] as const;
 
-export const ASSET_CONDITIONS = [
-  "NEW",
-  "GOOD",
-  "FAIR",
-  "DAMAGED",
-  "FOR_REPAIR",
-  "DISPOSED",
+export const MAINTENANCE_TYPES = [
+  "inspection",
+  "repair",
+  "maintenance",
+  "flagged",
 ] as const;
 
-/** Prefix used by the asset code generator (see asset.service.ts). */
-export const ASSET_CODE_PREFIX = "CRMC";
-
-/** Default page size used by `search()` when the caller doesn't specify one. */
-export const DEFAULT_PAGE_SIZE = 20;
-export const MAX_PAGE_SIZE = 100;
+/** Placeholder holder label used by release until borrower identity is wired. */
+export const CHECKED_OUT_PLACEHOLDER = "Checked Out";

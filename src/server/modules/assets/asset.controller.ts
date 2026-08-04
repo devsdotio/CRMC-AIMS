@@ -1,21 +1,38 @@
 import type { NextRequest } from "next/server";
-import { created, handleError, noContent, ok } from "@/server/shared/http";
+
+import {
+  created,
+  handleError,
+  noContent,
+  ok,
+} from "@/server/shared/http";
+
 import { AssetService } from "./asset.service";
 
 /**
- * Controller layer: parses the request, delegates to the service, and
- * shapes the HTTP response. No business rules live here — if you find
- * yourself writing an `if` that decides *what should happen*, it belongs
- * in `AssetService` instead.
+ * Thin HTTP adapter. Parses/request shape only — business rules live in
+ * AssetService. Response envelope matches `features/assets/client/assets-api.ts`
+ * so hooks integrate without client changes.
  */
 export class AssetController {
   constructor(private readonly assetService: AssetService = new AssetService()) {}
 
-  async createAsset(request: NextRequest) {
+  async listAssets(request: NextRequest | Request) {
+    try {
+      const url = new URL(request.url);
+      const status = url.searchParams.get("status") ?? undefined;
+      const data = await this.assetService.listAssets({ status });
+      return ok(data);
+    } catch (error) {
+      return handleError(error);
+    }
+  }
+
+  async createAsset(request: NextRequest | Request) {
     try {
       const body = await request.json();
-      const asset = await this.assetService.createAsset(body);
-      return created(asset);
+      const data = await this.assetService.createAsset(body);
+      return created(data);
     } catch (error) {
       return handleError(error);
     }
@@ -23,38 +40,18 @@ export class AssetController {
 
   async getAsset(id: string) {
     try {
-      const asset = await this.assetService.getAssetById(id);
-      return ok(asset);
+      const data = await this.assetService.getAssetById(id);
+      return ok(data);
     } catch (error) {
       return handleError(error);
     }
   }
 
-  async getAssets(request: NextRequest) {
-    try {
-      const includeArchived =
-        request.nextUrl.searchParams.get("includeArchived") === "true";
-      const assets = await this.assetService.getAssets(includeArchived);
-      return ok(assets);
-    } catch (error) {
-      return handleError(error);
-    }
-  }
-
-  async updateAsset(request: NextRequest, id: string) {
+  async updateAsset(request: NextRequest | Request, id: string) {
     try {
       const body = await request.json();
-      const asset = await this.assetService.updateAsset(id, body);
-      return ok(asset);
-    } catch (error) {
-      return handleError(error);
-    }
-  }
-
-  async archiveAsset(id: string) {
-    try {
-      const asset = await this.assetService.archiveAsset(id);
-      return ok(asset);
+      const data = await this.assetService.updateAsset(id, body);
+      return ok(data);
     } catch (error) {
       return handleError(error);
     }
@@ -69,13 +66,25 @@ export class AssetController {
     }
   }
 
-  async searchAssets(request: NextRequest) {
+  async releaseAsset(id: string) {
     try {
-      const params = Object.fromEntries(request.nextUrl.searchParams.entries());
-      const result = await this.assetService.searchAssets(params);
-      return ok(result);
+      const data = await this.assetService.releaseAsset(id);
+      return ok(data);
+    } catch (error) {
+      return handleError(error);
+    }
+  }
+
+  async returnAsset(request: NextRequest | Request, id: string) {
+    try {
+      const body = await request.json();
+      const data = await this.assetService.returnAsset(id, body);
+      return ok(data);
     } catch (error) {
       return handleError(error);
     }
   }
 }
+
+/** Shared singleton for route handlers. */
+export const assetController = new AssetController();

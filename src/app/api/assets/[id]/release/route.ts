@@ -1,7 +1,4 @@
-import {
-  assetController,
-  handleAssetControllerError,
-} from "@/features/assets/controller";
+import { assetController } from "@/server/modules/assets";
 
 /**
  * @swagger
@@ -28,10 +25,6 @@ export async function POST(
   _request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
-  try {
-    const { id } = await context.params;
-    return await assetController.releaseAsset(id);
-  } catch (error) {
-    return handleAssetControllerError(error);
-  }
+  const { id } = await context.params;
+  return assetController.releaseAsset(id);
 }
