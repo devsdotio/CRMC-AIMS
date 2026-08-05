@@ -36,7 +36,7 @@ export function useUsersQuery(): UseQueryResult<UserAccount[], Error> {
 }
 
 export function useCreateUserMutation(): UseMutationResult<
-  UserAccount & { inviteSent: boolean },
+  UserAccount,
   Error,
   CreateUserPayload
 > {
@@ -45,10 +45,7 @@ export function useCreateUserMutation(): UseMutationResult<
   return useMutation({
     mutationFn: async (payload) => {
       const created = await usersApi.createUser(payload);
-      return {
-        ...toUserAccount(created),
-        inviteSent: created.inviteSent,
-      };
+      return toUserAccount(created);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: userQueryKeys.all });

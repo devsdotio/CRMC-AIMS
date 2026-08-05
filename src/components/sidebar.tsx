@@ -52,8 +52,8 @@ export default function Sidebar({
   pendingCount = 0,
   lowStockCount = 0,
   overdueCount = 0,
-  userName = "Demo User",
-  userEmail = "user@aims",
+  userName = "Unknown user",
+  userEmail = "",
   onLogout,
 }: SidebarProps) {
   const pathname = usePathname();

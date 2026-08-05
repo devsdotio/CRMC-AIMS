@@ -17,7 +17,7 @@ export type CreateUserPayload = {
   email: string;
   role: Exclude<UserRole, "superadmin">;
   department?: string;
-  temporaryPassword?: string;
+  password: string;
 };
 
 export type UpdateUserPayload = {
@@ -100,12 +100,8 @@ export const usersApi = {
     return response.data;
   },
 
-  async createUser(
-    payload: CreateUserPayload
-  ): Promise<ProfileDTO & { inviteSent: boolean }> {
-    const response = await fetchJson<
-      ApiResponse<ProfileDTO & { inviteSent: boolean }>
-    >("/api/users", {
+  async createUser(payload: CreateUserPayload): Promise<ProfileDTO> {
+    const response = await fetchJson<ApiResponse<ProfileDTO>>("/api/users", {
       method: "POST",
       body: JSON.stringify(payload),
     });

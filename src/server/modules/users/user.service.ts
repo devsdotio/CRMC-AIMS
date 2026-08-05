@@ -106,7 +106,7 @@ export class UserService {
   async createUser(
     rawInput: unknown,
     actor: ActorContext
-  ): Promise<ProfileDTO & { inviteSent: boolean }> {
+  ): Promise<ProfileDTO> {
     const input: CreateUserInput = createUserSchema.parse(rawInput);
     assertCanAssignRole(actor, input.role);
 
@@ -117,63 +117,29 @@ export class UserService {
     }
 
     const admin = createAdminClient();
-    let authUserId: string;
-    let inviteSent = false;
 
-    if (input.temporaryPassword) {
-      const { data, error } = await admin.auth.admin.createUser({
-        email,
-        password: input.temporaryPassword,
-        email_confirm: true,
-        user_metadata: {
-          full_name: input.name.trim(),
-        },
-      });
+    const { data, error } = await admin.auth.admin.createUser({
+      email,
+      password: input.password,
+      email_confirm: true,
+      user_metadata: {
+        full_name: input.name.trim(),
+      },
+    });
 
-      if (error || !data.user) {
-        throw new BadRequestError(
-          error?.message ?? "Failed to create auth user."
+    if (error || !data.user) {
+      const message = error?.message ?? "Failed to create auth user.";
+      if (message.toLowerCase().includes("already")) {
+        throw new ConflictError(
+          "This email is already registered. Use a different email or edit the existing account."
         );
       }
-      authUserId = data.user.id;
-    } else {
-      const redirectTo =
-        process.env.NEXT_PUBLIC_SITE_URL != null
-          ? `${process.env.NEXT_PUBLIC_SITE_URL}/sign-in`
-          : undefined;
-
-      const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
-        data: { full_name: input.name.trim() },
-        redirectTo,
-      });
-
-      if (error || !data.user) {
-        // Fallback: user may already exist in auth without a profile
-        if (error?.message?.toLowerCase().includes("already")) {
-          const listed = await admin.auth.admin.listUsers({ perPage: 1000 });
-          const found = listed.data.users.find(
-            (u) => u.email?.toLowerCase() === email
-          );
-          if (!found) {
-            throw new ConflictError(
-              "This email is already registered in auth. Link a profile manually or use a different email."
-            );
-          }
-          authUserId = found.id;
-        } else {
-          throw new BadRequestError(
-            error?.message ?? "Failed to invite user."
-          );
-        }
-      } else {
-        authUserId = data.user.id;
-        inviteSent = true;
-      }
+      throw new BadRequestError(message);
     }
 
     try {
       const row = await this.profileRepository.create({
-        userId: authUserId,
+        userId: data.user.id,
         email,
         fullName: input.name.trim(),
         role: input.role,
@@ -182,8 +148,15 @@ export class UserService {
         createdByUserId: actor.userId,
       });
 
-      return { ...toProfileDTO(row), inviteSent };
+      return toProfileDTO(row);
     } catch (error) {
+      // Roll back auth user if profile insert fails so admins can retry cleanly
+      try {
+        await admin.auth.admin.deleteUser(data.user.id);
+      } catch {
+        // Best-effort cleanup
+      }
+
       if (
         typeof error === "object" &&
         error !== null &&

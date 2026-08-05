@@ -18,11 +18,8 @@ export interface CreateUserInput {
   email: string;
   role: AppRole;
   department?: string;
-  /**
-   * Optional temporary password. When omitted, user is invited by email
-   * (preferred for no open signup).
-   */
-  temporaryPassword?: string;
+  /** Required initial password set by the admin at provision time. */
+  password: string;
 }
 
 export interface UpdateUserInput {

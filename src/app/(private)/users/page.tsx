@@ -90,22 +90,24 @@ export default function UsersPage() {
     });
   };
 
-  const handleSendInvite = async (
-    name: string,
-    email: string,
-    role: UserRole,
-    department: string
-  ) => {
+  const handleCreateUser = async (input: {
+    name: string;
+    email: string;
+    role: UserRole;
+    department: string;
+    password: string;
+  }) => {
     setPageError(null);
-    if (role === "superadmin") {
+    if (input.role === "superadmin") {
       throw new Error("Superadmin accounts can only be created via seed script.");
     }
 
     await createUser.mutateAsync({
-      name,
-      email,
-      role,
-      department: department || undefined,
+      name: input.name,
+      email: input.email,
+      role: input.role,
+      department: input.department || undefined,
+      password: input.password,
     });
   };
 
@@ -160,8 +162,8 @@ export default function UsersPage() {
             </span>
           </div>
           <p className="text-xs text-text-secondary mt-0.5">
-            Provision accounts without self-signup. Admins invite staff and
-            borrowers; superadmins may also invite admins.
+            Provision accounts without self-signup. Admins set email and initial
+            password for staff and borrowers; superadmins may also create admins.
           </p>
         </div>
 
@@ -173,7 +175,7 @@ export default function UsersPage() {
             className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg bg-accent text-accent-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <UserPlus className="h-4 w-4" strokeWidth={2.5} />
-            Invite Staff Member
+            Create User
           </button>
         </div>
       </div>
@@ -221,7 +223,7 @@ export default function UsersPage() {
       <InviteUserDialog
         isOpen={inviteDialogOpen}
         onClose={() => setInviteDialogOpen(false)}
-        onSendInvite={handleSendInvite}
+        onCreateUser={handleCreateUser}
         canInviteAdmin={canInviteAdmin}
       />
 

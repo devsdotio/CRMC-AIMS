@@ -13,11 +13,11 @@ export const createUserSchema = z.object({
   email: z.string().trim().email("Valid email is required.").max(320),
   role: provisionableRoleSchema,
   department: z.string().trim().max(120).optional(),
-  temporaryPassword: z
+  /** Admin-set initial password. Required — no invite/email signup flow. */
+  password: z
     .string()
-    .min(8, "temporaryPassword must be at least 8 characters.")
-    .max(128)
-    .optional(),
+    .min(8, "password must be at least 8 characters.")
+    .max(128, "password is too long."),
 });
 
 export const updateUserSchema = z

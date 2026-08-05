@@ -1,39 +1,46 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, UserPlus, Send } from "lucide-react";
+import { X, UserPlus, Check, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { UserRole } from "./types";
 import { INVITABLE_ROLES, ROLE_DEFINITIONS } from "./types";
 
-export interface InviteUserDialogProps {
+export interface CreateUserDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onSendInvite: (
-    name: string,
-    email: string,
-    role: UserRole,
-    department: string
-  ) => void | Promise<void>;
+  onCreateUser: (input: {
+    name: string;
+    email: string;
+    role: UserRole;
+    department: string;
+    password: string;
+  }) => void | Promise<void>;
   /** When true, admin role is offered (superadmin only). */
   canInviteAdmin?: boolean;
 }
 
-interface InviteUserDialogFormProps {
+/** @deprecated Use CreateUserDialogProps */
+export type InviteUserDialogProps = CreateUserDialogProps;
+
+interface CreateUserDialogFormProps {
   onClose: () => void;
-  onSendInvite: InviteUserDialogProps["onSendInvite"];
+  onCreateUser: CreateUserDialogProps["onCreateUser"];
   canInviteAdmin: boolean;
 }
 
-function InviteUserDialogForm({
+function CreateUserDialogForm({
   onClose,
-  onSendInvite,
+  onCreateUser,
   canInviteAdmin,
-}: InviteUserDialogFormProps) {
+}: CreateUserDialogFormProps) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<UserRole>("staff");
   const [department, setDepartment] = useState("Property Custodian Office");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -58,29 +65,43 @@ function InviteUserDialogForm({
       setError("Please enter a valid institutional email address.");
       return;
     }
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
 
     setIsSubmitting(true);
     setError("");
     try {
-      await onSendInvite(name.trim(), email.trim(), role, department.trim());
-      setSuccessMessage(`Invitation sent to ${email.trim()}`);
+      await onCreateUser({
+        name: name.trim(),
+        email: email.trim(),
+        role,
+        department: department.trim(),
+        password,
+      });
+      setSuccessMessage(`Account created for ${email.trim()}`);
       setTimeout(() => {
         onClose();
-      }, 1000);
+      }, 900);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to send invitation.");
+      setError(err instanceof Error ? err.message : "Failed to create account.");
       setIsSubmitting(false);
     }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs transition-opacity overflow-y-auto">
-      <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
+      <div className="absolute inset-0" onClick={isSubmitting ? undefined : onClose} aria-hidden="true" />
 
       <div
         role="dialog"
         aria-modal="true"
-        aria-labelledby="invite-dialog-title"
+        aria-labelledby="create-user-dialog-title"
         className="relative w-full max-w-lg rounded-2xl border border-border bg-bg p-6 shadow-2xl z-10 animate-in fade-in zoom-in-95 duration-150 my-6 space-y-5"
       >
         <div className="flex items-start justify-between gap-3 border-b border-border pb-4">
@@ -89,11 +110,11 @@ function InviteUserDialogForm({
               <UserPlus className="h-5 w-5" />
             </div>
             <div>
-              <h3 id="invite-dialog-title" className="text-base font-bold text-text leading-tight">
-                Invite Staff Member
+              <h3 id="create-user-dialog-title" className="text-base font-bold text-text leading-tight">
+                Create User Account
               </h3>
               <p className="text-xs text-text-secondary mt-0.5">
-                Send an account activation invitation to staff email
+                Set email, role, and initial password — no self-signup / invite email
               </p>
             </div>
           </div>
@@ -101,8 +122,9 @@ function InviteUserDialogForm({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close invite dialog"
-            className="p-1 rounded-md text-text-secondary hover:text-text hover:bg-bg-subtle transition-colors cursor-pointer"
+            disabled={isSubmitting}
+            aria-label="Close create user dialog"
+            className="p-1 rounded-md text-text-secondary hover:text-text hover:bg-bg-subtle transition-colors cursor-pointer disabled:opacity-50"
           >
             <X className="h-5 w-5" />
           </button>
@@ -111,11 +133,11 @@ function InviteUserDialogForm({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label htmlFor="invite-name-input" className="block text-xs font-semibold text-text">
+              <label htmlFor="create-name-input" className="block text-xs font-semibold text-text">
                 Full Name <span className="text-accent">*</span>
               </label>
               <input
-                id="invite-name-input"
+                id="create-name-input"
                 type="text"
                 value={name}
                 onChange={(e) => {
@@ -128,29 +150,29 @@ function InviteUserDialogForm({
             </div>
 
             <div className="space-y-1">
-              <label htmlFor="invite-email-input" className="block text-xs font-semibold text-text">
-                Hospital Email <span className="text-accent">*</span>
+              <label htmlFor="create-email-input" className="block text-xs font-semibold text-text">
+                Institutional Email <span className="text-accent">*</span>
               </label>
               <input
-                id="invite-email-input"
+                id="create-email-input"
                 type="email"
                 value={email}
                 onChange={(e) => {
                   setEmail(e.target.value);
                   if (error) setError("");
                 }}
-                placeholder="e.g. m.santos@crmc.gov.ph"
+                placeholder="e.g. m.santos@crmc.edu.ph"
                 className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent font-mono"
               />
             </div>
           </div>
 
           <div className="space-y-1">
-            <label htmlFor="invite-dept-input" className="block text-xs font-semibold text-text">
+            <label htmlFor="create-dept-input" className="block text-xs font-semibold text-text">
               Department
             </label>
             <input
-              id="invite-dept-input"
+              id="create-dept-input"
               type="text"
               value={department}
               onChange={(e) => setDepartment(e.target.value)}
@@ -159,9 +181,57 @@ function InviteUserDialogForm({
             />
           </div>
 
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label htmlFor="create-password-input" className="block text-xs font-semibold text-text">
+                Initial Password <span className="text-accent">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  id="create-password-input"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (error) setError("");
+                  }}
+                  autoComplete="new-password"
+                  placeholder="Min. 8 characters"
+                  className="w-full h-9 px-3 pr-9 text-xs bg-bg border border-border rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-text-secondary hover:text-text p-0.5"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label htmlFor="create-confirm-password-input" className="block text-xs font-semibold text-text">
+                Confirm Password <span className="text-accent">*</span>
+              </label>
+              <input
+                id="create-confirm-password-input"
+                type={showPassword ? "text" : "password"}
+                value={confirmPassword}
+                onChange={(e) => {
+                  setConfirmPassword(e.target.value);
+                  if (error) setError("");
+                }}
+                autoComplete="new-password"
+                placeholder="Re-enter password"
+                className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent"
+              />
+            </div>
+          </div>
+
           <div className="space-y-2">
             <label className="block text-xs font-bold uppercase tracking-wider text-text-secondary">
-              Select Predefined System Role <span className="text-accent">*</span>
+              System Role <span className="text-accent">*</span>
             </label>
 
             <div className="space-y-2" role="radiogroup" aria-label="System role selection">
@@ -188,16 +258,18 @@ function InviteUserDialogForm({
                     <div
                       className={cn(
                         "mt-0.5 flex h-4 w-4 items-center justify-center rounded-full border shrink-0",
-                        isSelected ? "border-primary bg-primary text-primary-foreground" : "border-border"
+                        isSelected
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border"
                       )}
                     >
-                      {isSelected && <div className="h-1.5 w-1.5 rounded-full bg-primary-foreground" />}
+                      {isSelected && (
+                        <div className="h-1.5 w-1.5 rounded-full bg-primary-foreground" />
+                      )}
                     </div>
 
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-text">{rDef.title} Role</span>
-                      </div>
+                      <span className="text-xs font-bold text-text">{rDef.title} Role</span>
                       <p className="text-[11px] text-text-secondary mt-0.5 leading-snug">
                         {rDef.description}
                       </p>
@@ -211,7 +283,7 @@ function InviteUserDialogForm({
           {error && <p className="text-xs font-bold text-status-outofservice-text">{error}</p>}
           {successMessage && (
             <div className="p-2.5 rounded bg-status-active-bg/20 border border-status-active-bg/30 text-status-active-text font-bold text-xs flex items-center gap-1.5">
-              <Send className="h-4 w-4 shrink-0 animate-bounce" />
+              <Check className="h-4 w-4 shrink-0" />
               {successMessage}
             </div>
           )}
@@ -230,8 +302,8 @@ function InviteUserDialogForm({
               disabled={isSubmitting}
               className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-md bg-accent text-accent-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Send className="h-3.5 w-3.5" />
-              {isSubmitting ? "Sending…" : "Send Invitation"}
+              <UserPlus className="h-3.5 w-3.5" />
+              {isSubmitting ? "Creating…" : "Create Account"}
             </button>
           </div>
         </form>
@@ -240,20 +312,23 @@ function InviteUserDialogForm({
   );
 }
 
-export function InviteUserDialog({
+export function CreateUserDialog({
   isOpen,
   onClose,
-  onSendInvite,
+  onCreateUser,
   canInviteAdmin = false,
-}: InviteUserDialogProps) {
+}: CreateUserDialogProps) {
   if (!isOpen) return null;
 
   return (
-    <InviteUserDialogForm
-      key="invite"
+    <CreateUserDialogForm
+      key="create-user"
       onClose={onClose}
-      onSendInvite={onSendInvite}
+      onCreateUser={onCreateUser}
       canInviteAdmin={canInviteAdmin}
     />
   );
 }
+
+/** Back-compat alias while callers migrate names. */
+export const InviteUserDialog = CreateUserDialog;
