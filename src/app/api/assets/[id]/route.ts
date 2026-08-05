@@ -1,8 +1,7 @@
-import { NextResponse } from "next/server";
-
-import { deleteAsset, updateAsset } from "@/features/assets/actions";
-import { getAssetById } from "@/features/assets/queries";
-import type { UpdateAssetInput } from "@/features/assets/types";
+import {
+  assetController,
+  handleAssetControllerError,
+} from "@/features/assets/controller";
 
 /**
  * @swagger
@@ -29,16 +28,9 @@ export async function GET(
 ) {
   try {
     const { id } = await context.params;
-    const data = await getAssetById(id);
-
-    if (!data) {
-      return NextResponse.json({ error: "Asset not found." }, { status: 404 });
-    }
-
-    return NextResponse.json({ data });
+    return await assetController.getAssetById(id);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to get asset.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleAssetControllerError(error);
   }
 }
 
@@ -62,17 +54,32 @@ export async function GET(
  *           schema:
  *             type: object
  *             properties:
- *               code:
+ *               assetCode:
  *                 type: string
  *               name:
  *                 type: string
  *               category:
  *                 type: string
- *               condition:
+ *                 enum: [transport, computing, av, furniture]
+ *               location:
+ *                 type: string
+ *               serialNumber:
+ *                 type: string
+ *               currentHolder:
+ *                 type: string
+ *               department:
+ *                 type: string
+ *               purchaseDate:
+ *                 type: string
+ *               value:
+ *                 type: number
+ *               imageUrl:
+ *                 type: string
+ *               notes:
  *                 type: string
  *               status:
  *                 type: string
- *                 enum: [available, borrowed, under_repair]
+ *                 enum: [active, needs_repair, out_of_service, retired]
  *     responses:
  *       200:
  *         description: Asset updated successfully
@@ -89,33 +96,10 @@ export async function PATCH(
 ) {
   try {
     const { id } = await context.params;
-    const body = (await request.json()) as UpdateAssetInput;
-    const data = await updateAsset(id, body);
-
-    if (!data) {
-      return NextResponse.json({ error: "Asset not found." }, { status: 404 });
-    }
-
-    return NextResponse.json({ data });
+    const body = await request.json();
+    return await assetController.updateAsset(id, body);
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith("VALIDATION:")) {
-      return NextResponse.json(
-        { error: error.message.replace("VALIDATION:", "").trim() },
-        { status: 400 }
-      );
-    }
-
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      String((error as { code: unknown }).code) === "23505"
-    ) {
-      return NextResponse.json({ error: "Asset code already exists." }, { status: 409 });
-    }
-
-    const message = error instanceof Error ? error.message : "Failed to update asset.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleAssetControllerError(error);
   }
 }
 
@@ -144,22 +128,8 @@ export async function DELETE(
 ) {
   try {
     const { id } = await context.params;
-    const deleted = await deleteAsset(id);
-
-    if (!deleted) {
-      return NextResponse.json({ error: "Asset not found." }, { status: 404 });
-    }
-
-    return new NextResponse(null, { status: 204 });
+    return await assetController.deleteAsset(id);
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith("VALIDATION:")) {
-      return NextResponse.json(
-        { error: error.message.replace("VALIDATION:", "").trim() },
-        { status: 400 }
-      );
-    }
-
-    const message = error instanceof Error ? error.message : "Failed to delete asset.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleAssetControllerError(error);
   }
 }
