@@ -12,7 +12,8 @@
     "db:migrate:verbose": "tsx scripts/db-migrate.ts",
     "db:inspect": "tsx scripts/db-inspect.ts",
     "db:repair": "tsx scripts/db-repair-schema.ts",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "seed:superadmin": "tsx scripts/seed-superadmin.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

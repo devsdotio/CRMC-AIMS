@@ -4,18 +4,21 @@ import { useState, useEffect } from "react";
 import { X, UserPlus, Check, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { UserRole } from "./types";
-import { ROLE_DEFINITIONS } from "./types";
+import { INVITABLE_ROLES, ROLE_DEFINITIONS } from "./types";
 
 export interface InviteUserDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onSendInvite: (name: string, email: string, role: UserRole, department: string) => void;
+  /** When true, admin role is offered (superadmin only). */
+  canInviteAdmin?: boolean;
 }
 
 export function InviteUserDialog({
   isOpen,
   onClose,
   onSendInvite,
+  canInviteAdmin = false,
 }: InviteUserDialogProps) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -164,7 +167,9 @@ export function InviteUserDialog({
             </label>
 
             <div className="space-y-2" role="radiogroup" aria-label="System role selection">
-              {(Object.keys(ROLE_DEFINITIONS) as UserRole[]).map((rKey) => {
+              {(INVITABLE_ROLES.filter(
+                (rKey) => rKey !== "admin" || canInviteAdmin
+              ) as UserRole[]).map((rKey) => {
                 const rDef = ROLE_DEFINITIONS[rKey];
                 const isSelected = role === rKey;
                 return (

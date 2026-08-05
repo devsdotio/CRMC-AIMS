@@ -37,6 +37,25 @@ export function SignInForm() {
     successMessage: null,
   });
 
+  // Show auth errors passed from the private layout redirect
+  useEffect(() => {
+    const err = searchParams.get('error');
+    if (!err) return;
+
+    const messages: Record<string, string> = {
+      no_profile:
+        'This account has no application profile. Contact a system administrator.',
+      deactivated: 'This account has been deactivated.',
+      borrower_portal:
+        'Borrower accounts cannot access the staff workspace yet. Contact Property Custodian for updates.',
+    };
+
+    setFormState((prev) => ({
+      ...prev,
+      errorMessage: messages[err] ?? 'Unable to access the application.',
+    }));
+  }, [searchParams]);
+
   // Autofocus email field on mount
   useEffect(() => {
     emailInputRef.current?.focus();

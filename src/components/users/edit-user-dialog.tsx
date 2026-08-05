@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { X, Edit, AlertTriangle, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { UserAccount, UserRole } from "./types";
-import { ROLE_DEFINITIONS } from "./types";
+import { INVITABLE_ROLES, ROLE_DEFINITIONS } from "./types";
 
 export interface EditUserDialogProps {
   user: UserAccount | null;
@@ -169,7 +169,7 @@ export function EditUserDialog({
             </label>
 
             <div className="space-y-2" role="radiogroup" aria-label="System role selection">
-              {(Object.keys(ROLE_DEFINITIONS) as UserRole[]).map((rKey) => {
+              {(INVITABLE_ROLES as UserRole[]).map((rKey) => {
                 const rDef = ROLE_DEFINITIONS[rKey];
                 const isSelected = role === rKey;
                 return (

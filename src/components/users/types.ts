@@ -2,7 +2,7 @@
  * Shared TypeScript interfaces and predefined role definitions for Users & Roles feature.
  */
 
-export type UserRole = "admin" | "staff" | "borrower";
+export type UserRole = "superadmin" | "admin" | "staff" | "borrower";
 
 export type UserStatus = "active" | "deactivated";
 
@@ -13,22 +13,34 @@ export interface RoleDefinition {
 }
 
 export const ROLE_DEFINITIONS: Record<UserRole, RoleDefinition> = {
+  superadmin: {
+    title: "Superadmin",
+    description:
+      "Developer access — full system control and admin provisioning. Not for day-to-day campus ops.",
+    badgeStyle: "filled",
+  },
   admin: {
     title: "Admin",
-    description: "Full access — manage users/roles, all approve/reject actions, all data entry, system settings.",
+    description:
+      "Full operational control — manage staff and borrower accounts, all approve/reject actions, registry, settings.",
     badgeStyle: "filled",
   },
   staff: {
     title: "Staff",
-    description: "Day-to-day operations — approve/reject borrow requests, release/return assets, manage consumables, flag/resolve maintenance.",
+    description:
+      "Day-to-day operations — approve/reject borrow requests, release/return assets, manage consumables, flag/resolve maintenance.",
     badgeStyle: "outlined",
   },
   borrower: {
     title: "Borrower / Requester",
-    description: "Request access — submit borrow requests for equipment, request consumable stock, and track personal request status.",
+    description:
+      "Request access — submit borrow requests for equipment, request consumable stock, and track personal request status.",
     badgeStyle: "muted",
   },
 };
+
+/** Roles that can be assigned when inviting users (superadmin is seed-only). */
+export const INVITABLE_ROLES: UserRole[] = ["admin", "staff", "borrower"];
 
 export interface UserAccount {
   id: string;

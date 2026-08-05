@@ -15,6 +15,13 @@
       "when": 1785949353885,
       "tag": "0001_lively_night_thrasher",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785950035925,
+      "tag": "0002_glamorous_madame_hydra",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 
-import { requireActor, requireUser } from "@/server/shared/auth";
+import { requireAssetOperator, requireUser } from "@/server/shared/auth";
 import {
   created,
   handleError,
@@ -11,15 +11,15 @@ import {
 import { AssetService } from "./asset.service";
 
 /**
- * Thin HTTP adapter. Parses/request shape only — business rules live in
- * AssetService. Actor is always taken from the verified session for mutations.
+ * Thin HTTP adapter. Asset operators = superadmin | admin | staff.
+ * Actor/role always taken from verified session + profiles row.
  */
 export class AssetController {
   constructor(private readonly assetService: AssetService = new AssetService()) {}
 
   async listAssets(request: NextRequest | Request) {
     try {
-      await requireUser();
+      await requireAssetOperator();
       const url = new URL(request.url);
       const status = url.searchParams.get("status") ?? undefined;
       const data = await this.assetService.listAssets({ status });
@@ -31,9 +31,9 @@ export class AssetController {
 
   async createAsset(request: NextRequest | Request) {
     try {
-      const actor = await requireActor();
+      const session = await requireAssetOperator();
       const body = await request.json();
-      const data = await this.assetService.createAsset(body, actor);
+      const data = await this.assetService.createAsset(body, session.actor);
       return created(data);
     } catch (error) {
       return handleError(error);
@@ -42,7 +42,7 @@ export class AssetController {
 
   async getAsset(id: string) {
     try {
-      await requireUser();
+      await requireAssetOperator();
       const data = await this.assetService.getAssetById(id);
       return ok(data);
     } catch (error) {
@@ -52,9 +52,9 @@ export class AssetController {
 
   async updateAsset(request: NextRequest | Request, id: string) {
     try {
-      const actor = await requireActor();
+      const session = await requireAssetOperator();
       const body = await request.json();
-      const data = await this.assetService.updateAsset(id, body, actor);
+      const data = await this.assetService.updateAsset(id, body, session.actor);
       return ok(data);
     } catch (error) {
       return handleError(error);
@@ -63,8 +63,8 @@ export class AssetController {
 
   async deleteAsset(id: string) {
     try {
-      const actor = await requireActor();
-      await this.assetService.deleteAsset(id, actor);
+      const session = await requireAssetOperator();
+      await this.assetService.deleteAsset(id, session.actor);
       return noContent();
     } catch (error) {
       return handleError(error);
@@ -73,14 +73,14 @@ export class AssetController {
 
   async releaseAsset(request: NextRequest | Request, id: string) {
     try {
-      const actor = await requireActor();
+      const session = await requireAssetOperator();
       let body: unknown = {};
       try {
         body = await request.json();
       } catch {
         body = {};
       }
-      const data = await this.assetService.releaseAsset(id, body, actor);
+      const data = await this.assetService.releaseAsset(id, body, session.actor);
       return ok(data);
     } catch (error) {
       return handleError(error);
@@ -89,9 +89,9 @@ export class AssetController {
 
   async returnAsset(request: NextRequest | Request, id: string) {
     try {
-      const actor = await requireActor();
+      const session = await requireAssetOperator();
       const body = await request.json();
-      const data = await this.assetService.returnAsset(id, body, actor);
+      const data = await this.assetService.returnAsset(id, body, session.actor);
       return ok(data);
     } catch (error) {
       return handleError(error);
@@ -100,14 +100,18 @@ export class AssetController {
 
   async flagForMaintenance(request: NextRequest | Request, id: string) {
     try {
-      const actor = await requireActor();
+      const session = await requireAssetOperator();
       let body: unknown = {};
       try {
         body = await request.json();
       } catch {
         body = {};
       }
-      const data = await this.assetService.flagForMaintenance(id, body, actor);
+      const data = await this.assetService.flagForMaintenance(
+        id,
+        body,
+        session.actor
+      );
       return ok(data);
     } catch (error) {
       return handleError(error);
@@ -116,7 +120,7 @@ export class AssetController {
 
   async listLifecycle(request: NextRequest | Request, id: string) {
     try {
-      await requireUser();
+      await requireAssetOperator();
       const url = new URL(request.url);
       const limitRaw = url.searchParams.get("limit");
       const limit = limitRaw ? Number(limitRaw) : undefined;

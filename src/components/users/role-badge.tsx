@@ -1,6 +1,6 @@
 "use client";
 
-import { ShieldCheck, UserCheck, Hand } from "lucide-react";
+import { Shield, ShieldCheck, UserCheck, Hand } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { UserRole } from "./types";
 import { ROLE_DEFINITIONS } from "./types";
@@ -12,6 +12,7 @@ export interface RoleBadgeProps {
 }
 
 const ROLE_ICONS: Record<UserRole, typeof ShieldCheck> = {
+  superadmin: Shield,
   admin: ShieldCheck,
   staff: UserCheck,
   borrower: Hand,
