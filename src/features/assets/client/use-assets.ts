@@ -16,7 +16,7 @@ import type {
   CreateAssetInput,
   ReturnAssetInput,
   UpdateAssetInput,
-} from "@/features/assets/types";
+} from "@/types/assets";
 
 export function useAssetsQuery(status?: AssetStatus): UseQueryResult<Asset[], Error> {
   return useQuery({

@@ -1,6 +1,9 @@
-/**
- * Simplified TypeScript Interfaces for Asset & Inventory Analytics System.
- */
+import type { AssetCategory } from './shared';
+
+
+export type { AssetCategory };
+import type  from "./assets";
+import type { BaseFilterState } from "./filters";
 
 export type SimpleReportCategory =
   | "overview"
@@ -12,32 +15,27 @@ export type SimpleReportCategory =
 
 export type SimpleUserRole = "staff" | "dept_head" | "admin";
 
-export interface SimpleReportFilterState {
+export interface SimpleReportFilterState extends BaseFilterState {
   dateRange: string;
   department: string;
   category: string;
   status: string;
-  searchQuery: string;
   roleView: SimpleUserRole;
 }
-
-// ─── 1. Asset Inventory Summary ──────────────────────────────────────────────
 
 export interface SimpleAssetItem {
   id: string;
   tagNumber: string;
   serialNumber: string;
   name: string;
-  category: string;
+  category: AssetCategory;
   department: string;
   location: string;
   acquisitionDate: string;
   cost: number;
-  condition: "Good" | "Fair" | "Poor" | "Damaged";
-  status: "In Use" | "In Storage" | "Under Repair" | "Disposed";
+  condition: "Good" | "Fair" | "Poor" | "Damaged"; // Display-specific condition
+  status: "In Use" | "In Storage" | "Under Repair" | "Disposed"; // Display-specific status
 }
-
-// ─── 2. Borrowing & Lending ──────────────────────────────────────────────────
 
 export interface SimpleBorrowingEntry {
   id: string;
@@ -55,12 +53,10 @@ export interface SimpleBorrowingEntry {
 
 export interface SimpleFrequentBorrowed {
   assetName: string;
-  category: string;
+  category: AssetCategory;
   borrowCount: number;
   primaryDepartment: string;
 }
-
-// ─── 3. Maintenance & Condition ─────────────────────────────────────────────
 
 export interface SimpleMaintenanceLog {
   id: string;
@@ -86,12 +82,10 @@ export interface SimpleDamagedLostItem {
   reason: string;
 }
 
-// ─── 4. Procurement / Acquisition ───────────────────────────────────────────
-
 export interface SimpleAcquisitionItem {
   id: string;
   assetName: string;
-  category: string;
+  category: AssetCategory;
   department: string;
   quantity: number;
   totalCost: number;
@@ -99,13 +93,11 @@ export interface SimpleAcquisitionItem {
   supplier: string;
 }
 
-// ─── 5. Disposal & Write-off ────────────────────────────────────────────────
-
 export interface SimpleDisposalItem {
   id: string;
   assetTag: string;
   assetName: string;
-  category: string;
+  category: AssetCategory;
   department: string;
   disposalDate: string;
   disposalReason: "Beyond Economic Repair" | "Obsolescence" | "Lost/Stolen" | "Damaged";

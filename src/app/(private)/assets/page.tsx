@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { Plus } from "lucide-react";
-import type { Asset, ViewMode, AssetFilterState } from "@/components/assets/types";
+import type { Asset, ViewMode, AssetFilterState } from "@/types/assets";
 import { INITIAL_MOCK_ASSETS } from "@/components/assets/mock-data";
 import { AssetFilters } from "@/components/assets/asset-filters";
 import { AssetViewToggle } from "@/components/assets/asset-view-toggle";
@@ -40,7 +40,7 @@ export default function AssetsPage() {
 
   // Filter & Sort Assets
   const filteredAssets = useMemo(() => {
-    let result = assets.filter((asset) => {
+    const result = assets.filter((asset) => {
       // 1. Search Query
       if (filters.searchQuery.trim()) {
         const query = filters.searchQuery.toLowerCase();

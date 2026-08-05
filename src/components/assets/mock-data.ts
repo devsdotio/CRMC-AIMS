@@ -1,4 +1,4 @@
-import type { Asset } from "./types";
+import type { Asset } from "@/types/assets";
 
 export const INITIAL_MOCK_ASSETS: Asset[] = [
   {

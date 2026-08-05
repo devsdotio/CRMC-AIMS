@@ -8,7 +8,7 @@ import type {
   CreateAssetInput,
   ReturnAssetInput,
   UpdateAssetInput,
-} from "@/features/assets/types";
+} from "@/types/assets";
 import {
   parseAssetMetadata,
   serializeAssetMetadata,
@@ -106,7 +106,7 @@ function buildMetadataFromCreateInput(input: CreateAssetInput) {
 }
 
 function buildMetadataUpdate(input: UpdateAssetInput) {
-  const metadataUpdate: Partial<CreateAssetInput> = {};
+  const metadataUpdate: UpdateAssetInput = {};
 
   if (input.serialNumber !== undefined) {
     metadataUpdate.serialNumber = input.serialNumber;

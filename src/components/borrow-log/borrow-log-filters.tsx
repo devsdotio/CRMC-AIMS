@@ -2,7 +2,7 @@
 
 import { Search, FilterX, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { BorrowLogFilterState } from "./types";
+import type { BorrowLogFilterState } from "@/types/borrow-log";
 import { MOCK_DEPARTMENTS } from "./mock-data";
 
 export interface BorrowLogFiltersProps {

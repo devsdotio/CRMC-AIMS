@@ -1,7 +1,7 @@
 "use client";
 
-import { Wrench, AlertOctagon } from "lucide-react";
-import type { SimpleMaintenanceLog, SimpleDamagedLostItem } from "../types";
+import {  AlertOctagon } from "lucide-react";
+import type { SimpleMaintenanceLog, SimpleDamagedLostItem } from "@/types/reports";
 
 interface MaintenanceReportViewProps {
   maintenanceLogs: SimpleMaintenanceLog[];

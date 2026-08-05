@@ -1,9 +1,10 @@
 "use client";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { Search, FilterX, Calendar, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { MaintenanceLogFilterState, ConditionState } from "./types";
-import type { AssetCategory } from "@/components/assets/types";
+import type { MaintenanceLogFilterState, ConditionState } from "@/types/maintenance-logs";
+import type { AssetCategory } from "@/types/shared";
 
 export interface MaintenanceLogFiltersProps {
   filters: MaintenanceLogFilterState;

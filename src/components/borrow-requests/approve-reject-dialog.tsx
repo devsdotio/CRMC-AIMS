@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { X, AlertCircle, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { BorrowRequest } from "./types";
+import type { BorrowRequest } from "@/types/borrow-requests";
 
 export interface ApproveRejectDialogProps {
   request: BorrowRequest | null;

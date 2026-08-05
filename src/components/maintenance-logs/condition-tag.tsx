@@ -2,7 +2,7 @@
 
 import { CheckCircle2, Wrench, AlertOctagon, CheckCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { ConditionState } from "./types";
+import type { ConditionState } from "@/types/maintenance-logs";
 
 export interface ConditionTagProps {
   condition: ConditionState;

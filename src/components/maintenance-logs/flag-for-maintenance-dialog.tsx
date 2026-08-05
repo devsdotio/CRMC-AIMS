@@ -1,10 +1,11 @@
 "use client";
+/* eslint-disable react/no-unescaped-entities */
 
 import { useState, useEffect } from "react";
 import { X, Wrench, AlertTriangle, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { ConditionState } from "./types";
-import type { AssetCategory } from "@/components/assets/types";
+import type { ConditionState } from "@/types/maintenance-logs";
+import type { AssetCategory } from "@/types/shared";
 
 export interface FlagForMaintenanceDialogProps {
   isOpen: boolean;

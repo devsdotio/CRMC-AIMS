@@ -1,4 +1,4 @@
-import type { AssetStatus } from "@/features/assets/types";
+import type { AssetStatus } from "@/types/assets";
 
 export const assetQueryKeys = {
   all: ["assets"] as const,

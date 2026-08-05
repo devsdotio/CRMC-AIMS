@@ -1,9 +1,10 @@
 "use client";
+/* eslint-disable react/no-unescaped-entities */
 
 import { useState, useEffect } from "react";
 import { X, CheckCircle2, AlertTriangle, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { MaintenanceLogRecord } from "./types";
+import type { MaintenanceLogRecord } from "@/types/maintenance-logs";
 
 export interface ResolveMaintenanceDialogProps {
   record: MaintenanceLogRecord | null;

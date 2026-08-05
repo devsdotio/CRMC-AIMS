@@ -2,7 +2,7 @@
 
 import { Edit3, UserX, ShieldAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { UserAccount } from "./types";
+import type { UserAccount } from "@/types/users";
 import { RoleBadge } from "./role-badge";
 
 export interface UserTableRowProps {

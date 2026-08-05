@@ -18,7 +18,7 @@ import {
   RotateCcw,
   Boxes,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+
 
 // ─── Route Metadata Map ──────────────────────────────────────────────────────
 
@@ -199,8 +199,8 @@ export default function GlobalHeader({ onMobileMenuOpen }: GlobalHeaderProps) {
           )}
         </div>
 
-        {/* Notifications Popover */}
-        <div className="relative" ref={notifRef}>
+
+        {/* <div className="relative" ref={notifRef}>
           <button
             onClick={() => setIsNotifOpen((prev) => !prev)}
             className="relative p-2 text-[#5A5F73] hover:text-[#1B2140] hover:bg-[#F2F3F7] rounded-lg transition-colors cursor-pointer"
@@ -215,7 +215,7 @@ export default function GlobalHeader({ onMobileMenuOpen }: GlobalHeaderProps) {
             )}
           </button>
 
-          {/* Notifications Dropdown Panel */}
+          
           {isNotifOpen && (
             <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white border border-[#E3E5EC] rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
               <div className="flex items-center justify-between px-4 py-3 border-b border-[#E3E5EC] bg-[#F2F3F7]/50">
@@ -282,7 +282,7 @@ export default function GlobalHeader({ onMobileMenuOpen }: GlobalHeaderProps) {
               </div>
             </div>
           )}
-        </div>
+        </div> */}
 
         {/* Quick Action Dropdown */}
         <div className="relative" ref={quickActionRef}>

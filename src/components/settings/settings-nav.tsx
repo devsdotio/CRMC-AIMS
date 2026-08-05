@@ -2,8 +2,8 @@
 
 import { User, Tags, Server } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { SettingsSection } from "./types";
-import type { UserRole } from "@/components/users/types";
+import type { SettingsSection } from "@/types/settings";
+import type { UserRole } from "@/types/users";
 
 export interface SettingsNavProps {
   activeSection: SettingsSection;

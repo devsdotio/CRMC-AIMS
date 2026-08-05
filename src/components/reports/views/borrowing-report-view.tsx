@@ -1,7 +1,7 @@
 "use client";
 
-import { Repeat, TrendingUp } from "lucide-react";
-import type { SimpleBorrowingEntry, SimpleFrequentBorrowed } from "../types";
+import {  TrendingUp } from "lucide-react";
+import type { SimpleBorrowingEntry, SimpleFrequentBorrowed } from "@/types/reports";
 
 interface BorrowingReportViewProps {
   logs: SimpleBorrowingEntry[];

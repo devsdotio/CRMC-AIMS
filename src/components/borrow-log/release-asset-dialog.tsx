@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, ArrowUpFromLine, User, Package, Calendar, Check } from "lucide-react";
-import { cn } from "@/lib/utils";
-import type { BorrowLogRecord } from "./types";
+import { X, ArrowUpFromLine,    Check } from "lucide-react";
+
+import type  from "@/types/borrow-log";
 
 export interface ReleaseAssetDialogProps {
   isOpen: boolean;

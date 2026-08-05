@@ -3,7 +3,7 @@ import type { InferInsertModel, InferSelectModel } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { assets } from "@/features/assets/schema";
-import type { CreateAssetInput } from "@/features/assets/types";
+import type { CreateAssetInput } from "@/types/assets";
 
 export type AssetRecord = InferSelectModel<typeof assets>;
 type NewAssetRecord = InferInsertModel<typeof assets>;

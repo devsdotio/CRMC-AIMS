@@ -3,8 +3,8 @@
 import { useState, useEffect } from "react";
 import { X, Edit, AlertTriangle, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { UserAccount, UserRole } from "./types";
-import { ROLE_DEFINITIONS } from "./types";
+import type { UserAccount, UserRole } from "@/types/users";
+import { ROLE_DEFINITIONS } from "@/constants/roles";
 
 export interface EditUserDialogProps {
   user: UserAccount | null;

@@ -1,8 +1,9 @@
 "use client";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { Search, FilterX, ArrowUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { ConsumableFilterState } from "./types";
+import type { ConsumableFilterState } from "@/types/inventory";
 import { CONSUMABLE_CATEGORIES } from "./mock-data";
 
 export interface ConsumableFiltersProps {

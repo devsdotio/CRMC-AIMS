@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, PackagePlus, Edit, QrCode } from "lucide-react";
-import { cn } from "@/lib/utils";
-import type { Asset, AssetCategory, AssetStatus } from "./types";
+import { X, PackagePlus, Edit } from "lucide-react";
+
+import type { Asset, AssetCategory, AssetStatus } from "@/types/assets";
 import { QRCodeDisplay } from "./qr-code-display";
 
 export interface AddEditAssetDialogProps {

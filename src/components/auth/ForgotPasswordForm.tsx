@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Loader2, ArrowLeft, MailCheck, RefreshCw } from 'lucide-react';
 import { AuthCard } from './AuthCard';
 import { FormAlert } from './FormAlert';
-import { ForgotPasswordStep, AuthFormState } from './types';
+import { ForgotPasswordStep, AuthFormState } from "@/types/auth";
 
 export function ForgotPasswordForm() {
   const [step, setStep] = useState<ForgotPasswordStep>('request');

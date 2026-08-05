@@ -1,6 +1,4 @@
-/**
- * Shared TypeScript interfaces and severity calculations for Consumables feature.
- */
+import type { BaseFilterState } from "./filters";
 
 export type StockSeverity = "healthy" | "low" | "critical";
 
@@ -17,7 +15,7 @@ export interface StockHistoryEntry {
   id: string;
   date: string;
   type: StockActionType;
-  quantityChange: number; // e.g. +50 for restock, -5 for adjustment/usage
+  quantityChange: number;
   actor: string;
   reason?: string;
   notes?: string;
@@ -25,10 +23,10 @@ export interface StockHistoryEntry {
 
 export interface ConsumableItem {
   id: string;
-  itemCode: string; // e.g. CON-0102
+  itemCode: string;
   name: string;
   category: ConsumableCategory;
-  unit: string; // e.g. "reams", "cartridges", "bottles", "boxes"
+  unit: string;
   currentQty: number;
   minThreshold: number;
   location: string;
@@ -38,25 +36,8 @@ export interface ConsumableItem {
   history: StockHistoryEntry[];
 }
 
-export interface ConsumableFilterState {
-  searchQuery: string;
+export interface ConsumableFilterState extends BaseFilterState {
   category: string;
   stockLevel: "all" | "healthy" | "low" | "critical";
   sortBy: "critical" | "name" | "qty" | "updated";
-}
-
-/**
- * Named helper utility calculating stock severity.
- * - Critical: currentQty <= minThreshold
- * - Low: minThreshold < currentQty <= minThreshold * 1.2
- * - Healthy: currentQty > minThreshold * 1.2
- */
-export function getStockSeverity(currentQty: number, minThreshold: number): StockSeverity {
-  if (currentQty <= minThreshold) {
-    return "critical";
-  }
-  if (currentQty <= minThreshold * 1.2) {
-    return "low";
-  }
-  return "healthy";
 }

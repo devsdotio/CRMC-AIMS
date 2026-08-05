@@ -2,7 +2,7 @@
 
 import { PlusCircle, SlidersHorizontal, Tag } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { ConsumableItem } from "./types";
+import type { ConsumableItem } from "@/types/inventory";
 import { StockLevelBar } from "./stock-level-bar";
 
 export interface ConsumableCardProps {

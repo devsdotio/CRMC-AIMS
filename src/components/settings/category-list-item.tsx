@@ -2,7 +2,7 @@
 
 import { Edit3, Trash2, Tag } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { CategoryItem } from "./types";
+import type { CategoryItem } from "@/types/settings";
 
 export interface CategoryListItemProps {
   category: CategoryItem;

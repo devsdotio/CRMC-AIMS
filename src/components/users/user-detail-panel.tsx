@@ -3,8 +3,8 @@
 import { useEffect, useRef } from "react";
 import { X, Edit3, UserX, Mail, Building2, Calendar, ShieldCheck, Activity } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { UserAccount } from "./types";
-import { ROLE_DEFINITIONS } from "./types";
+import type { UserAccount } from "@/types/users";
+import { ROLE_DEFINITIONS } from "@/constants/roles";
 import { RoleBadge } from "./role-badge";
 
 export interface UserDetailPanelProps {

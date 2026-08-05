@@ -2,8 +2,8 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { Plus, PlusCircle } from "lucide-react";
-import type { ConsumableItem, ConsumableFilterState } from "@/components/consumables/types";
-import { getStockSeverity } from "@/components/consumables/types";
+import type { ConsumableItem, ConsumableFilterState } from "@/types/inventory";
+import { getStockSeverity } from "@/components/consumables/utils";
 import { INITIAL_MOCK_CONSUMABLES } from "@/components/consumables/mock-data";
 import { ConsumableFilters } from "@/components/consumables/consumable-filters";
 import { AssetViewToggle } from "@/components/assets/asset-view-toggle"; // Reused view mode toggle
@@ -50,7 +50,7 @@ export default function ConsumablesPage() {
 
   // Filter & Sort Items
   const filteredItems = useMemo(() => {
-    let result = items.filter((item) => {
+    const result = items.filter((item) => {
       // 1. Search Query
       if (filters.searchQuery.trim()) {
         const query = filters.searchQuery.toLowerCase();

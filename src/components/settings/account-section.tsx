@@ -1,6 +1,6 @@
 "use client";
 
-import type { UserProfile } from "./types";
+import type { UserProfile } from "@/types/settings";
 import { ProfileForm } from "./profile-form";
 import { ChangePasswordForm } from "./change-password-form";
 

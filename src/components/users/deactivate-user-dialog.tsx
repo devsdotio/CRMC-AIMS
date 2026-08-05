@@ -1,8 +1,9 @@
 "use client";
+/* eslint-disable react/no-unescaped-entities */
 
 import { useEffect } from "react";
-import { X, UserX, AlertOctagon } from "lucide-react";
-import type { UserAccount } from "./types";
+import { X, UserX } from "lucide-react";
+import type { UserAccount } from "@/types/users";
 
 export interface DeactivateUserDialogProps {
   user: UserAccount | null;

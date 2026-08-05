@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { X, Tag, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { CategoryItem, CategoryType } from "./types";
+import type { CategoryItem, CategoryType } from "@/types/settings";
 
 export interface AddEditCategoryDialogProps {
   isOpen: boolean;

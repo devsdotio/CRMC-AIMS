@@ -1,4 +1,4 @@
-import type { BorrowLogRecord } from "./types";
+import type { BorrowLogRecord } from "@/types/borrow-log";
 
 export const MOCK_DEPARTMENTS = [
   "All Departments",

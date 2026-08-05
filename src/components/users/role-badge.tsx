@@ -2,8 +2,8 @@
 
 import { ShieldCheck, UserCheck, Hand } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { UserRole } from "./types";
-import { ROLE_DEFINITIONS } from "./types";
+import type { UserRole } from "@/types/users";
+import { ROLE_DEFINITIONS } from "@/constants/roles";
 
 export interface RoleBadgeProps {
   role: UserRole;

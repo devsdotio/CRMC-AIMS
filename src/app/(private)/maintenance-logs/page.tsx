@@ -2,8 +2,8 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { Wrench } from "lucide-react";
-import type { MaintenanceLogRecord, MaintenanceLogFilterState, ConditionState } from "@/components/maintenance-logs/types";
-import type { AssetCategory } from "@/components/assets/types";
+import type { MaintenanceLogRecord, MaintenanceLogFilterState, ConditionState } from "@/types/maintenance-logs";
+import type { AssetCategory } from "@/types/shared";
 import { INITIAL_MOCK_MAINTENANCE_LOGS } from "@/components/maintenance-logs/mock-data";
 import { MaintenanceLogFilters } from "@/components/maintenance-logs/maintenance-log-filters";
 import { MaintenanceLogList } from "@/components/maintenance-logs/maintenance-log-list";
@@ -45,7 +45,7 @@ export default function MaintenanceLogsPage() {
 
   // Filter & Sort Log Entries
   const filteredRecords = useMemo(() => {
-    let result = records.filter((rec) => {
+    const result = records.filter((rec) => {
       // 1. Search Query (Asset Name, Asset Code, Log Code)
       if (filters.searchQuery.trim()) {
         const query = filters.searchQuery.toLowerCase();

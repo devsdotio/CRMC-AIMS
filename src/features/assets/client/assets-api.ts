@@ -4,7 +4,7 @@ import type {
   CreateAssetInput,
   ReturnAssetInput,
   UpdateAssetInput,
-} from "@/features/assets/types";
+} from "@/types/assets";
 
 type ApiResponse<T> = { data: T };
 type ApiErrorResponse = { error?: string };

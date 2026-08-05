@@ -2,7 +2,7 @@
 
 import { useRef, KeyboardEvent } from "react";
 import { cn } from "@/lib/utils";
-import type { LogTabFilter } from "./types";
+import type { LogTabFilter } from "@/types/borrow-log";
 
 export interface BorrowLogTabsProps {
   activeTab: LogTabFilter;

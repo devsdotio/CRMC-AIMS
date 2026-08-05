@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { ArrowUpFromLine } from "lucide-react";
-import type { BorrowLogRecord, LogTabFilter, BorrowLogFilterState, ReturnCondition } from "@/components/borrow-log/types";
+import type { BorrowLogRecord, LogTabFilter, BorrowLogFilterState, ReturnCondition } from "@/types/borrow-log";
 import { INITIAL_MOCK_LOGS } from "@/components/borrow-log/mock-data";
 import { BorrowLogTabs } from "@/components/borrow-log/borrow-log-tabs";
 import { BorrowLogFilters } from "@/components/borrow-log/borrow-log-filters";

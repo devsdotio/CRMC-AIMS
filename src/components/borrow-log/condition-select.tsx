@@ -2,7 +2,7 @@
 
 import { CheckCircle2, Wrench, AlertOctagon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { ReturnCondition } from "./types";
+import type { ReturnCondition } from "@/types/borrow-log";
 
 export interface ConditionSelectProps {
   value: ReturnCondition;

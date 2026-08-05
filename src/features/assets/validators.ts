@@ -3,7 +3,7 @@ import type {
   CreateAssetInput,
   ReturnAssetInput,
   UpdateAssetInput,
-} from "@/features/assets/types";
+} from "@/types/assets";
 import { ValidationError } from "@/features/assets/errors";
 
 const allowedStatuses: AssetStatus[] = [

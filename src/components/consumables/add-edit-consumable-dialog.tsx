@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { X, PackagePlus, Edit } from "lucide-react";
-import { cn } from "@/lib/utils";
-import type { ConsumableItem, ConsumableCategory } from "./types";
+
+import type { ConsumableItem, ConsumableCategory } from "@/types/inventory";
 
 export interface AddEditConsumableDialogProps {
   isOpen: boolean;

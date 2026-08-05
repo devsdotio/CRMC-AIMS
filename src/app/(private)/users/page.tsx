@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { UserPlus } from "lucide-react";
-import type { UserAccount, UserFilterState, UserRole } from "@/components/users/types";
+import type { UserAccount, UserFilterState, UserRole } from "@/types/users";
 import { INITIAL_MOCK_USERS, CURRENT_USER_ID } from "@/components/users/mock-data";
 import { UserFilters } from "@/components/users/user-filters";
 import { UserTable } from "@/components/users/user-table";

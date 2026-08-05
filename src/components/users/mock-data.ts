@@ -1,4 +1,4 @@
-import type { UserAccount } from "./types";
+import type { UserAccount } from "@/types/users";
 
 export const CURRENT_USER_ID = "usr-001"; // Currently logged-in Property Custodian Admin
 

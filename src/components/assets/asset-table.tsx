@@ -1,7 +1,7 @@
 "use client";
 
 import { PackageSearch } from "lucide-react";
-import type { Asset } from "./types";
+import type { Asset } from "@/types/assets";
 import { AssetTableRow } from "./asset-table-row";
 
 export interface AssetTableProps {

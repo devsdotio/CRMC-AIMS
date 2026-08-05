@@ -1,8 +1,10 @@
 "use client";
+ 
+import { getCategoryStyle } from "@/constants/categories";
 
 import { User, Calendar, RotateCcw, Tag, Building2, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { BorrowLogRecord, AssetCategory } from "./types";
+import type { BorrowLogRecord } from "@/types/borrow-log";
 import { OverdueBadge } from "./overdue-badge";
 
 export interface BorrowLogListItemProps {
@@ -11,19 +13,12 @@ export interface BorrowLogListItemProps {
   onProcessReturn: (record: BorrowLogRecord) => void;
 }
 
-const CATEGORY_STYLES: Record<AssetCategory, { bg: string; text: string; label: string }> = {
-  transport: { bg: "bg-category-transport-bg", text: "text-category-transport-text", label: "Transport" },
-  computing: { bg: "bg-category-computing-bg", text: "text-category-computing-text", label: "Computing" },
-  av:        { bg: "bg-category-av-bg",        text: "text-category-av-text",        label: "AV Equipment" },
-  furniture: { bg: "bg-category-furniture-bg", text: "text-category-furniture-text", label: "Furniture" },
-};
-
 export function BorrowLogListItem({
   record,
   onSelect,
   onProcessReturn,
 }: BorrowLogListItemProps) {
-  const categoryMeta = CATEGORY_STYLES[record.category];
+  const categoryMeta = getCategoryStyle(record.category);
 
   return (
     <div

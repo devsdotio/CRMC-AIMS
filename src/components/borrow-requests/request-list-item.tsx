@@ -1,8 +1,10 @@
 "use client";
+ 
+import { getCategoryStyle } from "@/constants/categories";
 
 import { Check, X, Calendar, User, Building2, Tag } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { BorrowRequest, AssetCategory, RequestStatus } from "./types";
+import type { BorrowRequest,  RequestStatus } from "@/types/borrow-requests";
 
 export interface RequestListItemProps {
   request: BorrowRequest;
@@ -10,13 +12,6 @@ export interface RequestListItemProps {
   onApprove: (request: BorrowRequest) => void;
   onReject: (request: BorrowRequest) => void;
 }
-
-const CATEGORY_STYLES: Record<AssetCategory, { bg: string; text: string; label: string }> = {
-  transport: { bg: "bg-category-transport-bg", text: "text-category-transport-text", label: "Transport" },
-  computing: { bg: "bg-category-computing-bg", text: "text-category-computing-text", label: "Computing" },
-  av:        { bg: "bg-category-av-bg",        text: "text-category-av-text",        label: "AV Equipment" },
-  furniture: { bg: "bg-category-furniture-bg", text: "text-category-furniture-text", label: "Furniture" },
-};
 
 const STATUS_STYLES: Record<RequestStatus, { bg: string; text: string; label: string }> = {
   pending:  { bg: "bg-status-repair-bg/20",     text: "text-status-repair-text font-bold",      label: "Pending Review" },
@@ -31,7 +26,7 @@ export function RequestListItem({
   onApprove,
   onReject,
 }: RequestListItemProps) {
-  const categoryMeta = CATEGORY_STYLES[request.category];
+  const categoryMeta = getCategoryStyle(request.category);
   const statusMeta = STATUS_STYLES[request.status];
 
   return (

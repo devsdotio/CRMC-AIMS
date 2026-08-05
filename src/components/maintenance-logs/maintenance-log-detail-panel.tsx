@@ -1,11 +1,13 @@
 "use client";
+ 
+import { getCategoryStyle } from "@/constants/categories";
 
 import { useEffect, useRef } from "react";
 import Link from "next/link";
-import { X, CheckCircle2, User, Calendar, Tag, History, FileText, ExternalLink, Wrench } from "lucide-react";
+import { X, CheckCircle2,   Tag,   ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { MaintenanceLogRecord } from "./types";
-import type { AssetCategory } from "@/components/assets/types";
+import type { MaintenanceLogRecord } from "@/types/maintenance-logs";
+import type  from "@/types/shared";
 import { ConditionTag } from "./condition-tag";
 
 export interface MaintenanceLogDetailPanelProps {
@@ -14,13 +16,6 @@ export interface MaintenanceLogDetailPanelProps {
   onClose: () => void;
   onResolve: (record: MaintenanceLogRecord) => void;
 }
-
-const CATEGORY_STYLES: Record<AssetCategory, { bg: string; text: string; label: string }> = {
-  transport: { bg: "bg-category-transport-bg", text: "text-category-transport-text", label: "Transport" },
-  computing: { bg: "bg-category-computing-bg", text: "text-category-computing-text", label: "Computing" },
-  av:        { bg: "bg-category-av-bg",        text: "text-category-av-text",        label: "AV Equipment" },
-  furniture: { bg: "bg-category-furniture-bg", text: "text-category-furniture-text", label: "Furniture" },
-};
 
 export function MaintenanceLogDetailPanel({
   record,
@@ -42,7 +37,7 @@ export function MaintenanceLogDetailPanel({
 
   if (!isOpen || !record) return null;
 
-  const categoryMeta = CATEGORY_STYLES[record.category];
+  const categoryMeta = getCategoryStyle(record.category);
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs transition-opacity duration-200">

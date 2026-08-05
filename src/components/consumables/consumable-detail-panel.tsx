@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { X, PlusCircle, SlidersHorizontal, MapPin, Truck, Calendar, History, Tag, FileText } from "lucide-react";
+import { X, PlusCircle, SlidersHorizontal, MapPin, Truck,  History, Tag } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { ConsumableItem } from "./types";
+import type { ConsumableItem } from "@/types/inventory";
 import { StockLevelBar } from "./stock-level-bar";
 
 export interface ConsumableDetailPanelProps {

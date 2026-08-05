@@ -7,7 +7,7 @@ import { Loader2, ArrowRight } from 'lucide-react';
 import { AuthCard } from './AuthCard';
 import { PasswordInput } from './PasswordInput';
 import { FormAlert } from './FormAlert';
-import { SignInFormValues, AuthFormState } from './types';
+import { SignInFormValues, AuthFormState } from "@/types/auth";
 
 export function SignInForm() {
   const router = useRouter();
