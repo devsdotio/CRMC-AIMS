@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 
+import { requireUser } from "@/server/shared/auth";
 import {
   created,
   handleError,
@@ -19,6 +20,7 @@ export class AssetController {
 
   async listAssets(request: NextRequest | Request) {
     try {
+      await requireUser();
       const url = new URL(request.url);
       const status = url.searchParams.get("status") ?? undefined;
       const data = await this.assetService.listAssets({ status });
@@ -30,6 +32,7 @@ export class AssetController {
 
   async createAsset(request: NextRequest | Request) {
     try {
+      await requireUser();
       const body = await request.json();
       const data = await this.assetService.createAsset(body);
       return created(data);
@@ -40,6 +43,7 @@ export class AssetController {
 
   async getAsset(id: string) {
     try {
+      await requireUser();
       const data = await this.assetService.getAssetById(id);
       return ok(data);
     } catch (error) {
@@ -49,6 +53,7 @@ export class AssetController {
 
   async updateAsset(request: NextRequest | Request, id: string) {
     try {
+      await requireUser();
       const body = await request.json();
       const data = await this.assetService.updateAsset(id, body);
       return ok(data);
@@ -59,6 +64,7 @@ export class AssetController {
 
   async deleteAsset(id: string) {
     try {
+      await requireUser();
       await this.assetService.deleteAsset(id);
       return noContent();
     } catch (error) {
@@ -68,6 +74,7 @@ export class AssetController {
 
   async releaseAsset(id: string) {
     try {
+      await requireUser();
       const data = await this.assetService.releaseAsset(id);
       return ok(data);
     } catch (error) {
@@ -77,6 +84,7 @@ export class AssetController {
 
   async returnAsset(request: NextRequest | Request, id: string) {
     try {
+      await requireUser();
       const body = await request.json();
       const data = await this.assetService.returnAsset(id, body);
       return ok(data);

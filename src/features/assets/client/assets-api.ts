@@ -9,9 +9,15 @@ import type {
 type ApiResponse<T> = { data: T };
 type ApiErrorResponse = { error?: string };
 
+/**
+ * Thin fetch wrapper for authenticated same-origin `/api/assets` calls.
+ * Cookies from Supabase SSR session are sent automatically (`same-origin`).
+ * Not consumed by the assets page yet — reserved for React Query hooks.
+ */
 async function fetchJson<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
   const response = await fetch(input, {
     ...init,
+    credentials: "same-origin",
     headers: {
       "Content-Type": "application/json",
       ...(init?.headers ?? {}),

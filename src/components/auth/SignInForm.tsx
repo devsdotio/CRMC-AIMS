@@ -2,15 +2,24 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2, ArrowRight } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 import { AuthCard } from './AuthCard';
 import { PasswordInput } from './PasswordInput';
 import { FormAlert } from './FormAlert';
 import { SignInFormValues, AuthFormState } from './types';
 
+function safeNextPath(raw: string | null): string {
+  if (!raw || !raw.startsWith('/') || raw.startsWith('//')) {
+    return '/dashboard';
+  }
+  return raw;
+}
+
 export function SignInForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const emailInputRef = useRef<HTMLInputElement>(null);
 
   const [formValues, setFormValues] = useState<SignInFormValues>({
@@ -83,30 +92,39 @@ export function SignInForm() {
 
     setFormState({ isLoading: true, errorMessage: null, successMessage: null });
 
-    // Simulated network request
-    setTimeout(() => {
-      // Failure path simulation for demonstration
-      if (
-        formValues.email.trim().toLowerCase() === 'error@crmc.edu.ph' ||
-        formValues.password === 'error'
-      ) {
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithPassword({
+        email: formValues.email.trim(),
+        password: formValues.password,
+      });
+
+      if (error) {
         setFormState({
           isLoading: false,
-          errorMessage: 'Invalid email or password. Please verify your credentials and try again.',
+          errorMessage:
+            'Invalid email or password. Please verify your credentials and try again.',
           successMessage: null,
         });
-      } else {
-        console.log('[CRMC-AIMS Auth] Sign In Payload:', formValues);
-        setFormState({
-          isLoading: false,
-          errorMessage: null,
-          successMessage: 'Sign in successful! Redirecting to dashboard...',
-        });
-        setTimeout(() => {
-          router.push('/dashboard');
-        }, 600);
+        return;
       }
-    }, 800);
+
+      setFormState({
+        isLoading: false,
+        errorMessage: null,
+        successMessage: 'Sign in successful! Redirecting to dashboard...',
+      });
+
+      const nextPath = safeNextPath(searchParams.get('next'));
+      router.push(nextPath);
+      router.refresh();
+    } catch {
+      setFormState({
+        isLoading: false,
+        errorMessage: 'Unable to sign in right now. Please try again.',
+        successMessage: null,
+      });
+    }
   };
 
   return (

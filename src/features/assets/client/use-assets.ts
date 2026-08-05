@@ -1,5 +1,12 @@
 "use client";
 
+/**
+ * React Query hooks for the Assets API.
+ * Ready for integration — the assets page still uses mock data until wired.
+ *
+ * @see `src/features/assets/client/index.ts` for the public barrel export.
+ */
+
 import {
   useMutation,
   useQuery,
