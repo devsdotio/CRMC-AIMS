@@ -1,4 +1,5 @@
 export * from "./assets";
+export * from "./asset-lifecycle-events";
 export * from "./categories";
 export * from "./departments";
 export * from "./locations";

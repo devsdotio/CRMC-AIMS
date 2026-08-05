@@ -6,13 +6,49 @@ import type {
   UpdateAssetInput,
 } from "@/features/assets/types";
 
+export type AssetLifecycleEvent = {
+  id: string;
+  assetId: string | null;
+  assetCode: string;
+  eventType:
+    | "created"
+    | "updated"
+    | "status_changed"
+    | "released"
+    | "returned"
+    | "flagged_maintenance"
+    | "deleted";
+  actor: {
+    userId: string;
+    email: string | null;
+    displayName: string;
+  };
+  fromStatus: string | null;
+  toStatus: string | null;
+  fromHolder: string | null;
+  toHolder: string | null;
+  payload: Record<string, unknown>;
+  createdAt: string;
+};
+
+export type ReleaseAssetInput = {
+  borrowerName?: string;
+  borrowerDepartment?: string;
+  notes?: string;
+  expectedReturnDate?: string;
+};
+
+export type FlagMaintenanceInput = {
+  description?: string;
+  notes?: string;
+};
+
 type ApiResponse<T> = { data: T };
 type ApiErrorResponse = { error?: string };
 
 /**
  * Thin fetch wrapper for authenticated same-origin `/api/assets` calls.
  * Cookies from Supabase SSR session are sent automatically (`same-origin`).
- * Not consumed by the assets page yet — reserved for React Query hooks.
  */
 async function fetchJson<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
   const response = await fetch(input, {
@@ -87,9 +123,10 @@ export const assetsApi = {
     await fetchJson<void>(`/api/assets/${id}`, { method: "DELETE" });
   },
 
-  async releaseAsset(id: string): Promise<Asset> {
+  async releaseAsset(id: string, payload: ReleaseAssetInput = {}): Promise<Asset> {
     const response = await fetchJson<ApiResponse<Asset>>(`/api/assets/${id}/release`, {
       method: "POST",
+      body: JSON.stringify(payload),
     });
 
     return response.data;
@@ -101,6 +138,34 @@ export const assetsApi = {
       body: JSON.stringify(payload),
     });
 
+    return response.data;
+  },
+
+  async flagForMaintenance(id: string, payload: FlagMaintenanceInput = {}): Promise<Asset> {
+    const response = await fetchJson<ApiResponse<Asset>>(
+      `/api/assets/${id}/flag-maintenance`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }
+    );
+
+    return response.data;
+  },
+
+  async listLifecycle(id: string, limit?: number): Promise<AssetLifecycleEvent[]> {
+    const searchParams = new URLSearchParams();
+    if (limit !== undefined) {
+      searchParams.set("limit", String(limit));
+    }
+    const query = searchParams.toString();
+    const path =
+      query.length > 0
+        ? `/api/assets/${id}/lifecycle?${query}`
+        : `/api/assets/${id}/lifecycle`;
+    const response = await fetchJson<ApiResponse<AssetLifecycleEvent[]>>(path, {
+      method: "GET",
+    });
     return response.data;
   },
 };

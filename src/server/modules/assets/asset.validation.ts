@@ -37,13 +37,32 @@ export const returnAssetSchema = z.object({
   status: assetStatusSchema.optional(),
 });
 
+/** Borrower identity is subject/assignee; actor staff is always from session. */
+export const releaseAssetSchema = z.object({
+  borrowerName: z.string().trim().min(1).max(255).optional(),
+  borrowerDepartment: z.string().trim().max(120).optional(),
+  notes: z.string().trim().max(2000).optional(),
+  expectedReturnDate: z
+    .string()
+    .trim()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "expectedReturnDate must be YYYY-MM-DD.")
+    .optional(),
+});
+
+export const flagMaintenanceSchema = z.object({
+  description: z.string().trim().max(2000).optional(),
+  notes: z.string().trim().max(2000).optional(),
+});
+
 export const listAssetsQuerySchema = z.object({
   status: assetStatusSchema.optional(),
 });
 
-export const assetIdSchema = z.string().trim().min(1, "id is required.");
+export const assetIdSchema = z.string().uuid("Asset id must be a valid UUID.");
 
 export type CreateAssetBody = z.infer<typeof createAssetSchema>;
 export type UpdateAssetBody = z.infer<typeof updateAssetSchema>;
 export type ReturnAssetBody = z.infer<typeof returnAssetSchema>;
+export type ReleaseAssetBody = z.infer<typeof releaseAssetSchema>;
+export type FlagMaintenanceBody = z.infer<typeof flagMaintenanceSchema>;
 export type ListAssetsQuery = z.infer<typeof listAssetsQuerySchema>;

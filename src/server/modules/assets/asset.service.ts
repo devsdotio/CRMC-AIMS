@@ -4,17 +4,24 @@ import {
   ConflictError,
   NotFoundError,
 } from "@/server/shared/errors";
+import type { ActorContext } from "@/server/shared/auth";
 
 import { CHECKED_OUT_PLACEHOLDER } from "./asset.constants";
+import { AssetLifecycleService } from "./asset.lifecycle.service";
+import { buildAssetFieldChanges } from "./asset.lifecycle.types";
 import { AssetRepository } from "./asset.repository";
 import type { IAssetRepository, ListAssetsFilters } from "./asset.types";
 import {
   assetIdSchema,
   createAssetSchema,
+  flagMaintenanceSchema,
   listAssetsQuerySchema,
+  releaseAssetSchema,
   returnAssetSchema,
   updateAssetSchema,
   type CreateAssetBody,
+  type FlagMaintenanceBody,
+  type ReleaseAssetBody,
   type ReturnAssetBody,
   type UpdateAssetBody,
 } from "./asset.validation";
@@ -85,9 +92,25 @@ function isBorrowed(row: AssetRow): boolean {
   return Boolean(row.currentHolder);
 }
 
+const TRACKED_UPDATE_FIELDS: (keyof AssetRow)[] = [
+  "assetCode",
+  "name",
+  "category",
+  "status",
+  "serialNumber",
+  "location",
+  "currentHolder",
+  "department",
+  "purchaseDate",
+  "value",
+  "imageUrl",
+  "notes",
+];
+
 export class AssetService {
   constructor(
-    private readonly assetRepository: IAssetRepository = new AssetRepository()
+    private readonly assetRepository: IAssetRepository = new AssetRepository(),
+    private readonly lifecycleService: AssetLifecycleService = new AssetLifecycleService()
   ) {}
 
   async listAssets(rawQuery: unknown): Promise<Asset[]> {
@@ -107,7 +130,7 @@ export class AssetService {
     return toAssetDTO(row);
   }
 
-  async createAsset(rawInput: unknown): Promise<Asset> {
+  async createAsset(rawInput: unknown, actor: ActorContext): Promise<Asset> {
     const input: CreateAssetBody = createAssetSchema.parse(rawInput);
 
     try {
@@ -129,6 +152,22 @@ export class AssetService {
         lastUpdated: now,
       });
 
+      await this.lifecycleService.record({
+        assetId: row.id,
+        assetCode: row.assetCode,
+        eventType: "created",
+        actor,
+        toStatus: row.status,
+        toHolder: row.currentHolder,
+        payload: {
+          snapshot: {
+            name: row.name,
+            category: row.category,
+            location: row.location,
+          },
+        },
+      });
+
       return toAssetDTO(row);
     } catch (error) {
       if (isPgUniqueViolation(error)) {
@@ -138,7 +177,11 @@ export class AssetService {
     }
   }
 
-  async updateAsset(rawId: string, rawInput: unknown): Promise<Asset> {
+  async updateAsset(
+    rawId: string,
+    rawInput: unknown,
+    actor: ActorContext
+  ): Promise<Asset> {
     const id = assetIdSchema.parse(rawId);
     const input: UpdateAssetBody = updateAssetSchema.parse(rawInput);
 
@@ -174,6 +217,40 @@ export class AssetService {
         throw new NotFoundError("Asset", id);
       }
 
+      const changes = buildAssetFieldChanges(
+        existing,
+        updated,
+        TRACKED_UPDATE_FIELDS
+      );
+
+      if (Object.keys(changes).length > 0) {
+        await this.lifecycleService.record({
+          assetId: updated.id,
+          assetCode: updated.assetCode,
+          eventType: "updated",
+          actor,
+          fromStatus: existing.status,
+          toStatus: updated.status,
+          fromHolder: existing.currentHolder,
+          toHolder: updated.currentHolder,
+          payload: { changes },
+        });
+
+        if (existing.status !== updated.status) {
+          await this.lifecycleService.record({
+            assetId: updated.id,
+            assetCode: updated.assetCode,
+            eventType: "status_changed",
+            actor,
+            fromStatus: existing.status,
+            toStatus: updated.status,
+            payload: {
+              via: "update",
+            },
+          });
+        }
+      }
+
       return toAssetDTO(updated);
     } catch (error) {
       if (error instanceof NotFoundError) {
@@ -186,24 +263,44 @@ export class AssetService {
     }
   }
 
-  async deleteAsset(rawId: string): Promise<void> {
+  async deleteAsset(rawId: string, actor: ActorContext): Promise<void> {
     const id = assetIdSchema.parse(rawId);
-    const deleted = await this.assetRepository.delete(id);
+    const existing = await this.assetRepository.findById(id);
 
+    if (!existing) {
+      throw new NotFoundError("Asset", id);
+    }
+
+    // Record first — history survives FK set-null after delete.
+    await this.lifecycleService.record({
+      assetId: existing.id,
+      assetCode: existing.assetCode,
+      eventType: "deleted",
+      actor,
+      fromStatus: existing.status,
+      fromHolder: existing.currentHolder,
+      payload: {
+        snapshot: {
+          name: existing.name,
+          category: existing.category,
+          location: existing.location,
+        },
+      },
+    });
+
+    const deleted = await this.assetRepository.delete(id);
     if (!deleted) {
       throw new NotFoundError("Asset", id);
     }
   }
 
   /**
-   * Marks an available active asset as checked out.
-   *
-   * Temporary model: sets `currentHolder` to a placeholder. When borrow
-   * requests land, this should accept borrower identity and write a
-   * borrow_transaction instead.
+   * Checks out an available active asset to a borrower.
+   * Records staff actor (who released) and borrower identity separately.
    */
-  async releaseAsset(rawId: string): Promise<Asset> {
+  async releaseAsset(rawId: string, rawInput: unknown, actor: ActorContext): Promise<Asset> {
     const id = assetIdSchema.parse(rawId);
+    const input: ReleaseAssetBody = releaseAssetSchema.parse(rawInput ?? {});
     const existing = await this.assetRepository.findById(id);
 
     if (!existing) {
@@ -214,8 +311,14 @@ export class AssetService {
       throw new ConflictError("Asset is not available for release.");
     }
 
+    const holder =
+      input.borrowerName?.trim() ||
+      input.borrowerDepartment?.trim() ||
+      CHECKED_OUT_PLACEHOLDER;
+
     const updated = await this.assetRepository.update(id, {
-      currentHolder: CHECKED_OUT_PLACEHOLDER,
+      currentHolder: holder,
+      department: input.borrowerDepartment ?? existing.department,
       lastUpdated: new Date(),
     });
 
@@ -223,14 +326,35 @@ export class AssetService {
       throw new NotFoundError("Asset", id);
     }
 
+    await this.lifecycleService.record({
+      assetId: updated.id,
+      assetCode: updated.assetCode,
+      eventType: "released",
+      actor,
+      fromStatus: existing.status,
+      toStatus: updated.status,
+      fromHolder: existing.currentHolder,
+      toHolder: updated.currentHolder,
+      payload: {
+        borrowerName: input.borrowerName ?? null,
+        borrowerDepartment: input.borrowerDepartment ?? null,
+        notes: input.notes ?? null,
+        expectedReturnDate: input.expectedReturnDate ?? null,
+      },
+    });
+
     return toAssetDTO(updated);
   }
 
   /**
-   * Clears the current holder and records the return condition in notes.
+   * Clears the current holder and records return condition.
    * Optional status lets the custodian flag needs_repair on return.
    */
-  async returnAsset(rawId: string, rawInput: unknown): Promise<Asset> {
+  async returnAsset(
+    rawId: string,
+    rawInput: unknown,
+    actor: ActorContext
+  ): Promise<Asset> {
     const id = assetIdSchema.parse(rawId);
     const input: ReturnAssetBody = returnAssetSchema.parse(rawInput);
 
@@ -244,14 +368,16 @@ export class AssetService {
       throw new ConflictError("Only borrowed assets can be returned.");
     }
 
+    const previousHolder = existing.currentHolder;
     const conditionNote = `Returned: ${input.condition}`;
     const nextNotes = existing.notes
       ? `${existing.notes}\n${conditionNote}`
       : conditionNote;
+    const nextStatus = input.status ?? existing.status;
 
     const updated = await this.assetRepository.update(id, {
       currentHolder: null,
-      status: input.status ?? existing.status,
+      status: nextStatus,
       notes: nextNotes,
       lastUpdated: new Date(),
     });
@@ -260,6 +386,117 @@ export class AssetService {
       throw new NotFoundError("Asset", id);
     }
 
+    await this.lifecycleService.record({
+      assetId: updated.id,
+      assetCode: updated.assetCode,
+      eventType: "returned",
+      actor,
+      fromStatus: existing.status,
+      toStatus: updated.status,
+      fromHolder: previousHolder,
+      toHolder: null,
+      payload: {
+        condition: input.condition,
+      },
+    });
+
+    if (existing.status !== updated.status) {
+      await this.lifecycleService.record({
+        assetId: updated.id,
+        assetCode: updated.assetCode,
+        eventType: "status_changed",
+        actor,
+        fromStatus: existing.status,
+        toStatus: updated.status,
+        payload: { via: "return" },
+      });
+    }
+
     return toAssetDTO(updated);
+  }
+
+  /**
+   * Flag for maintenance — explicit custodial action with ledger entry
+   * and a maintenanceHistory entry on the asset (until maintenance_logs land).
+   */
+  async flagForMaintenance(
+    rawId: string,
+    rawInput: unknown,
+    actor: ActorContext
+  ): Promise<Asset> {
+    const id = assetIdSchema.parse(rawId);
+    const input: FlagMaintenanceBody = flagMaintenanceSchema.parse(rawInput ?? {});
+    const existing = await this.assetRepository.findById(id);
+
+    if (!existing) {
+      throw new NotFoundError("Asset", id);
+    }
+
+    if (existing.status === "retired") {
+      throw new ConflictError("Retired assets cannot be flagged for maintenance.");
+    }
+
+    const description =
+      input.description?.trim() ||
+      "Flagged for maintenance inspection by Property Custodian.";
+
+    const entry: MaintenanceLogEntry = {
+      id: crypto.randomUUID(),
+      date: new Date().toISOString().slice(0, 10),
+      type: "flagged",
+      description,
+      technician: actor.displayName,
+    };
+
+    const history = normalizeMaintenanceHistory(existing.maintenanceHistory);
+
+    const updated = await this.assetRepository.update(id, {
+      status: "needs_repair",
+      maintenanceHistory: [...history, entry],
+      lastUpdated: new Date(),
+    });
+
+    if (!updated) {
+      throw new NotFoundError("Asset", id);
+    }
+
+    await this.lifecycleService.record({
+      assetId: updated.id,
+      assetCode: updated.assetCode,
+      eventType: "flagged_maintenance",
+      actor,
+      fromStatus: existing.status,
+      toStatus: updated.status,
+      fromHolder: existing.currentHolder,
+      toHolder: updated.currentHolder,
+      payload: {
+        description,
+        notes: input.notes ?? null,
+        maintenanceEntryId: entry.id,
+      },
+    });
+
+    if (existing.status !== updated.status) {
+      await this.lifecycleService.record({
+        assetId: updated.id,
+        assetCode: updated.assetCode,
+        eventType: "status_changed",
+        actor,
+        fromStatus: existing.status,
+        toStatus: updated.status,
+        payload: { via: "flagged_maintenance" },
+      });
+    }
+
+    return toAssetDTO(updated);
+  }
+
+  async listLifecycle(assetId: string, limit?: number) {
+    const id = assetIdSchema.parse(assetId);
+    const existing = await this.assetRepository.findById(id);
+    if (!existing) {
+      throw new NotFoundError("Asset", id);
+    }
+    return this.lifecycleService.listForAsset(id, limit);
   }
 }

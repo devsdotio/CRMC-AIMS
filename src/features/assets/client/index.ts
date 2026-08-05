@@ -1,24 +1,23 @@
 /**
  * Assets client data layer — prepared for UI integration, not wired yet.
  *
- * Usage (when you integrate `/assets`):
- * ```tsx
- * const { data: assets, isLoading, error } = useAssetsQuery();
- * const createAsset = useCreateAssetMutation();
- * ```
- *
- * Requires:
- * - `QueryProvider` in root layout (already present)
- * - Authenticated session (API returns 401 without one)
+ * Includes lifecycle ledger reads and accountable mutations (actor = session).
  */
 
-export { assetsApi } from "./assets-api";
+export {
+  assetsApi,
+  type AssetLifecycleEvent,
+  type FlagMaintenanceInput,
+  type ReleaseAssetInput,
+} from "./assets-api";
 export { assetQueryKeys } from "./query-keys";
 export {
+  useAssetLifecycleQuery,
   useAssetQuery,
   useAssetsQuery,
   useCreateAssetMutation,
   useDeleteAssetMutation,
+  useFlagMaintenanceMutation,
   useReleaseAssetMutation,
   useReturnAssetMutation,
   useUpdateAssetMutation,

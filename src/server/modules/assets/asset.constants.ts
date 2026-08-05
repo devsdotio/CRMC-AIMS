@@ -25,5 +25,19 @@ export const MAINTENANCE_TYPES = [
   "flagged",
 ] as const;
 
-/** Placeholder holder label used by release until borrower identity is wired. */
+/**
+ * Lifecycle ledger event types (append-only audit trail).
+ * Must match `asset_lifecycle_event_type` in schema.
+ */
+export const ASSET_LIFECYCLE_EVENT_TYPES = [
+  "created",
+  "updated",
+  "status_changed",
+  "released",
+  "returned",
+  "flagged_maintenance",
+  "deleted",
+] as const;
+
+/** Placeholder holder label used when release omits a borrower name. */
 export const CHECKED_OUT_PLACEHOLDER = "Checked Out";

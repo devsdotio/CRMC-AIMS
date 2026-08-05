@@ -38,8 +38,10 @@ export const assetStatusEnum = pgEnum("asset_status", [
  *
  * Borrow lifecycle (who has it) is tracked via `currentHolder` for now.
  * A dedicated borrow_transactions table will own that later; release/
- * return mutations will then write there instead of mutating holder
- * alone.
+ * return mutations will then write there instead of mutating holder alone.
+ *
+ * Every accountable mutation also appends an immutable row to
+ * `asset_lifecycle_events` (status changes, holder transitions, staff actor).
  *
  * Maintenance history is stored as jsonb matching MaintenanceLogEntry[]
  * until a first-class maintenance_logs table is introduced.
