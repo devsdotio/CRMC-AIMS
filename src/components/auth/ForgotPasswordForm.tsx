@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { Loader2, ArrowLeft, MailCheck, RefreshCw } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 import { AuthCard } from './AuthCard';
 import { FormAlert } from './FormAlert';
 import { ForgotPasswordStep, AuthFormState } from './types';
@@ -67,7 +68,26 @@ export function ForgotPasswordForm() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const sendResetEmail = async (targetEmail: string) => {
+    const supabase = createClient();
+    const redirectTo =
+      typeof window !== 'undefined'
+        ? `${window.location.origin}/sign-in`
+        : undefined;
+
+    // Always advance to confirmation regardless of whether the email exists
+    // (avoids account enumeration). Still report transport-level failures.
+    const { error } = await supabase.auth.resetPasswordForEmail(
+      targetEmail.trim(),
+      redirectTo ? { redirectTo } : undefined
+    );
+
+    if (error) {
+      throw error;
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const err = validateEmail(email);
     setTouched(true);
@@ -77,30 +97,41 @@ export function ForgotPasswordForm() {
 
     setFormState({ isLoading: true, errorMessage: null, successMessage: null });
 
-    // Simulated network request (~800ms)
-    setTimeout(() => {
-      console.log('[CRMC-AIMS Auth] Password Reset Requested for:', email);
+    try {
+      await sendResetEmail(email);
       setSubmittedEmail(email);
       setFormState({ isLoading: false, errorMessage: null, successMessage: null });
       setStep('confirmation');
       setCooldown(30);
-    }, 800);
+    } catch {
+      setFormState({
+        isLoading: false,
+        errorMessage: 'Unable to send a reset link right now. Please try again.',
+        successMessage: null,
+      });
+    }
   };
 
-  const handleResend = () => {
+  const handleResend = async () => {
     if (cooldown > 0 || formState.isLoading) return;
 
     setFormState({ isLoading: true, errorMessage: null, successMessage: null });
 
-    setTimeout(() => {
-      console.log('[CRMC-AIMS Auth] Resent Password Reset for:', submittedEmail);
+    try {
+      await sendResetEmail(submittedEmail);
       setFormState({
         isLoading: false,
         errorMessage: null,
         successMessage: 'A new reset link has been dispatched to your email.',
       });
       setCooldown(30);
-    }, 800);
+    } catch {
+      setFormState({
+        isLoading: false,
+        errorMessage: 'Unable to resend the reset link. Please try again.',
+        successMessage: null,
+      });
+    }
   };
 
   return (

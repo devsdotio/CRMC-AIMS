@@ -40,7 +40,7 @@ export default function AssetsPage() {
 
   // Filter & Sort Assets
   const filteredAssets = useMemo(() => {
-    let result = assets.filter((asset) => {
+    const result = assets.filter((asset) => {
       // 1. Search Query
       if (filters.searchQuery.trim()) {
         const query = filters.searchQuery.toLowerCase();

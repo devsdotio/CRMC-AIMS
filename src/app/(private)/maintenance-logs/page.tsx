@@ -45,7 +45,7 @@ export default function MaintenanceLogsPage() {
 
   // Filter & Sort Log Entries
   const filteredRecords = useMemo(() => {
-    let result = records.filter((rec) => {
+    const result = records.filter((rec) => {
       // 1. Search Query (Asset Name, Asset Code, Log Code)
       if (filters.searchQuery.trim()) {
         const query = filters.searchQuery.toLowerCase();

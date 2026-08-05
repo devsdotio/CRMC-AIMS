@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { Download, Check, QrCode } from "lucide-react";
+import { Download, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface QRCodeDisplayProps {

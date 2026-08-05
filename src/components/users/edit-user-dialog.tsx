@@ -1,91 +1,119 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Edit, AlertTriangle, Check } from "lucide-react";
+import { X, Edit, AlertTriangle, Check, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { UserAccount, UserRole } from "./types";
-import { ROLE_DEFINITIONS } from "./types";
+import type { UserAccount, UserRole, UserStatus } from "./types";
+import { INVITABLE_ROLES, ROLE_DEFINITIONS } from "./types";
+
+export type EditUserSaveInput = {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  department: string;
+  status: UserStatus;
+  /** When set (and non-empty), replaces the user's password. */
+  password?: string;
+};
 
 export interface EditUserDialogProps {
   user: UserAccount | null;
   currentUserId: string;
   isOpen: boolean;
   onClose: () => void;
-  onSave: (updated: UserAccount) => void;
+  onSave: (updated: EditUserSaveInput) => void | Promise<void>;
+  canInviteAdmin?: boolean;
 }
 
-export function EditUserDialog({
+interface EditUserDialogFormProps {
+  user: UserAccount;
+  currentUserId: string;
+  canInviteAdmin: boolean;
+  onClose: () => void;
+  onSave: (updated: EditUserSaveInput) => void | Promise<void>;
+}
+
+function EditUserDialogForm({
   user,
   currentUserId,
-  isOpen,
+  canInviteAdmin,
   onClose,
   onSave,
-}: EditUserDialogProps) {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [role, setRole] = useState<UserRole>("staff");
-  const [department, setDepartment] = useState("");
+}: EditUserDialogFormProps) {
+  const [name, setName] = useState(() => user.name);
+  const email = user.email;
+  const [role, setRole] = useState<UserRole>(() => user.role);
+  const [department, setDepartment] = useState(() => user.department);
+  const [status, setStatus] = useState<UserStatus>(() => user.status);
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    if (isOpen && user) {
-      setName(user.name);
-      setEmail(user.email);
-      setRole(user.role);
-      setDepartment(user.department);
-      setError("");
-    }
-  }, [isOpen, user]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && isOpen) {
+      if (e.key === "Escape" && !isSubmitting) {
         onClose();
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
-
-  if (!isOpen || !user) return null;
+  }, [onClose, isSubmitting]);
 
   const isSelf = user.id === currentUserId;
-  const isSelfDemotion = isSelf && user.role === "admin" && role !== "admin";
+  const isSelfDemotion =
+    isSelf &&
+    (user.role === "admin" || user.role === "superadmin") &&
+    role !== user.role;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
       setError("Please enter the user's full name.");
       return;
     }
-    if (!email.trim() || !email.includes("@")) {
-      setError("Please enter a valid email address.");
-      return;
+    if (password || confirmPassword) {
+      if (password.length < 8) {
+        setError("New password must be at least 8 characters.");
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError("Passwords do not match.");
+        return;
+      }
     }
 
-    onSave({
-      ...user,
-      name: name.trim(),
-      email: email.trim(),
-      role,
-      department: department.trim(),
-    });
-    onClose();
+    setIsSubmitting(true);
+    setError("");
+    try {
+      await onSave({
+        id: user.id,
+        name: name.trim(),
+        email: user.email,
+        role,
+        department: department.trim(),
+        status,
+        ...(password ? { password } : {}),
+      });
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save user.");
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs transition-opacity overflow-y-auto">
-      {/* Backdrop */}
       <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
 
-      {/* Dialog Window */}
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="edit-dialog-title"
         className="relative w-full max-w-lg rounded-2xl border border-border bg-bg p-6 shadow-2xl z-10 animate-in fade-in zoom-in-95 duration-150 my-6 space-y-5"
       >
-        {/* Header */}
         <div className="flex items-start justify-between gap-3 border-b border-border pb-4">
           <div className="flex items-center gap-2.5">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/15 text-accent shrink-0">
@@ -93,7 +121,7 @@ export function EditUserDialog({
             </div>
             <div>
               <h3 id="edit-dialog-title" className="text-base font-bold text-text leading-tight">
-                Edit Staff Account & Access Role
+                Edit User Account
               </h3>
               <p className="text-xs text-text-secondary mt-0.5 font-mono">
                 {user.email}
@@ -111,9 +139,7 @@ export function EditUserDialog({
           </button>
         </div>
 
-        {/* Form Body */}
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Name & Email */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
               <label htmlFor="edit-name-input" className="block text-xs font-semibold text-text">
@@ -133,22 +159,20 @@ export function EditUserDialog({
 
             <div className="space-y-1">
               <label htmlFor="edit-email-input" className="block text-xs font-semibold text-text">
-                Hospital Email <span className="text-accent">*</span>
+                Login Email
               </label>
               <input
                 id="edit-email-input"
                 type="email"
                 value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  if (error) setError("");
-                }}
-                className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text font-mono focus:outline-none focus:ring-2 focus:ring-accent"
+                readOnly
+                title="Email cannot be changed after the account is created"
+                className="w-full h-9 px-3 text-xs bg-bg-subtle border border-border rounded-lg text-text-secondary font-mono cursor-not-allowed"
               />
+              <p className="text-[10px] text-text-secondary">Login email cannot be changed here.</p>
             </div>
           </div>
 
-          {/* Department */}
           <div className="space-y-1">
             <label htmlFor="edit-dept-input" className="block text-xs font-semibold text-text">
               Department
@@ -162,14 +186,112 @@ export function EditUserDialog({
             />
           </div>
 
-          {/* Predefined Role Selector */}
+          <div className="space-y-2">
+            <label className="block text-xs font-bold uppercase tracking-wider text-text-secondary">
+              Account Status
+            </label>
+            <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Account status">
+              {(
+                [
+                  { value: "active" as const, label: "Active", hint: "Can sign in" },
+                  {
+                    value: "deactivated" as const,
+                    label: "Deactivated",
+                    hint: "Sign-in blocked",
+                  },
+                ] as const
+              ).map((opt) => {
+                const selected = status === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    disabled={isSelf && opt.value === "deactivated"}
+                    onClick={() => setStatus(opt.value)}
+                    className={cn(
+                      "flex flex-col items-start gap-0.5 p-3 rounded-xl border text-left transition-all cursor-pointer outline-none",
+                      "focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50 disabled:cursor-not-allowed",
+                      selected
+                        ? opt.value === "active"
+                          ? "bg-status-active-bg/10 border-status-active-text/40 ring-1 ring-status-active-text/30"
+                          : "bg-status-retired-bg/10 border-status-retired-text/40 ring-1 ring-status-retired-text/30"
+                        : "bg-bg border-border hover:bg-bg-subtle/60"
+                    )}
+                  >
+                    <span className="text-xs font-bold text-text">{opt.label}</span>
+                    <span className="text-[10px] text-text-secondary">{opt.hint}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="space-y-2 border border-border rounded-xl p-3 bg-bg-subtle/40">
+            <label className="block text-xs font-bold uppercase tracking-wider text-text-secondary">
+              Set New Password
+            </label>
+            <p className="text-[11px] text-text-secondary -mt-1">
+              Leave blank to keep the current password. Share any new password with the user out of band.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label htmlFor="edit-password-input" className="block text-xs font-semibold text-text">
+                  New Password
+                </label>
+                <div className="relative">
+                  <input
+                    id="edit-password-input"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      if (error) setError("");
+                    }}
+                    autoComplete="new-password"
+                    placeholder="Min. 8 characters"
+                    className="w-full h-9 px-3 pr-9 text-xs bg-bg border border-border rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-text-secondary hover:text-text p-0.5"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label htmlFor="edit-confirm-password-input" className="block text-xs font-semibold text-text">
+                  Confirm Password
+                </label>
+                <input
+                  id="edit-confirm-password-input"
+                  type={showPassword ? "text" : "password"}
+                  value={confirmPassword}
+                  onChange={(e) => {
+                    setConfirmPassword(e.target.value);
+                    if (error) setError("");
+                  }}
+                  autoComplete="new-password"
+                  placeholder="Re-enter if changing"
+                  className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+              </div>
+            </div>
+          </div>
+
           <div className="space-y-2">
             <label className="block text-xs font-bold uppercase tracking-wider text-text-secondary">
               System Access Role <span className="text-accent">*</span>
             </label>
 
             <div className="space-y-2" role="radiogroup" aria-label="System role selection">
-              {(Object.keys(ROLE_DEFINITIONS) as UserRole[]).map((rKey) => {
+              {(INVITABLE_ROLES.filter(
+                (rKey) => rKey !== "admin" || canInviteAdmin
+              ) as UserRole[]).map((rKey) => {
                 const rDef = ROLE_DEFINITIONS[rKey];
                 const isSelected = role === rKey;
                 return (
@@ -208,7 +330,6 @@ export function EditUserDialog({
             </div>
           </div>
 
-          {/* Self-Demotion Warning Banner */}
           {isSelfDemotion && (
             <div className="p-3.5 rounded-xl border border-status-repair-bg/40 bg-status-repair-bg/15 text-status-repair-text text-xs space-y-1">
               <div className="flex items-center gap-1.5 font-bold">
@@ -223,30 +344,57 @@ export function EditUserDialog({
 
           {error && <p className="text-xs font-bold text-status-outofservice-text">{error}</p>}
 
-          {/* Footer Actions */}
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-semibold text-text-secondary hover:text-text rounded-md border border-border bg-bg transition-colors cursor-pointer"
+              disabled={isSubmitting}
+              className="px-4 py-2 text-xs font-semibold text-text-secondary hover:text-text rounded-md border border-border bg-bg transition-colors cursor-pointer disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
+              disabled={isSubmitting || isSelf}
               className={cn(
-                "inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-md transition-colors cursor-pointer shadow-xs",
+                "inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-md transition-colors cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed",
                 isSelfDemotion
                   ? "bg-status-repair-bg text-status-repair-text hover:opacity-90"
                   : "bg-accent text-accent-foreground hover:opacity-90"
               )}
             >
               <Check className="h-4 w-4" strokeWidth={2.5} />
-              {isSelfDemotion ? "Confirm & Demote Self" : "Save Changes"}
+              {isSubmitting
+                ? "Saving…"
+                : isSelfDemotion
+                  ? "Confirm & Demote Self"
+                  : "Save Changes"}
             </button>
           </div>
         </form>
       </div>
     </div>
+  );
+}
+
+export function EditUserDialog({
+  user,
+  currentUserId,
+  isOpen,
+  onClose,
+  onSave,
+  canInviteAdmin = false,
+}: EditUserDialogProps) {
+  if (!isOpen || !user) return null;
+
+  return (
+    <EditUserDialogForm
+      key={user.id}
+      user={user}
+      currentUserId={currentUserId}
+      canInviteAdmin={canInviteAdmin}
+      onClose={onClose}
+      onSave={onSave}
+    />
   );
 }

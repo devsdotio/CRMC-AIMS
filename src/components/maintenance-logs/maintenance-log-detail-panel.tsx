@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import Link from "next/link";
-import { X, CheckCircle2, User, Calendar, Tag, History, FileText, ExternalLink, Wrench } from "lucide-react";
+import { X, CheckCircle2, Tag, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { MaintenanceLogRecord } from "./types";
 import type { AssetCategory } from "@/components/assets/types";

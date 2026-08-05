@@ -1,7 +1,4 @@
-import {
-  assetController,
-  handleAssetControllerError,
-} from "@/features/assets/controller";
+import { assetController } from "@/server/modules/assets";
 
 /**
  * @swagger
@@ -26,12 +23,8 @@ export async function GET(
   _request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
-  try {
-    const { id } = await context.params;
-    return await assetController.getAssetById(id);
-  } catch (error) {
-    return handleAssetControllerError(error);
-  }
+  const { id } = await context.params;
+  return assetController.getAsset(id);
 }
 
 /**
@@ -94,13 +87,8 @@ export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
-  try {
-    const { id } = await context.params;
-    const body = await request.json();
-    return await assetController.updateAsset(id, body);
-  } catch (error) {
-    return handleAssetControllerError(error);
-  }
+  const { id } = await context.params;
+  return assetController.updateAsset(request, id);
 }
 
 /**
@@ -126,10 +114,6 @@ export async function DELETE(
   _request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
-  try {
-    const { id } = await context.params;
-    return await assetController.deleteAsset(id);
-  } catch (error) {
-    return handleAssetControllerError(error);
-  }
+  const { id } = await context.params;
+  return assetController.deleteAsset(id);
 }

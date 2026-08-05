@@ -11,16 +11,15 @@ import {
   Package,
   Repeat,
   Boxes,
-  Wrench,
   Users,
   Settings,
-  FileText,
   ChevronLeft,
   ChevronRight,
   LogOut,
   User,
   ChevronsUpDown,
 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
 interface NavItem {
@@ -53,8 +52,8 @@ export default function Sidebar({
   pendingCount = 0,
   lowStockCount = 0,
   overdueCount = 0,
-  userName = "Demo User",
-  userEmail = "user@aims",
+  userName = "Unknown user",
+  userEmail = "",
   onLogout,
 }: SidebarProps) {
   const pathname = usePathname();
@@ -63,12 +62,29 @@ export default function Sidebar({
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
-  const handleLogout = () => {
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const handleLogout = async () => {
+    if (isLoggingOut) return;
     setUserMenuOpen(false);
+
     if (onLogout) {
       onLogout();
-    } else {
+      return;
+    }
+
+    setIsLoggingOut(true);
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
       router.push("/sign-in");
+      router.refresh();
+    } catch {
+      // Still leave the app shell if network sign-out fails; proxy will recheck session.
+      router.push("/sign-in");
+      router.refresh();
+    } finally {
+      setIsLoggingOut(false);
     }
   };
 
@@ -94,14 +110,12 @@ export default function Sidebar({
         { name: "Borrow Requests", href: "/borrow-requests", icon: ClipboardList, badge: pendingCount, badgeTone: "accent" },
         { name: "Assets", href: "/assets", icon: Package },
         { name: "Borrow & Return Log", href: "/borrow-log", icon: Repeat, badge: overdueCount, badgeTone: "warning" },
-        { name: "Inventory", href: "/consumables", icon: Boxes, badge: lowStockCount, badgeTone: "warning" },
-        { name: "Condition & Maint. Logs", href: "/maintenance-logs", icon: Wrench },
+        { name: "Inventory", href: "/consumables", icon: Boxes, badge: lowStockCount, badgeTone: "warning" }
       ],
     },
     {
       label: "Administration",
       items: [
-        { name: "Reports", href: "/reports", icon: FileText },
         { name: "Users & Roles", href: "/users", icon: Users },
         { name: "Settings", href: "/settings", icon: Settings },
       ],
@@ -280,10 +294,11 @@ export default function Sidebar({
               <button
                 type="button"
                 onClick={handleLogout}
-                className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm text-white/70 hover:bg-white/6 hover:text-white transition-colors cursor-pointer"
+                disabled={isLoggingOut}
+                className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm text-white/70 hover:bg-white/6 hover:text-white transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <LogOut className="w-4 h-4" />
-                Log out
+                {isLoggingOut ? "Signing out..." : "Log out"}
               </button>
             </motion.div>
           )}

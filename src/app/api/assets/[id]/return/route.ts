@@ -1,7 +1,4 @@
-import {
-  assetController,
-  handleAssetControllerError,
-} from "@/features/assets/controller";
+import { assetController } from "@/server/modules/assets";
 
 /**
  * @swagger
@@ -30,7 +27,7 @@ import {
  *               status:
  *                 type: string
  *                 enum: [active, needs_repair, out_of_service, retired]
- *                 description: Defaults to active when omitted
+ *                 description: Defaults to current status when omitted
  *     responses:
  *       200:
  *         description: Asset returned successfully
@@ -45,11 +42,6 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
-  try {
-    const { id } = await context.params;
-    const body = await request.json();
-    return await assetController.returnAsset(id, body);
-  } catch (error) {
-    return handleAssetControllerError(error);
-  }
+  const { id } = await context.params;
+  return assetController.returnAsset(request, id);
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { Edit3, UserX, ShieldAlert } from "lucide-react";
+import { Edit3, UserX, ShieldAlert, UserCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { UserAccount } from "./types";
 import { RoleBadge } from "./role-badge";
@@ -11,6 +11,7 @@ export interface UserTableRowProps {
   onSelect: (user: UserAccount) => void;
   onEdit: (user: UserAccount) => void;
   onDeactivate: (user: UserAccount) => void;
+  onReactivate: (user: UserAccount) => void;
 }
 
 export function UserTableRow({
@@ -19,6 +20,7 @@ export function UserTableRow({
   onSelect,
   onEdit,
   onDeactivate,
+  onReactivate,
 }: UserTableRowProps) {
   const isSelf = user.id === currentUserId;
 
@@ -35,10 +37,10 @@ export function UserTableRow({
       }}
       className={cn(
         "group border-b border-border bg-bg transition-colors duration-100 cursor-pointer",
-        "hover:bg-bg-subtle/80 focus:outline-none focus-visible:bg-bg-subtle"
+        "hover:bg-bg-subtle/80 focus:outline-none focus-visible:bg-bg-subtle",
+        user.status === "deactivated" && "opacity-80"
       )}
     >
-      {/* Name */}
       <td className="px-5 py-3.5 whitespace-nowrap">
         <div className="flex items-center gap-2">
           <span className="text-sm font-bold text-text group-hover:text-accent transition-colors block">
@@ -55,17 +57,14 @@ export function UserTableRow({
         </span>
       </td>
 
-      {/* Email */}
       <td className="px-3 py-3.5 text-xs font-mono text-text-secondary whitespace-nowrap">
         {user.email}
       </td>
 
-      {/* Role Badge */}
       <td className="px-3 py-3.5 whitespace-nowrap">
         <RoleBadge role={user.role} />
       </td>
 
-      {/* Account Status Badge */}
       <td className="px-3 py-3.5 whitespace-nowrap">
         {user.status === "active" ? (
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-status-active-bg/20 text-status-active-text">
@@ -78,25 +77,23 @@ export function UserTableRow({
         )}
       </td>
 
-      {/* Last Active */}
       <td className="px-3 py-3.5 text-xs text-text-secondary whitespace-nowrap hidden md:table-cell">
         {user.lastActive}
       </td>
 
-      {/* Actions */}
       <td className="px-5 py-3.5 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-end gap-1.5">
           <button
             type="button"
             onClick={() => onEdit(user)}
+            disabled={isSelf}
             aria-label={`Edit profile for ${user.name}`}
-            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-border bg-bg text-xs font-semibold text-text-secondary hover:text-text hover:border-primary transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-border bg-bg text-xs font-semibold text-text-secondary hover:text-text hover:border-primary transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Edit3 className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Edit</span>
           </button>
 
-          {/* Deactivate CTA — Disabled with explanatory tooltip if self */}
           {user.status === "active" ? (
             isSelf ? (
               <button
@@ -120,7 +117,15 @@ export function UserTableRow({
               </button>
             )
           ) : (
-            <span className="text-xs text-text-secondary/60 italic px-2">Deactivated</span>
+            <button
+              type="button"
+              onClick={() => onReactivate(user)}
+              aria-label={`Reactivate account for ${user.name}`}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-border bg-bg text-xs font-semibold text-status-active-text hover:border-status-active-text transition-colors cursor-pointer"
+            >
+              <UserCheck className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Reactivate</span>
+            </button>
           )}
         </div>
       </td>

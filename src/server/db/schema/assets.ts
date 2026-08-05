@@ -1,103 +1,92 @@
+import { sql } from "drizzle-orm";
 import {
-  pgTable,
-  pgEnum,
-  uuid,
-  text,
+  jsonb,
   numeric,
-  date,
+  pgEnum,
+  pgTable,
+  text,
   timestamp,
+  uuid,
+  date,
+  index,
 } from "drizzle-orm/pg-core";
-import { categories } from "./categories";
-import { departments } from "./departments";
-import { locations } from "./locations";
+
+import type { MaintenanceLogEntry } from "@/features/assets/types";
 
 /**
- * ---------------------------------------------------------------------------
- * Enums
- * ---------------------------------------------------------------------------
- * These map 1:1 to the constants exported from
- * `src/server/modules/assets/asset.constants.ts`. Keep both in sync.
+ * Enums mirror the frontend Asset contract
+ * (`src/components/assets/types.ts`). Keep these in sync with
+ * `src/server/modules/assets/asset.constants.ts`.
  */
-
-export const assetTypeEnum = pgEnum("asset_type", [
-  "CONSUMABLE",
-  "ASSIGNABLE",
-  "BORROWABLE",
+export const assetCategoryEnum = pgEnum("asset_category", [
+  "transport",
+  "computing",
+  "av",
+  "furniture",
 ]);
 
 export const assetStatusEnum = pgEnum("asset_status", [
-  "AVAILABLE",
-  "ASSIGNED",
-  "BORROWED",
-  "ARCHIVED",
-]);
-
-export const assetConditionEnum = pgEnum("asset_condition", [
-  "NEW",
-  "GOOD",
-  "FAIR",
-  "DAMAGED",
-  "FOR_REPAIR",
-  "DISPOSED",
+  "active",
+  "needs_repair",
+  "out_of_service",
+  "retired",
 ]);
 
 /**
- * ---------------------------------------------------------------------------
- * Assets table
- * ---------------------------------------------------------------------------
- * This represents the CATALOG of assets (the "what"), not individual
- * physical units (the "which one"). Serialized/unit-level tracking,
- * borrowing, assignment, and movement history are deliberately out of
- * scope here and will live in future tables:
+ * Coded capital equipment registry — one row per physical asset
+ * (the QR-tagged unit the custodian manages).
  *
- *   - asset_units          (individual serialized/trackable units)
- *   - inventory_movements  (stock in/out history for consumables)
- *   - borrow_transactions  (borrow/return lifecycle)
- *   - assignments          (long-term assignment to a person/department)
+ * Borrow lifecycle (who has it) is tracked via `currentHolder` for now.
+ * A dedicated borrow_transactions table will own that later; release/
+ * return mutations will then write there instead of mutating holder alone.
  *
- * Those tables will reference `assets.id` as a foreign key once built.
+ * Every accountable mutation also appends an immutable row to
+ * `asset_lifecycle_events` (status changes, holder transitions, staff actor).
+ *
+ * Maintenance history is stored as jsonb matching MaintenanceLogEntry[]
+ * until a first-class maintenance_logs table is introduced.
  */
-export const assets = pgTable("assets", {
-  id: uuid("id").primaryKey().defaultRandom(),
+export const assets = pgTable(
+  "assets",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
 
-  assetCode: text("asset_code").notNull().unique(),
+    assetCode: text("asset_code").notNull().unique(),
+    name: text("name").notNull(),
+    category: assetCategoryEnum("category").notNull(),
+    status: assetStatusEnum("status").notNull().default("active"),
 
-  name: text("name").notNull(),
-  description: text("description"),
+    serialNumber: text("serial_number"),
+    location: text("location").notNull(),
+    currentHolder: text("current_holder"),
+    department: text("department"),
+    purchaseDate: date("purchase_date", { mode: "string" }),
+    value: numeric("value", { precision: 14, scale: 2 }),
+    imageUrl: text("image_url"),
+    notes: text("notes"),
 
-  assetType: assetTypeEnum("asset_type").notNull(),
+    lastUpdated: timestamp("last_updated", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
 
-  categoryId: uuid("category_id")
-    .notNull()
-    .references(() => categories.id, { onDelete: "restrict" }),
+    maintenanceHistory: jsonb("maintenance_history")
+      .$type<MaintenanceLogEntry[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
 
-  locationId: uuid("location_id")
-    .notNull()
-    .references(() => locations.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("assets_status_idx").on(table.status),
+    index("assets_category_idx").on(table.category),
+    index("assets_location_idx").on(table.location),
+  ]
+);
 
-  departmentId: uuid("department_id").references(() => departments.id, {
-    onDelete: "set null",
-  }),
-
-  brand: text("brand"),
-  model: text("model"),
-  manufacturer: text("manufacturer"),
-
-  purchasePrice: numeric("purchase_price", { precision: 12, scale: 2 }),
-  purchaseDate: date("purchase_date", { mode: "date" }),
-
-  status: assetStatusEnum("status").notNull().default("AVAILABLE"),
-  condition: assetConditionEnum("condition").notNull().default("NEW"),
-
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-
-  archivedAt: timestamp("archived_at", { withTimezone: true }),
-});
-
-export type Asset = typeof assets.$inferSelect;
-export type NewAsset = typeof assets.$inferInsert;
+export type AssetRow = typeof assets.$inferSelect;
+export type NewAssetRow = typeof assets.$inferInsert;

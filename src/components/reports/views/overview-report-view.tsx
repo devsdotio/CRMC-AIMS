@@ -6,7 +6,6 @@ import {
   Repeat,
   AlertTriangle,
   Wrench,
-  TrendingUp,
   PieChart,
   BarChart2,
 } from "lucide-react";

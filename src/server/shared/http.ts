@@ -1,12 +1,17 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
+
 import { isAppError } from "./errors";
 
 /**
- * Standard success envelope used by every controller in every module.
+ * Success envelope used by the frontend assets client:
+ * `src/features/assets/client/assets-api.ts` → `{ data: T }`.
+ *
+ * Keep this shape stable so hooks integrate without client changes.
+ * Structured `success`/`code` can be layered on later without dropping `data`.
  */
 export function ok<T>(data: T, status = 200) {
-  return NextResponse.json({ success: true, data }, { status });
+  return NextResponse.json({ data }, { status });
 }
 
 export function created<T>(data: T) {
@@ -18,47 +23,24 @@ export function noContent() {
 }
 
 /**
- * Standard error envelope. Controllers should funnel every caught error
- * through this so responses stay consistent across modules.
+ * Error envelope used by the frontend assets client → `{ error: string }`.
  */
 export function handleError(error: unknown) {
   if (error instanceof ZodError) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: {
-          code: "VALIDATION_ERROR",
-          message: "Invalid request data.",
-          issues: error.flatten(),
-        },
-      },
-      { status: 422 }
-    );
+    const firstIssue = error.issues[0];
+    const message = firstIssue?.message ?? "Invalid request data.";
+
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 
   if (isAppError(error)) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: {
-          code: error.code,
-          message: error.message,
-        },
-      },
-      { status: error.statusCode }
-    );
+    return NextResponse.json({ error: error.message }, { status: error.statusCode });
   }
 
-  // Unexpected error — never leak internals to the client.
   console.error("Unhandled error:", error);
+
   return NextResponse.json(
-    {
-      success: false,
-      error: {
-        code: "INTERNAL_ERROR",
-        message: "An unexpected error occurred.",
-      },
-    },
+    { error: "An unexpected error occurred." },
     { status: 500 }
   );
 }

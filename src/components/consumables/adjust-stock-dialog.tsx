@@ -20,37 +20,31 @@ const ADJUSTMENT_REASONS = [
   "Other Accountability Reason",
 ];
 
-export function AdjustStockDialog({
+interface AdjustStockDialogFormProps {
+  item: ConsumableItem;
+  onClose: () => void;
+  onConfirmAdjust: AdjustStockDialogProps["onConfirmAdjust"];
+}
+
+function AdjustStockDialogForm({
   item,
-  isOpen,
   onClose,
   onConfirmAdjust,
-}: AdjustStockDialogProps) {
-  const [adjustmentDelta, setAdjustmentDelta] = useState<number>(-1);
+}: AdjustStockDialogFormProps) {
+  const [adjustmentDelta, setAdjustmentDelta] = useState(-1);
   const [reason, setReason] = useState(ADJUSTMENT_REASONS[0]);
   const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (isOpen && item) {
-      setAdjustmentDelta(-1);
-      setReason(ADJUSTMENT_REASONS[0]);
-      setNotes("");
-      setError("");
-    }
-  }, [isOpen, item]);
-
-  useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && isOpen) {
+      if (e.key === "Escape") {
         onClose();
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
-
-  if (!isOpen || !item) return null;
+  }, [onClose]);
 
   const newExpectedQty = item.currentQty + adjustmentDelta;
 
@@ -75,17 +69,14 @@ export function AdjustStockDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs transition-opacity">
-      {/* Backdrop */}
       <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
 
-      {/* Dialog Window */}
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="adjust-dialog-title"
         className="relative w-full max-w-md rounded-2xl border border-border bg-bg p-6 shadow-2xl z-10 animate-in fade-in zoom-in-95 duration-150 space-y-5"
       >
-        {/* Header */}
         <div className="flex items-start justify-between gap-3 border-b border-border pb-4">
           <div className="flex items-center gap-2.5">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-status-repair-bg/20 text-status-repair-text shrink-0">
@@ -111,7 +102,6 @@ export function AdjustStockDialog({
           </button>
         </div>
 
-        {/* Current vs New Quantity Preview */}
         <div className="p-3.5 rounded-xl border border-border bg-bg-subtle text-xs space-y-1.5">
           <div className="flex justify-between text-text-secondary">
             <span>Current Recorded Stock:</span>
@@ -129,9 +119,7 @@ export function AdjustStockDialog({
           </div>
         </div>
 
-        {/* Form Body */}
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Quantity Change Delta Input */}
           <div className="space-y-1">
             <label htmlFor="adjustment-delta-input" className="block text-xs font-semibold text-text">
               Stock Quantity Change (+ or -) <span className="text-accent">*</span>
@@ -150,7 +138,6 @@ export function AdjustStockDialog({
             <p className="text-[11px] text-text-secondary/70">Use negative values (e.g. -5) for lost/damaged stock.</p>
           </div>
 
-          {/* MANDATORY Reason Select */}
           <div className="space-y-1">
             <label htmlFor="adjustment-reason-select" className="block text-xs font-bold text-text">
               Accountability Reason <span className="text-accent">*</span>
@@ -172,7 +159,6 @@ export function AdjustStockDialog({
             </select>
           </div>
 
-          {/* Notes */}
           <div className="space-y-1">
             <label htmlFor="adjust-notes-input" className="block text-xs font-semibold text-text">
               Explanation & Incident Details
@@ -194,7 +180,6 @@ export function AdjustStockDialog({
             </div>
           )}
 
-          {/* Footer Actions */}
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
             <button
               type="button"
@@ -214,5 +199,23 @@ export function AdjustStockDialog({
         </form>
       </div>
     </div>
+  );
+}
+
+export function AdjustStockDialog({
+  item,
+  isOpen,
+  onClose,
+  onConfirmAdjust,
+}: AdjustStockDialogProps) {
+  if (!isOpen || !item) return null;
+
+  return (
+    <AdjustStockDialogForm
+      key={item.id}
+      item={item}
+      onClose={onClose}
+      onConfirmAdjust={onConfirmAdjust}
+    />
   );
 }

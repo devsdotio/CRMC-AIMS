@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { X, RotateCcw, User, Mail, Phone, Building2, Tag, Calendar, History, FileText, CheckCircle2 } from "lucide-react";
+import { X, RotateCcw, User, Mail, Phone, Building2, Tag, History } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BorrowLogRecord, AssetCategory } from "./types";
 import { OverdueBadge } from "./overdue-badge";

@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, PackagePlus, Edit, QrCode } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { X, PackagePlus, Edit } from "lucide-react";
 import type { Asset, AssetCategory, AssetStatus } from "./types";
 import { QRCodeDisplay } from "./qr-code-display";
 
@@ -20,78 +19,70 @@ const CATEGORY_PREFIXES: Record<AssetCategory, string> = {
   furniture: "FN",
 };
 
-export function AddEditAssetDialog({
-  isOpen,
+function generateAssetCode(category: AssetCategory = "computing"): string {
+  const prefix = CATEGORY_PREFIXES[category];
+  const randomNum = Math.floor(100 + Math.random() * 900);
+  return `${prefix}-${randomNum}`;
+}
+
+interface AddEditAssetDialogFormProps {
+  initialAsset?: Asset | null;
+  onClose: () => void;
+  onSave: (assetData: Partial<Asset>) => void;
+}
+
+function AddEditAssetDialogForm({
   initialAsset,
   onClose,
   onSave,
-}: AddEditAssetDialogProps) {
+}: AddEditAssetDialogFormProps) {
   const isEditing = Boolean(initialAsset);
 
-  const [name, setName] = useState("");
-  const [category, setCategory] = useState<AssetCategory>("computing");
-  const [status, setStatus] = useState<AssetStatus>("active");
-  const [assetCode, setAssetCode] = useState("");
-  const [serialNumber, setSerialNumber] = useState("");
-  const [location, setLocation] = useState("");
-  const [department, setDepartment] = useState("IT");
-  const [notes, setNotes] = useState("");
-  const [value, setValue] = useState<string>("");
-  const [purchaseDate, setPurchaseDate] = useState("");
-
+  const [name, setName] = useState(() => initialAsset?.name ?? "");
+  const [category, setCategory] = useState<AssetCategory>(
+    () => initialAsset?.category ?? "computing"
+  );
+  const [status, setStatus] = useState<AssetStatus>(
+    () => initialAsset?.status ?? "active"
+  );
+  const [assetCode, setAssetCode] = useState(
+    () => initialAsset?.assetCode ?? generateAssetCode("computing")
+  );
+  const [serialNumber, setSerialNumber] = useState(
+    () => initialAsset?.serialNumber ?? ""
+  );
+  const [location, setLocation] = useState(
+    () => initialAsset?.location ?? "IT Office — Rm 302"
+  );
+  const [department] = useState(
+    () => initialAsset?.department ?? "IT"
+  );
+  const [notes, setNotes] = useState(() => initialAsset?.notes ?? "");
+  const [value, setValue] = useState(() =>
+    initialAsset?.value ? String(initialAsset.value) : ""
+  );
+  const [purchaseDate, setPurchaseDate] = useState(
+    () =>
+      initialAsset?.purchaseDate ?? new Date().toISOString().split("T")[0]
+  );
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    if (isOpen) {
-      if (initialAsset) {
-        setName(initialAsset.name);
-        setCategory(initialAsset.category);
-        setStatus(initialAsset.status);
-        setAssetCode(initialAsset.assetCode);
-        setSerialNumber(initialAsset.serialNumber || "");
-        setLocation(initialAsset.location);
-        setDepartment(initialAsset.department || "IT");
-        setNotes(initialAsset.notes || "");
-        setValue(initialAsset.value ? String(initialAsset.value) : "");
-        setPurchaseDate(initialAsset.purchaseDate || "");
-      } else {
-        setName("");
-        setCategory("computing");
-        setStatus("active");
-        const randomNum = Math.floor(100 + Math.random() * 900);
-        setAssetCode(`CP-${randomNum}`);
-        setSerialNumber("");
-        setLocation("IT Office — Rm 302");
-        setDepartment("IT");
-        setNotes("");
-        setValue("");
-        setPurchaseDate(new Date().toISOString().split("T")[0]);
-      }
-      setError("");
-    }
-  }, [isOpen, initialAsset]);
-
-  // Update asset code prefix when category changes on new item
   const handleCategoryChange = (newCat: AssetCategory) => {
     setCategory(newCat);
     if (!isEditing) {
-      const prefix = CATEGORY_PREFIXES[newCat];
-      const randomNum = Math.floor(100 + Math.random() * 900);
-      setAssetCode(`${prefix}-${randomNum}`);
+      setAssetCode(generateAssetCode(newCat));
     }
   };
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && isOpen) {
+      if (e.key === "Escape") {
         onClose();
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
+  }, [onClose]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,17 +114,14 @@ export function AddEditAssetDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs transition-opacity overflow-y-auto">
-      {/* Backdrop */}
       <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
 
-      {/* Dialog Window */}
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="dialog-title"
         className="relative w-full max-w-xl rounded-2xl border border-border bg-bg p-6 shadow-2xl z-10 animate-in fade-in zoom-in-95 duration-150 my-8"
       >
-        {/* Header */}
         <div className="flex items-center justify-between gap-3 mb-5 border-b border-border pb-4">
           <div className="flex items-center gap-2.5">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/15 text-accent shrink-0">
@@ -159,9 +147,7 @@ export function AddEditAssetDialog({
           </button>
         </div>
 
-        {/* Form Body */}
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Top Row: Auto-generated Tag Preview */}
           <div className="grid grid-cols-1 md:grid-cols-[1fr_160px] gap-4 items-start p-3.5 rounded-xl border border-border bg-bg-subtle">
             <div className="space-y-2">
               <span className="text-[11px] font-bold uppercase tracking-wider text-text-secondary block">
@@ -180,7 +166,6 @@ export function AddEditAssetDialog({
             </div>
           </div>
 
-          {/* Asset Name */}
           <div className="space-y-1">
             <label htmlFor="asset-name-input" className="block text-xs font-semibold text-text">
               Asset Name <span className="text-accent">*</span>
@@ -198,7 +183,6 @@ export function AddEditAssetDialog({
             />
           </div>
 
-          {/* Category & Status Row */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
               <label htmlFor="category-select" className="block text-xs font-semibold text-text">
@@ -235,7 +219,6 @@ export function AddEditAssetDialog({
             </div>
           </div>
 
-          {/* Serial Number & Location Row */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
               <label htmlFor="serial-input" className="block text-xs font-semibold text-text">
@@ -266,7 +249,6 @@ export function AddEditAssetDialog({
             </div>
           </div>
 
-          {/* Value & Purchase Date */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
               <label htmlFor="value-input" className="block text-xs font-semibold text-text">
@@ -296,7 +278,6 @@ export function AddEditAssetDialog({
             </div>
           </div>
 
-          {/* Notes */}
           <div className="space-y-1">
             <label htmlFor="notes-input" className="block text-xs font-semibold text-text">
               Description / Custody Notes
@@ -313,7 +294,6 @@ export function AddEditAssetDialog({
 
           {error && <p className="text-xs font-bold text-status-outofservice-text">{error}</p>}
 
-          {/* Footer Actions */}
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
             <button
               type="button"
@@ -332,5 +312,23 @@ export function AddEditAssetDialog({
         </form>
       </div>
     </div>
+  );
+}
+
+export function AddEditAssetDialog({
+  isOpen,
+  initialAsset,
+  onClose,
+  onSave,
+}: AddEditAssetDialogProps) {
+  if (!isOpen) return null;
+
+  return (
+    <AddEditAssetDialogForm
+      key={initialAsset?.id ?? "new"}
+      initialAsset={initialAsset}
+      onClose={onClose}
+      onSave={onSave}
+    />
   );
 }
