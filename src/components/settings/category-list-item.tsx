@@ -1,6 +1,6 @@
 "use client";
 
-import { Edit3, Trash2, Tag, AlertTriangle } from "lucide-react";
+import { Edit3, Trash2, Tag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { CategoryItem } from "./types";
 

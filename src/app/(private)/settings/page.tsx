@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import type { SettingsSection, CategoryItem, UserProfile, SystemBackupStatus } from "@/components/settings/types";
 import { SettingsNav } from "@/components/settings/settings-nav";
 import { AccountSection } from "@/components/settings/account-section";

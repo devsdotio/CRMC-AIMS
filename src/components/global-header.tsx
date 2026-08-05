@@ -298,7 +298,7 @@ export default function GlobalHeader({ onMobileMenuOpen }: GlobalHeaderProps) {
         <div className="relative" ref={quickActionRef}>
           <button
             onClick={() => setIsQuickActionOpen((prev) => !prev)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1B2140] text-white font-medium text-xs rounded-lg hover:bg-[#FF4E45] transition-all duration-200 cursor-pointer shadow-xs"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white font-medium text-xs rounded-lg hover:bg-primary/90 transition-all duration-200 cursor-pointer shadow-xs"
           >
             <Plus className="w-4 h-4" />
             <span className="hidden sm:inline">Quick Action</span>

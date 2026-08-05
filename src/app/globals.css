@@ -317,3 +317,8 @@
     display: none;
   }
 }
+
+/* Hide Next.js dev indicator portal */
+nextjs-portal {
+  display: none !important;
+}

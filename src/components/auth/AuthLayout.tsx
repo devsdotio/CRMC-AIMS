@@ -1,5 +1,6 @@
 import React from 'react';
-import { Box, ShieldCheck, Building2 } from 'lucide-react';
+import Image from 'next/image';
+import { ShieldCheck, Building2 } from 'lucide-react';
 
 interface AuthLayoutProps {
   children: React.ReactNode;
@@ -17,8 +18,15 @@ export function AuthLayout({ children }: AuthLayoutProps) {
 
         {/* Header / Logo */}
         <div className="relative z-10 flex items-center gap-3">
-          <div className="flex items-center justify-center w-11 h-11 rounded-xl bg-[#FF4E45] text-white shadow-lg shadow-[#FF4E45]/30">
-            <Box className="w-6 h-6" />
+          <div className="flex items-center justify-center w-11 h-11 rounded-xl bg-white p-2 shadow-lg shadow-black/20 shrink-0">
+            <Image
+              src="/aims-logo.svg"
+              alt="CRMC-AIMS Logo"
+              width={36}
+              height={36}
+              className="w-full h-full object-contain"
+              priority
+            />
           </div>
           <div>
             <h1 className="text-xl font-bold tracking-tight text-white leading-tight">

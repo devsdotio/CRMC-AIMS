@@ -32,7 +32,9 @@ export function AddEditCategoryDialog({
   const [colorToken, setColorToken] = useState("computing");
   const [error, setError] = useState("");
 
-  useEffect(() => {
+  const [prevOpenKey, setPrevOpenKey] = useState({ isOpen: false, id: initialCategory?.id });
+  if (isOpen !== prevOpenKey.isOpen || initialCategory?.id !== prevOpenKey.id) {
+    setPrevOpenKey({ isOpen, id: initialCategory?.id });
     if (isOpen) {
       if (initialCategory) {
         setName(initialCategory.name);
@@ -43,7 +45,7 @@ export function AddEditCategoryDialog({
       }
       setError("");
     }
-  }, [isOpen, initialCategory]);
+  }
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
