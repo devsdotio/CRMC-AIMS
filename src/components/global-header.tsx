@@ -54,19 +54,9 @@ const ROUTE_MAP: Record<string, RouteMeta> = {
     subtitle: "Monitor stock quantities and minimum threshold alerts",
     category: "Operations",
   },
-  "/maintenance-logs": {
-    title: "Condition & Maintenance Logs",
-    subtitle: "Log asset repairs, condition reports, and service logs",
-    category: "Operations",
-  },
   "/users": {
     title: "Users & Roles",
     subtitle: "Manage custodian permissions and department users",
-    category: "Administration",
-  },
-  "/reports": {
-    title: "Reports & Analytics",
-    subtitle: "Generate and export inventory utilization reports",
     category: "Administration",
   },
   "/settings": {
