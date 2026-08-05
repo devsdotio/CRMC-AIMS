@@ -94,14 +94,12 @@ export default function Sidebar({
         { name: "Borrow Requests", href: "/borrow-requests", icon: ClipboardList, badge: pendingCount, badgeTone: "accent" },
         { name: "Assets", href: "/assets", icon: Package },
         { name: "Borrow & Return Log", href: "/borrow-log", icon: Repeat, badge: overdueCount, badgeTone: "warning" },
-        { name: "Inventory", href: "/consumables", icon: Boxes, badge: lowStockCount, badgeTone: "warning" },
-        { name: "Condition & Maint. Logs", href: "/maintenance-logs", icon: Wrench },
+        { name: "Inventory", href: "/consumables", icon: Boxes, badge: lowStockCount, badgeTone: "warning" }
       ],
     },
     {
       label: "Administration",
       items: [
-        { name: "Reports", href: "/reports", icon: FileText },
         { name: "Users & Roles", href: "/users", icon: Users },
         { name: "Settings", href: "/settings", icon: Settings },
       ],

@@ -206,18 +206,6 @@ export function AssetDetailPanel({
 
           {/* Maintenance & Condition Log Entries */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
-                <History className="h-3.5 w-3.5" />
-                Condition & Maintenance History
-              </h3>
-              <Link
-                href="/maintenance-logs"
-                className="text-[11px] font-semibold text-accent hover:underline flex items-center gap-0.5"
-              >
-                View all logs <ExternalLink className="h-3 w-3" />
-              </Link>
-            </div>
 
             <div className="p-4 rounded-lg border border-border bg-bg">
               {asset.maintenanceHistory.length === 0 ? (
