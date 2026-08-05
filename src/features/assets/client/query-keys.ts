@@ -1,0 +1,7 @@
+import type { AssetStatus } from "@/features/assets/types";
+
+export const assetQueryKeys = {
+  all: ["assets"] as const,
+  list: (status?: AssetStatus) => [...assetQueryKeys.all, "list", { status }] as const,
+  detail: (id: string) => [...assetQueryKeys.all, "detail", id] as const,
+};

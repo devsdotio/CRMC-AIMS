@@ -1,27 +1,32 @@
-import type { InferInsertModel, InferSelectModel } from "drizzle-orm";
+import type {
+	Asset,
+	AssetCategory,
+	AssetStatus,
+	MaintenanceLogEntry,
+} from "@/components/assets/types";
 
-import { assets } from "@/features/assets/schema";
+export type { Asset, AssetCategory, AssetStatus, MaintenanceLogEntry };
 
-export type Asset = InferSelectModel<typeof assets>;
-export type NewAsset = InferInsertModel<typeof assets>;
-export type AssetStatus = Asset["status"];
-
-export type CreateAssetInput = {
-	code: string;
-	name: string;
-	category: string;
-	condition: string;
-	status?: AssetStatus;
-};
+export type CreateAssetInput = Pick<
+	Asset,
+	"assetCode" | "name" | "category" | "status" | "location"
+> &
+	Partial<
+		Pick<
+			Asset,
+			| "serialNumber"
+			| "currentHolder"
+			| "department"
+			| "purchaseDate"
+			| "value"
+			| "imageUrl"
+			| "notes"
+		>
+	>;
 
 export type UpdateAssetInput = Partial<CreateAssetInput>;
 
-export type ReleaseAssetInput = {
-	expectedReturnAt?: string;
-	borrowerName?: string;
-};
-
 export type ReturnAssetInput = {
 	condition: string;
-	status?: Exclude<AssetStatus, "borrowed">;
+	status?: AssetStatus;
 };
