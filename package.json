@@ -9,6 +9,9 @@
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:migrate:verbose": "tsx scripts/db-migrate.ts",
+    "db:inspect": "tsx scripts/db-inspect.ts",
+    "db:repair": "tsx scripts/db-repair-schema.ts",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
