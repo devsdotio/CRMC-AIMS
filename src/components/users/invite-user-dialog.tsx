@@ -9,7 +9,12 @@ import { INVITABLE_ROLES, ROLE_DEFINITIONS } from "./types";
 export interface InviteUserDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onSendInvite: (name: string, email: string, role: UserRole, department: string) => void;
+  onSendInvite: (
+    name: string,
+    email: string,
+    role: UserRole,
+    department: string
+  ) => void | Promise<void>;
   /** When true, admin role is offered (superadmin only). */
   canInviteAdmin?: boolean;
 }
@@ -31,33 +36,41 @@ function InviteUserDialogForm({
   const [department, setDepartment] = useState("Property Custodian Office");
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") {
+      if (e.key === "Escape" && !isSubmitting) {
         onClose();
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  }, [onClose, isSubmitting]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
       setError("Please enter the staff member's full name.");
       return;
     }
     if (!email.trim() || !email.includes("@")) {
-      setError("Please enter a valid hospital email address.");
+      setError("Please enter a valid institutional email address.");
       return;
     }
 
-    onSendInvite(name.trim(), email.trim(), role, department.trim());
-    setSuccessMessage(`Invitation sent to ${email.trim()}`);
-    setTimeout(() => {
-      onClose();
-    }, 1200);
+    setIsSubmitting(true);
+    setError("");
+    try {
+      await onSendInvite(name.trim(), email.trim(), role, department.trim());
+      setSuccessMessage(`Invitation sent to ${email.trim()}`);
+      setTimeout(() => {
+        onClose();
+      }, 1000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to send invitation.");
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -207,16 +220,18 @@ function InviteUserDialogForm({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-semibold text-text-secondary hover:text-text rounded-md border border-border bg-bg transition-colors cursor-pointer"
+              disabled={isSubmitting}
+              className="px-4 py-2 text-xs font-semibold text-text-secondary hover:text-text rounded-md border border-border bg-bg transition-colors cursor-pointer disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-md bg-accent text-accent-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+              disabled={isSubmitting}
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-md bg-accent text-accent-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Send className="h-3.5 w-3.5" />
-              Send Invitation
+              {isSubmitting ? "Sending…" : "Send Invitation"}
             </button>
           </div>
         </form>

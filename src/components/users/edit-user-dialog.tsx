@@ -11,60 +11,71 @@ export interface EditUserDialogProps {
   currentUserId: string;
   isOpen: boolean;
   onClose: () => void;
-  onSave: (updated: UserAccount) => void;
+  onSave: (updated: UserAccount) => void | Promise<void>;
+  canInviteAdmin?: boolean;
 }
 
 interface EditUserDialogFormProps {
   user: UserAccount;
   currentUserId: string;
+  canInviteAdmin: boolean;
   onClose: () => void;
-  onSave: (updated: UserAccount) => void;
+  onSave: (updated: UserAccount) => void | Promise<void>;
 }
 
 function EditUserDialogForm({
   user,
   currentUserId,
+  canInviteAdmin,
   onClose,
   onSave,
 }: EditUserDialogFormProps) {
   const [name, setName] = useState(() => user.name);
-  const [email, setEmail] = useState(() => user.email);
+  const email = user.email;
   const [role, setRole] = useState<UserRole>(() => user.role);
   const [department, setDepartment] = useState(() => user.department);
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") {
+      if (e.key === "Escape" && !isSubmitting) {
         onClose();
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  }, [onClose, isSubmitting]);
 
   const isSelf = user.id === currentUserId;
-  const isSelfDemotion = isSelf && user.role === "admin" && role !== "admin";
+  const isSelfDemotion =
+    isSelf &&
+    (user.role === "admin" || user.role === "superadmin") &&
+    role !== user.role;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
       setError("Please enter the user's full name.");
       return;
     }
-    if (!email.trim() || !email.includes("@")) {
-      setError("Please enter a valid email address.");
-      return;
-    }
 
-    onSave({
-      ...user,
-      name: name.trim(),
-      email: email.trim(),
-      role,
-      department: department.trim(),
-    });
-    onClose();
+    setIsSubmitting(true);
+    setError("");
+    try {
+      await onSave({
+        ...user,
+        name: name.trim(),
+        // Email is identity — not editable via this API
+        email: user.email,
+        role,
+        department: department.trim(),
+      });
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save user.");
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -128,12 +139,11 @@ function EditUserDialogForm({
                 id="edit-email-input"
                 type="email"
                 value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  if (error) setError("");
-                }}
-                className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text font-mono focus:outline-none focus:ring-2 focus:ring-accent"
+                readOnly
+                title="Email cannot be changed after the account is created"
+                className="w-full h-9 px-3 text-xs bg-bg-subtle border border-border rounded-lg text-text-secondary font-mono cursor-not-allowed"
               />
+              <p className="text-[10px] text-text-secondary">Login email cannot be changed here.</p>
             </div>
           </div>
 
@@ -156,7 +166,9 @@ function EditUserDialogForm({
             </label>
 
             <div className="space-y-2" role="radiogroup" aria-label="System role selection">
-              {(INVITABLE_ROLES as UserRole[]).map((rKey) => {
+              {(INVITABLE_ROLES.filter(
+                (rKey) => rKey !== "admin" || canInviteAdmin
+              ) as UserRole[]).map((rKey) => {
                 const rDef = ROLE_DEFINITIONS[rKey];
                 const isSelected = role === rKey;
                 return (
@@ -213,21 +225,27 @@ function EditUserDialogForm({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-semibold text-text-secondary hover:text-text rounded-md border border-border bg-bg transition-colors cursor-pointer"
+              disabled={isSubmitting}
+              className="px-4 py-2 text-xs font-semibold text-text-secondary hover:text-text rounded-md border border-border bg-bg transition-colors cursor-pointer disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
+              disabled={isSubmitting || isSelf}
               className={cn(
-                "inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-md transition-colors cursor-pointer shadow-xs",
+                "inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-md transition-colors cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed",
                 isSelfDemotion
                   ? "bg-status-repair-bg text-status-repair-text hover:opacity-90"
                   : "bg-accent text-accent-foreground hover:opacity-90"
               )}
             >
               <Check className="h-4 w-4" strokeWidth={2.5} />
-              {isSelfDemotion ? "Confirm & Demote Self" : "Save Changes"}
+              {isSubmitting
+                ? "Saving…"
+                : isSelfDemotion
+                  ? "Confirm & Demote Self"
+                  : "Save Changes"}
             </button>
           </div>
         </form>
@@ -242,6 +260,7 @@ export function EditUserDialog({
   isOpen,
   onClose,
   onSave,
+  canInviteAdmin = false,
 }: EditUserDialogProps) {
   if (!isOpen || !user) return null;
 
@@ -250,6 +269,7 @@ export function EditUserDialog({
       key={user.id}
       user={user}
       currentUserId={currentUserId}
+      canInviteAdmin={canInviteAdmin}
       onClose={onClose}
       onSave={onSave}
     />

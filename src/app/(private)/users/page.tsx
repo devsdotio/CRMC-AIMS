@@ -1,43 +1,58 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
-import { UserPlus } from "lucide-react";
-import type { UserAccount, UserFilterState, UserRole } from "@/components/users/types";
-import { INITIAL_MOCK_USERS, CURRENT_USER_ID } from "@/components/users/mock-data";
+import { useState, useMemo } from "react";
+import { UserPlus, AlertCircle } from "lucide-react";
+import type {
+  UserAccount,
+  UserFilterState,
+  UserRole,
+} from "@/components/users/types";
 import { UserFilters } from "@/components/users/user-filters";
 import { UserTable } from "@/components/users/user-table";
 import { UserDetailPanel } from "@/components/users/user-detail-panel";
 import { InviteUserDialog } from "@/components/users/invite-user-dialog";
 import { EditUserDialog } from "@/components/users/edit-user-dialog";
 import { DeactivateUserDialog } from "@/components/users/deactivate-user-dialog";
+import {
+  useCreateUserMutation,
+  useDeactivateUserMutation,
+  useMeQuery,
+  useUpdateUserMutation,
+  useUsersQuery,
+} from "@/features/users/client";
 
 export default function UsersPage() {
-  const [users, setUsers] = useState<UserAccount[]>(INITIAL_MOCK_USERS);
-  const [isLoading, setIsLoading] = useState(true);
+  const { data: me, isLoading: meLoading, error: meError } = useMeQuery();
+  const {
+    data: users = [],
+    isLoading: usersLoading,
+    error: usersError,
+    isFetching,
+  } = useUsersQuery();
 
-  // Filter State
+  const createUser = useCreateUserMutation();
+  const updateUser = useUpdateUserMutation();
+  const deactivateUser = useDeactivateUserMutation();
+
+  const currentUserId = me?.id ?? "";
+  const canInviteAdmin = me?.role === "superadmin";
+  const isLoading = meLoading || usersLoading;
+
   const [filters, setFilters] = useState<UserFilterState>({
     searchQuery: "",
     role: "all",
     status: "all",
   });
 
-  // Modal / Drawer States
   const [selectedUser, setSelectedUser] = useState<UserAccount | null>(null);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [editDialogUser, setEditDialogUser] = useState<UserAccount | null>(null);
-  const [deactivateDialogUser, setDeactivateDialogUser] = useState<UserAccount | null>(null);
+  const [deactivateDialogUser, setDeactivateDialogUser] =
+    useState<UserAccount | null>(null);
+  const [pageError, setPageError] = useState<string | null>(null);
 
-  // Simulate initial load
-  useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 400);
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Filter Users
   const filteredUsers = useMemo(() => {
     return users.filter((u) => {
-      // 1. Search Query
       if (filters.searchQuery.trim()) {
         const query = filters.searchQuery.toLowerCase();
         const matchName = u.name.toLowerCase().includes(query);
@@ -45,12 +60,10 @@ export default function UsersPage() {
         if (!matchName && !matchEmail) return false;
       }
 
-      // 2. Role Filter
       if (filters.role && filters.role !== "all" && u.role !== filters.role) {
         return false;
       }
 
-      // 3. Status Filter
       if (filters.status && filters.status !== "all" && u.status !== filters.status) {
         return false;
       }
@@ -59,7 +72,12 @@ export default function UsersPage() {
     });
   }, [users, filters]);
 
-  // Handlers
+  // Keep detail panel in sync with query updates
+  const selectedSynced = useMemo(() => {
+    if (!selectedUser) return null;
+    return users.find((u) => u.id === selectedUser.id) ?? selectedUser;
+  }, [users, selectedUser]);
+
   const handleFilterChange = (updated: Partial<UserFilterState>) => {
     setFilters((prev) => ({ ...prev, ...updated }));
   };
@@ -72,53 +90,64 @@ export default function UsersPage() {
     });
   };
 
-  const handleSendInvite = (name: string, email: string, role: UserRole, department: string) => {
-    const newUser: UserAccount = {
-      id: `usr-${Date.now()}`,
+  const handleSendInvite = async (
+    name: string,
+    email: string,
+    role: UserRole,
+    department: string
+  ) => {
+    setPageError(null);
+    if (role === "superadmin") {
+      throw new Error("Superadmin accounts can only be created via seed script.");
+    }
+
+    await createUser.mutateAsync({
       name,
       email,
       role,
-      status: "active",
-      department,
-      dateAdded: new Date().toISOString().split("T")[0],
-      lastActive: "Invited (Pending login)",
-      activitySummary: "Account invitation sent",
-    };
-
-    setUsers((prev) => [newUser, ...prev]);
+      department: department || undefined,
+    });
   };
 
-  const handleSaveUser = (updatedUser: UserAccount) => {
-    setUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
-    if (selectedUser?.id === updatedUser.id) {
-      setSelectedUser(updatedUser);
+  const handleSaveUser = async (updatedUser: UserAccount) => {
+    setPageError(null);
+    if (updatedUser.role === "superadmin") {
+      throw new Error("Cannot assign superadmin via this form.");
     }
+
+    const saved = await updateUser.mutateAsync({
+      id: updatedUser.id,
+      payload: {
+        name: updatedUser.name,
+        role: updatedUser.role,
+        department: updatedUser.department || null,
+        status: updatedUser.status,
+      },
+    });
+
+    setSelectedUser((prev) => (prev?.id === saved.id ? saved : prev));
   };
 
-  const handleConfirmDeactivate = (userToDeactivate: UserAccount) => {
-    // Self-action protection safety check
-    if (userToDeactivate.id === CURRENT_USER_ID) return;
-
-    setUsers((prev) =>
-      prev.map((u) =>
-        u.id === userToDeactivate.id
-          ? {
-              ...u,
-              status: "deactivated",
-              lastActive: `Deactivated on ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`,
-            }
-          : u
-      )
-    );
-
-    if (selectedUser?.id === userToDeactivate.id) {
-      setSelectedUser((prev) => (prev ? { ...prev, status: "deactivated" } : null));
+  const handleConfirmDeactivate = async (userToDeactivate: UserAccount) => {
+    setPageError(null);
+    if (userToDeactivate.id === currentUserId) {
+      throw new Error("You cannot deactivate your own account.");
     }
+
+    const saved = await deactivateUser.mutateAsync(userToDeactivate.id);
+    setSelectedUser((prev) => (prev?.id === saved.id ? saved : prev));
   };
+
+  const loadError =
+    meError?.message ||
+    usersError?.message ||
+    pageError ||
+    (me && me.role !== "superadmin" && me.role !== "admin"
+      ? "Only admins can manage user accounts."
+      : null);
 
   return (
     <div className="h-full flex flex-col min-h-0 overflow-hidden bg-bg-subtle rounded-md" data-theme="light">
-      {/* ── Top Header Banner ────────────────────────────────────────── */}
       <div className="px-4 md:px-6 pt-5 pb-3 bg-bg shrink-0 flex flex-wrap items-center justify-between gap-4 border-b border-border">
         <div>
           <div className="flex items-center gap-2">
@@ -127,19 +156,21 @@ export default function UsersPage() {
             </h1>
             <span className="px-2 py-0.5 text-xs font-bold bg-bg-subtle text-text-secondary rounded-full border border-border">
               {filteredUsers.length} of {users.length} accounts
+              {isFetching && !isLoading ? " · updating…" : ""}
             </span>
           </div>
           <p className="text-xs text-text-secondary mt-0.5">
-            Manage staff accounts and predefined access boundaries (Admin, Staff, Borrower / Requester).
+            Provision accounts without self-signup. Admins invite staff and
+            borrowers; superadmins may also invite admins.
           </p>
         </div>
 
-        {/* Top Header Actions */}
         <div className="flex items-center gap-2.5">
           <button
             type="button"
             onClick={() => setInviteDialogOpen(true)}
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg bg-accent text-accent-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+            disabled={Boolean(loadError) || !me}
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg bg-accent text-accent-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <UserPlus className="h-4 w-4" strokeWidth={2.5} />
             Invite Staff Member
@@ -147,7 +178,13 @@ export default function UsersPage() {
         </div>
       </div>
 
-      {/* ── Search & Filter Controls ──────────────────────────────────── */}
+      {loadError && (
+        <div className="mx-4 md:mx-6 mt-3 flex items-start gap-2 rounded-lg border border-status-outofservice-bg/40 bg-status-outofservice-bg/10 px-3 py-2 text-xs text-status-outofservice-text">
+          <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+          <span>{loadError}</span>
+        </div>
+      )}
+
       <UserFilters
         filters={filters}
         onFilterChange={handleFilterChange}
@@ -155,11 +192,10 @@ export default function UsersPage() {
         totalUsersCount={users.length}
       />
 
-      {/* ── Internal Scrollable Table Region ──────────────────────────── */}
       <main className="flex-1 overflow-y-auto min-h-0 bg-bg">
         <UserTable
           users={filteredUsers}
-          currentUserId={CURRENT_USER_ID}
+          currentUserId={currentUserId}
           loading={isLoading}
           onSelect={setSelectedUser}
           onEdit={setEditDialogUser}
@@ -167,11 +203,10 @@ export default function UsersPage() {
         />
       </main>
 
-      {/* ── Detail Slide-over Panel ──────────────────────────────────── */}
       <UserDetailPanel
-        user={selectedUser}
-        currentUserId={CURRENT_USER_ID}
-        isOpen={Boolean(selectedUser)}
+        user={selectedSynced}
+        currentUserId={currentUserId}
+        isOpen={Boolean(selectedSynced)}
         onClose={() => setSelectedUser(null)}
         onEdit={(u) => {
           setSelectedUser(null);
@@ -183,23 +218,22 @@ export default function UsersPage() {
         }}
       />
 
-      {/* ── Invite User Dialog ───────────────────────────────────────── */}
       <InviteUserDialog
         isOpen={inviteDialogOpen}
         onClose={() => setInviteDialogOpen(false)}
         onSendInvite={handleSendInvite}
+        canInviteAdmin={canInviteAdmin}
       />
 
-      {/* ── Edit User Dialog ─────────────────────────────────────────── */}
       <EditUserDialog
         user={editDialogUser}
-        currentUserId={CURRENT_USER_ID}
+        currentUserId={currentUserId}
         isOpen={Boolean(editDialogUser)}
         onClose={() => setEditDialogUser(null)}
         onSave={handleSaveUser}
+        canInviteAdmin={canInviteAdmin}
       />
 
-      {/* ── Deactivate User Dialog ───────────────────────────────────── */}
       <DeactivateUserDialog
         user={deactivateDialogUser}
         isOpen={Boolean(deactivateDialogUser)}
