@@ -17,6 +17,19 @@ function safeNextPath(raw: string | null): string {
   return raw;
 }
 
+const REDIRECT_ERROR_MESSAGES: Record<string, string> = {
+  no_profile:
+    'This account has no application profile. Contact a system administrator.',
+  deactivated: 'This account has been deactivated.',
+  borrower_portal:
+    'Borrower accounts cannot access the staff workspace yet. Contact Property Custodian for updates.',
+};
+
+function getRedirectErrorMessage(errorKey: string | null): string | null {
+  if (!errorKey) return null;
+  return REDIRECT_ERROR_MESSAGES[errorKey] ?? 'Unable to access the application.';
+}
+
 export function SignInForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -37,24 +50,13 @@ export function SignInForm() {
     successMessage: null,
   });
 
-  // Show auth errors passed from the private layout redirect
-  useEffect(() => {
-    const err = searchParams.get('error');
-    if (!err) return;
-
-    const messages: Record<string, string> = {
-      no_profile:
-        'This account has no application profile. Contact a system administrator.',
-      deactivated: 'This account has been deactivated.',
-      borrower_portal:
-        'Borrower accounts cannot access the staff workspace yet. Contact Property Custodian for updates.',
-    };
-
-    setFormState((prev) => ({
-      ...prev,
-      errorMessage: messages[err] ?? 'Unable to access the application.',
-    }));
-  }, [searchParams]);
+  const paramErrorKey = searchParams.get('error');
+  const [dismissedParamErrorKey, setDismissedParamErrorKey] = useState<string | null>(null);
+  const redirectErrorMessage =
+    paramErrorKey && paramErrorKey !== dismissedParamErrorKey
+      ? getRedirectErrorMessage(paramErrorKey)
+      : null;
+  const displayErrorMessage = formState.errorMessage ?? redirectErrorMessage;
 
   // Autofocus email field on mount
   useEffect(() => {
@@ -86,6 +88,7 @@ export function SignInForm() {
   const handleChange = (field: keyof SignInFormValues, value: string | boolean) => {
     setFormValues((prev) => ({ ...prev, [field]: value }));
     setFormState((prev) => ({ ...prev, errorMessage: null }));
+    if (paramErrorKey) setDismissedParamErrorKey(paramErrorKey);
 
     if (touched[field as 'email' | 'password']) {
       if (field === 'email') {
@@ -161,9 +164,12 @@ export function SignInForm() {
 
         {/* Global Error/Success Alert */}
         <FormAlert
-          type={formState.errorMessage ? 'error' : 'success'}
-          message={formState.errorMessage || formState.successMessage}
-          onDismiss={() => setFormState((prev) => ({ ...prev, errorMessage: null, successMessage: null }))}
+          type={displayErrorMessage ? 'error' : 'success'}
+          message={displayErrorMessage || formState.successMessage}
+          onDismiss={() => {
+            setFormState((prev) => ({ ...prev, errorMessage: null, successMessage: null }));
+            if (paramErrorKey) setDismissedParamErrorKey(paramErrorKey);
+          }}
         />
 
         {/* Form */}

@@ -14,40 +14,34 @@ export interface EditUserDialogProps {
   onSave: (updated: UserAccount) => void;
 }
 
-export function EditUserDialog({
+interface EditUserDialogFormProps {
+  user: UserAccount;
+  currentUserId: string;
+  onClose: () => void;
+  onSave: (updated: UserAccount) => void;
+}
+
+function EditUserDialogForm({
   user,
   currentUserId,
-  isOpen,
   onClose,
   onSave,
-}: EditUserDialogProps) {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [role, setRole] = useState<UserRole>("staff");
-  const [department, setDepartment] = useState("");
+}: EditUserDialogFormProps) {
+  const [name, setName] = useState(() => user.name);
+  const [email, setEmail] = useState(() => user.email);
+  const [role, setRole] = useState<UserRole>(() => user.role);
+  const [department, setDepartment] = useState(() => user.department);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (isOpen && user) {
-      setName(user.name);
-      setEmail(user.email);
-      setRole(user.role);
-      setDepartment(user.department);
-      setError("");
-    }
-  }, [isOpen, user]);
-
-  useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && isOpen) {
+      if (e.key === "Escape") {
         onClose();
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
-
-  if (!isOpen || !user) return null;
+  }, [onClose]);
 
   const isSelf = user.id === currentUserId;
   const isSelfDemotion = isSelf && user.role === "admin" && role !== "admin";
@@ -75,17 +69,14 @@ export function EditUserDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs transition-opacity overflow-y-auto">
-      {/* Backdrop */}
       <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
 
-      {/* Dialog Window */}
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="edit-dialog-title"
         className="relative w-full max-w-lg rounded-2xl border border-border bg-bg p-6 shadow-2xl z-10 animate-in fade-in zoom-in-95 duration-150 my-6 space-y-5"
       >
-        {/* Header */}
         <div className="flex items-start justify-between gap-3 border-b border-border pb-4">
           <div className="flex items-center gap-2.5">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/15 text-accent shrink-0">
@@ -111,9 +102,7 @@ export function EditUserDialog({
           </button>
         </div>
 
-        {/* Form Body */}
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Name & Email */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
               <label htmlFor="edit-name-input" className="block text-xs font-semibold text-text">
@@ -148,7 +137,6 @@ export function EditUserDialog({
             </div>
           </div>
 
-          {/* Department */}
           <div className="space-y-1">
             <label htmlFor="edit-dept-input" className="block text-xs font-semibold text-text">
               Department
@@ -162,7 +150,6 @@ export function EditUserDialog({
             />
           </div>
 
-          {/* Predefined Role Selector */}
           <div className="space-y-2">
             <label className="block text-xs font-bold uppercase tracking-wider text-text-secondary">
               System Access Role <span className="text-accent">*</span>
@@ -208,7 +195,6 @@ export function EditUserDialog({
             </div>
           </div>
 
-          {/* Self-Demotion Warning Banner */}
           {isSelfDemotion && (
             <div className="p-3.5 rounded-xl border border-status-repair-bg/40 bg-status-repair-bg/15 text-status-repair-text text-xs space-y-1">
               <div className="flex items-center gap-1.5 font-bold">
@@ -223,7 +209,6 @@ export function EditUserDialog({
 
           {error && <p className="text-xs font-bold text-status-outofservice-text">{error}</p>}
 
-          {/* Footer Actions */}
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
             <button
               type="button"
@@ -248,5 +233,25 @@ export function EditUserDialog({
         </form>
       </div>
     </div>
+  );
+}
+
+export function EditUserDialog({
+  user,
+  currentUserId,
+  isOpen,
+  onClose,
+  onSave,
+}: EditUserDialogProps) {
+  if (!isOpen || !user) return null;
+
+  return (
+    <EditUserDialogForm
+      key={user.id}
+      user={user}
+      currentUserId={currentUserId}
+      onClose={onClose}
+      onSave={onSave}
+    />
   );
 }

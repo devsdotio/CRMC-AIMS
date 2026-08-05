@@ -27,11 +27,15 @@ const SAMPLE_ASSETS: { code: string; name: string; category: AssetCategory }[] =
   { code: "AV-014", name: "Epson PowerLite LCD Projector #A-102", category: "av" },
 ];
 
-export function FlagForMaintenanceDialog({
-  isOpen,
+interface FlagForMaintenanceDialogFormProps {
+  onClose: () => void;
+  onConfirmFlag: FlagForMaintenanceDialogProps["onConfirmFlag"];
+}
+
+function FlagForMaintenanceDialogForm({
   onClose,
   onConfirmFlag,
-}: FlagForMaintenanceDialogProps) {
+}: FlagForMaintenanceDialogFormProps) {
   const [selectedAssetCode, setSelectedAssetCode] = useState(SAMPLE_ASSETS[0].code);
   const [condition, setCondition] = useState<ConditionState>("needs_maintenance");
   const [notes, setNotes] = useState("");
@@ -39,26 +43,14 @@ export function FlagForMaintenanceDialog({
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (isOpen) {
-      setSelectedAssetCode(SAMPLE_ASSETS[0].code);
-      setCondition("needs_maintenance");
-      setNotes("");
-      setScheduledDate("");
-      setError("");
-    }
-  }, [isOpen]);
-
-  useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && isOpen) {
+      if (e.key === "Escape") {
         onClose();
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
+  }, [onClose]);
 
   const targetAsset = SAMPLE_ASSETS.find((a) => a.code === selectedAssetCode) || SAMPLE_ASSETS[0];
 
@@ -82,17 +74,14 @@ export function FlagForMaintenanceDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs transition-opacity overflow-y-auto">
-      {/* Backdrop */}
       <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
 
-      {/* Dialog Window */}
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="flag-dialog-title"
         className="relative w-full max-w-lg rounded-2xl border border-border bg-bg p-6 shadow-2xl z-10 animate-in fade-in zoom-in-95 duration-150 my-6 space-y-5"
       >
-        {/* Header */}
         <div className="flex items-start justify-between gap-3 border-b border-border pb-4">
           <div className="flex items-center gap-2.5">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/15 text-accent shrink-0">
@@ -118,9 +107,7 @@ export function FlagForMaintenanceDialog({
           </button>
         </div>
 
-        {/* Form Body */}
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Target Asset Select */}
           <div className="space-y-1">
             <label htmlFor="flag-asset-select" className="block text-xs font-semibold text-text">
               Target Institutional Asset <span className="text-accent">*</span>
@@ -139,7 +126,6 @@ export function FlagForMaintenanceDialog({
             </select>
           </div>
 
-          {/* Condition Severity Select */}
           <div className="space-y-1">
             <label htmlFor="flag-condition-select" className="block text-xs font-semibold text-text">
               Flagged Condition Status <span className="text-accent">*</span>
@@ -155,7 +141,6 @@ export function FlagForMaintenanceDialog({
             </select>
           </div>
 
-          {/* Optional Scheduled Date */}
           <div className="space-y-1">
             <label htmlFor="scheduled-date-input" className="block text-xs font-semibold text-text">
               Target Service Completion Date (Optional)
@@ -169,7 +154,6 @@ export function FlagForMaintenanceDialog({
             />
           </div>
 
-          {/* Required Issue Notes */}
           <div className="space-y-1">
             <label htmlFor="flag-notes-input" className="block text-xs font-semibold text-text">
               Issue Description / Fault Details <span className="text-accent">*</span>
@@ -190,19 +174,17 @@ export function FlagForMaintenanceDialog({
             />
           </div>
 
-          {/* Cross feature notice */}
           <div className="p-3 rounded-lg border border-border bg-bg-subtle text-[11px] text-text-secondary flex items-start gap-2">
             <AlertTriangle className="h-4 w-4 text-accent shrink-0 mt-0.5" />
             <span>
               <strong>Cross-Feature Effect:</strong> Submitting this flag will set asset tag{" "}
               <strong className="font-mono text-text">{targetAsset.code}</strong> status to{" "}
-              <span className="font-bold text-text">"{condition.replace("_", " ")}"</span> across the Assets Registry until resolved.
+              <span className="font-bold text-text">&quot;{condition.replace("_", " ")}&quot;</span> across the Assets Registry until resolved.
             </span>
           </div>
 
           {error && <p className="text-xs font-bold text-status-outofservice-text">{error}</p>}
 
-          {/* Footer Actions */}
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
             <button
               type="button"
@@ -222,5 +204,21 @@ export function FlagForMaintenanceDialog({
         </form>
       </div>
     </div>
+  );
+}
+
+export function FlagForMaintenanceDialog({
+  isOpen,
+  onClose,
+  onConfirmFlag,
+}: FlagForMaintenanceDialogProps) {
+  if (!isOpen) return null;
+
+  return (
+    <FlagForMaintenanceDialogForm
+      key="flag"
+      onClose={onClose}
+      onConfirmFlag={onConfirmFlag}
+    />
   );
 }

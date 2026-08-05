@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, UserPlus, Check, Send } from "lucide-react";
+import { X, UserPlus, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { UserRole } from "./types";
 import { INVITABLE_ROLES, ROLE_DEFINITIONS } from "./types";
@@ -14,12 +14,17 @@ export interface InviteUserDialogProps {
   canInviteAdmin?: boolean;
 }
 
-export function InviteUserDialog({
-  isOpen,
+interface InviteUserDialogFormProps {
+  onClose: () => void;
+  onSendInvite: InviteUserDialogProps["onSendInvite"];
+  canInviteAdmin: boolean;
+}
+
+function InviteUserDialogForm({
   onClose,
   onSendInvite,
-  canInviteAdmin = false,
-}: InviteUserDialogProps) {
+  canInviteAdmin,
+}: InviteUserDialogFormProps) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<UserRole>("staff");
@@ -28,27 +33,14 @@ export function InviteUserDialog({
   const [successMessage, setSuccessMessage] = useState("");
 
   useEffect(() => {
-    if (isOpen) {
-      setName("");
-      setEmail("");
-      setRole("staff");
-      setDepartment("Property Custodian Office");
-      setError("");
-      setSuccessMessage("");
-    }
-  }, [isOpen]);
-
-  useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && isOpen) {
+      if (e.key === "Escape") {
         onClose();
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
+  }, [onClose]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,17 +62,14 @@ export function InviteUserDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs transition-opacity overflow-y-auto">
-      {/* Backdrop */}
       <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
 
-      {/* Dialog Window */}
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="invite-dialog-title"
         className="relative w-full max-w-lg rounded-2xl border border-border bg-bg p-6 shadow-2xl z-10 animate-in fade-in zoom-in-95 duration-150 my-6 space-y-5"
       >
-        {/* Header */}
         <div className="flex items-start justify-between gap-3 border-b border-border pb-4">
           <div className="flex items-center gap-2.5">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/15 text-accent shrink-0">
@@ -106,9 +95,7 @@ export function InviteUserDialog({
           </button>
         </div>
 
-        {/* Form Body */}
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Name & Email */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
               <label htmlFor="invite-name-input" className="block text-xs font-semibold text-text">
@@ -145,7 +132,6 @@ export function InviteUserDialog({
             </div>
           </div>
 
-          {/* Department */}
           <div className="space-y-1">
             <label htmlFor="invite-dept-input" className="block text-xs font-semibold text-text">
               Department
@@ -160,7 +146,6 @@ export function InviteUserDialog({
             />
           </div>
 
-          {/* Predefined Role Selector with Inline Descriptions */}
           <div className="space-y-2">
             <label className="block text-xs font-bold uppercase tracking-wider text-text-secondary">
               Select Predefined System Role <span className="text-accent">*</span>
@@ -218,7 +203,6 @@ export function InviteUserDialog({
             </div>
           )}
 
-          {/* Footer Actions */}
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
             <button
               type="button"
@@ -238,5 +222,23 @@ export function InviteUserDialog({
         </form>
       </div>
     </div>
+  );
+}
+
+export function InviteUserDialog({
+  isOpen,
+  onClose,
+  onSendInvite,
+  canInviteAdmin = false,
+}: InviteUserDialogProps) {
+  if (!isOpen) return null;
+
+  return (
+    <InviteUserDialogForm
+      key="invite"
+      onClose={onClose}
+      onSendInvite={onSendInvite}
+      canInviteAdmin={canInviteAdmin}
+    />
   );
 }

@@ -122,7 +122,9 @@ export function MaintenanceLogFilters({
           {/* Sort Select */}
           <select
             value={filters.sortBy}
-            onChange={(e) => onFilterChange({ sortBy: e.target.value as any })}
+            onChange={(e) =>
+              onFilterChange({ sortBy: e.target.value as MaintenanceLogFilterState["sortBy"] })
+            }
             className="h-9 px-2.5 text-xs bg-bg-subtle border border-border rounded-lg text-text font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent"
           >
             <option value="date_desc">Newest First</option>

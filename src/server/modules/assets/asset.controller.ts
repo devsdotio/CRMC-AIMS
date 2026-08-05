@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 
-import { requireAssetOperator, requireUser } from "@/server/shared/auth";
+import { requireAssetOperator } from "@/server/shared/auth";
 import {
   created,
   handleError,

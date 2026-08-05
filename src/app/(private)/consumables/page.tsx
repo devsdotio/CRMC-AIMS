@@ -50,7 +50,7 @@ export default function ConsumablesPage() {
 
   // Filter & Sort Items
   const filteredItems = useMemo(() => {
-    let result = items.filter((item) => {
+    const result = items.filter((item) => {
       // 1. Search Query
       if (filters.searchQuery.trim()) {
         const query = filters.searchQuery.toLowerCase();

@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, User, Calendar, Tag, ExternalLink, AlertTriangle } from "lucide-react";
+import { CheckCircle2, User, Calendar, Tag, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { MaintenanceLogRecord } from "./types";
 import type { AssetCategory } from "@/components/assets/types";

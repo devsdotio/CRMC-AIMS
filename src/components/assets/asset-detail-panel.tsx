@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import Link from "next/link";
-import { X, Edit3, Wrench, MapPin, User, Tag, Calendar, DollarSign, FileText, History, ExternalLink } from "lucide-react";
+import { X, Edit3, Wrench, MapPin, User, Tag, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Asset, AssetCategory, AssetStatus } from "./types";
 import { QRCodeDisplay } from "./qr-code-display";

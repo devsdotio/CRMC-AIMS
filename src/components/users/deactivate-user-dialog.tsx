@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { X, UserX, AlertOctagon } from "lucide-react";
+import { X, UserX } from "lucide-react";
 import type { UserAccount } from "./types";
 
 export interface DeactivateUserDialogProps {
@@ -70,7 +70,7 @@ export function DeactivateUserDialog({
         {/* Confirmation Body Summary */}
         <div className="p-4 rounded-xl border border-border bg-bg-subtle text-xs space-y-2">
           <p className="text-text font-bold leading-snug">
-            Are you sure you want to deactivate {user.name}'s account?
+            Are you sure you want to deactivate {`${user.name}'s`} account?
           </p>
           <ul className="list-disc list-inside space-y-1 text-text-secondary">
             <li>This account will lose system access immediately.</li>

@@ -1,6 +1,5 @@
 "use client";
 
-import { Trash2, ShieldAlert } from "lucide-react";
 import type { SimpleDisposalItem } from "../types";
 
 interface DisposalReportViewProps {

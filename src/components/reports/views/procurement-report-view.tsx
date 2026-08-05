@@ -1,6 +1,6 @@
 "use client";
 
-import { ShoppingBag, Landmark } from "lucide-react";
+import { Landmark } from "lucide-react";
 import type { SimpleAcquisitionItem } from "../types";
 
 interface ProcurementReportViewProps {
