@@ -1,4 +1,7 @@
-import type { AssetLifecycleEventPayload, AssetRow } from "@/server/db/schema";
+import type {
+  AssetLifecycleEventPayload,
+  AssetRow,
+} from "@/server/db/schema";
 import type { ActorContext } from "@/server/shared/auth";
 
 import { ASSET_LIFECYCLE_EVENT_TYPES } from "./asset.constants";
@@ -27,7 +30,8 @@ export interface RecordLifecycleEventInput {
   assetId: string | null;
   assetCode: string;
   eventType: AssetLifecycleEventType;
-  actor: ActorContext;
+  /** Role is allowed on ActorContext but not persisted on ledger for privacy flexibility. */
+  actor: Pick<ActorContext, "userId" | "email" | "displayName">;
   fromStatus?: string | null;
   toStatus?: string | null;
   fromHolder?: string | null;
