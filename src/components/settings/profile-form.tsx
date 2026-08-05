@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { User, Check, Save } from "lucide-react";
+import { useState } from "react";
+import { Check, Save } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { UserProfile } from "./types";
 
@@ -16,11 +16,14 @@ export function ProfileForm({ profile, onSaveProfile }: ProfileFormProps) {
   const [department, setDepartment] = useState(profile.department);
   const [savedSuccess, setSavedSuccess] = useState(false);
 
-  useEffect(() => {
+  // Sync state if profile changes externally
+  const [prevProfile, setPrevProfile] = useState(profile);
+  if (profile !== prevProfile) {
+    setPrevProfile(profile);
     setName(profile.name);
     setEmail(profile.email);
     setDepartment(profile.department);
-  }, [profile]);
+  }
 
   const isDirty =
     name !== profile.name ||

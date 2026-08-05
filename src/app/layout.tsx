@@ -12,6 +12,9 @@ const quicksand = localFont({
 export const metadata: Metadata = {
   title: "CRMC - AIMS",
   description: "CRMC Asset & Inventory Management System",
+  icons: {
+    icon: "/aims-logo.svg",
+  },
 };
 
 export default function RootLayout({

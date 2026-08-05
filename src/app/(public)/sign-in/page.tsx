@@ -1,0 +1,16 @@
+import { Metadata } from 'next';
+import { AuthLayout } from '@/components/auth/AuthLayout';
+import { SignInForm } from '@/components/auth/SignInForm';
+
+export const metadata: Metadata = {
+  title: 'Sign In | CRMC-AIMS',
+  description: 'Sign in to the Cebu Roosevelt Memorial Colleges Asset & Inventory Management System',
+};
+
+export default function SignInPage() {
+  return (
+    <AuthLayout>
+      <SignInForm />
+    </AuthLayout>
+  );
+}

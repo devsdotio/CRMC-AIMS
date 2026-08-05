@@ -11,7 +11,7 @@ export interface AccountSectionProps {
 
 export function AccountSection({ profile, onSaveProfile }: AccountSectionProps) {
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="w-full space-y-6">
       <ProfileForm profile={profile} onSaveProfile={onSaveProfile} />
       <ChangePasswordForm />
     </div>
