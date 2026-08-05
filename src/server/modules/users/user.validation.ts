@@ -8,16 +8,18 @@ export const profileStatusSchema = z.enum(PROFILE_STATUSES);
 /** Roles creatable via API (superadmin excluded — seed only). */
 export const provisionableRoleSchema = z.enum(["admin", "staff", "borrower"]);
 
+const passwordSchema = z
+  .string()
+  .min(8, "password must be at least 8 characters.")
+  .max(128, "password is too long.");
+
 export const createUserSchema = z.object({
   name: z.string().trim().min(1, "name is required.").max(255),
   email: z.string().trim().email("Valid email is required.").max(320),
   role: provisionableRoleSchema,
   department: z.string().trim().max(120).optional(),
   /** Admin-set initial password. Required — no invite/email signup flow. */
-  password: z
-    .string()
-    .min(8, "password must be at least 8 characters.")
-    .max(128, "password is too long."),
+  password: passwordSchema,
 });
 
 export const updateUserSchema = z
@@ -26,6 +28,8 @@ export const updateUserSchema = z
     role: provisionableRoleSchema.optional(),
     department: z.string().trim().max(120).nullable().optional(),
     status: profileStatusSchema.optional(),
+    /** Optional replacement password set by an admin. */
+    password: passwordSchema.optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: "At least one field must be provided for an update.",

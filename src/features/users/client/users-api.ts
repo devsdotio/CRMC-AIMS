@@ -1,4 +1,5 @@
 import type { UserAccount, UserRole, UserStatus } from "@/components/users/types";
+import { formatRelativeTime } from "@/lib/format-relative-time";
 
 export type ProfileDTO = {
   id: string;
@@ -9,6 +10,7 @@ export type ProfileDTO = {
   department: string | null;
   dateAdded: string;
   lastActive: string | null;
+  lastActiveAt: string | null;
   createdByUserId: string | null;
 };
 
@@ -25,11 +27,21 @@ export type UpdateUserPayload = {
   role?: Exclude<UserRole, "superadmin">;
   department?: string | null;
   status?: UserStatus;
+  /** Admin-set password replacement. Omit to leave password unchanged. */
+  password?: string;
 };
 
 export type MeProfile = ProfileDTO;
 
 export function toUserAccount(profile: ProfileDTO): UserAccount {
+  const lastActive =
+    profile.lastActive ??
+    (profile.status === "deactivated"
+      ? profile.lastActiveAt
+        ? `Deactivated · last seen ${formatRelativeTime(profile.lastActiveAt)}`
+        : "Deactivated"
+      : formatRelativeTime(profile.lastActiveAt));
+
   return {
     id: profile.id,
     name: profile.name,
@@ -38,9 +50,11 @@ export function toUserAccount(profile: ProfileDTO): UserAccount {
     status: profile.status,
     department: profile.department ?? "",
     dateAdded: profile.dateAdded,
-    lastActive: profile.lastActive ?? "—",
+    lastActive,
     activitySummary:
-      profile.status === "active" ? undefined : "Account deactivated",
+      profile.status === "active"
+        ? undefined
+        : "Account deactivated — sign-in blocked until reactivated",
   };
 }
 
@@ -121,5 +135,9 @@ export const usersApi = {
       method: "DELETE",
     });
     return response.data;
+  },
+
+  async reactivateUser(id: string): Promise<ProfileDTO> {
+    return this.updateUser(id, { status: "active" });
   },
 };

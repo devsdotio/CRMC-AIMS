@@ -88,3 +88,21 @@ export function useDeactivateUserMutation(): UseMutationResult<
     },
   });
 }
+
+export function useReactivateUserMutation(): UseMutationResult<
+  UserAccount,
+  Error,
+  string
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id) => {
+      const updated = await usersApi.reactivateUser(id);
+      return toUserAccount(updated);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: userQueryKeys.all });
+    },
+  });
+}

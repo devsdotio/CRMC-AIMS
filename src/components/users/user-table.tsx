@@ -11,9 +11,8 @@ export interface UserTableProps {
   onSelect: (user: UserAccount) => void;
   onEdit: (user: UserAccount) => void;
   onDeactivate: (user: UserAccount) => void;
+  onReactivate: (user: UserAccount) => void;
 }
-
-// ─── Matched Skeleton Row for Users Table ───────────────────────────────────
 
 function SkeletonTableRow() {
   return (
@@ -51,6 +50,7 @@ export function UserTable({
   onSelect,
   onEdit,
   onDeactivate,
+  onReactivate,
 }: UserTableProps) {
   if (loading) {
     return (
@@ -114,6 +114,7 @@ export function UserTable({
               onSelect={onSelect}
               onEdit={onEdit}
               onDeactivate={onDeactivate}
+              onReactivate={onReactivate}
             />
           ))}
         </tbody>

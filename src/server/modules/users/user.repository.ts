@@ -1,4 +1,4 @@
-import { and, asc, eq, ilike, or } from "drizzle-orm";
+import { and, asc, eq, ilike, isNull, lt, or } from "drizzle-orm";
 
 import { getDb } from "@/server/db";
 import {
@@ -8,6 +8,9 @@ import {
 } from "@/server/db/schema";
 
 import type { IProfileRepository, ListUsersFilters } from "./user.types";
+
+/** Minimum interval between last-active writes for the same user. */
+const LAST_ACTIVE_TOUCH_MS = 5 * 60 * 1000;
 
 export class ProfileRepository implements IProfileRepository {
   async findByUserId(userId: string): Promise<ProfileRow | null> {
@@ -78,5 +81,25 @@ export class ProfileRepository implements IProfileRepository {
       .where(eq(profiles.userId, userId))
       .returning();
     return row ?? null;
+  }
+
+  /**
+   * Records recent activity. Throttled to avoid a write on every request.
+   * Callers should treat failures as best-effort.
+   */
+  async touchLastActive(userId: string): Promise<void> {
+    const db = getDb();
+    const now = new Date();
+    const threshold = new Date(now.getTime() - LAST_ACTIVE_TOUCH_MS);
+
+    await db
+      .update(profiles)
+      .set({ lastActiveAt: now })
+      .where(
+        and(
+          eq(profiles.userId, userId),
+          or(isNull(profiles.lastActiveAt), lt(profiles.lastActiveAt, threshold))
+        )
+      );
   }
 }

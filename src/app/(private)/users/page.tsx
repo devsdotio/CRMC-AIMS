@@ -11,12 +11,16 @@ import { UserFilters } from "@/components/users/user-filters";
 import { UserTable } from "@/components/users/user-table";
 import { UserDetailPanel } from "@/components/users/user-detail-panel";
 import { InviteUserDialog } from "@/components/users/invite-user-dialog";
-import { EditUserDialog } from "@/components/users/edit-user-dialog";
+import {
+  EditUserDialog,
+  type EditUserSaveInput,
+} from "@/components/users/edit-user-dialog";
 import { DeactivateUserDialog } from "@/components/users/deactivate-user-dialog";
 import {
   useCreateUserMutation,
   useDeactivateUserMutation,
   useMeQuery,
+  useReactivateUserMutation,
   useUpdateUserMutation,
   useUsersQuery,
 } from "@/features/users/client";
@@ -33,6 +37,7 @@ export default function UsersPage() {
   const createUser = useCreateUserMutation();
   const updateUser = useUpdateUserMutation();
   const deactivateUser = useDeactivateUserMutation();
+  const reactivateUser = useReactivateUserMutation();
 
   const currentUserId = me?.id ?? "";
   const canInviteAdmin = me?.role === "superadmin";
@@ -72,7 +77,6 @@ export default function UsersPage() {
     });
   }, [users, filters]);
 
-  // Keep detail panel in sync with query updates
   const selectedSynced = useMemo(() => {
     if (!selectedUser) return null;
     return users.find((u) => u.id === selectedUser.id) ?? selectedUser;
@@ -111,19 +115,20 @@ export default function UsersPage() {
     });
   };
 
-  const handleSaveUser = async (updatedUser: UserAccount) => {
+  const handleSaveUser = async (input: EditUserSaveInput) => {
     setPageError(null);
-    if (updatedUser.role === "superadmin") {
+    if (input.role === "superadmin") {
       throw new Error("Cannot assign superadmin via this form.");
     }
 
     const saved = await updateUser.mutateAsync({
-      id: updatedUser.id,
+      id: input.id,
       payload: {
-        name: updatedUser.name,
-        role: updatedUser.role,
-        department: updatedUser.department || null,
-        status: updatedUser.status,
+        name: input.name,
+        role: input.role,
+        department: input.department || null,
+        status: input.status,
+        ...(input.password ? { password: input.password } : {}),
       },
     });
 
@@ -138,6 +143,18 @@ export default function UsersPage() {
 
     const saved = await deactivateUser.mutateAsync(userToDeactivate.id);
     setSelectedUser((prev) => (prev?.id === saved.id ? saved : prev));
+  };
+
+  const handleReactivate = async (userToReactivate: UserAccount) => {
+    setPageError(null);
+    try {
+      const saved = await reactivateUser.mutateAsync(userToReactivate.id);
+      setSelectedUser((prev) => (prev?.id === saved.id ? saved : prev));
+    } catch (err) {
+      setPageError(
+        err instanceof Error ? err.message : "Failed to reactivate account."
+      );
+    }
   };
 
   const loadError =
@@ -162,8 +179,8 @@ export default function UsersPage() {
             </span>
           </div>
           <p className="text-xs text-text-secondary mt-0.5">
-            Provision accounts without self-signup. Admins set email and initial
-            password for staff and borrowers; superadmins may also create admins.
+            Set passwords, deactivate or reactivate accounts, and track last
+            activity. Superadmins may also create admins.
           </p>
         </div>
 
@@ -202,6 +219,7 @@ export default function UsersPage() {
           onSelect={setSelectedUser}
           onEdit={setEditDialogUser}
           onDeactivate={setDeactivateDialogUser}
+          onReactivate={handleReactivate}
         />
       </main>
 
@@ -217,6 +235,9 @@ export default function UsersPage() {
         onDeactivate={(u) => {
           setSelectedUser(null);
           setDeactivateDialogUser(u);
+        }}
+        onReactivate={(u) => {
+          void handleReactivate(u);
         }}
       />
 

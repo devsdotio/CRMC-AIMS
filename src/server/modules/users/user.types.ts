@@ -9,7 +9,10 @@ export interface ProfileDTO {
   status: ProfileStatus;
   department: string | null;
   dateAdded: string;
+  /** Human-relative display string ("Active now", "2 hours ago", …). */
   lastActive: string | null;
+  /** ISO timestamp when last seen, or null if never. */
+  lastActiveAt: string | null;
   createdByUserId: string | null;
 }
 
@@ -27,6 +30,8 @@ export interface UpdateUserInput {
   role?: AppRole;
   department?: string | null;
   status?: ProfileStatus;
+  /** When set, replaces the auth password (admin-set). */
+  password?: string;
 }
 
 export interface ListUsersFilters {
@@ -48,6 +53,7 @@ export interface IProfileRepository {
       Omit<import("@/server/db/schema").ProfileRow, "userId" | "createdAt">
     >
   ): Promise<import("@/server/db/schema").ProfileRow | null>;
+  touchLastActive(userId: string): Promise<void>;
 }
 
 export type { ActorContext };

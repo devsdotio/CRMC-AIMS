@@ -10,6 +10,7 @@ export {
   useCreateUserMutation,
   useDeactivateUserMutation,
   useMeQuery,
+  useReactivateUserMutation,
   useUpdateUserMutation,
   useUsersQuery,
 } from "./use-users";

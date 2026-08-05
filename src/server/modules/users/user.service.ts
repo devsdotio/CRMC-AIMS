@@ -1,5 +1,6 @@
 import type { ProfileRow } from "@/server/db/schema";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { formatRelativeTime } from "@/lib/format-relative-time";
 import {
   BadRequestError,
   ConflictError,
@@ -33,6 +34,8 @@ function toDateString(value: Date | string): string {
 }
 
 export function toProfileDTO(row: ProfileRow): ProfileDTO {
+  const lastActiveAt = row.lastActiveAt ?? null;
+
   return {
     id: row.userId,
     email: row.email,
@@ -41,7 +44,17 @@ export function toProfileDTO(row: ProfileRow): ProfileDTO {
     status: row.status,
     department: row.department,
     dateAdded: toDateString(row.createdAt),
-    lastActive: null,
+    lastActive:
+      row.status === "deactivated"
+        ? lastActiveAt
+          ? `Deactivated · last seen ${formatRelativeTime(lastActiveAt)}`
+          : "Deactivated"
+        : formatRelativeTime(lastActiveAt),
+    lastActiveAt: lastActiveAt
+      ? lastActiveAt instanceof Date
+        ? lastActiveAt.toISOString()
+        : String(lastActiveAt)
+      : null,
     createdByUserId: row.createdByUserId,
   };
 }
@@ -79,11 +92,30 @@ export class UserService {
   ) {}
 
   async getMe(actor: ActorContext): Promise<ProfileDTO> {
+    // Record presence while loading the current profile (throttled in repo).
+    try {
+      await this.profileRepository.touchLastActive(actor.userId);
+    } catch {
+      // Best-effort — presence should not fail the profile load.
+    }
+
     const row = await this.profileRepository.findByUserId(actor.userId);
     if (!row) {
       throw new NotFoundError("Profile", actor.userId);
     }
     return toProfileDTO(row);
+  }
+
+  /**
+   * Best-effort last-active stamp for layouts / session gates.
+   * Does not throw.
+   */
+  async recordActivity(userId: string): Promise<void> {
+    try {
+      await this.profileRepository.touchLastActive(userId);
+    } catch {
+      // ignore
+    }
   }
 
   async listUsersForActor(
@@ -146,6 +178,7 @@ export class UserService {
         status: "active",
         department: input.department?.trim() || null,
         createdByUserId: actor.userId,
+        lastActiveAt: null,
       });
 
       return toProfileDTO(row);
@@ -188,15 +221,40 @@ export class UserService {
       assertCanAssignRole(actor, input.role);
     }
 
-    const updated = await this.profileRepository.update(userId, {
-      ...(input.name !== undefined ? { fullName: input.name } : {}),
-      ...(input.role !== undefined ? { role: input.role } : {}),
-      ...(input.department !== undefined ? { department: input.department } : {}),
-      ...(input.status !== undefined ? { status: input.status } : {}),
-    });
+    // Password changes go through Supabase Auth admin API only
+    if (input.password) {
+      const admin = createAdminClient();
+      const { error } = await admin.auth.admin.updateUserById(userId, {
+        password: input.password,
+      });
+      if (error) {
+        throw new BadRequestError(
+          error.message || "Failed to update user password."
+        );
+      }
+    }
 
-    if (!updated) {
-      throw new NotFoundError("User", userId);
+    const hasProfileFields =
+      input.name !== undefined ||
+      input.role !== undefined ||
+      input.department !== undefined ||
+      input.status !== undefined;
+
+    let updated: ProfileRow | null = existing;
+
+    if (hasProfileFields) {
+      updated = await this.profileRepository.update(userId, {
+        ...(input.name !== undefined ? { fullName: input.name } : {}),
+        ...(input.role !== undefined ? { role: input.role } : {}),
+        ...(input.department !== undefined
+          ? { department: input.department }
+          : {}),
+        ...(input.status !== undefined ? { status: input.status } : {}),
+      });
+
+      if (!updated) {
+        throw new NotFoundError("User", userId);
+      }
     }
 
     // Sync display name onto auth metadata (best-effort)
@@ -223,10 +281,21 @@ export class UserService {
       }
     }
 
-    return toProfileDTO(updated);
+    // Password-only update: re-read for fresh DTO
+    if (!hasProfileFields) {
+      const row = await this.profileRepository.findByUserId(userId);
+      if (!row) throw new NotFoundError("User", userId);
+      return toProfileDTO(row);
+    }
+
+    return toProfileDTO(updated!);
   }
 
   async deactivateUser(rawId: string, actor: ActorContext): Promise<ProfileDTO> {
     return this.updateUser(rawId, { status: "deactivated" }, actor);
+  }
+
+  async reactivateUser(rawId: string, actor: ActorContext): Promise<ProfileDTO> {
+    return this.updateUser(rawId, { status: "active" }, actor);
   }
 }

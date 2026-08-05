@@ -1,17 +1,28 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Edit, AlertTriangle, Check } from "lucide-react";
+import { X, Edit, AlertTriangle, Check, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { UserAccount, UserRole } from "./types";
+import type { UserAccount, UserRole, UserStatus } from "./types";
 import { INVITABLE_ROLES, ROLE_DEFINITIONS } from "./types";
+
+export type EditUserSaveInput = {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  department: string;
+  status: UserStatus;
+  /** When set (and non-empty), replaces the user's password. */
+  password?: string;
+};
 
 export interface EditUserDialogProps {
   user: UserAccount | null;
   currentUserId: string;
   isOpen: boolean;
   onClose: () => void;
-  onSave: (updated: UserAccount) => void | Promise<void>;
+  onSave: (updated: EditUserSaveInput) => void | Promise<void>;
   canInviteAdmin?: boolean;
 }
 
@@ -20,7 +31,7 @@ interface EditUserDialogFormProps {
   currentUserId: string;
   canInviteAdmin: boolean;
   onClose: () => void;
-  onSave: (updated: UserAccount) => void | Promise<void>;
+  onSave: (updated: EditUserSaveInput) => void | Promise<void>;
 }
 
 function EditUserDialogForm({
@@ -34,6 +45,10 @@ function EditUserDialogForm({
   const email = user.email;
   const [role, setRole] = useState<UserRole>(() => user.role);
   const [department, setDepartment] = useState(() => user.department);
+  const [status, setStatus] = useState<UserStatus>(() => user.status);
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -59,17 +74,28 @@ function EditUserDialogForm({
       setError("Please enter the user's full name.");
       return;
     }
+    if (password || confirmPassword) {
+      if (password.length < 8) {
+        setError("New password must be at least 8 characters.");
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError("Passwords do not match.");
+        return;
+      }
+    }
 
     setIsSubmitting(true);
     setError("");
     try {
       await onSave({
-        ...user,
+        id: user.id,
         name: name.trim(),
-        // Email is identity — not editable via this API
         email: user.email,
         role,
         department: department.trim(),
+        status,
+        ...(password ? { password } : {}),
       });
       onClose();
     } catch (err) {
@@ -95,7 +121,7 @@ function EditUserDialogForm({
             </div>
             <div>
               <h3 id="edit-dialog-title" className="text-base font-bold text-text leading-tight">
-                Edit Staff Account & Access Role
+                Edit User Account
               </h3>
               <p className="text-xs text-text-secondary mt-0.5 font-mono">
                 {user.email}
@@ -133,7 +159,7 @@ function EditUserDialogForm({
 
             <div className="space-y-1">
               <label htmlFor="edit-email-input" className="block text-xs font-semibold text-text">
-                Hospital Email <span className="text-accent">*</span>
+                Login Email
               </label>
               <input
                 id="edit-email-input"
@@ -158,6 +184,103 @@ function EditUserDialogForm({
               onChange={(e) => setDepartment(e.target.value)}
               className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent"
             />
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-xs font-bold uppercase tracking-wider text-text-secondary">
+              Account Status
+            </label>
+            <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Account status">
+              {(
+                [
+                  { value: "active" as const, label: "Active", hint: "Can sign in" },
+                  {
+                    value: "deactivated" as const,
+                    label: "Deactivated",
+                    hint: "Sign-in blocked",
+                  },
+                ] as const
+              ).map((opt) => {
+                const selected = status === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    disabled={isSelf && opt.value === "deactivated"}
+                    onClick={() => setStatus(opt.value)}
+                    className={cn(
+                      "flex flex-col items-start gap-0.5 p-3 rounded-xl border text-left transition-all cursor-pointer outline-none",
+                      "focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50 disabled:cursor-not-allowed",
+                      selected
+                        ? opt.value === "active"
+                          ? "bg-status-active-bg/10 border-status-active-text/40 ring-1 ring-status-active-text/30"
+                          : "bg-status-retired-bg/10 border-status-retired-text/40 ring-1 ring-status-retired-text/30"
+                        : "bg-bg border-border hover:bg-bg-subtle/60"
+                    )}
+                  >
+                    <span className="text-xs font-bold text-text">{opt.label}</span>
+                    <span className="text-[10px] text-text-secondary">{opt.hint}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="space-y-2 border border-border rounded-xl p-3 bg-bg-subtle/40">
+            <label className="block text-xs font-bold uppercase tracking-wider text-text-secondary">
+              Set New Password
+            </label>
+            <p className="text-[11px] text-text-secondary -mt-1">
+              Leave blank to keep the current password. Share any new password with the user out of band.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label htmlFor="edit-password-input" className="block text-xs font-semibold text-text">
+                  New Password
+                </label>
+                <div className="relative">
+                  <input
+                    id="edit-password-input"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      if (error) setError("");
+                    }}
+                    autoComplete="new-password"
+                    placeholder="Min. 8 characters"
+                    className="w-full h-9 px-3 pr-9 text-xs bg-bg border border-border rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-text-secondary hover:text-text p-0.5"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label htmlFor="edit-confirm-password-input" className="block text-xs font-semibold text-text">
+                  Confirm Password
+                </label>
+                <input
+                  id="edit-confirm-password-input"
+                  type={showPassword ? "text" : "password"}
+                  value={confirmPassword}
+                  onChange={(e) => {
+                    setConfirmPassword(e.target.value);
+                    if (error) setError("");
+                  }}
+                  autoComplete="new-password"
+                  placeholder="Re-enter if changing"
+                  className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+              </div>
+            </div>
           </div>
 
           <div className="space-y-2">

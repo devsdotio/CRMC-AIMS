@@ -46,6 +46,12 @@ export const profiles = pgTable(
     /** Staff who provisioned this account (null for seed/superadmin bootstrap). */
     createdByUserId: uuid("created_by_user_id"),
 
+    /**
+     * Last time this user hit an authenticated app route / API.
+     * Null until first successful session after account creation.
+     */
+    lastActiveAt: timestamp("last_active_at", { withTimezone: true }),
+
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -57,6 +63,7 @@ export const profiles = pgTable(
     index("profiles_role_idx").on(table.role),
     index("profiles_status_idx").on(table.status),
     index("profiles_email_idx").on(table.email),
+    index("profiles_last_active_at_idx").on(table.lastActiveAt),
   ]
 );
 

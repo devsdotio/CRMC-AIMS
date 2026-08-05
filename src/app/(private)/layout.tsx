@@ -4,6 +4,7 @@ import DashboardLayout from "@/components/dashboard-layout";
 import { createClient } from "@/lib/supabase/server";
 import { getDb } from "@/server/db";
 import { profiles } from "@/server/db/schema";
+import { UserService } from "@/server/modules/users/user.service";
 import { isStaffShellRole, type AppRole } from "@/server/shared/roles";
 import { eq } from "drizzle-orm";
 
@@ -42,6 +43,9 @@ export default async function PrivateLayout({
     // Borrowers are authenticated but not admitted into the staff workspace yet.
     redirect("/sign-in?error=borrower_portal");
   }
+
+  // Throttled presence stamp (does not throw).
+  await new UserService().recordActivity(user.id);
 
   return <DashboardLayout>{children}</DashboardLayout>;
 }

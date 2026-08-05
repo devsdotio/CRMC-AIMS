@@ -74,6 +74,16 @@ export class UserController {
     }
   }
 
+  async reactivateUser(id: string) {
+    try {
+      const session = await requireUserManager();
+      const data = await this.userService.reactivateUser(id, session.actor);
+      return ok(data);
+    } catch (error) {
+      return handleError(error);
+    }
+  }
+
   /** Lightweight session probe for any authenticated profile. */
   async sessionProbe() {
     try {
