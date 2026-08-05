@@ -27,19 +27,32 @@ const journal = JSON.parse(
 };
 
 async function main() {
-  const countRows = await sql`select count(*)::int as n from assets`;
-  const n = countRows[0]?.n ?? 0;
-  console.log(`Existing public.assets row count: ${n}`);
+  const assetsExists = await sql`
+    select exists (
+      select 1
+      from information_schema.tables
+      where table_schema = 'public' and table_name = 'assets'
+    ) as exists
+  `;
+  const hasAssets = Boolean(assetsExists[0]?.exists);
 
-  if (n > 0) {
-    console.error(
-      "Refusing to drop assets — table has data. Back up or migrate manually first."
-    );
-    process.exitCode = 1;
-    return;
+  if (hasAssets) {
+    const countRows = await sql`select count(*)::int as n from assets`;
+    const n = countRows[0]?.n ?? 0;
+    console.log(`Existing public.assets row count: ${n}`);
+
+    if (n > 0) {
+      console.error(
+        "Refusing to drop assets — table has data. Back up or migrate manually first."
+      );
+      process.exitCode = 1;
+      return;
+    }
+  } else {
+    console.log("public.assets does not exist (likely mid-failed push). Continuing…");
   }
 
-  console.log("Dropping incompatible draft objects...");
+  console.log("Dropping incompatible / partial draft objects...");
   await sql.begin(async (tx) => {
     // Drop enums via cascade of tables that use them
     await tx`drop table if exists "assets" cascade`;
