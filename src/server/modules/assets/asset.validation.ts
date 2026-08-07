@@ -32,21 +32,29 @@ export const updateAssetSchema = createAssetSchema
     message: "At least one field must be provided for an update.",
   });
 
-export const returnAssetSchema = z.object({
-  condition: z.string().trim().min(1, "condition is required.").max(2000),
-  status: assetStatusSchema.optional(),
-});
-
-/** Borrower identity is subject/assignee; actor staff is always from session. */
+/** Borrower is subject/assignee; staff actor always from session (never body). */
 export const releaseAssetSchema = z.object({
-  borrowerName: z.string().trim().min(1).max(255).optional(),
-  borrowerDepartment: z.string().trim().max(120).optional(),
+  borrowerName: z
+    .string()
+    .trim()
+    .min(1, "borrowerName is required for accountable release.")
+    .max(255),
+  borrowerDepartment: z.string().trim().min(1).max(120).optional(),
+  borrowerEmail: z.string().trim().email().max(320).optional(),
+  borrowerPhone: z.string().trim().max(40).optional(),
   notes: z.string().trim().max(2000).optional(),
   expectedReturnDate: z
     .string()
     .trim()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "expectedReturnDate must be YYYY-MM-DD.")
     .optional(),
+  requestId: z.string().uuid().optional(),
+});
+
+export const returnAssetSchema = z.object({
+  condition: z.string().trim().min(1, "condition is required.").max(2000),
+  status: assetStatusSchema.optional(),
+  flagMaintenance: z.boolean().optional(),
 });
 
 export const flagMaintenanceSchema = z.object({

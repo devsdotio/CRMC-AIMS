@@ -1,6 +1,7 @@
 import { and, count, desc, eq, ilike, or, sql } from "drizzle-orm";
 
 import { getDb } from "@/server/db";
+import type { DbSession } from "@/server/db/transaction";
 import {
   borrowRequests,
   type BorrowRequestRow,
@@ -13,8 +14,12 @@ import type {
 } from "./borrow-request.types";
 
 export class BorrowRequestRepository implements IBorrowRequestRepository {
-  async findById(id: string): Promise<BorrowRequestRow | null> {
-    const db = getDb();
+  private db(session?: DbSession) {
+    return session ?? getDb();
+  }
+
+  async findById(id: string, session?: DbSession): Promise<BorrowRequestRow | null> {
+    const db = this.db(session);
     const [row] = await db
       .select()
       .from(borrowRequests)
@@ -23,8 +28,11 @@ export class BorrowRequestRepository implements IBorrowRequestRepository {
     return row ?? null;
   }
 
-  async list(filters: ListBorrowRequestFilters = {}): Promise<BorrowRequestRow[]> {
-    const db = getDb();
+  async list(
+    filters: ListBorrowRequestFilters = {},
+    session?: DbSession
+  ): Promise<BorrowRequestRow[]> {
+    const db = this.db(session);
     const conditions = [];
 
     if (filters.status) {
@@ -46,19 +54,22 @@ export class BorrowRequestRepository implements IBorrowRequestRepository {
       );
     }
 
-    const base = db.select().from(borrowRequests).orderBy(desc(borrowRequests.requestedAt));
+    const base = db
+      .select()
+      .from(borrowRequests)
+      .orderBy(desc(borrowRequests.requestedAt));
     if (conditions.length === 0) return base;
     return base.where(and(...conditions));
   }
 
-  async countAll(): Promise<number> {
-    const db = getDb();
+  async countAll(session?: DbSession): Promise<number> {
+    const db = this.db(session);
     const [row] = await db.select({ value: count() }).from(borrowRequests);
     return Number(row?.value ?? 0);
   }
 
-  async countPending(): Promise<number> {
-    const db = getDb();
+  async countPending(session?: DbSession): Promise<number> {
+    const db = this.db(session);
     const [row] = await db
       .select({ value: count() })
       .from(borrowRequests)
@@ -67,9 +78,10 @@ export class BorrowRequestRepository implements IBorrowRequestRepository {
   }
 
   async create(
-    data: Omit<NewBorrowRequestRow, "id" | "createdAt" | "updatedAt">
+    data: Omit<NewBorrowRequestRow, "id" | "createdAt" | "updatedAt">,
+    session?: DbSession
   ): Promise<BorrowRequestRow> {
-    const db = getDb();
+    const db = this.db(session);
     const [row] = await db.insert(borrowRequests).values(data).returning();
     if (!row) throw new Error("Failed to create borrow request.");
     return row;
@@ -77,9 +89,10 @@ export class BorrowRequestRepository implements IBorrowRequestRepository {
 
   async update(
     id: string,
-    data: Partial<Omit<BorrowRequestRow, "id" | "createdAt" | "requestCode">>
+    data: Partial<Omit<BorrowRequestRow, "id" | "createdAt" | "requestCode">>,
+    session?: DbSession
   ): Promise<BorrowRequestRow | null> {
-    const db = getDb();
+    const db = this.db(session);
     const [row] = await db
       .update(borrowRequests)
       .set({ ...data, updatedAt: new Date() })
@@ -89,7 +102,6 @@ export class BorrowRequestRepository implements IBorrowRequestRepository {
   }
 }
 
-/** Next request sequential for the year (best-effort, not lock-free perfect). */
 export async function nextBorrowRequestSequence(): Promise<number> {
   const db = getDb();
   const [row] = await db

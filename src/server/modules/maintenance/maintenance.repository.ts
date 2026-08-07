@@ -1,6 +1,7 @@
 import { and, count, desc, eq, ilike, or, sql } from "drizzle-orm";
 
 import { getDb } from "@/server/db";
+import type { DbSession } from "@/server/db/transaction";
 import {
   maintenanceLogs,
   type MaintenanceLogRow,
@@ -13,8 +14,12 @@ import type {
 } from "./maintenance.types";
 
 export class MaintenanceRepository implements IMaintenanceRepository {
-  async findById(id: string): Promise<MaintenanceLogRow | null> {
-    const db = getDb();
+  private db(session?: DbSession) {
+    return session ?? getDb();
+  }
+
+  async findById(id: string, session?: DbSession): Promise<MaintenanceLogRow | null> {
+    const db = this.db(session);
     const [row] = await db
       .select()
       .from(maintenanceLogs)
@@ -23,8 +28,11 @@ export class MaintenanceRepository implements IMaintenanceRepository {
     return row ?? null;
   }
 
-  async list(filters: ListMaintenanceFilters = {}): Promise<MaintenanceLogRow[]> {
-    const db = getDb();
+  async list(
+    filters: ListMaintenanceFilters = {},
+    session?: DbSession
+  ): Promise<MaintenanceLogRow[]> {
+    const db = this.db(session);
     const conditions = [];
 
     if (filters.openOnly) {
@@ -54,8 +62,8 @@ export class MaintenanceRepository implements IMaintenanceRepository {
     return base.where(and(...conditions));
   }
 
-  async countOpen(): Promise<number> {
-    const db = getDb();
+  async countOpen(session?: DbSession): Promise<number> {
+    const db = this.db(session);
     const [row] = await db
       .select({ value: count() })
       .from(maintenanceLogs)
@@ -63,8 +71,8 @@ export class MaintenanceRepository implements IMaintenanceRepository {
     return Number(row?.value ?? 0);
   }
 
-  async countYear(): Promise<number> {
-    const db = getDb();
+  async countYear(session?: DbSession): Promise<number> {
+    const db = this.db(session);
     const [row] = await db
       .select({ value: count() })
       .from(maintenanceLogs)
@@ -75,9 +83,10 @@ export class MaintenanceRepository implements IMaintenanceRepository {
   }
 
   async create(
-    data: Omit<NewMaintenanceLogRow, "id" | "createdAt" | "updatedAt">
+    data: Omit<NewMaintenanceLogRow, "id" | "createdAt" | "updatedAt">,
+    session?: DbSession
   ): Promise<MaintenanceLogRow> {
-    const db = getDb();
+    const db = this.db(session);
     const [row] = await db.insert(maintenanceLogs).values(data).returning();
     if (!row) throw new Error("Failed to create maintenance log.");
     return row;
@@ -85,9 +94,10 @@ export class MaintenanceRepository implements IMaintenanceRepository {
 
   async update(
     id: string,
-    data: Partial<Omit<MaintenanceLogRow, "id" | "createdAt" | "logCode">>
+    data: Partial<Omit<MaintenanceLogRow, "id" | "createdAt" | "logCode">>,
+    session?: DbSession
   ): Promise<MaintenanceLogRow | null> {
-    const db = getDb();
+    const db = this.db(session);
     const [row] = await db
       .update(maintenanceLogs)
       .set({ ...data, updatedAt: new Date() })

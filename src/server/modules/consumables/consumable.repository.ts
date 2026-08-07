@@ -1,6 +1,7 @@
 import { and, count, desc, eq, ilike, or, sql } from "drizzle-orm";
 
 import { getDb } from "@/server/db";
+import type { DbSession } from "@/server/db/transaction";
 import {
   consumables,
   type ConsumableRow,
@@ -13,8 +14,12 @@ import type {
 } from "./consumable.types";
 
 export class ConsumableRepository implements IConsumableRepository {
-  async findById(id: string): Promise<ConsumableRow | null> {
-    const db = getDb();
+  private db(session?: DbSession) {
+    return session ?? getDb();
+  }
+
+  async findById(id: string, session?: DbSession): Promise<ConsumableRow | null> {
+    const db = this.db(session);
     const [row] = await db
       .select()
       .from(consumables)
@@ -23,8 +28,24 @@ export class ConsumableRepository implements IConsumableRepository {
     return row ?? null;
   }
 
-  async findByCode(itemCode: string): Promise<ConsumableRow | null> {
-    const db = getDb();
+  async findByIdForUpdate(
+    id: string,
+    session: DbSession
+  ): Promise<ConsumableRow | null> {
+    const [row] = await session
+      .select()
+      .from(consumables)
+      .where(eq(consumables.id, id))
+      .for("update")
+      .limit(1);
+    return row ?? null;
+  }
+
+  async findByCode(
+    itemCode: string,
+    session?: DbSession
+  ): Promise<ConsumableRow | null> {
+    const db = this.db(session);
     const [row] = await db
       .select()
       .from(consumables)
@@ -33,8 +54,11 @@ export class ConsumableRepository implements IConsumableRepository {
     return row ?? null;
   }
 
-  async list(filters: ListConsumableFilters = {}): Promise<ConsumableRow[]> {
-    const db = getDb();
+  async list(
+    filters: ListConsumableFilters = {},
+    session?: DbSession
+  ): Promise<ConsumableRow[]> {
+    const db = this.db(session);
     const conditions = [];
 
     if (filters.category) {
@@ -51,8 +75,6 @@ export class ConsumableRepository implements IConsumableRepository {
       );
     }
 
-    // stockLevel filtered in service after load for "low" band (needs threshold ratio)
-    // critical: qty <= min can be done in SQL
     if (filters.stockLevel === "critical") {
       conditions.push(
         sql`${consumables.currentQty} <= ${consumables.minThreshold}`
@@ -64,8 +86,8 @@ export class ConsumableRepository implements IConsumableRepository {
     return base.where(and(...conditions));
   }
 
-  async countYear(): Promise<number> {
-    const db = getDb();
+  async countYear(session?: DbSession): Promise<number> {
+    const db = this.db(session);
     const [row] = await db
       .select({ value: count() })
       .from(consumables)
@@ -75,9 +97,8 @@ export class ConsumableRepository implements IConsumableRepository {
     return Number(row?.value ?? 0);
   }
 
-  async countLowStock(): Promise<number> {
-    const db = getDb();
-    // Low or critical: current_qty <= min * 1.2
+  async countLowStock(session?: DbSession): Promise<number> {
+    const db = this.db(session);
     const [row] = await db
       .select({ value: count() })
       .from(consumables)
@@ -88,9 +109,10 @@ export class ConsumableRepository implements IConsumableRepository {
   }
 
   async create(
-    data: Omit<NewConsumableRow, "id" | "createdAt" | "updatedAt">
+    data: Omit<NewConsumableRow, "id" | "createdAt" | "updatedAt">,
+    session?: DbSession
   ): Promise<ConsumableRow> {
-    const db = getDb();
+    const db = this.db(session);
     const [row] = await db.insert(consumables).values(data).returning();
     if (!row) throw new Error("Failed to create consumable.");
     return row;
@@ -98,9 +120,10 @@ export class ConsumableRepository implements IConsumableRepository {
 
   async update(
     id: string,
-    data: Partial<Omit<ConsumableRow, "id" | "createdAt" | "itemCode">>
+    data: Partial<Omit<ConsumableRow, "id" | "createdAt" | "itemCode">>,
+    session?: DbSession
   ): Promise<ConsumableRow | null> {
-    const db = getDb();
+    const db = this.db(session);
     const [row] = await db
       .update(consumables)
       .set({ ...data, updatedAt: new Date() })

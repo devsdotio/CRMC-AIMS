@@ -1,6 +1,7 @@
 import { and, desc, eq, isNotNull } from "drizzle-orm";
 
 import { getDb } from "@/server/db";
+import type { DbSession } from "@/server/db/transaction";
 import {
   assetLifecycleEvents,
   type AssetLifecycleEventRow,
@@ -14,10 +15,15 @@ import type { ListLifecycleEventsFilters } from "./asset.lifecycle.types";
  * Intentionally no update/delete methods — audit integrity.
  */
 export class AssetLifecycleRepository {
+  private db(session?: DbSession) {
+    return session ?? getDb();
+  }
+
   async append(
-    event: Omit<NewAssetLifecycleEventRow, "id" | "createdAt">
+    event: Omit<NewAssetLifecycleEventRow, "id" | "createdAt">,
+    session?: DbSession
   ): Promise<AssetLifecycleEventRow> {
-    const db = getDb();
+    const db = this.db(session);
     const [row] = await db.insert(assetLifecycleEvents).values(event).returning();
 
     if (!row) {
@@ -29,9 +35,10 @@ export class AssetLifecycleRepository {
 
   async findByAssetId(
     assetId: string,
-    limit = 100
+    limit = 100,
+    session?: DbSession
   ): Promise<AssetLifecycleEventRow[]> {
-    const db = getDb();
+    const db = this.db(session);
     return db
       .select()
       .from(assetLifecycleEvents)
@@ -41,9 +48,10 @@ export class AssetLifecycleRepository {
   }
 
   async findMany(
-    filters: ListLifecycleEventsFilters = {}
+    filters: ListLifecycleEventsFilters = {},
+    session?: DbSession
   ): Promise<AssetLifecycleEventRow[]> {
-    const db = getDb();
+    const db = this.db(session);
     const limit = Math.min(filters.limit ?? 100, 500);
     const conditions = [];
 
@@ -57,7 +65,6 @@ export class AssetLifecycleRepository {
       conditions.push(eq(assetLifecycleEvents.eventType, filters.eventType));
     }
 
-    // Exclude fully orphaned noise unless filtering by assetCode (post-delete audit)
     if (!filters.assetId && !filters.assetCode) {
       conditions.push(isNotNull(assetLifecycleEvents.assetId));
     }

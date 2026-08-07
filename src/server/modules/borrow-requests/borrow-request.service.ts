@@ -3,7 +3,7 @@ import type {
   BorrowRequestRow,
 } from "@/server/db/schema";
 import { formatRelativeTime } from "@/lib/format-relative-time";
-import { formatSequentialCode, isoNow } from "@/server/shared/codes";
+import { generateOperationalCode, isoNow } from "@/server/shared/codes";
 import type { ActorContext } from "@/server/shared/auth";
 import {
   BadRequestError,
@@ -11,10 +11,7 @@ import {
   NotFoundError,
 } from "@/server/shared/errors";
 
-import {
-  BorrowRequestRepository,
-  nextBorrowRequestSequence,
-} from "./borrow-request.repository";
+import { BorrowRequestRepository } from "./borrow-request.repository";
 import type {
   BorrowRequestDTO,
   IBorrowRequestRepository,
@@ -88,8 +85,7 @@ export class BorrowRequestService {
 
   async create(rawInput: unknown, actor: ActorContext): Promise<BorrowRequestDTO> {
     const input = createBorrowRequestSchema.parse(rawInput);
-    const seq = await nextBorrowRequestSequence();
-    const requestCode = formatSequentialCode("REQ", seq);
+    const requestCode = generateOperationalCode("REQ");
 
     const submitted = historyEntry("submitted", actor.displayName, "Request recorded");
 

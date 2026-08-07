@@ -1,6 +1,7 @@
 import { and, count, desc, eq, ilike, lt, or, sql } from "drizzle-orm";
 
 import { getDb } from "@/server/db";
+import type { DbSession } from "@/server/db/transaction";
 import {
   borrowTransactions,
   type BorrowTransactionRow,
@@ -14,8 +15,15 @@ import type {
 } from "./borrow-log.types";
 
 export class BorrowLogRepository implements IBorrowLogRepository {
-  async findById(id: string): Promise<BorrowTransactionRow | null> {
-    const db = getDb();
+  private db(session?: DbSession) {
+    return session ?? getDb();
+  }
+
+  async findById(
+    id: string,
+    session?: DbSession
+  ): Promise<BorrowTransactionRow | null> {
+    const db = this.db(session);
     const [row] = await db
       .select()
       .from(borrowTransactions)
@@ -24,10 +32,24 @@ export class BorrowLogRepository implements IBorrowLogRepository {
     return row ?? null;
   }
 
-  async findActiveByAssetId(
-    assetId: string
+  async findByIdForUpdate(
+    id: string,
+    session: DbSession
   ): Promise<BorrowTransactionRow | null> {
-    const db = getDb();
+    const [row] = await session
+      .select()
+      .from(borrowTransactions)
+      .where(eq(borrowTransactions.id, id))
+      .for("update")
+      .limit(1);
+    return row ?? null;
+  }
+
+  async findActiveByAssetId(
+    assetId: string,
+    session?: DbSession
+  ): Promise<BorrowTransactionRow | null> {
+    const db = this.db(session);
     const [row] = await db
       .select()
       .from(borrowTransactions)
@@ -41,8 +63,11 @@ export class BorrowLogRepository implements IBorrowLogRepository {
     return row ?? null;
   }
 
-  async list(filters: ListBorrowLogFilters = {}): Promise<BorrowTransactionRow[]> {
-    const db = getDb();
+  async list(
+    filters: ListBorrowLogFilters = {},
+    session?: DbSession
+  ): Promise<BorrowTransactionRow[]> {
+    const db = this.db(session);
     const conditions = [];
     const today = todayDateString();
 
@@ -50,7 +75,6 @@ export class BorrowLogRepository implements IBorrowLogRepository {
       conditions.push(eq(borrowTransactions.status, "returned"));
     } else if (filters.status === "active") {
       conditions.push(eq(borrowTransactions.status, "active"));
-      // not overdue: due_date >= today
       conditions.push(sql`${borrowTransactions.dueDate} >= ${today}`);
     } else if (filters.status === "overdue") {
       conditions.push(eq(borrowTransactions.status, "active"));
@@ -82,8 +106,8 @@ export class BorrowLogRepository implements IBorrowLogRepository {
     return base.where(and(...conditions));
   }
 
-  async countActive(): Promise<number> {
-    const db = getDb();
+  async countActive(session?: DbSession): Promise<number> {
+    const db = this.db(session);
     const [row] = await db
       .select({ value: count() })
       .from(borrowTransactions)
@@ -91,8 +115,8 @@ export class BorrowLogRepository implements IBorrowLogRepository {
     return Number(row?.value ?? 0);
   }
 
-  async countOverdue(): Promise<number> {
-    const db = getDb();
+  async countOverdue(session?: DbSession): Promise<number> {
+    const db = this.db(session);
     const today = todayDateString();
     const [row] = await db
       .select({ value: count() })
@@ -106,8 +130,8 @@ export class BorrowLogRepository implements IBorrowLogRepository {
     return Number(row?.value ?? 0);
   }
 
-  async countYear(): Promise<number> {
-    const db = getDb();
+  async countYear(session?: DbSession): Promise<number> {
+    const db = this.db(session);
     const [row] = await db
       .select({ value: count() })
       .from(borrowTransactions)
@@ -118,9 +142,10 @@ export class BorrowLogRepository implements IBorrowLogRepository {
   }
 
   async create(
-    data: Omit<NewBorrowTransactionRow, "id" | "createdAt" | "updatedAt">
+    data: Omit<NewBorrowTransactionRow, "id" | "createdAt" | "updatedAt">,
+    session?: DbSession
   ): Promise<BorrowTransactionRow> {
-    const db = getDb();
+    const db = this.db(session);
     const [row] = await db.insert(borrowTransactions).values(data).returning();
     if (!row) throw new Error("Failed to create borrow log.");
     return row;
@@ -128,9 +153,10 @@ export class BorrowLogRepository implements IBorrowLogRepository {
 
   async update(
     id: string,
-    data: Partial<Omit<BorrowTransactionRow, "id" | "createdAt" | "logCode">>
+    data: Partial<Omit<BorrowTransactionRow, "id" | "createdAt" | "logCode">>,
+    session?: DbSession
   ): Promise<BorrowTransactionRow | null> {
-    const db = getDb();
+    const db = this.db(session);
     const [row] = await db
       .update(borrowTransactions)
       .set({ ...data, updatedAt: new Date() })

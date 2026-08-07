@@ -2,19 +2,29 @@ import type {
   BorrowLogHistoryEntry,
   BorrowTransactionRow,
 } from "@/server/db/schema";
-import { formatSequentialCode, isoNow, todayDateString } from "@/server/shared/codes";
+import {
+  dueDatePlusDays,
+  generateOperationalCode,
+  isoNow,
+  todayDateString,
+} from "@/server/shared/codes";
 import type { ActorContext } from "@/server/shared/auth";
 import {
   ConflictError,
   NotFoundError,
 } from "@/server/shared/errors";
+import {
+  isUniqueViolation,
+  withTransaction,
+  type DbSession,
+} from "@/server/db/transaction";
 import { AssetRepository } from "@/server/modules/assets/asset.repository";
 import { AssetLifecycleService } from "@/server/modules/assets/asset.lifecycle.service";
 import { BorrowRequestRepository } from "@/server/modules/borrow-requests/borrow-request.repository";
-import { MaintenanceLogService } from "@/server/modules/maintenance/maintenance.service";
+import { MaintenanceRepository } from "@/server/modules/maintenance/maintenance.repository";
 
 import { BorrowLogRepository } from "./borrow-log.repository";
-import type { BorrowLogDTO, IBorrowLogRepository } from "./borrow-log.types";
+import type { BorrowLogDTO } from "./borrow-log.types";
 import {
   borrowLogIdSchema,
   listBorrowLogQuerySchema,
@@ -86,13 +96,18 @@ function historyEntry(
   };
 }
 
+/**
+ * Custody authority for coded equipment.
+ * Release/return always write: borrow log + asset holder + lifecycle (atomic).
+ * Optional: request status + maintenance open case.
+ */
 export class BorrowLogService {
   constructor(
-    private readonly repo: IBorrowLogRepository = new BorrowLogRepository(),
-    private readonly assets: AssetRepository = new AssetRepository(),
-    private readonly lifecycle: AssetLifecycleService = new AssetLifecycleService(),
-    private readonly requests: BorrowRequestRepository = new BorrowRequestRepository(),
-    private readonly maintenance: MaintenanceLogService = new MaintenanceLogService()
+    private readonly repo = new BorrowLogRepository(),
+    private readonly assets = new AssetRepository(),
+    private readonly lifecycle = new AssetLifecycleService(),
+    private readonly requests = new BorrowRequestRepository(),
+    private readonly maintenance = new MaintenanceRepository()
   ) {}
 
   async list(rawQuery: unknown): Promise<BorrowLogDTO[]> {
@@ -109,18 +124,37 @@ export class BorrowLogService {
   }
 
   /**
-   * Releases an asset: opens a custody log + stamps asset.currentHolder + lifecycle.
+   * Atomic release: lock asset → open log → set holder → lifecycle.
+   * Race-safe via FOR UPDATE + unique index on one active log per asset.
    */
   async release(rawInput: unknown, actor: ActorContext): Promise<BorrowLogDTO> {
     const input = releaseBorrowSchema.parse(rawInput);
-    const asset = await this.assets.findById(input.assetId);
+
+    try {
+      return await withTransaction(async (tx) => this.releaseInTx(input, actor, tx));
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        throw new ConflictError(
+          "Asset already has an active borrow log (concurrent release prevented)."
+        );
+      }
+      throw error;
+    }
+  }
+
+  private async releaseInTx(
+    input: ReturnType<typeof releaseBorrowSchema.parse>,
+    actor: ActorContext,
+    tx: DbSession
+  ): Promise<BorrowLogDTO> {
+    const asset = await this.assets.findByIdForUpdate(input.assetId, tx);
     if (!asset) throw new NotFoundError("Asset", input.assetId);
 
     if (asset.status !== "active" || asset.currentHolder) {
       throw new ConflictError("Asset is not available for release.");
     }
 
-    const open = await this.repo.findActiveByAssetId(asset.id);
+    const open = await this.repo.findActiveByAssetId(asset.id, tx);
     if (open) {
       throw new ConflictError("Asset already has an active borrow log.");
     }
@@ -129,7 +163,7 @@ export class BorrowLogService {
     let requestCode: string | null = input.requestCode ?? null;
 
     if (input.requestId) {
-      const req = await this.requests.findById(input.requestId);
+      const req = await this.requests.findById(input.requestId, tx);
       if (!req) throw new NotFoundError("Borrow request", input.requestId);
       if (req.status !== "approved") {
         throw new ConflictError("Borrow request must be approved before release.");
@@ -138,62 +172,78 @@ export class BorrowLogService {
       requestId = req.id;
     }
 
-    const seq = (await this.repo.countYear()) + 1;
-    const logCode = formatSequentialCode("LOG", seq);
+    const logCode = generateOperationalCode("LOG");
     const entry = historyEntry("released", actor.displayName, input.notes);
 
-    const row = await this.repo.create({
-      logCode,
-      requestId,
-      requestCode,
-      assetId: asset.id,
-      assetCode: asset.assetCode,
-      assetName: asset.name,
-      category: asset.category,
-      borrowerUserId: input.borrowerUserId ?? null,
-      borrowerName: input.borrowerName,
-      borrowerEmail: (input.borrowerEmail ?? "").toLowerCase(),
-      borrowerPhone: input.borrowerPhone ?? "",
-      department: input.department,
-      releasedAt: new Date(),
-      dueDate: input.dueDate,
-      returnedAt: null,
-      status: "active",
-      conditionOnReturn: null,
-      conditionNotes: null,
-      releasedByUserId: actor.userId,
-      releasedByName: actor.displayName,
-      receivedByUserId: null,
-      receivedByName: null,
-      history: [entry],
-    });
-
-    await this.assets.update(asset.id, {
-      currentHolder: input.borrowerName,
-      department: input.department,
-      lastUpdated: new Date(),
-    });
-
-    await this.lifecycle.record({
-      assetId: asset.id,
-      assetCode: asset.assetCode,
-      eventType: "released",
-      actor,
-      fromStatus: asset.status,
-      toStatus: asset.status,
-      fromHolder: asset.currentHolder,
-      toHolder: input.borrowerName,
-      payload: {
+    const row = await this.repo.create(
+      {
         logCode,
+        requestId,
         requestCode,
+        assetId: asset.id,
+        assetCode: asset.assetCode,
+        assetName: asset.name,
+        category: asset.category,
+        borrowerUserId: input.borrowerUserId ?? null,
+        borrowerName: input.borrowerName,
+        borrowerEmail: (input.borrowerEmail ?? "").toLowerCase(),
+        borrowerPhone: input.borrowerPhone ?? "",
+        department: input.department,
+        releasedAt: new Date(),
         dueDate: input.dueDate,
-        notes: input.notes ?? null,
+        returnedAt: null,
+        status: "active",
+        conditionOnReturn: null,
+        conditionNotes: null,
+        releasedByUserId: actor.userId,
+        releasedByName: actor.displayName,
+        receivedByUserId: null,
+        receivedByName: null,
+        history: [entry],
       },
-    });
+      tx
+    );
+
+    await this.assets.update(
+      asset.id,
+      {
+        currentHolder: input.borrowerName,
+        department: input.department,
+        lastUpdated: new Date(),
+      },
+      tx
+    );
+
+    await this.lifecycle.record(
+      {
+        assetId: asset.id,
+        assetCode: asset.assetCode,
+        eventType: "released",
+        actor,
+        fromStatus: asset.status,
+        toStatus: asset.status,
+        fromHolder: asset.currentHolder,
+        toHolder: input.borrowerName,
+        payload: {
+          logCode,
+          logId: row.id,
+          requestCode,
+          requestId,
+          dueDate: input.dueDate,
+          notes: input.notes ?? null,
+          borrowerEmail: input.borrowerEmail ?? null,
+        },
+      },
+      tx
+    );
 
     return toBorrowLogDTO(row);
   }
 
+  /**
+   * Atomic return: lock log → close → clear holder → lifecycle
+   * → optional maintenance case → mark request returned.
+   */
   async returnLog(
     rawId: string,
     rawInput: unknown,
@@ -201,117 +251,173 @@ export class BorrowLogService {
   ): Promise<BorrowLogDTO> {
     const id = borrowLogIdSchema.parse(rawId);
     const input = returnBorrowSchema.parse(rawInput);
-    const existing = await this.repo.findById(id);
-    if (!existing) throw new NotFoundError("Borrow log", id);
-    if (existing.status !== "active") {
-      throw new ConflictError("Only active borrow logs can be returned.");
-    }
 
-    const history = [
-      ...(Array.isArray(existing.history) ? existing.history : []),
-      historyEntry(
-        input.condition === "needs_repair" || input.flagMaintenance
-          ? "flagged_repair"
-          : "returned",
-        actor.displayName,
-        input.conditionNotes ?? `Condition: ${input.condition}`
-      ),
-    ];
+    return withTransaction(async (tx) => {
+      const existing = await this.repo.findByIdForUpdate(id, tx);
+      if (!existing) throw new NotFoundError("Borrow log", id);
+      if (existing.status !== "active") {
+        throw new ConflictError("Only active borrow logs can be returned.");
+      }
 
-    const updated = await this.repo.update(id, {
-      status: "returned",
-      returnedAt: new Date(),
-      conditionOnReturn: input.condition,
-      conditionNotes: input.conditionNotes ?? null,
-      receivedByUserId: actor.userId,
-      receivedByName: actor.displayName,
-      history,
-    });
-    if (!updated) throw new NotFoundError("Borrow log", id);
+      const needsMaint =
+        input.condition === "needs_repair" ||
+        input.condition === "damaged" ||
+        Boolean(input.flagMaintenance);
 
-    if (existing.assetId) {
-      const asset = await this.assets.findById(existing.assetId);
-      if (asset) {
-        const nextStatus =
-          input.condition === "needs_repair" || input.flagMaintenance
-            ? "needs_repair"
-            : asset.status;
+      const history = [
+        ...(Array.isArray(existing.history) ? existing.history : []),
+        historyEntry(
+          needsMaint ? "flagged_repair" : "returned",
+          actor.displayName,
+          input.conditionNotes ?? `Condition: ${input.condition}`
+        ),
+      ];
 
-        await this.assets.update(asset.id, {
-          currentHolder: null,
-          status: nextStatus,
-          lastUpdated: new Date(),
-        });
+      const updated = await this.repo.update(
+        id,
+        {
+          status: "returned",
+          returnedAt: new Date(),
+          conditionOnReturn: input.condition,
+          conditionNotes: input.conditionNotes ?? null,
+          receivedByUserId: actor.userId,
+          receivedByName: actor.displayName,
+          history,
+        },
+        tx
+      );
+      if (!updated) throw new NotFoundError("Borrow log", id);
 
-        await this.lifecycle.record({
-          assetId: asset.id,
-          assetCode: asset.assetCode,
-          eventType: "returned",
-          actor,
-          fromStatus: asset.status,
-          toStatus: nextStatus,
-          fromHolder: existing.borrowerName,
-          toHolder: null,
-          payload: {
-            logCode: existing.logCode,
-            condition: input.condition,
-            conditionNotes: input.conditionNotes ?? null,
-          },
-        });
+      if (existing.assetId) {
+        const asset = await this.assets.findByIdForUpdate(existing.assetId, tx);
+        if (asset) {
+          const nextStatus = needsMaint ? "needs_repair" : asset.status;
 
-        if (
-          (input.condition === "needs_repair" || input.flagMaintenance) &&
-          asset.status !== nextStatus
-        ) {
-          await this.lifecycle.record({
-            assetId: asset.id,
-            assetCode: asset.assetCode,
-            eventType: "status_changed",
-            actor,
-            fromStatus: asset.status,
-            toStatus: nextStatus,
-            payload: { via: "borrow_return" },
-          });
-        }
+          await this.assets.update(
+            asset.id,
+            {
+              currentHolder: null,
+              status: nextStatus,
+              lastUpdated: new Date(),
+            },
+            tx
+          );
 
-        if (input.condition === "needs_repair" || input.flagMaintenance) {
-          await this.maintenance.createFromReturn(
+          await this.lifecycle.record(
             {
               assetId: asset.id,
               assetCode: asset.assetCode,
-              assetName: asset.name,
-              category: asset.category,
-              notes:
-                input.conditionNotes?.trim() ||
-                `Returned with condition: ${input.condition}`,
-              relatedBorrowLogCode: existing.logCode,
-              condition:
-                input.condition === "damaged" ? "damaged" : "needs_maintenance",
+              eventType: "returned",
+              actor,
+              fromStatus: asset.status,
+              toStatus: nextStatus,
+              fromHolder: existing.borrowerName,
+              toHolder: null,
+              payload: {
+                logCode: existing.logCode,
+                logId: existing.id,
+                condition: input.condition,
+                conditionNotes: input.conditionNotes ?? null,
+              },
             },
-            actor
+            tx
+          );
+
+          if (asset.status !== nextStatus) {
+            await this.lifecycle.record(
+              {
+                assetId: asset.id,
+                assetCode: asset.assetCode,
+                eventType: "status_changed",
+                actor,
+                fromStatus: asset.status,
+                toStatus: nextStatus,
+                payload: { via: "borrow_return", logCode: existing.logCode },
+              },
+              tx
+            );
+          }
+
+          if (needsMaint) {
+            const mntCode = generateOperationalCode("MNT");
+            await this.maintenance.create(
+              {
+                logCode: mntCode,
+                assetId: asset.id,
+                assetCode: asset.assetCode,
+                assetName: asset.name,
+                category: asset.category,
+                condition:
+                  input.condition === "damaged" ? "damaged" : "needs_maintenance",
+                source: "return_checkout",
+                dateLogged: todayDateString(),
+                loggedByUserId: actor.userId,
+                loggedByName: actor.displayName,
+                notes:
+                  input.conditionNotes?.trim() ||
+                  `Returned with condition: ${input.condition}`,
+                isResolved: false,
+                resolutionDate: null,
+                resolutionNotes: null,
+                resolvedByUserId: null,
+                resolvedByName: null,
+                relatedBorrowLogCode: existing.logCode,
+                scheduledDate: null,
+              },
+              tx
+            );
+
+            await this.lifecycle.record(
+              {
+                assetId: asset.id,
+                assetCode: asset.assetCode,
+                eventType: "flagged_maintenance",
+                actor,
+                fromStatus: nextStatus,
+                toStatus: nextStatus,
+                fromHolder: null,
+                toHolder: null,
+                payload: {
+                  via: "borrow_return",
+                  maintenanceLogCode: mntCode,
+                  relatedBorrowLogCode: existing.logCode,
+                },
+              },
+              tx
+            );
+          }
+        }
+      }
+
+      if (existing.requestId) {
+        const req = await this.requests.findById(existing.requestId, tx);
+        if (req && req.status === "approved") {
+          await this.requests.update(
+            req.id,
+            {
+              status: "returned",
+              history: [
+                ...(Array.isArray(req.history) ? req.history : []),
+                {
+                  id: crypto.randomUUID(),
+                  action: "returned",
+                  actor: actor.displayName,
+                  timestamp: isoNow(),
+                  note: `Via borrow log ${existing.logCode}`,
+                },
+              ],
+            },
+            tx
           );
         }
       }
-    }
 
-    if (existing.requestId) {
-      const req = await this.requests.findById(existing.requestId);
-      if (req && req.status === "approved") {
-        await this.requests.update(req.id, {
-          status: "returned",
-          history: [
-            ...(Array.isArray(req.history) ? req.history : []),
-            {
-              id: crypto.randomUUID(),
-              action: "returned",
-              actor: actor.displayName,
-              timestamp: isoNow(),
-            },
-          ],
-        });
-      }
-    }
+      return toBorrowLogDTO(updated);
+    });
+  }
 
-    return toBorrowLogDTO(updated);
+  /** Helper for AssetService.releaseAsset → single custody path. */
+  defaultDueDate(): string {
+    return dueDatePlusDays(7);
   }
 }

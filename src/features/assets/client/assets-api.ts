@@ -32,10 +32,14 @@ export type AssetLifecycleEvent = {
 };
 
 export type ReleaseAssetInput = {
-  borrowerName?: string;
+  /** Required — anonymous checkout is not allowed for accountability. */
+  borrowerName: string;
   borrowerDepartment?: string;
+  borrowerEmail?: string;
+  borrowerPhone?: string;
   notes?: string;
   expectedReturnDate?: string;
+  requestId?: string;
 };
 
 export type FlagMaintenanceInput = {
@@ -123,7 +127,7 @@ export const assetsApi = {
     await fetchJson<void>(`/api/assets/${id}`, { method: "DELETE" });
   },
 
-  async releaseAsset(id: string, payload: ReleaseAssetInput = {}): Promise<Asset> {
+  async releaseAsset(id: string, payload: ReleaseAssetInput): Promise<Asset> {
     const response = await fetchJson<ApiResponse<Asset>>(`/api/assets/${id}/release`, {
       method: "POST",
       body: JSON.stringify(payload),

@@ -28,10 +28,15 @@ export function getDb(): Database {
   }
 
   /**
-   * `max: 1` is a safe default for serverless / Next.js route handlers.
-   * Raise it when running as a long-lived Node process.
+   * Small pool: Next route handlers share the process; transactions need headroom.
+   * keepAlive + connect_timeout avoid hung statements on flaky network to Supabase.
    */
-  const client = postgres(connectionString, { max: 1 });
+  const client = postgres(connectionString, {
+    max: 10,
+    idle_timeout: 20,
+    connect_timeout: 15,
+    prepare: false,
+  });
   const db = drizzle(client, { schema });
 
   globalForDb.__crmcPg = client;

@@ -1,14 +1,18 @@
 import type { ConsumableRow, StockHistoryEntry } from "@/server/db/schema";
-import { formatSequentialCode, todayDateString } from "@/server/shared/codes";
+import {
+  generateOperationalCode,
+  todayDateString,
+} from "@/server/shared/codes";
 import type { ActorContext } from "@/server/shared/auth";
 import {
   BadRequestError,
   ConflictError,
   NotFoundError,
 } from "@/server/shared/errors";
+import { withTransaction } from "@/server/db/transaction";
 
 import { ConsumableRepository } from "./consumable.repository";
-import type { ConsumableDTO, IConsumableRepository } from "./consumable.types";
+import type { ConsumableDTO } from "./consumable.types";
 import {
   consumableIdSchema,
   createConsumableSchema,
@@ -68,9 +72,7 @@ function historyEntry(
 }
 
 export class ConsumableService {
-  constructor(
-    private readonly repo: IConsumableRepository = new ConsumableRepository()
-  ) {}
+  constructor(private readonly repo = new ConsumableRepository()) {}
 
   async list(rawQuery: unknown): Promise<ConsumableDTO[]> {
     const filters = listConsumablesQuerySchema.parse(rawQuery ?? {});
@@ -102,9 +104,7 @@ export class ConsumableService {
 
   async create(rawInput: unknown, actor: ActorContext): Promise<ConsumableDTO> {
     const input = createConsumableSchema.parse(rawInput);
-    const itemCode =
-      input.itemCode?.trim() ||
-      formatSequentialCode("CON", (await this.repo.countYear()) + 1);
+    const itemCode = input.itemCode?.trim() || generateOperationalCode("CON");
 
     const exists = await this.repo.findByCode(itemCode);
     if (exists) {
@@ -168,27 +168,34 @@ export class ConsumableService {
   ): Promise<ConsumableDTO> {
     const id = consumableIdSchema.parse(rawId);
     const input = stockMovementSchema.parse(rawInput);
-    const existing = await this.repo.findById(id);
-    if (!existing) throw new NotFoundError("Consumable", id);
 
-    const history = [
-      ...(Array.isArray(existing.history) ? existing.history : []),
-      historyEntry(
-        "restock",
-        input.quantity,
-        actor.displayName,
-        input.reason,
-        input.notes
-      ),
-    ];
+    return withTransaction(async (tx) => {
+      const existing = await this.repo.findByIdForUpdate(id, tx);
+      if (!existing) throw new NotFoundError("Consumable", id);
 
-    const updated = await this.repo.update(id, {
-      currentQty: existing.currentQty + input.quantity,
-      lastRestocked: new Date(),
-      history,
+      const history = [
+        ...(Array.isArray(existing.history) ? existing.history : []),
+        historyEntry(
+          "restock",
+          input.quantity,
+          actor.displayName,
+          input.reason,
+          input.notes
+        ),
+      ];
+
+      const updated = await this.repo.update(
+        id,
+        {
+          currentQty: existing.currentQty + input.quantity,
+          lastRestocked: new Date(),
+          history,
+        },
+        tx
+      );
+      if (!updated) throw new NotFoundError("Consumable", id);
+      return toDTO(updated);
     });
-    if (!updated) throw new NotFoundError("Consumable", id);
-    return toDTO(updated);
   }
 
   async checkout(
@@ -198,32 +205,39 @@ export class ConsumableService {
   ): Promise<ConsumableDTO> {
     const id = consumableIdSchema.parse(rawId);
     const input = stockMovementSchema.parse(rawInput);
-    const existing = await this.repo.findById(id);
-    if (!existing) throw new NotFoundError("Consumable", id);
 
-    if (existing.currentQty < input.quantity) {
-      throw new BadRequestError(
-        `Insufficient stock. Available: ${existing.currentQty} ${existing.unit}.`
+    return withTransaction(async (tx) => {
+      const existing = await this.repo.findByIdForUpdate(id, tx);
+      if (!existing) throw new NotFoundError("Consumable", id);
+
+      if (existing.currentQty < input.quantity) {
+        throw new BadRequestError(
+          `Insufficient stock. Available: ${existing.currentQty} ${existing.unit}.`
+        );
+      }
+
+      const history = [
+        ...(Array.isArray(existing.history) ? existing.history : []),
+        historyEntry(
+          "checkout",
+          -input.quantity,
+          actor.displayName,
+          input.reason,
+          input.notes
+        ),
+      ];
+
+      const updated = await this.repo.update(
+        id,
+        {
+          currentQty: existing.currentQty - input.quantity,
+          history,
+        },
+        tx
       );
-    }
-
-    const history = [
-      ...(Array.isArray(existing.history) ? existing.history : []),
-      historyEntry(
-        "checkout",
-        -input.quantity,
-        actor.displayName,
-        input.reason,
-        input.notes
-      ),
-    ];
-
-    const updated = await this.repo.update(id, {
-      currentQty: existing.currentQty - input.quantity,
-      history,
+      if (!updated) throw new NotFoundError("Consumable", id);
+      return toDTO(updated);
     });
-    if (!updated) throw new NotFoundError("Consumable", id);
-    return toDTO(updated);
   }
 
   async adjust(
@@ -233,30 +247,34 @@ export class ConsumableService {
   ): Promise<ConsumableDTO> {
     const id = consumableIdSchema.parse(rawId);
     const input = stockAdjustSchema.parse(rawInput);
-    const existing = await this.repo.findById(id);
-    if (!existing) throw new NotFoundError("Consumable", id);
 
-    const next = existing.currentQty + input.quantityChange;
-    if (next < 0) {
-      throw new BadRequestError("Adjustment would result in negative stock.");
-    }
+    return withTransaction(async (tx) => {
+      const existing = await this.repo.findByIdForUpdate(id, tx);
+      if (!existing) throw new NotFoundError("Consumable", id);
 
-    const history = [
-      ...(Array.isArray(existing.history) ? existing.history : []),
-      historyEntry(
-        "adjustment",
-        input.quantityChange,
-        actor.displayName,
-        input.reason,
-        input.notes
-      ),
-    ];
+      const next = existing.currentQty + input.quantityChange;
+      if (next < 0) {
+        throw new BadRequestError("Adjustment would result in negative stock.");
+      }
 
-    const updated = await this.repo.update(id, {
-      currentQty: next,
-      history,
+      const history = [
+        ...(Array.isArray(existing.history) ? existing.history : []),
+        historyEntry(
+          "adjustment",
+          input.quantityChange,
+          actor.displayName,
+          input.reason,
+          input.notes
+        ),
+      ];
+
+      const updated = await this.repo.update(
+        id,
+        { currentQty: next, history },
+        tx
+      );
+      if (!updated) throw new NotFoundError("Consumable", id);
+      return toDTO(updated);
     });
-    if (!updated) throw new NotFoundError("Consumable", id);
-    return toDTO(updated);
   }
 }
