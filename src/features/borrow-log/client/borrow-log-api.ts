@@ -1,0 +1,67 @@
+import type { BorrowLogDTO } from "@/server/modules/borrow-log/borrow-log.types";
+import { fetchJson, type ApiResponse } from "@/features/shared/fetch-json";
+
+export type BorrowLogRecord = BorrowLogDTO;
+
+export type ReleaseBorrowPayload = {
+  assetId: string;
+  requestId?: string;
+  requestCode?: string;
+  borrowerName: string;
+  borrowerEmail?: string;
+  borrowerPhone?: string;
+  department: string;
+  dueDate: string;
+  notes?: string;
+  borrowerUserId?: string;
+};
+
+export type ReturnBorrowPayload = {
+  condition: "good" | "damaged" | "needs_repair";
+  conditionNotes?: string;
+  flagMaintenance?: boolean;
+};
+
+export const borrowLogApi = {
+  async list(params?: {
+    status?: BorrowLogRecord["status"];
+    department?: string;
+    search?: string;
+  }): Promise<BorrowLogRecord[]> {
+    const sp = new URLSearchParams();
+    if (params?.status) sp.set("status", params.status);
+    if (params?.department) sp.set("department", params.department);
+    if (params?.search) sp.set("search", params.search);
+    const qs = sp.toString();
+    const res = await fetchJson<ApiResponse<BorrowLogRecord[]>>(
+      qs ? `/api/borrow-log?${qs}` : "/api/borrow-log"
+    );
+    return res.data;
+  },
+
+  async getById(id: string): Promise<BorrowLogRecord> {
+    const res = await fetchJson<ApiResponse<BorrowLogRecord>>(
+      `/api/borrow-log/${id}`
+    );
+    return res.data;
+  },
+
+  async release(payload: ReleaseBorrowPayload): Promise<BorrowLogRecord> {
+    const res = await fetchJson<ApiResponse<BorrowLogRecord>>("/api/borrow-log", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    return res.data;
+  },
+
+  async returnLog(
+    id: string,
+    payload: ReturnBorrowPayload
+  ): Promise<BorrowLogRecord> {
+    const res = await fetchJson<ApiResponse<BorrowLogRecord>>(
+      `/api/borrow-log/${id}/return`,
+      { method: "POST", body: JSON.stringify(payload) }
+    );
+    return res.data;
+  },
+};

@@ -4,10 +4,7 @@ export * from "./profiles";
 export * from "./categories";
 export * from "./departments";
 export * from "./locations";
-
-// Future modules:
-// export * from "./asset-units";
-// export * from "./inventory-movements";
-// export * from "./borrow-transactions";
-// export * from "./assignments";
-// export * from "./maintenance-logs";
+export * from "./borrow-requests";
+export * from "./borrow-transactions";
+export * from "./consumables";
+export * from "./maintenance-logs";
