@@ -105,7 +105,7 @@ export function useDeleteAssetMutation(): UseMutationResult<void, Error, string>
 export function useReleaseAssetMutation(): UseMutationResult<
   Asset,
   Error,
-  { id: string; payload?: ReleaseAssetInput }
+  { id: string; payload: ReleaseAssetInput }
 > {
   const queryClient = useQueryClient();
 
