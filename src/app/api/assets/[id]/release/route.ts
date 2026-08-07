@@ -1,13 +1,10 @@
-import {
-  assetController,
-  handleAssetControllerError,
-} from "@/features/assets/controller";
+import { assetController } from "@/server/modules/assets";
 
 /**
  * @swagger
  * /api/assets/{id}/release:
  *   post:
- *     summary: Release a coded asset to borrower flow
+ *     summary: Release a coded asset to a borrower
  *     tags: [Assets]
  *     parameters:
  *       - in: path
@@ -16,22 +13,36 @@ import {
  *         schema:
  *           type: string
  *           format: uuid
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               borrowerName:
+ *                 type: string
+ *               borrowerDepartment:
+ *                 type: string
+ *               notes:
+ *                 type: string
+ *               expectedReturnDate:
+ *                 type: string
+ *                 format: date
  *     responses:
  *       200:
- *         description: Asset released successfully
+ *         description: Asset released; lifecycle event recorded with staff actor
+ *       401:
+ *         description: Authentication required
  *       404:
  *         description: Asset not found
  *       409:
  *         description: Asset is not available for release
  */
 export async function POST(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
-  try {
-    const { id } = await context.params;
-    return await assetController.releaseAsset(id);
-  } catch (error) {
-    return handleAssetControllerError(error);
-  }
+  const { id } = await context.params;
+  return assetController.releaseAsset(request, id);
 }

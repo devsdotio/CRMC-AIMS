@@ -1,5 +1,4 @@
 "use client";
-/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { Search, FilterX, ArrowUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -18,8 +17,6 @@ export function ConsumableFilters({
   filters,
   onFilterChange,
   onResetFilters,
-  totalCount,
-  filteredCount,
 }: ConsumableFiltersProps) {
   const isFiltered =
     Boolean(filters.searchQuery) ||
@@ -75,7 +72,9 @@ export function ConsumableFilters({
             <select
               id="stock-level-filter"
               value={filters.stockLevel}
-              onChange={(e) => onFilterChange({ stockLevel: e.target.value as any })}
+              onChange={(e) =>
+                onFilterChange({ stockLevel: e.target.value as ConsumableFilterState["stockLevel"] })
+              }
               className="h-9 px-3 text-xs bg-bg-subtle border border-border rounded-lg text-text font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent focus:bg-bg transition-colors"
             >
               <option value="all">All Stock Levels</option>
@@ -91,7 +90,9 @@ export function ConsumableFilters({
             <select
               id="consumable-sort"
               value={filters.sortBy}
-              onChange={(e) => onFilterChange({ sortBy: e.target.value as any })}
+              onChange={(e) =>
+                onFilterChange({ sortBy: e.target.value as ConsumableFilterState["sortBy"] })
+              }
               className="h-9 px-2.5 text-xs bg-bg-subtle border border-border rounded-lg text-text font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent"
             >
               <option value="critical">Sort: Most Critical First</option>

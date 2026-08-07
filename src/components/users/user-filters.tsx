@@ -15,7 +15,6 @@ export function UserFilters({
   filters,
   onFilterChange,
   onResetFilters,
-  totalUsersCount,
 }: UserFiltersProps) {
   const isFiltered =
     Boolean(filters.searchQuery) ||

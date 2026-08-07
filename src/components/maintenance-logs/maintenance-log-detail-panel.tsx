@@ -7,7 +7,7 @@ import Link from "next/link";
 import { X, CheckCircle2,   Tag,   ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { MaintenanceLogRecord } from "@/types/maintenance-logs";
-import type  from "@/types/shared";
+
 import { ConditionTag } from "./condition-tag";
 
 export interface MaintenanceLogDetailPanelProps {

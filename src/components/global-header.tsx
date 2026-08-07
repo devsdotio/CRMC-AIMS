@@ -106,9 +106,17 @@ const MOCK_NOTIFICATIONS: NotificationItem[] = [
 
 interface GlobalHeaderProps {
   onMobileMenuOpen: () => void;
+  /** Display name from the signed-in profile (sidebar/header identity). */
+  userName?: string;
+  /** Role title label, e.g. "Admin", "Staff", "Superadmin". */
+  userRoleLabel?: string;
 }
 
-export default function GlobalHeader({ onMobileMenuOpen }: GlobalHeaderProps) {
+export default function GlobalHeader({
+  onMobileMenuOpen,
+  userName,
+  userRoleLabel = "—",
+}: GlobalHeaderProps) {
   const pathname = usePathname();
   const [searchQuery, setSearchQuery] = useState("");
   const [isNotifOpen, setIsNotifOpen] = useState(false);
@@ -327,12 +335,24 @@ export default function GlobalHeader({ onMobileMenuOpen }: GlobalHeaderProps) {
         {/* Vertical Divider */}
         <div className="h-6 w-px bg-[#E3E5EC] mx-0.5 hidden sm:block" />
 
-        {/* User Pill Header Badge */}
-        <div className="hidden sm:flex items-center gap-2 px-2 py-1 rounded-full bg-[#F2F3F7] border border-[#E3E5EC]">
-          <div className="flex items-center justify-center w-6 h-6 rounded-full bg-[#1B2140] text-white text-[10px] font-bold">
+        {/* Signed-in user identity */}
+        <div
+          className="hidden sm:flex items-center gap-2 px-2 py-1 rounded-full bg-[#F2F3F7] border border-[#E3E5EC] max-w-[14rem]"
+          title={userName ? `${userName} · ${userRoleLabel}` : userRoleLabel}
+        >
+          <div className="flex items-center justify-center w-6 h-6 rounded-full bg-[#1B2140] text-white text-[10px] font-bold shrink-0">
             <User className="w-3.5 h-3.5" />
           </div>
-          <span className="text-xs font-semibold text-[#1B2140] pr-1">Custodian</span>
+          <div className="min-w-0 pr-1">
+            <span className="block text-xs font-semibold text-[#1B2140] truncate leading-tight">
+              {userName ?? userRoleLabel}
+            </span>
+            {userName ? (
+              <span className="block text-[10px] font-medium text-[#6B7280] truncate leading-tight">
+                {userRoleLabel}
+              </span>
+            ) : null}
+          </div>
         </div>
       </div>
     </header>

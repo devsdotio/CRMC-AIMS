@@ -7,13 +7,13 @@ const databaseUrl = process.env.DATABASE_URL;
 
 if (!databaseUrl) {
   throw new Error(
-    "DATABASE_URL is not configured. Add it to .env.local or your shell environment before running Drizzle commands.",
+    "DATABASE_URL is not configured. Add it to .env.local or your shell environment before running Drizzle commands."
   );
 }
 
 export default defineConfig({
-  schema: "./src/db/schema.ts",
-  out: "./src/db/migrations",
+  schema: "./src/server/db/schema/index.ts",
+  out: "./src/server/db/migrations",
   dialect: "postgresql",
   dbCredentials: {
     url: databaseUrl,

@@ -1,7 +1,4 @@
-import {
-  assetController,
-  handleAssetControllerError,
-} from "@/features/assets/controller";
+import { assetController } from "@/server/modules/assets";
 
 /**
  * @swagger
@@ -69,11 +66,7 @@ import {
  *                           type: object
  */
 export async function GET(request: Request) {
-  try {
-    return await assetController.listAssets(request);
-  } catch (error) {
-    return handleAssetControllerError(error);
-  }
+  return assetController.listAssets(request);
 }
 
 /**
@@ -88,7 +81,7 @@ export async function GET(request: Request) {
  *         application/json:
  *           schema:
  *             type: object
- *             required: [assetCode, name, category, status, location]
+ *             required: [assetCode, name, category, location]
  *             properties:
  *               assetCode:
  *                 type: string
@@ -129,10 +122,5 @@ export async function GET(request: Request) {
  *         description: Duplicate asset code
  */
 export async function POST(request: Request) {
-  try {
-    const body = await request.json();
-    return await assetController.createAsset(body);
-  } catch (error) {
-    return handleAssetControllerError(error);
-  }
+  return assetController.createAsset(request);
 }

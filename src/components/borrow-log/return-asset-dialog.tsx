@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, RotateCcw,    AlertTriangle, Check } from "lucide-react";
-
+import { X, RotateCcw, AlertTriangle, Check } from "lucide-react";
 import type { BorrowLogRecord, ReturnCondition } from "@/types/borrow-log";
 import { ConditionSelect } from "./condition-select";
 
@@ -13,33 +12,29 @@ export interface ReturnAssetDialogProps {
   onConfirmReturn: (record: BorrowLogRecord, condition: ReturnCondition, notes?: string) => void;
 }
 
-export function ReturnAssetDialog({
+interface ReturnAssetDialogFormProps {
+  record: BorrowLogRecord;
+  onClose: () => void;
+  onConfirmReturn: ReturnAssetDialogProps["onConfirmReturn"];
+}
+
+function ReturnAssetDialogForm({
   record,
-  isOpen,
   onClose,
   onConfirmReturn,
-}: ReturnAssetDialogProps) {
+}: ReturnAssetDialogFormProps) {
   const [condition, setCondition] = useState<ReturnCondition>("good");
   const [notes, setNotes] = useState("");
 
   useEffect(() => {
-    if (isOpen && record) {
-      setCondition("good");
-      setNotes("");
-    }
-  }, [isOpen, record]);
-
-  useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && isOpen) {
+      if (e.key === "Escape") {
         onClose();
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
-
-  if (!isOpen || !record) return null;
+  }, [onClose]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,17 +44,14 @@ export function ReturnAssetDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs transition-opacity overflow-y-auto">
-      {/* Backdrop */}
       <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
 
-      {/* Dialog Window */}
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="return-dialog-title"
         className="relative w-full max-w-lg rounded-2xl border border-border bg-bg p-6 shadow-2xl z-10 animate-in fade-in zoom-in-95 duration-150 my-6 space-y-5"
       >
-        {/* Header */}
         <div className="flex items-start justify-between gap-3 border-b border-border pb-4">
           <div className="flex items-center gap-2.5">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/15 text-accent shrink-0">
@@ -85,7 +77,6 @@ export function ReturnAssetDialog({
           </button>
         </div>
 
-        {/* Transaction Summary Card */}
         <div className="p-3.5 rounded-xl border border-border bg-bg-subtle space-y-1.5 text-xs">
           <div className="flex items-center justify-between">
             <span className="font-bold text-text">{record.assetName}</span>
@@ -103,9 +94,7 @@ export function ReturnAssetDialog({
           )}
         </div>
 
-        {/* Form Body */}
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Condition Picker Component */}
           <div className="space-y-2">
             <label className="block text-xs font-bold uppercase tracking-wider text-text-secondary">
               Returned Condition Assessment <span className="text-accent">*</span>
@@ -113,7 +102,6 @@ export function ReturnAssetDialog({
             <ConditionSelect value={condition} onChange={setCondition} />
           </div>
 
-          {/* Condition Notes */}
           <div className="space-y-1">
             <label htmlFor="return-notes-input" className="block text-xs font-semibold text-text">
               Condition & Inspection Notes
@@ -128,7 +116,6 @@ export function ReturnAssetDialog({
             />
           </div>
 
-          {/* Footer Actions */}
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
             <button
               type="button"
@@ -148,5 +135,23 @@ export function ReturnAssetDialog({
         </form>
       </div>
     </div>
+  );
+}
+
+export function ReturnAssetDialog({
+  record,
+  isOpen,
+  onClose,
+  onConfirmReturn,
+}: ReturnAssetDialogProps) {
+  if (!isOpen || !record) return null;
+
+  return (
+    <ReturnAssetDialogForm
+      key={record.id}
+      record={record}
+      onClose={onClose}
+      onConfirmReturn={onConfirmReturn}
+    />
   );
 }

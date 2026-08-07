@@ -1,10 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, ArrowUpFromLine,    Check } from "lucide-react";
-
-import type  from "@/types/borrow-log";
-
+import { X, ArrowUpFromLine, Check } from "lucide-react";
 export interface ReleaseAssetDialogProps {
   isOpen: boolean;
   onClose: () => void;
@@ -18,46 +15,39 @@ export interface ReleaseAssetDialogProps {
   }) => void;
 }
 
-export function ReleaseAssetDialog({
-  isOpen,
+function defaultDueDate(): string {
+  const defaultDue = new Date();
+  defaultDue.setDate(defaultDue.getDate() + 7);
+  return defaultDue.toISOString().split("T")[0];
+}
+
+interface ReleaseAssetDialogFormProps {
+  onClose: () => void;
+  onConfirmRelease: ReleaseAssetDialogProps["onConfirmRelease"];
+}
+
+function ReleaseAssetDialogForm({
   onClose,
   onConfirmRelease,
-}: ReleaseAssetDialogProps) {
+}: ReleaseAssetDialogFormProps) {
   const [borrowerName, setBorrowerName] = useState("");
   const [department, setDepartment] = useState("IT");
-  const [assetCode, setAssetCode] = useState("");
-  const [assetName, setAssetName] = useState("");
-  const [dueDate, setDueDate] = useState("");
+  const [assetCode, setAssetCode] = useState("CP-080");
+  const [assetName, setAssetName] = useState("Dell Latitude 5420 Laptop");
+  const [dueDate, setDueDate] = useState(defaultDueDate);
   const [notes, setNotes] = useState("");
   const [verified, setVerified] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (isOpen) {
-      setBorrowerName("");
-      setDepartment("IT");
-      setAssetCode("CP-080");
-      setAssetName("Dell Latitude 5420 Laptop");
-      const defaultDue = new Date();
-      defaultDue.setDate(defaultDue.getDate() + 7);
-      setDueDate(defaultDue.toISOString().split("T")[0]);
-      setNotes("");
-      setVerified(false);
-      setError("");
-    }
-  }, [isOpen]);
-
-  useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && isOpen) {
+      if (e.key === "Escape") {
         onClose();
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
+  }, [onClose]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,17 +81,14 @@ export function ReleaseAssetDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs transition-opacity overflow-y-auto">
-      {/* Backdrop */}
       <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
 
-      {/* Dialog Window */}
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="release-dialog-title"
         className="relative w-full max-w-lg rounded-2xl border border-border bg-bg p-6 shadow-2xl z-10 animate-in fade-in zoom-in-95 duration-150 my-6 space-y-5"
       >
-        {/* Header */}
         <div className="flex items-start justify-between gap-3 border-b border-border pb-4">
           <div className="flex items-center gap-2.5">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/15 text-accent shrink-0">
@@ -127,9 +114,7 @@ export function ReleaseAssetDialog({
           </button>
         </div>
 
-        {/* Form Body */}
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Asset Lookup & Scan Row */}
           <div className="p-3.5 rounded-xl border border-border bg-bg-subtle space-y-2">
             <div className="flex items-center justify-between">
               <label htmlFor="release-asset-code" className="text-xs font-bold text-text">
@@ -155,7 +140,6 @@ export function ReleaseAssetDialog({
             </div>
           </div>
 
-          {/* Borrower Name & Department */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
               <label htmlFor="borrower-name-input" className="block text-xs font-semibold text-text">
@@ -193,7 +177,6 @@ export function ReleaseAssetDialog({
             </div>
           </div>
 
-          {/* Expected Due Date */}
           <div className="space-y-1">
             <label htmlFor="due-date-input" className="block text-xs font-semibold text-text">
               Expected Return Date <span className="text-accent">*</span>
@@ -207,7 +190,6 @@ export function ReleaseAssetDialog({
             />
           </div>
 
-          {/* Notes */}
           <div className="space-y-1">
             <label htmlFor="release-notes-input" className="block text-xs font-semibold text-text">
               Handoff Notes (Accessories, Cables, Conditions)
@@ -222,7 +204,6 @@ export function ReleaseAssetDialog({
             />
           </div>
 
-          {/* Verification Checkbox */}
           <label className="flex items-start gap-2.5 p-3 rounded-lg border border-border bg-bg-subtle cursor-pointer select-none">
             <input
               type="checkbox"
@@ -240,7 +221,6 @@ export function ReleaseAssetDialog({
 
           {error && <p className="text-xs font-bold text-status-outofservice-text">{error}</p>}
 
-          {/* Footer Actions */}
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
             <button
               type="button"
@@ -260,5 +240,21 @@ export function ReleaseAssetDialog({
         </form>
       </div>
     </div>
+  );
+}
+
+export function ReleaseAssetDialog({
+  isOpen,
+  onClose,
+  onConfirmRelease,
+}: ReleaseAssetDialogProps) {
+  if (!isOpen) return null;
+
+  return (
+    <ReleaseAssetDialogForm
+      key="release"
+      onClose={onClose}
+      onConfirmRelease={onConfirmRelease}
+    />
   );
 }

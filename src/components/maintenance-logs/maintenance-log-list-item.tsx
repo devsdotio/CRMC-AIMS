@@ -5,7 +5,7 @@ import { getCategoryStyle } from "@/constants/categories";
 import { CheckCircle2, User, Calendar, Tag, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { MaintenanceLogRecord } from "@/types/maintenance-logs";
-import type  from "@/types/shared";
+
 import { ConditionTag } from "./condition-tag";
 
 export interface MaintenanceLogListItemProps {

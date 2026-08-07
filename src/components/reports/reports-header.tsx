@@ -1,7 +1,6 @@
 "use client";
 
-import {  Download, ShieldCheck, UserCheck, Calendar, User } from "lucide-react";
-
+import { Download, ShieldCheck, UserCheck, Calendar, User } from "lucide-react";
 import type { SimpleUserRole } from "@/types/reports";
 
 interface ReportsHeaderProps {

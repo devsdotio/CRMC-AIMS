@@ -1,21 +1,40 @@
 import type { NextRequest } from "next/server";
-import { created, handleError, noContent, ok } from "@/server/shared/http";
+
+import { requireAssetOperator } from "@/server/shared/auth";
+import {
+  created,
+  handleError,
+  noContent,
+  ok,
+} from "@/server/shared/http";
+
 import { AssetService } from "./asset.service";
 
 /**
- * Controller layer: parses the request, delegates to the service, and
- * shapes the HTTP response. No business rules live here — if you find
- * yourself writing an `if` that decides *what should happen*, it belongs
- * in `AssetService` instead.
+ * Thin HTTP adapter. Asset operators = superadmin | admin | staff.
+ * Actor/role always taken from verified session + profiles row.
  */
 export class AssetController {
   constructor(private readonly assetService: AssetService = new AssetService()) {}
 
-  async createAsset(request: NextRequest) {
+  async listAssets(request: NextRequest | Request) {
     try {
+      await requireAssetOperator();
+      const url = new URL(request.url);
+      const status = url.searchParams.get("status") ?? undefined;
+      const data = await this.assetService.listAssets({ status });
+      return ok(data);
+    } catch (error) {
+      return handleError(error);
+    }
+  }
+
+  async createAsset(request: NextRequest | Request) {
+    try {
+      const session = await requireAssetOperator();
       const body = await request.json();
-      const asset = await this.assetService.createAsset(body);
-      return created(asset);
+      const data = await this.assetService.createAsset(body, session.actor);
+      return created(data);
     } catch (error) {
       return handleError(error);
     }
@@ -23,38 +42,20 @@ export class AssetController {
 
   async getAsset(id: string) {
     try {
-      const asset = await this.assetService.getAssetById(id);
-      return ok(asset);
+      await requireAssetOperator();
+      const data = await this.assetService.getAssetById(id);
+      return ok(data);
     } catch (error) {
       return handleError(error);
     }
   }
 
-  async getAssets(request: NextRequest) {
+  async updateAsset(request: NextRequest | Request, id: string) {
     try {
-      const includeArchived =
-        request.nextUrl.searchParams.get("includeArchived") === "true";
-      const assets = await this.assetService.getAssets(includeArchived);
-      return ok(assets);
-    } catch (error) {
-      return handleError(error);
-    }
-  }
-
-  async updateAsset(request: NextRequest, id: string) {
-    try {
+      const session = await requireAssetOperator();
       const body = await request.json();
-      const asset = await this.assetService.updateAsset(id, body);
-      return ok(asset);
-    } catch (error) {
-      return handleError(error);
-    }
-  }
-
-  async archiveAsset(id: string) {
-    try {
-      const asset = await this.assetService.archiveAsset(id);
-      return ok(asset);
+      const data = await this.assetService.updateAsset(id, body, session.actor);
+      return ok(data);
     } catch (error) {
       return handleError(error);
     }
@@ -62,20 +63,77 @@ export class AssetController {
 
   async deleteAsset(id: string) {
     try {
-      await this.assetService.deleteAsset(id);
+      const session = await requireAssetOperator();
+      await this.assetService.deleteAsset(id, session.actor);
       return noContent();
     } catch (error) {
       return handleError(error);
     }
   }
 
-  async searchAssets(request: NextRequest) {
+  async releaseAsset(request: NextRequest | Request, id: string) {
     try {
-      const params = Object.fromEntries(request.nextUrl.searchParams.entries());
-      const result = await this.assetService.searchAssets(params);
-      return ok(result);
+      const session = await requireAssetOperator();
+      let body: unknown = {};
+      try {
+        body = await request.json();
+      } catch {
+        body = {};
+      }
+      const data = await this.assetService.releaseAsset(id, body, session.actor);
+      return ok(data);
+    } catch (error) {
+      return handleError(error);
+    }
+  }
+
+  async returnAsset(request: NextRequest | Request, id: string) {
+    try {
+      const session = await requireAssetOperator();
+      const body = await request.json();
+      const data = await this.assetService.returnAsset(id, body, session.actor);
+      return ok(data);
+    } catch (error) {
+      return handleError(error);
+    }
+  }
+
+  async flagForMaintenance(request: NextRequest | Request, id: string) {
+    try {
+      const session = await requireAssetOperator();
+      let body: unknown = {};
+      try {
+        body = await request.json();
+      } catch {
+        body = {};
+      }
+      const data = await this.assetService.flagForMaintenance(
+        id,
+        body,
+        session.actor
+      );
+      return ok(data);
+    } catch (error) {
+      return handleError(error);
+    }
+  }
+
+  async listLifecycle(request: NextRequest | Request, id: string) {
+    try {
+      await requireAssetOperator();
+      const url = new URL(request.url);
+      const limitRaw = url.searchParams.get("limit");
+      const limit = limitRaw ? Number(limitRaw) : undefined;
+      const data = await this.assetService.listLifecycle(
+        id,
+        Number.isFinite(limit) ? limit : undefined
+      );
+      return ok(data);
     } catch (error) {
       return handleError(error);
     }
   }
 }
+
+/** Shared singleton for route handlers. */
+export const assetController = new AssetController();

@@ -5,7 +5,6 @@ import {
   ArrowUpFromLine,
   ClipboardList,
   Package,
-  Repeat,
   Boxes,
   Wrench,
   type LucideIcon,

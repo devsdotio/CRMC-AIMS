@@ -31,8 +31,6 @@ export function AssetFilters({
   filters,
   onFilterChange,
   onResetFilters,
-  totalAssetsCount,
-  filteredAssetsCount,
 }: AssetFiltersProps) {
   const activeCount =
     (filters.searchQuery ? 1 : 0) +
@@ -86,7 +84,9 @@ export function AssetFilters({
             <select
               id="asset-sort"
               value={filters.sortBy}
-              onChange={(e) => onFilterChange({ sortBy: e.target.value as any })}
+              onChange={(e) =>
+                onFilterChange({ sortBy: e.target.value as AssetFilterState["sortBy"] })
+              }
               className="h-8 px-2.5 text-xs bg-bg-subtle border border-border rounded-lg text-text font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent"
             >
               <option value="name">Name (A-Z)</option>

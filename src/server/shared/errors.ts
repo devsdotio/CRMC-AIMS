@@ -52,6 +52,20 @@ export class BadRequestError extends AppError {
   }
 }
 
+export class UnauthorizedError extends AppError {
+  constructor(message = "Authentication required.") {
+    super(message, 401, "UNAUTHORIZED");
+    this.name = "UnauthorizedError";
+  }
+}
+
+export class ForbiddenError extends AppError {
+  constructor(message = "You do not have permission to perform this action.") {
+    super(message, 403, "FORBIDDEN");
+    this.name = "ForbiddenError";
+  }
+}
+
 /**
  * Type guard used by controllers to safely branch on AppError vs
  * unexpected errors without using `any`.

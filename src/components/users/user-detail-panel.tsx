@@ -1,7 +1,17 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { X, Edit3, UserX, Mail, Building2, Calendar, ShieldCheck, Activity } from "lucide-react";
+import {
+  X,
+  Edit3,
+  UserX,
+  UserCheck,
+  Mail,
+  Building2,
+  Calendar,
+  ShieldCheck,
+  Activity,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { UserAccount } from "@/types/users";
 import { ROLE_DEFINITIONS } from "@/constants/roles";
@@ -14,6 +24,7 @@ export interface UserDetailPanelProps {
   onClose: () => void;
   onEdit: (user: UserAccount) => void;
   onDeactivate: (user: UserAccount) => void;
+  onReactivate: (user: UserAccount) => void;
 }
 
 export function UserDetailPanel({
@@ -23,6 +34,7 @@ export function UserDetailPanel({
   onClose,
   onEdit,
   onDeactivate,
+  onReactivate,
 }: UserDetailPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -43,10 +55,8 @@ export function UserDetailPanel({
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs transition-opacity duration-200">
-      {/* Backdrop */}
       <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
 
-      {/* Drawer Container */}
       <aside
         ref={panelRef}
         role="dialog"
@@ -57,7 +67,6 @@ export function UserDetailPanel({
           "animate-in slide-in-from-right duration-250 ease-in-out"
         )}
       >
-        {/* Panel Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-bg-subtle/50 shrink-0">
           <div>
             <div className="flex items-center gap-2">
@@ -87,21 +96,20 @@ export function UserDetailPanel({
           </button>
         </div>
 
-        {/* Scrollable Body */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* Quick Action CTAs */}
           <div className="flex items-center gap-2.5">
             <button
               type="button"
               onClick={() => onEdit(user)}
-              className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-border bg-bg text-text hover:border-primary transition-colors cursor-pointer"
+              disabled={isSelf}
+              className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-border bg-bg text-text hover:border-primary transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Edit3 className="h-3.5 w-3.5" />
-              Edit Account Profile
+              Edit Account
             </button>
 
-            {user.status === "active" &&
-              (!isSelf ? (
+            {user.status === "active" ? (
+              !isSelf ? (
                 <button
                   type="button"
                   onClick={() => onDeactivate(user)}
@@ -120,10 +128,19 @@ export function UserDetailPanel({
                   <UserX className="h-3.5 w-3.5" />
                   Self-Protected
                 </button>
-              ))}
+              )
+            ) : (
+              <button
+                type="button"
+                onClick={() => onReactivate(user)}
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-border bg-bg text-status-active-text hover:border-status-active-text transition-colors cursor-pointer"
+              >
+                <UserCheck className="h-3.5 w-3.5" />
+                Reactivate
+              </button>
+            )}
           </div>
 
-          {/* Role Boundary & Permissions Box */}
           <div className="space-y-2">
             <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
               <ShieldCheck className="h-3.5 w-3.5" />
@@ -140,7 +157,6 @@ export function UserDetailPanel({
             </div>
           </div>
 
-          {/* Account Profile Specifications */}
           <div className="space-y-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary">
               Account Profile Details
@@ -152,25 +168,30 @@ export function UserDetailPanel({
               </div>
               <div className="flex items-center gap-2 text-text-secondary">
                 <Building2 className="h-4 w-4 shrink-0" />
-                <span>{user.department}</span>
+                <span>{user.department || "—"}</span>
               </div>
               <div className="flex items-center gap-2 text-text-secondary pt-2 border-t border-border">
                 <Calendar className="h-4 w-4 shrink-0" />
-                <span>Account Created: <strong className="text-text">{user.dateAdded}</strong></span>
+                <span>
+                  Account Created:{" "}
+                  <strong className="text-text">{user.dateAdded}</strong>
+                </span>
               </div>
               <div className="flex items-center gap-2 text-text-secondary">
                 <Activity className="h-4 w-4 shrink-0" />
-                <span>Last Active: <strong className="text-text">{user.lastActive}</strong></span>
+                <span>
+                  Last Active:{" "}
+                  <strong className="text-text">{user.lastActive}</strong>
+                </span>
               </div>
             </div>
           </div>
 
-          {/* Activity Summary */}
           {user.activitySummary && (
             <div className="space-y-2">
               <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
                 <Activity className="h-3.5 w-3.5" />
-                Recent Operational Activity
+                Account Note
               </h3>
               <div className="p-3.5 rounded-lg border border-border bg-bg-subtle text-xs text-text font-medium leading-relaxed">
                 {user.activitySummary}

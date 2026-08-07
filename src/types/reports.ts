@@ -2,7 +2,7 @@ import type { AssetCategory } from './shared';
 
 
 export type { AssetCategory };
-import type  from "./assets";
+
 import type { BaseFilterState } from "./filters";
 
 export type SimpleReportCategory =

@@ -13,42 +13,44 @@ export interface RestockDialogProps {
   onConfirmRestock: (itemId: string, qtyReceived: number, notes?: string) => void;
 }
 
-export function RestockDialog({
+interface RestockDialogFormProps {
+  item: ConsumableItem | null;
+  allItems: ConsumableItem[];
+  onClose: () => void;
+  onConfirmRestock: RestockDialogProps["onConfirmRestock"];
+}
+
+function getInitialSelectedItemId(
+  item: ConsumableItem | null,
+  allItems: ConsumableItem[]
+): string {
+  if (item) return item.id;
+  if (allItems.length > 0) return allItems[0].id;
+  return "";
+}
+
+function RestockDialogForm({
   item,
   allItems,
-  isOpen,
   onClose,
   onConfirmRestock,
-}: RestockDialogProps) {
-  const [selectedItemId, setSelectedItemId] = useState("");
-  const [qtyReceived, setQtyReceived] = useState<number>(20);
+}: RestockDialogFormProps) {
+  const [selectedItemId, setSelectedItemId] = useState(() =>
+    getInitialSelectedItemId(item, allItems)
+  );
+  const [qtyReceived, setQtyReceived] = useState(20);
   const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (isOpen) {
-      if (item) {
-        setSelectedItemId(item.id);
-      } else if (allItems.length > 0) {
-        setSelectedItemId(allItems[0].id);
-      }
-      setQtyReceived(20);
-      setNotes("");
-      setError("");
-    }
-  }, [isOpen, item, allItems]);
-
-  useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && isOpen) {
+      if (e.key === "Escape") {
         onClose();
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
+  }, [onClose]);
 
   const targetItem = allItems.find((i) => i.id === selectedItemId) || item;
 
@@ -69,17 +71,14 @@ export function RestockDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs transition-opacity">
-      {/* Backdrop */}
       <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
 
-      {/* Dialog Window */}
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="restock-dialog-title"
         className="relative w-full max-w-md rounded-2xl border border-border bg-bg p-6 shadow-2xl z-10 animate-in fade-in zoom-in-95 duration-150 space-y-5"
       >
-        {/* Header */}
         <div className="flex items-start justify-between gap-3 border-b border-border pb-4">
           <div className="flex items-center gap-2.5">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/15 text-accent shrink-0">
@@ -105,9 +104,7 @@ export function RestockDialog({
           </button>
         </div>
 
-        {/* Form Body */}
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Target Item Picker */}
           <div className="space-y-1">
             <label htmlFor="restock-item-select" className="block text-xs font-semibold text-text">
               Target Consumable Item <span className="text-accent">*</span>
@@ -126,7 +123,6 @@ export function RestockDialog({
             </select>
           </div>
 
-          {/* Current vs New Quantity Preview */}
           {targetItem && (
             <div className="p-3.5 rounded-xl border border-border bg-bg-subtle text-xs space-y-1.5">
               <div className="flex justify-between text-text-secondary">
@@ -144,7 +140,6 @@ export function RestockDialog({
             </div>
           )}
 
-          {/* Quantity Received Input */}
           <div className="space-y-1">
             <label htmlFor="qty-received-input" className="block text-xs font-semibold text-text">
               Quantity Received <span className="text-accent">*</span>
@@ -162,7 +157,6 @@ export function RestockDialog({
             />
           </div>
 
-          {/* PO Reference / Supplier Notes */}
           <div className="space-y-1">
             <label htmlFor="restock-notes-input" className="block text-xs font-semibold text-text">
               PO # / Delivery Receipt Notes
@@ -179,7 +173,6 @@ export function RestockDialog({
 
           {error && <p className="text-xs font-bold text-status-outofservice-text">{error}</p>}
 
-          {/* Footer Actions */}
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
             <button
               type="button"
@@ -199,5 +192,25 @@ export function RestockDialog({
         </form>
       </div>
     </div>
+  );
+}
+
+export function RestockDialog({
+  item,
+  allItems,
+  isOpen,
+  onClose,
+  onConfirmRestock,
+}: RestockDialogProps) {
+  if (!isOpen) return null;
+
+  return (
+    <RestockDialogForm
+      key={item?.id ?? allItems[0]?.id ?? "restock"}
+      item={item}
+      allItems={allItems}
+      onClose={onClose}
+      onConfirmRestock={onConfirmRestock}
+    />
   );
 }

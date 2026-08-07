@@ -1,6 +1,6 @@
 import type { BaseFilterState } from "./filters";
 
-export type UserRole = "admin" | "staff" | "borrower";
+export type UserRole = "superadmin" | "admin" | "staff" | "borrower";
 
 export type UserStatus = "active" | "deactivated";
 

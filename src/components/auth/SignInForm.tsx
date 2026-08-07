@@ -2,15 +2,37 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2, ArrowRight } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 import { AuthCard } from './AuthCard';
 import { PasswordInput } from './PasswordInput';
 import { FormAlert } from './FormAlert';
 import { SignInFormValues, AuthFormState } from "@/types/auth";
 
+function safeNextPath(raw: string | null): string {
+  if (!raw || !raw.startsWith('/') || raw.startsWith('//')) {
+    return '/dashboard';
+  }
+  return raw;
+}
+
+const REDIRECT_ERROR_MESSAGES: Record<string, string> = {
+  no_profile:
+    'This account has no application profile. Contact a system administrator.',
+  deactivated: 'This account has been deactivated.',
+  borrower_portal:
+    'Borrower accounts cannot access the staff workspace yet. Contact Property Custodian for updates.',
+};
+
+function getRedirectErrorMessage(errorKey: string | null): string | null {
+  if (!errorKey) return null;
+  return REDIRECT_ERROR_MESSAGES[errorKey] ?? 'Unable to access the application.';
+}
+
 export function SignInForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const emailInputRef = useRef<HTMLInputElement>(null);
 
   const [formValues, setFormValues] = useState<SignInFormValues>({
@@ -27,6 +49,14 @@ export function SignInForm() {
     errorMessage: null,
     successMessage: null,
   });
+
+  const paramErrorKey = searchParams.get('error');
+  const [dismissedParamErrorKey, setDismissedParamErrorKey] = useState<string | null>(null);
+  const redirectErrorMessage =
+    paramErrorKey && paramErrorKey !== dismissedParamErrorKey
+      ? getRedirectErrorMessage(paramErrorKey)
+      : null;
+  const displayErrorMessage = formState.errorMessage ?? redirectErrorMessage;
 
   // Autofocus email field on mount
   useEffect(() => {
@@ -58,6 +88,7 @@ export function SignInForm() {
   const handleChange = (field: keyof SignInFormValues, value: string | boolean) => {
     setFormValues((prev) => ({ ...prev, [field]: value }));
     setFormState((prev) => ({ ...prev, errorMessage: null }));
+    if (paramErrorKey) setDismissedParamErrorKey(paramErrorKey);
 
     if (touched[field as 'email' | 'password']) {
       if (field === 'email') {
@@ -83,30 +114,39 @@ export function SignInForm() {
 
     setFormState({ isLoading: true, errorMessage: null, successMessage: null });
 
-    // Simulated network request
-    setTimeout(() => {
-      // Failure path simulation for demonstration
-      if (
-        formValues.email.trim().toLowerCase() === 'error@crmc.edu.ph' ||
-        formValues.password === 'error'
-      ) {
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithPassword({
+        email: formValues.email.trim(),
+        password: formValues.password,
+      });
+
+      if (error) {
         setFormState({
           isLoading: false,
-          errorMessage: 'Invalid email or password. Please verify your credentials and try again.',
+          errorMessage:
+            'Invalid email or password. Please verify your credentials and try again.',
           successMessage: null,
         });
-      } else {
-        console.log('[CRMC-AIMS Auth] Sign In Payload:', formValues);
-        setFormState({
-          isLoading: false,
-          errorMessage: null,
-          successMessage: 'Sign in successful! Redirecting to dashboard...',
-        });
-        setTimeout(() => {
-          router.push('/dashboard');
-        }, 600);
+        return;
       }
-    }, 800);
+
+      setFormState({
+        isLoading: false,
+        errorMessage: null,
+        successMessage: 'Sign in successful! Redirecting to dashboard...',
+      });
+
+      const nextPath = safeNextPath(searchParams.get('next'));
+      router.push(nextPath);
+      router.refresh();
+    } catch {
+      setFormState({
+        isLoading: false,
+        errorMessage: 'Unable to sign in right now. Please try again.',
+        successMessage: null,
+      });
+    }
   };
 
   return (
@@ -124,9 +164,12 @@ export function SignInForm() {
 
         {/* Global Error/Success Alert */}
         <FormAlert
-          type={formState.errorMessage ? 'error' : 'success'}
-          message={formState.errorMessage || formState.successMessage}
-          onDismiss={() => setFormState((prev) => ({ ...prev, errorMessage: null, successMessage: null }))}
+          type={displayErrorMessage ? 'error' : 'success'}
+          message={displayErrorMessage || formState.successMessage}
+          onDismiss={() => {
+            setFormState((prev) => ({ ...prev, errorMessage: null, successMessage: null }));
+            if (paramErrorKey) setDismissedParamErrorKey(paramErrorKey);
+          }}
         />
 
         {/* Form */}

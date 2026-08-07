@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { X, PackagePlus, Edit } from "lucide-react";
-
 import type { ConsumableItem, ConsumableCategory } from "@/types/inventory";
 
 export interface AddEditConsumableDialogProps {
@@ -12,60 +11,42 @@ export interface AddEditConsumableDialogProps {
   onSave: (itemData: Partial<ConsumableItem>) => void;
 }
 
-export function AddEditConsumableDialog({
-  isOpen,
+interface AddEditConsumableDialogFormProps {
+  initialItem?: ConsumableItem | null;
+  onClose: () => void;
+  onSave: (itemData: Partial<ConsumableItem>) => void;
+}
+
+function AddEditConsumableDialogForm({
   initialItem,
   onClose,
   onSave,
-}: AddEditConsumableDialogProps) {
+}: AddEditConsumableDialogFormProps) {
   const isEditing = Boolean(initialItem);
 
-  const [name, setName] = useState("");
-  const [category, setCategory] = useState<ConsumableCategory>("office_supplies");
-  const [unit, setUnit] = useState("reams");
-  const [currentQty, setCurrentQty] = useState<number>(0);
-  const [minThreshold, setMinThreshold] = useState<number>(10);
-  const [location, setLocation] = useState("");
-  const [supplier, setSupplier] = useState("");
-  const [notes, setNotes] = useState("");
+  const [name, setName] = useState(() => initialItem?.name ?? "");
+  const [category, setCategory] = useState<ConsumableCategory>(
+    () => initialItem?.category ?? "office_supplies"
+  );
+  const [unit, setUnit] = useState(() => initialItem?.unit ?? "reams");
+  const [currentQty, setCurrentQty] = useState(() => initialItem?.currentQty ?? 50);
+  const [minThreshold, setMinThreshold] = useState(() => initialItem?.minThreshold ?? 15);
+  const [location, setLocation] = useState(
+    () => initialItem?.location ?? "Supply Storage Bay A1"
+  );
+  const [supplier, setSupplier] = useState(() => initialItem?.supplier ?? "");
+  const [notes, setNotes] = useState(() => initialItem?.notes ?? "");
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (isOpen) {
-      if (initialItem) {
-        setName(initialItem.name);
-        setCategory(initialItem.category);
-        setUnit(initialItem.unit);
-        setCurrentQty(initialItem.currentQty);
-        setMinThreshold(initialItem.minThreshold);
-        setLocation(initialItem.location);
-        setSupplier(initialItem.supplier || "");
-        setNotes(initialItem.notes || "");
-      } else {
-        setName("");
-        setCategory("office_supplies");
-        setUnit("reams");
-        setCurrentQty(50);
-        setMinThreshold(15);
-        setLocation("Supply Storage Bay A1");
-        setSupplier("");
-        setNotes("");
-      }
-      setError("");
-    }
-  }, [isOpen, initialItem]);
-
-  useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && isOpen) {
+      if (e.key === "Escape") {
         onClose();
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
+  }, [onClose]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,17 +77,14 @@ export function AddEditConsumableDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs transition-opacity overflow-y-auto">
-      {/* Backdrop */}
       <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
 
-      {/* Dialog Window */}
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="dialog-title"
         className="relative w-full max-w-lg rounded-2xl border border-border bg-bg p-6 shadow-2xl z-10 animate-in fade-in zoom-in-95 duration-150 my-8"
       >
-        {/* Header */}
         <div className="flex items-center justify-between gap-3 mb-5 border-b border-border pb-4">
           <div className="flex items-center gap-2.5">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/15 text-accent shrink-0">
@@ -132,9 +110,7 @@ export function AddEditConsumableDialog({
           </button>
         </div>
 
-        {/* Form Body */}
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Item Name */}
           <div className="space-y-1">
             <label htmlFor="consumable-name-input" className="block text-xs font-semibold text-text">
               Item Name <span className="text-accent">*</span>
@@ -152,7 +128,6 @@ export function AddEditConsumableDialog({
             />
           </div>
 
-          {/* Category & Unit Row */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
               <label htmlFor="category-select" className="block text-xs font-semibold text-text">
@@ -187,7 +162,6 @@ export function AddEditConsumableDialog({
             </div>
           </div>
 
-          {/* Quantities Row */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl border border-border bg-bg-subtle">
             <div className="space-y-1">
               <label htmlFor="current-qty-input" className="block text-xs font-semibold text-text">
@@ -218,7 +192,6 @@ export function AddEditConsumableDialog({
             </div>
           </div>
 
-          {/* Location & Supplier */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
               <label htmlFor="location-input-con" className="block text-xs font-semibold text-text">
@@ -249,7 +222,6 @@ export function AddEditConsumableDialog({
             </div>
           </div>
 
-          {/* Notes */}
           <div className="space-y-1">
             <label htmlFor="consumable-notes-input" className="block text-xs font-semibold text-text">
               Notes / Consumption Specs
@@ -266,7 +238,6 @@ export function AddEditConsumableDialog({
 
           {error && <p className="text-xs font-bold text-status-outofservice-text">{error}</p>}
 
-          {/* Footer Actions */}
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
             <button
               type="button"
@@ -285,5 +256,23 @@ export function AddEditConsumableDialog({
         </form>
       </div>
     </div>
+  );
+}
+
+export function AddEditConsumableDialog({
+  isOpen,
+  initialItem,
+  onClose,
+  onSave,
+}: AddEditConsumableDialogProps) {
+  if (!isOpen) return null;
+
+  return (
+    <AddEditConsumableDialogForm
+      key={initialItem?.id ?? "new"}
+      initialItem={initialItem}
+      onClose={onClose}
+      onSave={onSave}
+    />
   );
 }

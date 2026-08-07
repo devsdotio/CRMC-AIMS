@@ -13,38 +13,40 @@ export interface ApproveRejectDialogProps {
   onConfirm: (request: BorrowRequest, mode: "approve" | "reject", reason?: string) => void;
 }
 
-export function ApproveRejectDialog({
+interface ApproveRejectDialogFormProps {
+  request: BorrowRequest;
+  mode: "approve" | "reject";
+  onClose: () => void;
+  onConfirm: ApproveRejectDialogProps["onConfirm"];
+}
+
+function ApproveRejectDialogForm({
   request,
   mode,
-  isOpen,
   onClose,
   onConfirm,
-}: ApproveRejectDialogProps) {
+}: ApproveRejectDialogFormProps) {
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  const isApprove = mode === "approve";
+
   useEffect(() => {
-    if (isOpen && mode === "reject") {
-      setReason("");
-      setError("");
+    if (!isApprove) {
       setTimeout(() => textareaRef.current?.focus(), 100);
     }
-  }, [isOpen, mode]);
+  }, [isApprove]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && isOpen) {
+      if (e.key === "Escape") {
         onClose();
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
-
-  if (!isOpen || !request || !mode) return null;
-
-  const isApprove = mode === "approve";
+  }, [onClose]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,17 +60,14 @@ export function ApproveRejectDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs transition-opacity">
-      {/* Backdrop */}
       <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
 
-      {/* Modal Dialog Box */}
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="dialog-title"
         className="relative w-full max-w-md rounded-xl border border-border bg-bg p-6 shadow-2xl z-10 animate-in fade-in zoom-in-95 duration-150"
       >
-        {/* Header */}
         <div className="flex items-start justify-between gap-3 mb-4">
           <div className="flex items-center gap-2.5">
             <div
@@ -105,7 +104,6 @@ export function ApproveRejectDialog({
           </button>
         </div>
 
-        {/* Confirmation Body Summary */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="p-3 rounded-lg border border-border bg-bg-subtle text-xs space-y-1">
             <p className="text-text">
@@ -144,7 +142,6 @@ export function ApproveRejectDialog({
             </p>
           )}
 
-          {/* Action buttons */}
           <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-border">
             <button
               type="button"
@@ -168,5 +165,25 @@ export function ApproveRejectDialog({
         </form>
       </div>
     </div>
+  );
+}
+
+export function ApproveRejectDialog({
+  request,
+  mode,
+  isOpen,
+  onClose,
+  onConfirm,
+}: ApproveRejectDialogProps) {
+  if (!isOpen || !request || !mode) return null;
+
+  return (
+    <ApproveRejectDialogForm
+      key={`${request.id}-${mode}`}
+      request={request}
+      mode={mode}
+      onClose={onClose}
+      onConfirm={onConfirm}
+    />
   );
 }
