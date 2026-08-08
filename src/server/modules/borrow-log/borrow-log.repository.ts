@@ -1,0 +1,167 @@
+import { and, count, desc, eq, ilike, lt, or, sql } from "drizzle-orm";
+
+import { getDb } from "@/server/db";
+import type { DbSession } from "@/server/db/transaction";
+import {
+  borrowTransactions,
+  type BorrowTransactionRow,
+  type NewBorrowTransactionRow,
+} from "@/server/db/schema";
+import { todayDateString } from "@/server/shared/codes";
+
+import type {
+  IBorrowLogRepository,
+  ListBorrowLogFilters,
+} from "./borrow-log.types";
+
+export class BorrowLogRepository implements IBorrowLogRepository {
+  private db(session?: DbSession) {
+    return session ?? getDb();
+  }
+
+  async findById(
+    id: string,
+    session?: DbSession
+  ): Promise<BorrowTransactionRow | null> {
+    const db = this.db(session);
+    const [row] = await db
+      .select()
+      .from(borrowTransactions)
+      .where(eq(borrowTransactions.id, id))
+      .limit(1);
+    return row ?? null;
+  }
+
+  async findByIdForUpdate(
+    id: string,
+    session: DbSession
+  ): Promise<BorrowTransactionRow | null> {
+    const [row] = await session
+      .select()
+      .from(borrowTransactions)
+      .where(eq(borrowTransactions.id, id))
+      .for("update")
+      .limit(1);
+    return row ?? null;
+  }
+
+  async findActiveByAssetId(
+    assetId: string,
+    session?: DbSession
+  ): Promise<BorrowTransactionRow | null> {
+    const db = this.db(session);
+    const [row] = await db
+      .select()
+      .from(borrowTransactions)
+      .where(
+        and(
+          eq(borrowTransactions.assetId, assetId),
+          eq(borrowTransactions.status, "active")
+        )
+      )
+      .limit(1);
+    return row ?? null;
+  }
+
+  async list(
+    filters: ListBorrowLogFilters = {},
+    session?: DbSession
+  ): Promise<BorrowTransactionRow[]> {
+    const db = this.db(session);
+    const conditions = [];
+    const today = todayDateString();
+
+    if (filters.status === "returned") {
+      conditions.push(eq(borrowTransactions.status, "returned"));
+    } else if (filters.status === "active") {
+      conditions.push(eq(borrowTransactions.status, "active"));
+      conditions.push(sql`${borrowTransactions.dueDate} >= ${today}`);
+    } else if (filters.status === "overdue") {
+      conditions.push(eq(borrowTransactions.status, "active"));
+      conditions.push(lt(borrowTransactions.dueDate, today));
+    }
+
+    if (filters.department?.trim()) {
+      conditions.push(eq(borrowTransactions.department, filters.department.trim()));
+    }
+    if (filters.search?.trim()) {
+      const q = `%${filters.search.trim()}%`;
+      conditions.push(
+        or(
+          ilike(borrowTransactions.borrowerName, q),
+          ilike(borrowTransactions.logCode, q),
+          ilike(borrowTransactions.assetCode, q),
+          ilike(borrowTransactions.assetName, q),
+          ilike(borrowTransactions.requestCode, q)
+        )!
+      );
+    }
+
+    const base = db
+      .select()
+      .from(borrowTransactions)
+      .orderBy(desc(borrowTransactions.releasedAt));
+
+    if (conditions.length === 0) return base;
+    return base.where(and(...conditions));
+  }
+
+  async countActive(session?: DbSession): Promise<number> {
+    const db = this.db(session);
+    const [row] = await db
+      .select({ value: count() })
+      .from(borrowTransactions)
+      .where(eq(borrowTransactions.status, "active"));
+    return Number(row?.value ?? 0);
+  }
+
+  async countOverdue(session?: DbSession): Promise<number> {
+    const db = this.db(session);
+    const today = todayDateString();
+    const [row] = await db
+      .select({ value: count() })
+      .from(borrowTransactions)
+      .where(
+        and(
+          eq(borrowTransactions.status, "active"),
+          lt(borrowTransactions.dueDate, today)
+        )
+      );
+    return Number(row?.value ?? 0);
+  }
+
+  async countYear(session?: DbSession): Promise<number> {
+    const db = this.db(session);
+    const [row] = await db
+      .select({ value: count() })
+      .from(borrowTransactions)
+      .where(
+        sql`extract(year from ${borrowTransactions.createdAt}) = extract(year from now())`
+      );
+    return Number(row?.value ?? 0);
+  }
+
+  async create(
+    data: Omit<NewBorrowTransactionRow, "id" | "createdAt" | "updatedAt">,
+    session?: DbSession
+  ): Promise<BorrowTransactionRow> {
+    const db = this.db(session);
+    const [row] = await db.insert(borrowTransactions).values(data).returning();
+    if (!row) throw new Error("Failed to create borrow log.");
+    return row;
+  }
+
+  async update(
+    id: string,
+    data: Partial<Omit<BorrowTransactionRow, "id" | "createdAt" | "logCode">>,
+    session?: DbSession
+  ): Promise<BorrowTransactionRow | null> {
+    const db = this.db(session);
+    const [row] = await db
+      .update(borrowTransactions)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(borrowTransactions.id, id))
+      .returning();
+    return row ?? null;
+  }
+}

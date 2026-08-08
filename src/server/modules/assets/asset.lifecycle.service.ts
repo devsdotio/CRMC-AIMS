@@ -36,20 +36,26 @@ export class AssetLifecycleService {
     private readonly lifecycleRepository: AssetLifecycleRepository = new AssetLifecycleRepository()
   ) {}
 
-  async record(input: RecordLifecycleEventInput): Promise<AssetLifecycleEventDTO> {
-    const row = await this.lifecycleRepository.append({
-      assetId: input.assetId,
-      assetCode: input.assetCode,
-      eventType: input.eventType,
-      actorUserId: input.actor.userId,
-      actorEmail: input.actor.email,
-      actorDisplayName: input.actor.displayName,
-      fromStatus: input.fromStatus ?? null,
-      toStatus: input.toStatus ?? null,
-      fromHolder: input.fromHolder ?? null,
-      toHolder: input.toHolder ?? null,
-      payload: input.payload ?? {},
-    });
+  async record(
+    input: RecordLifecycleEventInput,
+    session?: import("@/server/db/transaction").DbSession
+  ): Promise<AssetLifecycleEventDTO> {
+    const row = await this.lifecycleRepository.append(
+      {
+        assetId: input.assetId,
+        assetCode: input.assetCode,
+        eventType: input.eventType,
+        actorUserId: input.actor.userId,
+        actorEmail: input.actor.email,
+        actorDisplayName: input.actor.displayName,
+        fromStatus: input.fromStatus ?? null,
+        toStatus: input.toStatus ?? null,
+        fromHolder: input.fromHolder ?? null,
+        toHolder: input.toHolder ?? null,
+        payload: input.payload ?? {},
+      },
+      session
+    );
 
     return toLifecycleDTO(row);
   }
