@@ -8,6 +8,16 @@ import { UserService } from "@/server/modules/users/user.service";
 import { isStaffShellRole, type AppRole } from "@/server/shared/roles";
 import { eq } from "drizzle-orm";
 
+/**
+ * Staff shell gate.
+ *
+ * Do not call supabase.auth.signOut() here and then redirect.
+ * Cookie clears from Server Components often never land on the redirect
+ * response → proxy still sees a session → bounces you back to /dashboard
+ * (GET /dashboard 307 forever).
+ *
+ * Gate-failure redirects use `?error=…` and SignInForm clears the session.
+ */
 export default async function PrivateLayout({
   children,
 }: Readonly<{
@@ -22,30 +32,35 @@ export default async function PrivateLayout({
     redirect("/sign-in");
   }
 
-  const db = getDb();
-  const [profile] = await db
-    .select()
-    .from(profiles)
-    .where(eq(profiles.userId, user.id))
-    .limit(1);
+  let profile: typeof profiles.$inferSelect | undefined;
+  try {
+    const db = getDb();
+    const rows = await db
+      .select()
+      .from(profiles)
+      .where(eq(profiles.userId, user.id))
+      .limit(1);
+    profile = rows[0];
+  } catch (error) {
+    // DB timeout / network: fail closed with a recoverable sign-in state
+    console.error("[private-layout] profile lookup failed:", error);
+    redirect("/sign-in?error=no_profile");
+  }
 
   if (!profile) {
-    await supabase.auth.signOut();
     redirect("/sign-in?error=no_profile");
   }
 
   if (profile.status !== "active") {
-    await supabase.auth.signOut();
     redirect("/sign-in?error=deactivated");
   }
 
   if (!isStaffShellRole(profile.role as AppRole)) {
-    // Borrowers are authenticated but not admitted into the staff workspace yet.
     redirect("/sign-in?error=borrower_portal");
   }
 
-  // Throttled presence stamp (does not throw).
-  await new UserService().recordActivity(user.id);
+  // Best-effort presence (never block entry)
+  void new UserService().recordActivity(user.id);
 
   return <DashboardLayout>{children}</DashboardLayout>;
 }

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { Loader2, ArrowRight } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { AuthCard } from './AuthCard';
@@ -25,13 +25,18 @@ const REDIRECT_ERROR_MESSAGES: Record<string, string> = {
     'Borrower accounts cannot access the staff workspace yet. Contact Property Custodian for updates.',
 };
 
+const STAY_ON_SIGN_IN_ERRORS = new Set([
+  'no_profile',
+  'deactivated',
+  'borrower_portal',
+]);
+
 function getRedirectErrorMessage(errorKey: string | null): string | null {
   if (!errorKey) return null;
   return REDIRECT_ERROR_MESSAGES[errorKey] ?? 'Unable to access the application.';
 }
 
 export function SignInForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const emailInputRef = useRef<HTMLInputElement>(null);
 
@@ -62,6 +67,33 @@ export function SignInForm() {
   useEffect(() => {
     emailInputRef.current?.focus();
   }, []);
+
+  /**
+   * Clear residual Supabase session when the private shell rejected entry.
+   * Server Components cannot reliably attach signOut cookies to redirects.
+   */
+  useEffect(() => {
+    if (!paramErrorKey || !STAY_ON_SIGN_IN_ERRORS.has(paramErrorKey)) {
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const supabase = createClient();
+        await supabase.auth.signOut();
+      } catch {
+        // Best-effort
+      }
+      if (!cancelled) {
+        // Drop auth cookies from a stuck bounce loop even if signOut is partial
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [paramErrorKey]);
 
   const validateEmail = (email: string) => {
     if (!email.trim()) return 'Email address is required.';
@@ -138,8 +170,8 @@ export function SignInForm() {
       });
 
       const nextPath = safeNextPath(searchParams.get('next'));
-      router.push(nextPath);
-      router.refresh();
+      // Full navigation so proxy + layout see the new session cookies reliably.
+      window.location.assign(nextPath);
     } catch {
       setFormState({
         isLoading: false,
