@@ -1,7 +1,7 @@
 "use client";
 
 import { Download, ShieldCheck, UserCheck, Calendar, User } from "lucide-react";
-import type { SimpleUserRole } from "./types";
+import type { SimpleUserRole } from "@/types/reports";
 
 interface ReportsHeaderProps {
   generatedAt: string;

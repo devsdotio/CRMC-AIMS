@@ -1,4 +1,4 @@
-import type { UserRole } from "@/components/users/types";
+import type { UserRole } from "./users";
 
 export type SettingsSection = "account" | "categories" | "system";
 

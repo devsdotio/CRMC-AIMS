@@ -71,7 +71,7 @@ export async function updateSession(request: NextRequest) {
   // Authenticated users on auth pages → app home
   if (user && isPublicPage(pathname)) {
     const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
+    url.pathname = "/";
     return NextResponse.redirect(url);
   }
 

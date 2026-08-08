@@ -1,5 +1,7 @@
 "use client";
 
+import type { UserRole } from "@/types/users";
+
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -18,6 +20,8 @@ import {
   LogOut,
   User,
   ChevronsUpDown,
+  ShoppingBag,
+  History,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -28,6 +32,7 @@ interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
   badge?: number;
   badgeTone?: "accent" | "warning";
+  roles?: UserRole[];
 }
 
 interface NavSection {
@@ -43,6 +48,7 @@ interface SidebarProps {
   overdueCount?: number;
   userName?: string;
   userEmail?: string;
+  userRole?: UserRole;
   onLogout?: () => void;
 }
 
@@ -54,6 +60,7 @@ export default function Sidebar({
   overdueCount = 0,
   userName = "Unknown user",
   userEmail = "",
+  userRole,
   onLogout,
 }: SidebarProps) {
   const pathname = usePathname();
@@ -99,28 +106,42 @@ export default function Sidebar({
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  const sections: NavSection[] = [
+  const allSections: NavSection[] = [
     {
       label: "Overview",
-      items: [{ name: "Dashboard", href: "/dashboard", icon: LayoutDashboard }],
+      items: [
+        { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["superadmin", "admin", "staff"] },
+        { name: "My Dashboard", href: "/borrower-db/dashboard", icon: LayoutDashboard, roles: ["borrower"] },
+      ],
     },
     {
       label: "Operations",
       items: [
-        { name: "Borrow Requests", href: "/borrow-requests", icon: ClipboardList, badge: pendingCount, badgeTone: "accent" },
-        { name: "Assets", href: "/assets", icon: Package },
-        { name: "Borrow & Return Log", href: "/borrow-log", icon: Repeat, badge: overdueCount, badgeTone: "warning" },
-        { name: "Inventory", href: "/consumables", icon: Boxes, badge: lowStockCount, badgeTone: "warning" }
+        { name: "Borrow Requests", href: "/borrow-requests", icon: ClipboardList, badge: pendingCount, badgeTone: "accent", roles: ["superadmin", "admin", "staff"] },
+        { name: "Browse Assets", href: "/borrower-db", icon: ShoppingBag, roles: ["borrower"] },
+        { name: "My Requests", href: "/borrower-db/requests", icon: ClipboardList, roles: ["borrower"] },
+        { name: "Borrow History", href: "/borrower-db/history", icon: History, roles: ["borrower"] },
+        { name: "Assets", href: "/assets", icon: Package, roles: ["superadmin", "admin", "staff"] },
+        { name: "Borrow & Return Log", href: "/borrow-log", icon: Repeat, badge: overdueCount, badgeTone: "warning", roles: ["superadmin", "admin", "staff"] },
+        { name: "Inventory", href: "/consumables", icon: Boxes, badge: lowStockCount, badgeTone: "warning", roles: ["superadmin", "admin", "staff"] }
       ],
     },
     {
       label: "Administration",
       items: [
-        { name: "Users & Roles", href: "/users", icon: Users },
-        { name: "Settings", href: "/settings", icon: Settings },
+        { name: "Users & Roles", href: "/users", icon: Users, roles: ["superadmin", "admin"] },
+        { name: "Settings", href: "/settings", icon: Settings, roles: ["superadmin", "admin"] },
       ],
     },
   ];
+
+  // Filter sections and items based on user role
+  const sections = allSections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => !item.roles || (userRole && item.roles.includes(userRole))),
+    }))
+    .filter((section) => section.items.length > 0);
 
   const handleToggle = () => {
     const next = !isCollapsed;

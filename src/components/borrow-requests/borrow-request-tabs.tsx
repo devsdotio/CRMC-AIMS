@@ -2,7 +2,7 @@
 
 import { useRef, KeyboardEvent } from "react";
 import { cn } from "@/lib/utils";
-import type { TabFilter } from "./types";
+import type { TabFilter } from "@/types/borrow-requests";
 
 export interface BorrowRequestTabsProps {
   activeTab: TabFilter;

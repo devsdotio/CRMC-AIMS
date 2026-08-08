@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { X, FileText, FileSpreadsheet, Download, Check, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { SimpleReportCategory, SimpleUserRole } from "./types";
+import type { SimpleReportCategory, SimpleUserRole } from "@/types/reports";
 
 interface ExportModalProps {
   isOpen: boolean;

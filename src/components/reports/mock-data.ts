@@ -6,7 +6,7 @@ import type {
   SimpleDamagedLostItem,
   SimpleAcquisitionItem,
   SimpleDisposalItem,
-} from "./types";
+} from "@/types/reports";
 
 // ─── 1. Asset Inventory Summary Mock Data ────────────────────────────────────
 
@@ -16,7 +16,7 @@ export const MOCK_SIMPLE_ASSETS: SimpleAssetItem[] = [
     tagNumber: "CRMC-EQ-001",
     serialNumber: "SN-984210",
     name: "High-Resolution LCD Projector",
-    category: "AV Equipment",
+    category: "av",
     department: "Communications",
     location: "AV Hall 1",
     acquisitionDate: "2024-01-15",
@@ -29,7 +29,7 @@ export const MOCK_SIMPLE_ASSETS: SimpleAssetItem[] = [
     tagNumber: "CRMC-CP-044",
     serialNumber: "SN-PC-77491",
     name: "Workstation PC i7 32GB RAM",
-    category: "Computing",
+    category: "computing",
     department: "Computer Science",
     location: "ICT Lab A",
     acquisitionDate: "2023-06-10",
@@ -42,7 +42,7 @@ export const MOCK_SIMPLE_ASSETS: SimpleAssetItem[] = [
     tagNumber: "CRMC-LB-008",
     serialNumber: "SN-MIC-1049",
     name: "Binocular Optical Microscope",
-    category: "Lab Tools",
+    category: "transport",
     department: "Medical Technology",
     location: "Bio Lab 2",
     acquisitionDate: "2020-02-14",
@@ -55,7 +55,7 @@ export const MOCK_SIMPLE_ASSETS: SimpleAssetItem[] = [
     tagNumber: "CRMC-FN-089",
     serialNumber: "N/A",
     name: "Ergonomic Office Chair",
-    category: "Furniture",
+    category: "furniture",
     department: "Nursing",
     location: "Dean Office",
     acquisitionDate: "2024-04-05",
@@ -68,7 +68,7 @@ export const MOCK_SIMPLE_ASSETS: SimpleAssetItem[] = [
     tagNumber: "CRMC-AV-012",
     serialNumber: "SN-CAM-3310",
     name: "Digital SLR Camera Kit",
-    category: "AV Equipment",
+    category: "av",
     department: "Communications",
     location: "Media Storage",
     acquisitionDate: "2022-11-20",
@@ -121,9 +121,9 @@ export const MOCK_SIMPLE_BORROWINGS: SimpleBorrowingEntry[] = [
 ];
 
 export const MOCK_SIMPLE_FREQUENT_BORROWED: SimpleFrequentBorrowed[] = [
-  { assetName: "Portable LCD Projector", category: "AV Equipment", borrowCount: 42, primaryDepartment: "Communications" },
-  { assetName: "Wireless Presenter Pointer", category: "AV Equipment", borrowCount: 38, primaryDepartment: "Nursing" },
-  { assetName: "Digital Multimeter Kit", category: "Lab Tools", borrowCount: 29, primaryDepartment: "Engineering" },
+  { assetName: "Portable LCD Projector", category: "av", borrowCount: 42, primaryDepartment: "Communications" },
+  { assetName: "Wireless Presenter Pointer", category: "av", borrowCount: 38, primaryDepartment: "Nursing" },
+  { assetName: "Digital Multimeter Kit", category: "transport", borrowCount: 29, primaryDepartment: "Engineering" },
 ];
 
 // ─── 3. Maintenance & Condition Mock Data ────────────────────────────────────
@@ -174,7 +174,7 @@ export const MOCK_SIMPLE_ACQUISITIONS: SimpleAcquisitionItem[] = [
   {
     id: "acq-01",
     assetName: "Core i7 Workstation PCs",
-    category: "Computing",
+    category: "computing",
     department: "Computer Science",
     quantity: 10,
     totalCost: 450000,
@@ -184,7 +184,7 @@ export const MOCK_SIMPLE_ACQUISITIONS: SimpleAcquisitionItem[] = [
   {
     id: "acq-02",
     assetName: "Ergonomic Lab Stool Chairs",
-    category: "Furniture",
+    category: "furniture",
     department: "Nursing",
     quantity: 15,
     totalCost: 90000,
@@ -200,7 +200,7 @@ export const MOCK_SIMPLE_DISPOSALS: SimpleDisposalItem[] = [
     id: "dsp-01",
     assetTag: "CRMC-AV-012",
     assetName: "Digital SLR Camera Kit",
-    category: "AV Equipment",
+    category: "av",
     department: "Communications",
     disposalDate: "2026-06-01",
     disposalReason: "Beyond Economic Repair",

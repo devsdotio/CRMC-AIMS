@@ -1,7 +1,7 @@
 "use client";
 
 import { ClipboardCheck, CheckCircle2 } from "lucide-react";
-import type { BorrowLogRecord, LogTabFilter } from "./types";
+import type { BorrowLogRecord, LogTabFilter } from "@/types/borrow-log";
 import { BorrowLogListItem } from "./borrow-log-list-item";
 
 export interface BorrowLogListProps {

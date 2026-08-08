@@ -1,4 +1,4 @@
-import type { UserAccount, UserRole, UserStatus } from "@/components/users/types";
+import type { UserAccount, UserRole, UserStatus } from "@/types/users";
 import { formatRelativeTime } from "@/lib/format-relative-time";
 
 export type ProfileDTO = {

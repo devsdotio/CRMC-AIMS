@@ -1,7 +1,7 @@
 "use client";
 
 import { PackageSearch } from "lucide-react";
-import type { ConsumableItem } from "./types";
+import type { ConsumableItem } from "@/types/inventory";
 import { ConsumableCard } from "./consumable-card";
 
 export interface ConsumableGridProps {

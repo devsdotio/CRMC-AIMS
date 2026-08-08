@@ -1,7 +1,7 @@
 "use client";
 
 import { ClipboardCheck, Inbox } from "lucide-react";
-import type { BorrowRequest, TabFilter } from "./types";
+import type { BorrowRequest, TabFilter } from "@/types/borrow-requests";
 import { RequestListItem } from "./request-list-item";
 
 export interface RequestListProps {

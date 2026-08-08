@@ -1,6 +1,6 @@
 "use client";
 
-import type { SimpleDisposalItem } from "../types";
+import type { SimpleDisposalItem } from "@/types/reports";
 
 interface DisposalReportViewProps {
   disposals: SimpleDisposalItem[];

@@ -2,7 +2,7 @@
 
 import { Search, FilterX } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { UserFilterState } from "./types";
+import type { UserFilterState } from "@/types/users";
 
 export interface UserFiltersProps {
   filters: UserFilterState;

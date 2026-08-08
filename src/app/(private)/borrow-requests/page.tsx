@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import type { BorrowRequest, TabFilter, FilterState } from "@/components/borrow-requests/types";
+import type { BorrowRequest, TabFilter, BorrowRequestFilterState } from "@/types/borrow-requests";
 import { INITIAL_MOCK_REQUESTS } from "@/components/borrow-requests/mock-data";
 import { BorrowRequestTabs } from "@/components/borrow-requests/borrow-request-tabs";
 import { RequestFilters } from "@/components/borrow-requests/request-filters";
@@ -15,7 +15,7 @@ export default function BorrowRequestsPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   // Filter State
-  const [filters, setFilters] = useState<FilterState>({
+  const [filters, setFilters] = useState<BorrowRequestFilterState>({
     searchQuery: "",
     department: "All Departments",
     startDate: "",
@@ -97,7 +97,7 @@ export default function BorrowRequestsPage() {
   }, [requests, activeTab, filters]);
 
   // Handlers for state updates
-  const handleFilterChange = (updated: Partial<FilterState>) => {
+  const handleFilterChange = (updated: Partial<BorrowRequestFilterState>) => {
     setFilters((prev) => ({ ...prev, ...updated }));
   };
 

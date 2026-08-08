@@ -1,30 +1,42 @@
 "use client";
-
+import { getCategoryStyle } from "@/constants/categories";
 import { Tag, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Asset, AssetCategory, AssetStatus } from "./types";
+import type { Asset,  AssetStatus } from "@/types/assets";
 
 export interface AssetTableRowProps {
   asset: Asset;
   onSelect: (asset: Asset) => void;
 }
 
-const CATEGORY_STYLES: Record<AssetCategory, { bg: string; text: string; label: string }> = {
-  transport: { bg: "bg-category-transport-bg", text: "text-category-transport-text", label: "Transport" },
-  computing: { bg: "bg-category-computing-bg", text: "text-category-computing-text", label: "Computing" },
-  av:        { bg: "bg-category-av-bg",        text: "text-category-av-text",        label: "AV Equipment" },
-  furniture: { bg: "bg-category-furniture-bg", text: "text-category-furniture-text", label: "Furniture" },
-};
-
-const STATUS_STYLES: Record<AssetStatus, { bg: string; text: string; label: string }> = {
-  active:         { bg: "bg-status-active-bg/20",     text: "text-status-active-text font-bold",      label: "Active" },
-  needs_repair:   { bg: "bg-status-repair-bg/20",     text: "text-status-repair-text font-bold",      label: "Needs Repair" },
-  out_of_service: { bg: "bg-status-outofservice-bg/20", text: "text-status-outofservice-text font-bold", label: "Out of Service" },
-  retired:        { bg: "bg-status-retired-bg/20",    text: "text-status-retired-text font-bold",     label: "Retired" },
+const STATUS_STYLES: Record<
+  AssetStatus,
+  { bg: string; text: string; label: string }
+> = {
+  active: {
+    bg: "bg-status-active-bg/20",
+    text: "text-status-active-text font-bold",
+    label: "Active",
+  },
+  needs_repair: {
+    bg: "bg-status-repair-bg/20",
+    text: "text-status-repair-text font-bold",
+    label: "Needs Repair",
+  },
+  out_of_service: {
+    bg: "bg-status-outofservice-bg/20",
+    text: "text-status-outofservice-text font-bold",
+    label: "Out of Service",
+  },
+  retired: {
+    bg: "bg-status-retired-bg/20",
+    text: "text-status-retired-text font-bold",
+    label: "Retired",
+  },
 };
 
 export function AssetTableRow({ asset, onSelect }: AssetTableRowProps) {
-  const categoryMeta = CATEGORY_STYLES[asset.category];
+  const categoryMeta = getCategoryStyle(asset.category);
   const statusMeta = STATUS_STYLES[asset.status];
 
   return (
@@ -40,7 +52,7 @@ export function AssetTableRow({ asset, onSelect }: AssetTableRowProps) {
       }}
       className={cn(
         "group border-b border-border bg-bg transition-colors duration-100 cursor-pointer",
-        "hover:bg-bg-subtle/80 focus:outline-none focus-visible:bg-bg-subtle"
+        "hover:bg-bg-subtle/80 focus:outline-none focus-visible:bg-bg-subtle",
       )}
     >
       {/* Code */}
@@ -66,7 +78,7 @@ export function AssetTableRow({ asset, onSelect }: AssetTableRowProps) {
           className={cn(
             "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider",
             categoryMeta.bg,
-            categoryMeta.text
+            categoryMeta.text,
           )}
         >
           <Tag className="h-2.5 w-2.5" />
@@ -80,7 +92,7 @@ export function AssetTableRow({ asset, onSelect }: AssetTableRowProps) {
           className={cn(
             "inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold tabular-nums",
             statusMeta.bg,
-            statusMeta.text
+            statusMeta.text,
           )}
         >
           {statusMeta.label}
@@ -109,7 +121,10 @@ export function AssetTableRow({ asset, onSelect }: AssetTableRowProps) {
       </td>
 
       {/* Actions */}
-      <td className="px-5 py-3.5 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+      <td
+        className="px-5 py-3.5 text-right whitespace-nowrap"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-end gap-1.5">
           <button
             type="button"

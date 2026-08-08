@@ -1,4 +1,4 @@
-import type { Asset, MaintenanceLogEntry } from "@/features/assets/types";
+import type { Asset, MaintenanceLogEntry } from "@/types/assets";
 import type { AssetRow } from "@/server/db/schema";
 import {
   ConflictError,

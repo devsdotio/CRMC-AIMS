@@ -1,10 +1,10 @@
-/**
- * Shared TypeScript interfaces for Borrow Requests feature.
- */
+import type { AssetCategory } from './shared';
+
+
+export type { AssetCategory };
+import type { BaseFilterState, DateRangeFilter } from "./filters";
 
 export type RequestStatus = "pending" | "approved" | "rejected" | "returned";
-
-export type AssetCategory = "transport" | "computing" | "av" | "furniture";
 
 export type TabFilter = "pending" | "approved" | "rejected" | "all";
 
@@ -29,7 +29,6 @@ export interface BorrowRequest {
   quantity: number;
   purpose: string;
   requestedAt: string;
-  relativeTime: string;
   expectedReturnDate: string;
   status: RequestStatus;
   notes?: string;
@@ -37,9 +36,6 @@ export interface BorrowRequest {
   history: ActionHistoryLog[];
 }
 
-export interface FilterState {
-  searchQuery: string;
+export interface BorrowRequestFilterState extends BaseFilterState, DateRangeFilter {
   department: string;
-  startDate: string;
-  endDate: string;
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { CategoryItem, CategoryType } from "./types";
+import type { CategoryItem, CategoryType } from "@/types/settings";
 import { CategoryList } from "./category-list";
 import { AddEditCategoryDialog } from "./add-edit-category-dialog";
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { Users } from "lucide-react";
-import type { UserAccount } from "./types";
+import type { UserAccount } from "@/types/users";
 import { UserTableRow } from "./user-table-row";
 
 export interface UserTableProps {

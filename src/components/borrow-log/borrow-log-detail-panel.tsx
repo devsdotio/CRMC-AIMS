@@ -1,9 +1,11 @@
 "use client";
 
+import { getCategoryStyle } from "@/constants/categories";
+
 import { useEffect, useRef } from "react";
 import { X, RotateCcw, User, Mail, Phone, Building2, Tag, History } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { BorrowLogRecord, AssetCategory } from "./types";
+import type { BorrowLogRecord } from "@/types/borrow-log";
 import { OverdueBadge } from "./overdue-badge";
 
 export interface BorrowLogDetailPanelProps {
@@ -12,13 +14,6 @@ export interface BorrowLogDetailPanelProps {
   onClose: () => void;
   onProcessReturn: (record: BorrowLogRecord) => void;
 }
-
-const CATEGORY_STYLES: Record<AssetCategory, { bg: string; text: string; label: string }> = {
-  transport: { bg: "bg-category-transport-bg", text: "text-category-transport-text", label: "Transport" },
-  computing: { bg: "bg-category-computing-bg", text: "text-category-computing-text", label: "Computing" },
-  av:        { bg: "bg-category-av-bg",        text: "text-category-av-text",        label: "AV Equipment" },
-  furniture: { bg: "bg-category-furniture-bg", text: "text-category-furniture-text", label: "Furniture" },
-};
 
 export function BorrowLogDetailPanel({
   record,
@@ -40,7 +35,7 @@ export function BorrowLogDetailPanel({
 
   if (!isOpen || !record) return null;
 
-  const categoryMeta = CATEGORY_STYLES[record.category];
+  const categoryMeta = getCategoryStyle(record.category);
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs transition-opacity duration-200">

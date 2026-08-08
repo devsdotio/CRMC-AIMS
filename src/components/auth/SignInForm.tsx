@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2, ArrowRight } from 'lucide-react';
@@ -8,11 +8,11 @@ import { createClient } from '@/lib/supabase/client';
 import { AuthCard } from './AuthCard';
 import { PasswordInput } from './PasswordInput';
 import { FormAlert } from './FormAlert';
-import { SignInFormValues, AuthFormState } from './types';
+import { SignInFormValues, AuthFormState } from "@/types/auth";
 
 function safeNextPath(raw: string | null): string {
   if (!raw || !raw.startsWith('/') || raw.startsWith('//')) {
-    return '/dashboard';
+    return '/';
   }
   return raw;
 }
@@ -34,6 +34,7 @@ export function SignInForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const emailInputRef = useRef<HTMLInputElement>(null);
+  const [isPending, startTransition] = useTransition();
 
   const [formValues, setFormValues] = useState<SignInFormValues>({
     email: '',
@@ -132,14 +133,34 @@ export function SignInForm() {
       }
 
       setFormState({
-        isLoading: false,
+        isLoading: true, // Keep loading active while fetching profile and transitioning
         errorMessage: null,
-        successMessage: 'Sign in successful! Redirecting to dashboard...',
+        successMessage: 'Sign in successful! Preparing dashboard...',
       });
 
-      const nextPath = safeNextPath(searchParams.get('next'));
-      router.push(nextPath);
-      router.refresh();
+      let nextPath = safeNextPath(searchParams.get('next'));
+      
+      // If the target is root, resolve the actual dashboard URL here on the client 
+      // to avoid triggering a server-side redirect that flushes the DOM (white screen)
+      if (nextPath === '/') {
+        try {
+          const res = await fetch('/api/me');
+          if (res.ok) {
+            const profile = await res.json();
+            if (profile.role === 'borrower') {
+              nextPath = '/borrower-db/dashboard';
+            } else {
+              nextPath = '/dashboard';
+            }
+          }
+        } catch {
+          // fallback to root if API fails
+        }
+      }
+
+      startTransition(() => {
+        router.push(nextPath);
+      });
     } catch {
       setFormState({
         isLoading: false,
@@ -158,7 +179,7 @@ export function SignInForm() {
             Sign In
           </h2>
           <p className="text-xs sm:text-sm text-muted-foreground">
-            Access the Property Custodian&apos;s Office workspace
+            Access the Enterprise Asset Management workspace
           </p>
         </div>
 
@@ -173,81 +194,85 @@ export function SignInForm() {
         />
 
         {/* Form */}
-        <form onSubmit={handleSubmit} noValidate className="space-y-4">
-          {/* Email Field */}
-          <div className="space-y-1.5">
-            <label
-              htmlFor="email"
-              className="block text-xs font-semibold uppercase tracking-wider text-foreground"
-            >
-              Email Address
-            </label>
-            <input
-              id="email"
-              type="email"
-              ref={emailInputRef}
-              value={formValues.email}
-              onChange={(e) => handleChange('email', e.target.value)}
-              onBlur={() => handleBlur('email')}
-              placeholder="custodian@crmc.edu.ph"
-              disabled={formState.isLoading}
-              className={`flex h-11 w-full rounded-xl border bg-background px-3.5 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 transition-colors ${
-                errors.email && touched.email
-                  ? 'border-red-500'
-                  : 'border-border'
-              }`}
-            />
-            {errors.email && touched.email && (
-              <p className="text-xs text-red-500 font-medium animate-in fade-in-50">
-                {errors.email}
-              </p>
-            )}
-          </div>
-
-          {/* Password Field */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
+        <form onSubmit={handleSubmit} noValidate className="space-y-4 relative">
+          
+          {/* Inputs Container */}
+          <div className="space-y-4">
+            {/* Email Field */}
+            <div className="space-y-1.5">
               <label
-                htmlFor="password"
+                htmlFor="email"
                 className="block text-xs font-semibold uppercase tracking-wider text-foreground"
               >
-                Password
+                Email Address
               </label>
-              <Link
-                href="/forgot-password"
-                className="text-xs font-medium text-[#FF4E45] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
-              >
-                Forgot your password?
-              </Link>
-            </div>
-            <PasswordInput
-              id="password"
-              value={formValues.password}
-              onChange={(e) => handleChange('password', e.target.value)}
-              onBlur={() => handleBlur('password')}
-              placeholder="••••••••"
-              disabled={formState.isLoading}
-              error={Boolean(errors.password && touched.password)}
-            />
-            {errors.password && touched.password && (
-              <p className="text-xs text-red-500 font-medium animate-in fade-in-50">
-                {errors.password}
-              </p>
-            )}
-          </div>
-
-          {/* Remember Me Checkbox */}
-          <div className="flex items-center justify-between pt-1">
-            <label className="flex items-center gap-2.5 cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground transition-colors select-none">
               <input
-                type="checkbox"
-                checked={formValues.rememberMe}
-                onChange={(e) => handleChange('rememberMe', e.target.checked)}
+                id="email"
+                type="email"
+                ref={emailInputRef}
+                value={formValues.email}
+                onChange={(e) => handleChange('email', e.target.value)}
+                onBlur={() => handleBlur('email')}
+                placeholder="admin@example.com"
                 disabled={formState.isLoading}
-                className="w-4 h-4 rounded border-border text-[#FF4E45] focus:ring-ring focus:ring-offset-0 disabled:opacity-50 accent-[#FF4E45]"
+                className={`flex h-11 w-full rounded-xl border bg-background px-3.5 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 transition-colors ${
+                  errors.email && touched.email
+                    ? 'border-red-500'
+                    : 'border-border'
+                }`}
               />
-              <span>Remember me on this device</span>
-            </label>
+              {errors.email && touched.email && (
+                <p className="text-xs text-red-500 font-medium animate-in fade-in-50">
+                  {errors.email}
+                </p>
+              )}
+            </div>
+
+            {/* Password Field */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label
+                  htmlFor="password"
+                  className="block text-xs font-semibold uppercase tracking-wider text-foreground"
+                >
+                  Password
+                </label>
+                <Link
+                  href="/forgot-password"
+                  className="text-xs font-medium text-[#FF4E45] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                >
+                  Forgot your password?
+                </Link>
+              </div>
+              <PasswordInput
+                id="password"
+                value={formValues.password}
+                onChange={(e) => handleChange('password', e.target.value)}
+                onBlur={() => handleBlur('password')}
+                placeholder="••••••••"
+                disabled={formState.isLoading}
+                error={Boolean(errors.password && touched.password)}
+              />
+              {errors.password && touched.password && (
+                <p className="text-xs text-red-500 font-medium animate-in fade-in-50">
+                  {errors.password}
+                </p>
+              )}
+            </div>
+
+            {/* Remember Me Checkbox */}
+            <div className="flex items-center justify-between pt-1">
+              <label className="flex items-center gap-2.5 cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground transition-colors select-none">
+                <input
+                  type="checkbox"
+                  checked={formValues.rememberMe}
+                  onChange={(e) => handleChange('rememberMe', e.target.checked)}
+                  disabled={formState.isLoading}
+                  className="w-4 h-4 rounded border-border text-[#FF4E45] focus:ring-ring focus:ring-offset-0 disabled:opacity-50 accent-[#FF4E45]"
+                />
+                <span>Remember me on this device</span>
+              </label>
+            </div>
           </div>
 
           {/* Submit Button */}
@@ -273,7 +298,7 @@ export function SignInForm() {
         {/* Footer Support Info */}
         <div className="pt-4 border-t border-border text-center space-y-1">
           <p className="text-xs text-muted-foreground">
-            Cebu Roosevelt Memorial Colleges &bull; Property Custodian System
+            AIMS &bull; Asset & Inventory Management System
           </p>
           <p className="text-[11px] text-muted-foreground/80">
             For account access requests, contact your System Administrator.
