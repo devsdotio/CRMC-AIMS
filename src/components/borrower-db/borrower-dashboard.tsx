@@ -20,23 +20,25 @@ import { cn } from "@/lib/utils";
 import { getCategoryStyle } from "@/constants/categories";
 import { useBorrowerPortal } from "./context";
 import { RequisitionSlip } from "@/components/requisition-slip/RequisitionSlip";
-import type {
+import {
   PortalSummaryStats,
   PortalBorrowRequest,
   PortalBorrowLogRecord,
 } from "./types";
+import { useDashboardSnapshotQuery } from "@/features/dashboard/client/use-dashboard";
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
 
 interface StatCardProps {
   label: string;
-  value: number;
+  value?: number;
   subtext: string;
   icon: React.ElementType;
   tone?: "default" | "warning" | "danger" | "success";
+  isLoading?: boolean;
 }
 
-function DashStatCard({ label, value, subtext, icon: Icon, tone = "default" }: StatCardProps) {
+function DashStatCard({ label, value, subtext, icon: Icon, tone = "default", isLoading }: StatCardProps) {
   const toneStyles = {
     default: {
       icon: "bg-accent/10 text-accent",
@@ -57,6 +59,7 @@ function DashStatCard({ label, value, subtext, icon: Icon, tone = "default" }: S
   };
 
   const styles = toneStyles[tone];
+  const showBadge = !isLoading && value !== undefined && value > 0;
 
   return (
     <div className="rounded-2xl border border-border bg-card p-5 flex flex-col gap-3 hover:border-text-secondary/30 transition-colors duration-200">
@@ -64,19 +67,23 @@ function DashStatCard({ label, value, subtext, icon: Icon, tone = "default" }: S
         <div className={cn("h-10 w-10 rounded-xl flex items-center justify-center", styles.icon)}>
           <Icon className="h-5 w-5" aria-hidden />
         </div>
-        {tone === "warning" && value > 0 && (
+        {tone === "warning" && showBadge && (
           <span className="text-[10px] font-bold uppercase tracking-widest text-status-repair-text bg-status-repair-bg/10 border border-status-repair-bg/30 px-2 py-0.5 rounded-full">
             Attention
           </span>
         )}
-        {tone === "danger" && value > 0 && (
+        {tone === "danger" && showBadge && (
           <span className="text-[10px] font-bold uppercase tracking-widest text-status-outofservice-text bg-status-outofservice-bg/10 border border-status-outofservice-bg/30 px-2 py-0.5 rounded-full">
             Urgent
           </span>
         )}
       </div>
       <div>
-        <p className={cn("text-3xl font-bold tabular-nums", styles.value)}>{value}</p>
+        {isLoading ? (
+          <div className="h-9 w-12 bg-border animate-pulse rounded my-1" />
+        ) : (
+          <p className={cn("text-3xl font-bold tabular-nums", styles.value)}>{value ?? 0}</p>
+        )}
         <p className="text-sm font-semibold text-text mt-0.5">{label}</p>
         <p className="text-xs text-text-secondary mt-0.5">{subtext}</p>
       </div>
@@ -147,6 +154,22 @@ function ActiveBorrowCard({ record }: { record: PortalBorrowLogRecord }) {
   );
 }
 
+function ActiveBorrowCardSkeleton() {
+  return (
+    <div className="flex items-center gap-3 px-4 py-3 border-b border-border last:border-b-0 border-l-4 border-l-transparent">
+      <div className="h-10 w-10 shrink-0 rounded-xl bg-border animate-pulse" />
+      <div className="flex-1 min-w-0 space-y-2">
+        <div className="h-4 w-32 bg-border animate-pulse rounded" />
+        <div className="h-3 w-24 bg-border animate-pulse rounded" />
+      </div>
+      <div className="shrink-0 text-right space-y-1">
+        <div className="h-3 w-6 bg-border animate-pulse rounded ml-auto" />
+        <div className="h-3 w-16 bg-border animate-pulse rounded" />
+      </div>
+    </div>
+  );
+}
+
 // ─── Pending Request Card ─────────────────────────────────────────────────────
 
 function PendingRequestCard({ request }: { request: PortalBorrowRequest }) {
@@ -185,6 +208,19 @@ function PendingRequestCard({ request }: { request: PortalBorrowRequest }) {
       >
         {statusBadge.label}
       </span>
+    </div>
+  );
+}
+
+function PendingRequestCardSkeleton() {
+  return (
+    <div className="flex items-center gap-3 px-4 py-3 border-b border-border last:border-b-0 border-l-4 border-l-transparent">
+      <div className="h-8 w-8 shrink-0 rounded-lg bg-border animate-pulse" />
+      <div className="flex-1 min-w-0 space-y-2">
+        <div className="h-4 w-40 bg-border animate-pulse rounded" />
+        <div className="h-3 w-20 bg-border animate-pulse rounded" />
+      </div>
+      <div className="h-5 w-16 rounded-full bg-border animate-pulse" />
     </div>
   );
 }
@@ -242,48 +278,67 @@ function QuickActionBtn({
 
 // ─── Main Dashboard ────────────────────────────────────────────────────────────
 
-interface BorrowerDashboardProps {
-  stats: PortalSummaryStats;
-  activeItems: PortalBorrowLogRecord[];
-  recentRequests: PortalBorrowRequest[];
-}
-
-export function BorrowerDashboard({
-  stats,
-  activeItems,
-  recentRequests,
-}: BorrowerDashboardProps) {
+export function BorrowerDashboard() {
   const { openWizard } = useBorrowerPortal();
   const [isReqOpen, setIsReqOpen] = useState(false);
+  const { data: snapshot, isLoading } = useDashboardSnapshotQuery();
+
+  const stats = snapshot?.summary;
+  const overdueAssets = snapshot?.overdueAssets || [];
+  const rawPending = snapshot?.pendingRequests || [];
+
+  const activeItemsMapped = overdueAssets.map((asset) => ({
+    id: asset.id,
+    assetCode: asset.assetCode,
+    assetName: asset.assetName,
+    category: "computing" as const, // Fallback category since snapshot doesn't include it in OverdueAsset
+    status: "overdue" as const,
+    dueDate: asset.dueSince.split("T")[0],
+    daysOverdue: asset.daysOverdue,
+  }));
+
+  const pendingRequestsMapped = rawPending.map((req) => ({
+    id: req.id,
+    requestCode: `REQ-${req.id.substring(0,6).toUpperCase()}`,
+    itemDescription: req.itemDescription,
+    itemType: "asset" as const,
+    category: "computing" as const,
+    status: "pending" as const,
+    requestedAt: req.requestedAt,
+  }));
 
   const statCards: StatCardProps[] = [
     {
       label: "Active Borrowings",
-      value: stats.activeBorrowings,
+      value: stats?.activeBorrows,
       subtext: "Items currently out on loan",
       icon: Package,
       tone: "default",
+      isLoading,
     },
     {
       label: "Pending Requests",
-      value: stats.pendingRequests,
-      subtext: stats.pendingRequests > 0 ? "Awaiting staff approval" : "No pending requests",
+      value: stats?.pendingApprovals,
+      subtext: stats?.pendingApprovals ? "Awaiting staff approval" : "No pending requests",
       icon: Clock,
-      tone: stats.pendingRequests > 0 ? "warning" : "default",
+      tone: stats && stats.pendingApprovals > 0 ? "warning" : "default",
+      isLoading,
     },
     {
       label: "Overdue Items",
-      value: stats.overdueItems,
-      subtext: stats.overdueItems > 0 ? "Past due date — return immediately" : "All items on time",
+      value: stats?.overdueAssets,
+      subtext: stats?.overdueAssets ? "Past due date — return immediately" : "All items on time",
       icon: AlertTriangle,
-      tone: stats.overdueItems > 0 ? "danger" : "default",
+      tone: stats && stats.overdueAssets > 0 ? "danger" : "default",
+      isLoading,
     },
     {
-      label: "Completed This Semester",
-      value: stats.completedThisSemester,
-      subtext: "Successfully returned items",
-      icon: CheckCircle2,
-      tone: "success",
+      label: "Low Stock Consumables",
+      value: stats?.lowStockItems,
+      subtext: "Needs attention",
+      icon: Tag,
+      tone: "warning",
+      isLoading,
     },
   ];
 
@@ -296,12 +351,16 @@ export function BorrowerDashboard({
           <TrendingUp className="h-6 w-6 text-accent" aria-hidden />
         </div>
         <div className="flex-1">
-          <h1 className="text-lg font-bold text-text">Good day, Maria!</h1>
+          <h1 className="text-lg font-bold text-text">Welcome to your Dashboard!</h1>
           <p className="text-sm text-text-secondary mt-0.5">
             Here&apos;s a summary of your borrowing activity. You have{" "}
-            <span className="font-semibold text-text">{stats.activeBorrowings} item{stats.activeBorrowings !== 1 ? "s" : ""}</span> currently on loan
-            {stats.overdueItems > 0 && (
-              <> and <span className="font-bold text-status-outofservice-bg dark:text-status-outofservice-text">{stats.overdueItems} overdue</span></>
+            {isLoading ? (
+              <span className="inline-block w-12 h-3.5 bg-border animate-pulse rounded align-middle" />
+            ) : (
+              <span className="font-semibold text-text">{stats?.activeBorrows ?? 0} item{stats?.activeBorrows !== 1 ? "s" : ""}</span>
+            )} currently on loan
+            {(!isLoading && stats && stats.overdueAssets > 0) && (
+              <> and <span className="font-bold text-status-outofservice-bg dark:text-status-outofservice-text">{stats.overdueAssets} overdue</span></>
             )}.
           </p>
         </div>
@@ -337,12 +396,12 @@ export function BorrowerDashboard({
       {/* ── Row 2: Active Items + Recent Requests ──────────────────────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
 
-        {/* Active Borrowings */}
+        {/* Active Borrowings (Showing Overdue from Snapshot for now) */}
         <section aria-labelledby="active-borrowings-heading">
           <div className="rounded-2xl border border-border bg-card overflow-hidden h-full flex flex-col">
             <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
               <h2 id="active-borrowings-heading" className="text-sm font-bold text-text">
-                Active Borrowings
+                Attention Required (Overdue)
               </h2>
               <Link
                 href="/borrower-db/history"
@@ -352,27 +411,26 @@ export function BorrowerDashboard({
               </Link>
             </div>
 
-            {activeItems.length === 0 ? (
+            {isLoading ? (
+              <div className="overflow-y-auto">
+                <ActiveBorrowCardSkeleton />
+                <ActiveBorrowCardSkeleton />
+                <ActiveBorrowCardSkeleton />
+              </div>
+            ) : activeItemsMapped.length === 0 ? (
               <div className="flex flex-col items-center justify-center flex-1 py-12 text-center px-6">
                 <div className="h-12 w-12 rounded-full bg-bg-subtle flex items-center justify-center mb-3">
-                  <Package className="h-5 w-5 text-text-secondary" aria-hidden />
+                  <CheckCircle2 className="h-5 w-5 text-status-active-text" aria-hidden />
                 </div>
-                <p className="text-sm font-semibold text-text">Nothing out on loan</p>
+                <p className="text-sm font-semibold text-text">All caught up!</p>
                 <p className="text-xs text-text-secondary mt-1 max-w-xs">
-                  You currently have no active borrowings. Browse available items to get started.
+                  You have no overdue items. Check your history for all active borrowings.
                 </p>
-                <button
-                  type="button"
-                  onClick={() => openWizard()}
-                  className="mt-4 text-xs text-accent font-semibold hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                >
-                  Browse items →
-                </button>
               </div>
             ) : (
               <div className="overflow-y-auto">
-                {activeItems.map((record) => (
-                  <ActiveBorrowCard key={record.id} record={record} />
+                {activeItemsMapped.map((record) => (
+                  <ActiveBorrowCard key={record.id} record={record as any} />
                 ))}
               </div>
             )}
@@ -384,7 +442,7 @@ export function BorrowerDashboard({
           <div className="rounded-2xl border border-border bg-card overflow-hidden h-full flex flex-col">
             <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
               <h2 id="recent-requests-heading" className="text-sm font-bold text-text">
-                Recent Requests
+                Recent Pending Requests
               </h2>
               <Link
                 href="/borrower-db/requests"
@@ -394,14 +452,26 @@ export function BorrowerDashboard({
               </Link>
             </div>
 
-            {recentRequests.length === 0 ? (
-              <div className="flex flex-col items-center justify-center flex-1 py-10 text-center px-6">
-                <p className="text-sm text-text-secondary">No requests yet.</p>
+            {isLoading ? (
+              <div className="overflow-y-auto">
+                <PendingRequestCardSkeleton />
+                <PendingRequestCardSkeleton />
+                <PendingRequestCardSkeleton />
+              </div>
+            ) : pendingRequestsMapped.length === 0 ? (
+              <div className="flex flex-col items-center justify-center flex-1 py-12 text-center px-6">
+                <div className="h-12 w-12 rounded-full bg-bg-subtle flex items-center justify-center mb-3">
+                  <Package className="h-5 w-5 text-text-secondary" aria-hidden />
+                </div>
+                <p className="text-sm font-semibold text-text">No pending requests</p>
+                <p className="text-xs text-text-secondary mt-1 max-w-xs">
+                  You don't have any requests waiting for approval.
+                </p>
               </div>
             ) : (
               <div className="overflow-y-auto">
-                {recentRequests.slice(0, 5).map((req) => (
-                  <PendingRequestCard key={req.id} request={req} />
+                {pendingRequestsMapped.slice(0, 5).map((req) => (
+                  <PendingRequestCard key={req.id} request={req as any} />
                 ))}
               </div>
             )}

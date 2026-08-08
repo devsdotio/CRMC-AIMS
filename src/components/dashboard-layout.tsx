@@ -5,6 +5,7 @@ import Sidebar from "@/components/sidebar";
 import GlobalHeader from "@/components/global-header";
 import { cn } from "@/lib/utils";
 import { useMeQuery } from "@/features/users/client";
+import { useDashboardSnapshotQuery } from "@/features/dashboard/client/use-dashboard";
 import { ROLE_DEFINITIONS } from "@/constants/roles";
 
 interface DashboardLayoutProps {
@@ -14,16 +15,28 @@ interface DashboardLayoutProps {
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const { data: me, isLoading: meLoading } = useMeQuery();
+  const { data: snapshot } = useDashboardSnapshotQuery();
 
   const userName = me?.name ?? (meLoading ? "Loading…" : "Unknown user");
   const userEmail = me?.email ?? "";
   const userRoleLabel = me ? ROLE_DEFINITIONS[me.role].title : meLoading ? "…" : "—";
+  
+  const pendingCount = snapshot?.summary.pendingApprovals ?? 0;
+  const overdueCount = snapshot?.summary.overdueAssets ?? 0;
+  const lowStockCount = snapshot?.summary.lowStockItems ?? 0;
 
   return (
     <div className="flex h-full w-full overflow-hidden bg-[#F2F3F7] text-[#1B2140]">
       {/* Desktop Sidebar (hidden on mobile) */}
       <div className="hidden md:block h-full shrink-0">
-        <Sidebar userName={userName} userEmail={userEmail} userRole={me?.role} />
+        <Sidebar 
+          userName={userName} 
+          userEmail={userEmail} 
+          userRole={me?.role}
+          pendingCount={pendingCount}
+          overdueCount={overdueCount}
+          lowStockCount={lowStockCount}
+        />
       </div>
 
       {/* Mobile Sidebar Overlay Drawer */}
@@ -49,6 +62,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             userName={userName}
             userEmail={userEmail}
             userRole={me?.role}
+            pendingCount={pendingCount}
+            overdueCount={overdueCount}
+            lowStockCount={lowStockCount}
           />
         </div>
       </div>

@@ -35,6 +35,7 @@ export function useConsumablesQuery(filters?: {
   return useQuery({
     queryKey: consumableQueryKeys.list(filters),
     queryFn: () => consumablesApi.list(filters),
+    staleTime: 5 * 60 * 1000,
   });
 }
 

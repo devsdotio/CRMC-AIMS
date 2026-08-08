@@ -6,10 +6,11 @@ import { cn } from "@/lib/utils";
 import { BrowseItemCard, BrowseItemCardSkeleton } from "./browse-item-card";
 import type { BrowseItem } from "./types";
 
+import { useAssetsQuery } from "@/features/assets/client/use-assets";
+import { useConsumablesQuery } from "@/features/consumables/client/use-consumables";
+
 interface BrowseTabProps {
-  items: BrowseItem[];
   onRequest: (item: BrowseItem) => void;
-  loading?: boolean;
 }
 
 const CATEGORY_FILTERS = [
@@ -25,18 +26,47 @@ const CATEGORY_FILTERS = [
 
 type CategoryKey = (typeof CATEGORY_FILTERS)[number]["key"];
 
-export function BrowseTab({ items, onRequest, loading = false }: BrowseTabProps) {
+export function BrowseTab({ onRequest }: BrowseTabProps) {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<CategoryKey>("all");
   const [availableOnly, setAvailableOnly] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+
+  const { data: assets = [], isLoading: assetsLoading } = useAssetsQuery();
+  const { data: consumables = [], isLoading: consumablesLoading } = useConsumablesQuery();
+  const loading = assetsLoading || consumablesLoading;
+
+  const items = useMemo(() => {
+    return [
+      ...assets.map(a => ({
+        id: a.id,
+        name: a.name,
+        category: a.category,
+        type: "asset" as const,
+        status: a.status,
+        assetCode: a.assetCode,
+        location: a.location,
+      })),
+      ...consumables.map(c => ({
+        id: c.id,
+        name: c.name,
+        category: c.category,
+        type: "consumable" as const,
+        status: c.currentQty <= 0 ? "out_of_stock" : c.currentQty <= c.minThreshold ? "low_stock" : "available",
+        itemCode: c.itemCode,
+        currentQty: c.currentQty,
+        unit: c.unit,
+        location: c.location,
+      }))
+    ] as BrowseItem[];
+  }, [assets, consumables]);
 
   const filtered = useMemo(() => {
     return items.filter((item) => {
       const matchesSearch =
         item.name.toLowerCase().includes(search.toLowerCase()) ||
         (item.type === "asset" ? item.assetCode : item.itemCode)
-          .toLowerCase()
+          ?.toLowerCase()
           .includes(search.toLowerCase());
       const matchesCategory = category === "all" || item.category === category;
       const matchesAvailable =

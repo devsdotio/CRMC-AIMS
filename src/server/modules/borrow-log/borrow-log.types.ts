@@ -30,14 +30,15 @@ export type ListBorrowLogFilters = {
   status?: "active" | "overdue" | "returned";
   department?: string;
   search?: string;
+  borrowerUserId?: string;
 };
 
 export interface IBorrowLogRepository {
   findById(id: string): Promise<BorrowTransactionRow | null>;
   findActiveByAssetId(assetId: string): Promise<BorrowTransactionRow | null>;
   list(filters?: ListBorrowLogFilters): Promise<BorrowTransactionRow[]>;
-  countActive(): Promise<number>;
-  countOverdue(): Promise<number>;
+  countActive(session?: any, userId?: string): Promise<number>;
+  countOverdue(session?: any, userId?: string): Promise<number>;
   countYear(): Promise<number>;
   create(
     data: Omit<

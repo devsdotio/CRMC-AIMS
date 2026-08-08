@@ -1,4 +1,5 @@
-import { requireAssetOperator } from "@/server/shared/auth";
+import { requireActor } from "@/server/shared/auth";
+import { isAssetOperatorRole } from "@/server/shared/roles";
 import { handleError, ok } from "@/server/shared/http";
 
 import { DashboardService } from "./dashboard.service";
@@ -8,8 +9,12 @@ export class DashboardController {
 
   async snapshot() {
     try {
-      await requireAssetOperator();
-      return ok(await this.service.getSnapshot());
+      const session = await requireActor();
+      if (isAssetOperatorRole(session.role)) {
+        return ok(await this.service.getSnapshot());
+      } else {
+        return ok(await this.service.getBorrowerSnapshot(session.userId));
+      }
     } catch (error) {
       return handleError(error);
     }

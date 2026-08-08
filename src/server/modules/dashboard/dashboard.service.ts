@@ -79,6 +79,57 @@ export class DashboardService {
     private readonly assets = new AssetRepository()
   ) {}
 
+  async getBorrowerSnapshot(userId: string, limit = 5): Promise<DashboardSnapshotDTO> {
+    const [
+      activeBorrows,
+      pendingApprovals,
+      overdueAssets,
+      pendingRows,
+      overdueRows,
+    ] = await Promise.all([
+      this.borrowLog.countActive(undefined, userId),
+      this.requests.countPending(undefined, userId),
+      this.borrowLog.countOverdue(undefined, userId),
+      this.requests.list({ status: "pending", requesterUserId: userId }),
+      this.borrowLog.list({ status: "overdue", borrowerUserId: userId }),
+    ]);
+
+    return {
+      summary: {
+        activeBorrows,
+        pendingApprovals,
+        lowStockItems: 0,
+        overdueAssets,
+      },
+      pendingRequests: pendingRows.slice(0, limit).map((r) => ({
+        id: r.id,
+        requesterName: r.requesterName,
+        department: r.department,
+        itemDescription: r.itemDescription,
+        requestedAt:
+          r.requestedAt instanceof Date
+            ? r.requestedAt.toISOString()
+            : String(r.requestedAt),
+        relativeTime: formatRelativeTime(r.requestedAt),
+      })),
+      overdueAssets: overdueRows.slice(0, limit).map((row) => {
+        const dto = toBorrowLogDTO(row);
+        return {
+          id: dto.id,
+          assetName: dto.assetName,
+          assetCode: dto.assetCode,
+          borrowerName: dto.borrowerName,
+          department: dto.department,
+          daysOverdue: dto.daysOverdue ?? 0,
+          dueSince: `${dto.dueDate}T00:00:00Z`,
+        };
+      }),
+      lowStockItems: [],
+      categoryDistribution: [],
+      recentActivity: [],
+    };
+  }
+
   async getSnapshot(limit = 5): Promise<DashboardSnapshotDTO> {
     const [
       activeBorrows,
