@@ -23,7 +23,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     <div className="flex h-full w-full overflow-hidden bg-[#F2F3F7] text-[#1B2140]">
       {/* Desktop Sidebar (hidden on mobile) */}
       <div className="hidden md:block h-full shrink-0">
-        <Sidebar userName={userName} userEmail={userEmail} />
+        <Sidebar userName={userName} userEmail={userEmail} userRole={me?.role} />
       </div>
 
       {/* Mobile Sidebar Overlay Drawer */}
@@ -48,6 +48,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             className="border-r-0 w-full h-full"
             userName={userName}
             userEmail={userEmail}
+            userRole={me?.role}
           />
         </div>
       </div>

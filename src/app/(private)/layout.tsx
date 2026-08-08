@@ -39,10 +39,6 @@ export default async function PrivateLayout({
     redirect("/sign-in?error=deactivated");
   }
 
-  if (!isStaffShellRole(profile.role as AppRole)) {
-    // Borrowers are authenticated but not admitted into the staff workspace yet.
-    redirect("/sign-in?error=borrower_portal");
-  }
 
   // Throttled presence stamp (does not throw).
   await new UserService().recordActivity(user.id);

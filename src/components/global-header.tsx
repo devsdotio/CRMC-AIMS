@@ -19,7 +19,6 @@ import {
   Boxes,
 } from "lucide-react";
 
-
 // ─── Route Metadata Map ──────────────────────────────────────────────────────
 
 interface RouteMeta {
@@ -121,7 +120,8 @@ export default function GlobalHeader({
   const [searchQuery, setSearchQuery] = useState("");
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isQuickActionOpen, setIsQuickActionOpen] = useState(false);
-  const [notifications, setNotifications] = useState<NotificationItem[]>(MOCK_NOTIFICATIONS);
+  const [notifications, setNotifications] =
+    useState<NotificationItem[]>(MOCK_NOTIFICATIONS);
 
   const notifRef = useRef<HTMLDivElement>(null);
   const quickActionRef = useRef<HTMLDivElement>(null);
@@ -141,7 +141,10 @@ export default function GlobalHeader({
       if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
         setIsNotifOpen(false);
       }
-      if (quickActionRef.current && !quickActionRef.current.contains(e.target as Node)) {
+      if (
+        quickActionRef.current &&
+        !quickActionRef.current.contains(e.target as Node)
+      ) {
         setIsQuickActionOpen(false);
       }
     }
@@ -170,7 +173,9 @@ export default function GlobalHeader({
           <div className="flex items-center gap-1.5 text-xs text-[#5A5F73]">
             <span className="font-medium">{currentRoute.category}</span>
             <ChevronRight className="w-3 h-3 text-[#9AA0AC]" />
-            <span className="font-semibold text-[#1B2140] truncate">{currentRoute.title}</span>
+            <span className="font-semibold text-[#1B2140] truncate">
+              {currentRoute.title}
+            </span>
           </div>
           {/* Page Subtitle */}
           <p className="text-xs text-[#5A5F73] truncate hidden sm:block">
@@ -207,137 +212,12 @@ export default function GlobalHeader({
           )}
         </div>
 
-
-        {/* <div className="relative" ref={notifRef}>
-          <button
-            onClick={() => setIsNotifOpen((prev) => !prev)}
-            className="relative p-2 text-[#5A5F73] hover:text-[#1B2140] hover:bg-[#F2F3F7] rounded-lg transition-colors cursor-pointer"
-            aria-label="View notifications"
-          >
-            <Bell className="w-5 h-5" />
-            {unreadCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#FF4E45] opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#FF4E45]" />
-              </span>
-            )}
-          </button>
-
-          
-          {isNotifOpen && (
-            <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white border border-[#E3E5EC] rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-[#E3E5EC] bg-[#F2F3F7]/50">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-xs font-bold text-[#1B2140]">Notifications</h3>
-                  {unreadCount > 0 && (
-                    <span className="px-1.5 py-0.5 text-[10px] font-bold text-white bg-[#FF4E45] rounded-full">
-                      {unreadCount} new
-                    </span>
-                  )}
-                </div>
-                {unreadCount > 0 && (
-                  <button
-                    onClick={markAllRead}
-                    className="text-[11px] font-semibold text-[#FF4E45] hover:underline cursor-pointer"
-                  >
-                    Mark all read
-                  </button>
-                )}
-              </div>
-
-              <div className="divide-y divide-[#E3E5EC] max-h-72 overflow-y-auto">
-                {notifications.length === 0 ? (
-                  <div className="p-6 text-center text-xs text-[#5A5F73]">
-                    <CheckCircle2 className="w-6 h-6 text-[#2ECC71] mx-auto mb-1.5" />
-                    No unread notifications
-                  </div>
-                ) : (
-                  notifications.map((item) => (
-                    <div
-                      key={item.id}
-                      className={cn(
-                        "p-3.5 flex gap-3 transition-colors hover:bg-[#F2F3F7]/40",
-                        item.unread && "bg-white font-medium"
-                      )}
-                    >
-                      <div className="mt-0.5 shrink-0">
-                        {item.type === "urgent" && <AlertTriangle className="w-4 h-4 text-[#FF4E45]" />}
-                        {item.type === "warning" && <Clock className="w-4 h-4 text-[#FFB020]" />}
-                        {item.type === "info" && <Bell className="w-4 h-4 text-[#1B2140]" />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-xs font-bold text-[#1B2140] truncate">{item.title}</p>
-                          <span className="text-[10px] text-[#5A5F73] shrink-0">{item.time}</span>
-                        </div>
-                        <p className="text-xs text-[#5A5F73] mt-0.5 line-clamp-2 leading-relaxed">
-                          {item.message}
-                        </p>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              <div className="p-2 border-t border-[#E3E5EC] bg-[#F2F3F7]/30 text-center">
-                <Link
-                  href="/borrow-requests"
-                  onClick={() => setIsNotifOpen(false)}
-                  className="text-xs font-semibold text-[#1B2140] hover:text-[#FF4E45] transition-colors"
-                >
-                  View all system logs →
-                </Link>
-              </div>
-            </div>
-          )}
-        </div> */}
-
-        {/* Quick Action Dropdown */}
-        <div className="relative" ref={quickActionRef}>
-          <button
-            onClick={() => setIsQuickActionOpen((prev) => !prev)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white font-medium text-xs rounded-lg hover:bg-primary/90 transition-all duration-200 cursor-pointer shadow-xs"
-          >
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Quick Action</span>
-          </button>
-
-          {isQuickActionOpen && (
-            <div className="absolute right-0 mt-2 w-48 bg-white border border-[#E3E5EC] rounded-xl shadow-xl z-50 p-1 animate-in fade-in slide-in-from-top-2 duration-150">
-              <Link
-                href="/assets/new"
-                onClick={() => setIsQuickActionOpen(false)}
-                className="flex items-center gap-2.5 px-3 py-2 text-xs text-[#1B2140] hover:bg-[#F2F3F7] rounded-lg transition-colors font-medium"
-              >
-                <PackagePlus className="w-4 h-4 text-[#FF4E45]" />
-                Add New Asset
-              </Link>
-              <Link
-                href="/borrow-log/return"
-                onClick={() => setIsQuickActionOpen(false)}
-                className="flex items-center gap-2.5 px-3 py-2 text-xs text-[#1B2140] hover:bg-[#F2F3F7] rounded-lg transition-colors font-medium"
-              >
-                <RotateCcw className="w-4 h-4 text-[#2ECC71]" />
-                Log Return
-              </Link>
-              <Link
-                href="/consumables/restock"
-                onClick={() => setIsQuickActionOpen(false)}
-                className="flex items-center gap-2.5 px-3 py-2 text-xs text-[#1B2140] hover:bg-[#F2F3F7] rounded-lg transition-colors font-medium"
-              >
-                <Boxes className="w-4 h-4 text-[#FFB020]" />
-                Restock Consumable
-              </Link>
-            </div>
-          )}
-        </div>
-
         {/* Vertical Divider */}
         <div className="h-6 w-px bg-[#E3E5EC] mx-0.5 hidden sm:block" />
 
         {/* Signed-in user identity */}
         <div
-          className="hidden sm:flex items-center gap-2 px-2 py-1 rounded-full bg-[#F2F3F7] border border-[#E3E5EC] max-w-[14rem]"
+          className="hidden sm:flex items-center gap-2 px-2 py-1 rounded-full bg-[#F2F3F7] border border-[#E3E5EC] max-w-56"
           title={userName ? `${userName} · ${userRoleLabel}` : userRoleLabel}
         >
           <div className="flex items-center justify-center w-6 h-6 rounded-full bg-[#1B2140] text-white text-[10px] font-bold shrink-0">

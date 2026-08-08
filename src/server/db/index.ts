@@ -29,9 +29,9 @@ export function getDb(): Database {
 
   /**
    * `max: 1` is a safe default for serverless / Next.js route handlers.
-   * Raise it when running as a long-lived Node process.
+   * `prepare: false` is required when using transaction-level connection poolers like Supabase (port 6543).
    */
-  const client = postgres(connectionString, { max: 1 });
+  const client = postgres(connectionString, { max: 1, prepare: false });
   const db = drizzle(client, { schema });
 
   globalForDb.__crmcPg = client;
