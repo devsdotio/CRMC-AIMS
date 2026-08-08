@@ -3,8 +3,16 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const PUBLIC_PAGE_PATHS = ["/sign-in", "/forgot-password"] as const;
 
-/** API routes that stay reachable without a session (ops / probes). */
-const PUBLIC_API_PATHS = ["/api/health"] as const;
+/**
+ * Unauthenticated API/UI paths.
+ * Swagger is allowlisted for local/dev convenience — remove before production
+ * ship if the docs surface is deleted.
+ */
+const PUBLIC_API_PATHS = [
+  "/api/health",
+  "/api/docs",
+  "/api/docs/spec",
+] as const;
 
 function isPublicPage(pathname: string): boolean {
   return PUBLIC_PAGE_PATHS.some(
@@ -67,16 +75,10 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Unauthenticated
+  // Unauthenticated — allowlisted pages/APIs pass; everything else is gated
   if (!user && !isPublicPage(pathname) && !isPublicApi(pathname)) {
-    // Swagger UI page lives under `/api/docs` — redirect like other app pages
-    const isDocsUiPage =
-      pathname === "/api/docs" ||
-      (pathname.startsWith("/api/docs/") &&
-        !pathname.startsWith("/api/docs/spec"));
-
-    // Other API routes: JSON 401 (do not HTML-redirect fetch callers)
-    if (isApiPath(pathname) && !isDocsUiPage) {
+    // JSON 401 for API callers (do not HTML-redirect fetch)
+    if (isApiPath(pathname)) {
       return NextResponse.json(
         { error: "Authentication required." },
         { status: 401 }
