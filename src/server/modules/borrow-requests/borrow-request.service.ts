@@ -5,10 +5,12 @@ import type {
 import { formatRelativeTime } from "@/lib/format-relative-time";
 import { generateOperationalCode, isoNow } from "@/server/shared/codes";
 import type { ActorContext } from "@/server/shared/auth";
+import { isAssetOperatorRole } from "@/server/shared/roles";
 import {
   BadRequestError,
   ConflictError,
   NotFoundError,
+  ForbiddenError,
 } from "@/server/shared/errors";
 
 import { BorrowRequestRepository } from "./borrow-request.repository";
@@ -70,16 +72,22 @@ export class BorrowRequestService {
     private readonly repo: IBorrowRequestRepository = new BorrowRequestRepository()
   ) {}
 
-  async list(rawQuery: unknown): Promise<BorrowRequestDTO[]> {
+  async list(rawQuery: unknown, actor?: ActorContext): Promise<BorrowRequestDTO[]> {
     const filters = listBorrowRequestsQuerySchema.parse(rawQuery ?? {});
+    if (actor && !isAssetOperatorRole(actor.role)) {
+      filters.requesterUserId = actor.userId;
+    }
     const rows = await this.repo.list(filters);
     return rows.map(toDTO);
   }
 
-  async getById(rawId: string): Promise<BorrowRequestDTO> {
+  async getById(rawId: string, actor?: ActorContext): Promise<BorrowRequestDTO> {
     const id = borrowRequestIdSchema.parse(rawId);
     const row = await this.repo.findById(id);
     if (!row) throw new NotFoundError("Borrow request", id);
+    if (actor && !isAssetOperatorRole(actor.role) && row.requesterUserId !== actor.userId) {
+      throw new ForbiddenError("You are not allowed to view this request.");
+    }
     return toDTO(row);
   }
 

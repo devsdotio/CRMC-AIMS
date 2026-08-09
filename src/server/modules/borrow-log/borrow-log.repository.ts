@@ -84,6 +84,9 @@ export class BorrowLogRepository implements IBorrowLogRepository {
     if (filters.department?.trim()) {
       conditions.push(eq(borrowTransactions.department, filters.department.trim()));
     }
+    if (filters.borrowerUserId) {
+      conditions.push(eq(borrowTransactions.borrowerUserId, filters.borrowerUserId));
+    }
     if (filters.search?.trim()) {
       const q = `%${filters.search.trim()}%`;
       conditions.push(
@@ -106,27 +109,29 @@ export class BorrowLogRepository implements IBorrowLogRepository {
     return base.where(and(...conditions));
   }
 
-  async countActive(session?: DbSession): Promise<number> {
+  async countActive(session?: DbSession, userId?: string): Promise<number> {
     const db = this.db(session);
+    const conditions = [eq(borrowTransactions.status, "active")];
+    if (userId) conditions.push(eq(borrowTransactions.borrowerUserId, userId));
     const [row] = await db
       .select({ value: count() })
       .from(borrowTransactions)
-      .where(eq(borrowTransactions.status, "active"));
+      .where(and(...conditions));
     return Number(row?.value ?? 0);
   }
 
-  async countOverdue(session?: DbSession): Promise<number> {
+  async countOverdue(session?: DbSession, userId?: string): Promise<number> {
     const db = this.db(session);
     const today = todayDateString();
+    const conditions = [
+      eq(borrowTransactions.status, "active"),
+      lt(borrowTransactions.dueDate, today)
+    ];
+    if (userId) conditions.push(eq(borrowTransactions.borrowerUserId, userId));
     const [row] = await db
       .select({ value: count() })
       .from(borrowTransactions)
-      .where(
-        and(
-          eq(borrowTransactions.status, "active"),
-          lt(borrowTransactions.dueDate, today)
-        )
-      );
+      .where(and(...conditions));
     return Number(row?.value ?? 0);
   }
 

@@ -1,10 +1,5 @@
 "use client";
 
-/**
- * React Query hooks for the Assets API + lifecycle ledger.
- * Ready for integration — the assets page still uses mock data until wired.
- */
-
 import {
   useMutation,
   useQuery,
@@ -42,6 +37,7 @@ export function useAssetsQuery(status?: AssetStatus): UseQueryResult<Asset[], Er
   return useQuery({
     queryKey: assetQueryKeys.list(status),
     queryFn: () => assetsApi.listAssets(status),
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }
 

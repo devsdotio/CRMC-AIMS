@@ -9,9 +9,11 @@ import {
   todayDateString,
 } from "@/server/shared/codes";
 import type { ActorContext } from "@/server/shared/auth";
+import { isAssetOperatorRole } from "@/server/shared/roles";
 import {
   ConflictError,
   NotFoundError,
+  ForbiddenError,
 } from "@/server/shared/errors";
 import {
   isUniqueViolation,
@@ -110,16 +112,22 @@ export class BorrowLogService {
     private readonly maintenance = new MaintenanceRepository()
   ) {}
 
-  async list(rawQuery: unknown): Promise<BorrowLogDTO[]> {
+  async list(rawQuery: unknown, actor?: ActorContext): Promise<BorrowLogDTO[]> {
     const filters = listBorrowLogQuerySchema.parse(rawQuery ?? {});
+    if (actor && !isAssetOperatorRole(actor.role)) {
+      filters.borrowerUserId = actor.userId;
+    }
     const rows = await this.repo.list(filters);
     return rows.map(toBorrowLogDTO);
   }
 
-  async getById(rawId: string): Promise<BorrowLogDTO> {
+  async getById(rawId: string, actor?: ActorContext): Promise<BorrowLogDTO> {
     const id = borrowLogIdSchema.parse(rawId);
     const row = await this.repo.findById(id);
     if (!row) throw new NotFoundError("Borrow log", id);
+    if (actor && !isAssetOperatorRole(actor.role) && row.borrowerUserId !== actor.userId) {
+      throw new ForbiddenError("You are not allowed to view this log.");
+    }
     return toBorrowLogDTO(row);
   }
 

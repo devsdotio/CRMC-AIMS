@@ -41,6 +41,9 @@ export class BorrowRequestRepository implements IBorrowRequestRepository {
     if (filters.department?.trim()) {
       conditions.push(eq(borrowRequests.department, filters.department.trim()));
     }
+    if (filters.requesterUserId) {
+      conditions.push(eq(borrowRequests.requesterUserId, filters.requesterUserId));
+    }
     if (filters.search?.trim()) {
       const q = `%${filters.search.trim()}%`;
       conditions.push(
@@ -68,12 +71,14 @@ export class BorrowRequestRepository implements IBorrowRequestRepository {
     return Number(row?.value ?? 0);
   }
 
-  async countPending(session?: DbSession): Promise<number> {
+  async countPending(session?: DbSession, userId?: string): Promise<number> {
     const db = this.db(session);
+    const conditions = [eq(borrowRequests.status, "pending")];
+    if (userId) conditions.push(eq(borrowRequests.requesterUserId, userId));
     const [row] = await db
       .select({ value: count() })
       .from(borrowRequests)
-      .where(eq(borrowRequests.status, "pending"));
+      .where(and(...conditions));
     return Number(row?.value ?? 0);
   }
 

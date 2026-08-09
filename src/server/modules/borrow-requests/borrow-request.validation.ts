@@ -13,6 +13,7 @@ export const listBorrowRequestsQuerySchema = z.object({
   status: borrowRequestStatusSchema.optional(),
   department: z.string().trim().max(120).optional(),
   search: z.string().trim().max(200).optional(),
+  requesterUserId: z.string().uuid().optional(),
 });
 
 export const createBorrowRequestSchema = z.object({

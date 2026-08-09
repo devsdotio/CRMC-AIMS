@@ -6,11 +6,7 @@ import { cn } from "@/lib/utils";
 import { getCategoryStyle } from "@/constants/categories";
 import { OverdueBadge } from "@/components/borrow-log/overdue-badge";
 import type { PortalBorrowLogRecord } from "./types";
-
-interface BorrowHistoryTabProps {
-  records: PortalBorrowLogRecord[];
-  loading?: boolean;
-}
+import { useBorrowLogQuery } from "@/features/borrow-log/client/use-borrow-log";
 
 function ConditionBadge({ condition }: { condition?: string }) {
   if (!condition) return null;
@@ -53,11 +49,9 @@ function RowSkeleton() {
   );
 }
 
-export function BorrowHistoryTab({
-  records,
-  loading = false,
-}: BorrowHistoryTabProps) {
+export function BorrowHistoryTab() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const { data: records = [], isLoading: loading } = useBorrowLogQuery();
 
   const toggleExpand = (id: string) => {
     setExpandedId((prev) => (prev === id ? null : id));

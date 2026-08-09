@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 
-import { requireAssetOperator } from "@/server/shared/auth";
+import { requireAssetOperator, requireActor } from "@/server/shared/auth";
 import {
   created,
   handleError,
@@ -10,16 +10,12 @@ import {
 
 import { AssetService } from "./asset.service";
 
-/**
- * Thin HTTP adapter. Asset operators = superadmin | admin | staff.
- * Actor/role always taken from verified session + profiles row.
- */
 export class AssetController {
   constructor(private readonly assetService: AssetService = new AssetService()) {}
 
   async listAssets(request: NextRequest | Request) {
     try {
-      await requireAssetOperator();
+      await requireActor();
       const url = new URL(request.url);
       const status = url.searchParams.get("status") ?? undefined;
       const data = await this.assetService.listAssets({ status });
@@ -42,7 +38,7 @@ export class AssetController {
 
   async getAsset(id: string) {
     try {
-      await requireAssetOperator();
+      await requireActor();
       const data = await this.assetService.getAssetById(id);
       return ok(data);
     } catch (error) {
@@ -135,5 +131,4 @@ export class AssetController {
   }
 }
 
-/** Shared singleton for route handlers. */
 export const assetController = new AssetController();

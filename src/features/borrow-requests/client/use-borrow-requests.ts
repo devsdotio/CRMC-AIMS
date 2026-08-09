@@ -20,6 +20,7 @@ import {
   type CreateBorrowRequestPayload,
 } from "./borrow-requests-api";
 import { borrowRequestQueryKeys } from "./query-keys";
+import { dashboardQueryKeys } from "@/features/dashboard/client/query-keys";
 
 export function useBorrowRequestsQuery(filters?: {
   status?: BorrowRequest["status"];
@@ -42,6 +43,8 @@ export function useBorrowRequestQuery(
   });
 }
 
+
+
 export function useCreateBorrowRequestMutation(): UseMutationResult<
   BorrowRequest,
   Error,
@@ -50,8 +53,45 @@ export function useCreateBorrowRequestMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (payload) => borrowRequestsApi.create(payload),
-    onSuccess: () => {
+    onSuccess: (newRequest) => {
+      // 1. Optimistically add to lists
+      qc.setQueriesData<BorrowRequest[]>(
+        { queryKey: borrowRequestQueryKeys.list() },
+        (old) => {
+          if (!old) return [newRequest];
+          return [newRequest, ...old];
+        }
+      );
+
+      // 2. Optimistically update dashboard snapshot
+      qc.setQueriesData<any>(
+        { queryKey: dashboardQueryKeys.snapshot() },
+        (old: any) => {
+          if (!old) return old;
+          return {
+            ...old,
+            summary: {
+              ...old.summary,
+              pendingApprovals: (old.summary?.pendingApprovals || 0) + 1,
+            },
+            pendingRequests: [
+              {
+                id: newRequest.id,
+                requesterName: newRequest.requesterName,
+                department: newRequest.department,
+                itemDescription: newRequest.itemDescription,
+                requestedAt: newRequest.requestedAt,
+                relativeTime: newRequest.relativeTime,
+              },
+              ...(old.pendingRequests || []),
+            ],
+          };
+        }
+      );
+
+      // 3. Eventually consistent re-fetch
       qc.invalidateQueries({ queryKey: borrowRequestQueryKeys.all });
+      qc.invalidateQueries({ queryKey: dashboardQueryKeys.all });
     },
   });
 }

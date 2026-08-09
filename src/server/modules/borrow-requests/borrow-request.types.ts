@@ -28,6 +28,7 @@ export type ListBorrowRequestFilters = {
   status?: BorrowRequestDTO["status"];
   department?: string;
   search?: string;
+  requesterUserId?: string;
 };
 
 export interface IBorrowRequestRepository {
@@ -46,5 +47,5 @@ export interface IBorrowRequestRepository {
       Omit<BorrowRequestRow, "id" | "createdAt" | "requestCode">
     >
   ): Promise<BorrowRequestRow | null>;
-  countPending(): Promise<number>;
+  countPending(session?: any, userId?: string): Promise<number>;
 }

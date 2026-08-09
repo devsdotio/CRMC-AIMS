@@ -10,6 +10,7 @@ export const listBorrowLogQuerySchema = z.object({
   status: logFilterStatusSchema.optional(),
   department: z.string().trim().max(120).optional(),
   search: z.string().trim().max(200).optional(),
+  borrowerUserId: z.string().uuid().optional(),
 });
 
 export const releaseBorrowSchema = z.object({

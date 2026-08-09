@@ -119,7 +119,7 @@ export default function Sidebar({
       items: [
         { name: "Borrow Requests", href: "/borrow-requests", icon: ClipboardList, badge: pendingCount, badgeTone: "accent", roles: ["superadmin", "admin", "staff"] },
         { name: "Browse Assets", href: "/borrower-db", icon: ShoppingBag, roles: ["borrower"] },
-        { name: "My Requests", href: "/borrower-db/requests", icon: ClipboardList, roles: ["borrower"] },
+        { name: "My Requests", href: "/borrower-db/requests", icon: ClipboardList, badge: pendingCount, badgeTone: "accent", roles: ["borrower"] },
         { name: "Borrow History", href: "/borrower-db/history", icon: History, roles: ["borrower"] },
         { name: "Assets", href: "/assets", icon: Package, roles: ["superadmin", "admin", "staff"] },
         { name: "Borrow & Return Log", href: "/borrow-log", icon: Repeat, badge: overdueCount, badgeTone: "warning", roles: ["superadmin", "admin", "staff"] },
@@ -154,9 +154,9 @@ export default function Sidebar({
     const Icon = item.icon;
     const hasBadge = (item.badge ?? 0) > 0;
     const badgeClass =
-      item.badgeTone === "warning"
-        ? "bg-status-repair-bg text-status-repair-text"
-        : "bg-accent text-accent-foreground";
+      item.badgeTone === "accent"
+        ? "bg-blue-100 text-primary"
+        : "bg-status-repair-bg text-status-repair-text";
 
     return (
       <Link
