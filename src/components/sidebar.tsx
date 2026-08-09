@@ -7,6 +7,7 @@ import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   LayoutDashboard,
   ClipboardList,
@@ -15,13 +16,13 @@ import {
   Boxes,
   Users,
   Settings,
-  ChevronLeft,
-  ChevronRight,
   LogOut,
   User,
   ChevronsUpDown,
   ShoppingBag,
   History,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -68,6 +69,7 @@ export default function Sidebar({
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
+  const queryClient = useQueryClient();
 
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
@@ -84,10 +86,12 @@ export default function Sidebar({
     try {
       const supabase = createClient();
       await supabase.auth.signOut();
+      queryClient.clear();
       router.push("/sign-in");
       router.refresh();
     } catch {
       // Still leave the app shell if network sign-out fails; proxy will recheck session.
+      queryClient.clear();
       router.push("/sign-in");
       router.refresh();
     } finally {
@@ -117,13 +121,14 @@ export default function Sidebar({
     {
       label: "Operations",
       items: [
-        { name: "Borrow Requests", href: "/borrow-requests", icon: ClipboardList, badge: pendingCount, badgeTone: "accent", roles: ["superadmin", "admin", "staff"] },
+
         { name: "Browse Assets", href: "/borrower-db", icon: ShoppingBag, roles: ["borrower"] },
         { name: "My Requests", href: "/borrower-db/requests", icon: ClipboardList, badge: pendingCount, badgeTone: "accent", roles: ["borrower"] },
         { name: "Borrow History", href: "/borrower-db/history", icon: History, roles: ["borrower"] },
         { name: "Assets", href: "/assets", icon: Package, roles: ["superadmin", "admin", "staff"] },
-        { name: "Borrow & Return Log", href: "/borrow-log", icon: Repeat, badge: overdueCount, badgeTone: "warning", roles: ["superadmin", "admin", "staff"] },
-        { name: "Inventory", href: "/consumables", icon: Boxes, badge: lowStockCount, badgeTone: "warning", roles: ["superadmin", "admin", "staff"] }
+        // { name: "Borrow & Return Log", href: "/borrow-log", icon: Repeat, badge: overdueCount, badgeTone: "warning", roles: ["superadmin", "admin", "staff"] },
+        { name: "Inventory", href: "/consumables", icon: Boxes, badge: lowStockCount, badgeTone: "warning", roles: ["superadmin", "admin", "staff"] },
+        { name: "Borrow Requests", href: "/borrow-requests", icon: ClipboardList, badge: pendingCount, badgeTone: "accent", roles: ["superadmin", "admin", "staff"] }
       ],
     },
     {
@@ -231,16 +236,28 @@ export default function Sidebar({
 
   return (
     <aside
+      onClick={() => {
+        if (isCollapsed) {
+          handleToggle();
+        }
+      }}
       className={cn(
         "relative flex flex-col h-full bg-primary border-r border-white/10",
-        "transition-[width] duration-300 ease-in-out z-30 overflow-x-hidden",
-        isCollapsed ? "w-19" : "w-64",
+        "transition-[width] duration-300 ease-in-out z-30",
+        isCollapsed ? "w-19 cursor-pointer hover:bg-primary/90" : "w-64",
         className
       )}
     >
       {/* Brand header */}
-      <div className="flex items-center h-16 px-4 border-b border-white/10 shrink-0">
-        <Link href="/dashboard" className="flex items-center gap-3 overflow-hidden select-none">
+      <div className={cn("flex items-center h-16 border-b border-white/10 shrink-0", isCollapsed ? "justify-center" : "justify-between px-4")}>
+        <Link 
+          href="/dashboard" 
+          className="flex items-center gap-3 overflow-hidden select-none"
+          onClick={(e) => {
+            // Prevent navigation if we're just clicking to expand the sidebar
+            if (isCollapsed) e.preventDefault();
+          }}
+        >
           <div className="flex items-center justify-center w-9 h-9 rounded-full bg-white p-1.5 shrink-0 shadow-sm shadow-black/20">
             <Image
               src="/aims-logo.svg"
@@ -257,6 +274,22 @@ export default function Sidebar({
             </span>
           )}
         </Link>
+        
+        {!isCollapsed && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation(); // prevent clicking the aside
+              handleToggle();
+            }}
+            aria-label="Collapse sidebar"
+            className={cn(
+              "hidden md:flex items-center justify-center rounded-md text-white/50 hover:text-white hover:bg-white/10 transition-colors",
+              "w-8 h-8 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+            )}
+          >
+            <PanelLeftClose className="w-5 h-5" />
+          </button>
+        )}
       </div>
 
 
@@ -326,18 +359,7 @@ export default function Sidebar({
         </AnimatePresence>
       </div>
 
-      {/* Collapse toggle — absolutely positioned on the right edge of the sidebar, vertically centered */}
-      <button
-        onClick={handleToggle}
-        aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-        className={cn(
-          "absolute top-1/2 -translate-y-1/2 -right-3 hidden md:flex items-center justify-center w-6 h-6 rounded-full",
-          "bg-primary border border-white/20 text-white shadow-md cursor-pointer z-40",
-          "hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
-        )}
-      >
-        {isCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
-      </button>
+
     </aside>
   );
 }

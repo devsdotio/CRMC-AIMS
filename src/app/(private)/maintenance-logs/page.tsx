@@ -4,7 +4,11 @@ import { useState, useMemo, useEffect } from "react";
 import { Wrench } from "lucide-react";
 import type { MaintenanceLogRecord, MaintenanceLogFilterState, ConditionState } from "@/types/maintenance-logs";
 import type { AssetCategory } from "@/types/shared";
-import { INITIAL_MOCK_MAINTENANCE_LOGS } from "@/components/maintenance-logs/mock-data";
+import {
+  useMaintenanceLogsQuery,
+  useCreateMaintenanceLogMutation,
+  useResolveMaintenanceLogMutation,
+} from "@/features/maintenance-logs/client/use-maintenance-logs";
 import { MaintenanceLogFilters } from "@/components/maintenance-logs/maintenance-log-filters";
 import { MaintenanceLogList } from "@/components/maintenance-logs/maintenance-log-list";
 import { MaintenanceLogDetailPanel } from "@/components/maintenance-logs/maintenance-log-detail-panel";
@@ -12,8 +16,9 @@ import { FlagForMaintenanceDialog } from "@/components/maintenance-logs/flag-for
 import { ResolveMaintenanceDialog } from "@/components/maintenance-logs/resolve-maintenance-dialog";
 
 export default function MaintenanceLogsPage() {
-  const [records, setRecords] = useState<MaintenanceLogRecord[]>(INITIAL_MOCK_MAINTENANCE_LOGS);
-  const [isLoading, setIsLoading] = useState(true);
+  const { data: records = [], isLoading } = useMaintenanceLogsQuery();
+  const flagMutation = useCreateMaintenanceLogMutation();
+  const resolveMutation = useResolveMaintenanceLogMutation();
 
   // Filter & Sort State
   const [filters, setFilters] = useState<MaintenanceLogFilterState>({
@@ -31,12 +36,6 @@ export default function MaintenanceLogsPage() {
   const [flagDialogOpen, setFlagDialogOpen] = useState(false);
   const [resolveDialogRecord, setResolveDialogRecord] = useState<MaintenanceLogRecord | null>(null);
 
-  // Simulate initial load
-  useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 400);
-    return () => clearTimeout(timer);
-  }, []);
-
   // Compute live open items count
   const openCount = useMemo(
     () => records.filter((r) => !r.isResolved).length,
@@ -47,7 +46,7 @@ export default function MaintenanceLogsPage() {
   const filteredRecords = useMemo(() => {
     const result = records.filter((rec) => {
       // 1. Search Query (Asset Name, Asset Code, Log Code)
-      if (filters.searchQuery.trim()) {
+      if (filters.searchQuery?.trim()) {
         const query = filters.searchQuery.toLowerCase();
         const matchName = rec.assetName.toLowerCase().includes(query);
         const matchAssetCode = rec.assetCode.toLowerCase().includes(query);
@@ -112,7 +111,7 @@ export default function MaintenanceLogsPage() {
     });
   };
 
-  const handleConfirmFlag = (flagData: {
+  const handleConfirmFlag = async (flagData: {
     assetCode: string;
     assetName: string;
     category: AssetCategory;
@@ -120,56 +119,30 @@ export default function MaintenanceLogsPage() {
     notes: string;
     scheduledDate?: string;
   }) => {
-    const today = new Date().toISOString().split("T")[0];
-    const newRecord: MaintenanceLogRecord = {
-      id: `mnt-${Date.now()}`,
-      logCode: `MNT-2026-${Math.floor(1000 + Math.random() * 9000)}`,
+    await flagMutation.mutateAsync({
+      assetId: flagData.assetCode, // Note: the mock UI passes assetCode instead of assetId, we'll map it to assetId for the mutation
       assetCode: flagData.assetCode,
       assetName: flagData.assetName,
-      category: flagData.category,
+      category: flagData.category as "computing" | "transport" | "av" | "furniture",
       condition: flagData.condition,
-      source: "manual_flag",
-      dateLogged: today,
-      loggedBy: "Dave Custodio (Custodian)",
       notes: flagData.notes,
-      isResolved: false,
       scheduledDate: flagData.scheduledDate,
-    };
-
-    setRecords((prev) => [newRecord, ...prev]);
+    });
   };
 
-  const handleConfirmResolve = (
+  const handleConfirmResolve = async (
     rec: MaintenanceLogRecord,
     resolutionNotes: string,
     technician: string,
     date: string
   ) => {
-    setRecords((prev) =>
-      prev.map((item) => {
-        if (item.id !== rec.id) return item;
-        return {
-          ...item,
-          isResolved: true,
-          resolutionDate: date,
-          resolutionNotes,
-          resolvedBy: technician,
-        };
-      })
-    );
+    await resolveMutation.mutateAsync({
+      id: rec.id,
+      resolutionNotes,
+    });
 
     if (selectedRecord?.id === rec.id) {
-      setSelectedRecord((prev) =>
-        prev
-          ? {
-              ...prev,
-              isResolved: true,
-              resolutionDate: date,
-              resolutionNotes,
-              resolvedBy: technician,
-            }
-          : null
-      );
+      setSelectedRecord(null);
     }
   };
 

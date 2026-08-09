@@ -96,7 +96,8 @@ function StepSelect({
 }) {
   const [search, setSearch] = useState("");
   const { data: assets = [], isLoading: assetsLoading } = useAssetsQuery();
-  const { data: consumables = [], isLoading: consumablesLoading } = useConsumablesQuery();
+  const { data: paginatedData, isLoading: consumablesLoading } = useConsumablesQuery();
+  const consumables = paginatedData?.data ?? [];
 
   const BROWSE_ITEMS = useMemo(() => {
     return [
@@ -479,6 +480,9 @@ export function NewBorrowRequestWizard({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [errorMessage, setErrorMessage] = useState("");
 
+  const { mutateAsync: createRequest, isPending: isSubmitting, isSuccess: isSubmitted, reset: resetMutation } = useCreateBorrowRequestMutation();
+  const { data: me } = useMeQuery();
+
   useEffect(() => {
     if (open) {
       setStep(prefilledItem ? "details" : "select");
@@ -492,11 +496,9 @@ export function NewBorrowRequestWizard({
       });
       setFieldErrors({});
       setErrorMessage("");
+      resetMutation();
     }
-  }, [open, prefilledItem]);
-
-  const { mutateAsync: createRequest, isPending: isSubmitting, isSuccess: isSubmitted } = useCreateBorrowRequestMutation();
-  const { data: me } = useMeQuery();
+  }, [open, prefilledItem, resetMutation]);
 
   const patchValues = useCallback(
     (patch: Partial<WizardFormValues>) => setValues((p) => ({ ...p, ...patch })),
@@ -588,7 +590,7 @@ export function NewBorrowRequestWizard({
       />
 
       {/* Panel */}
-      <div className="relative z-10 w-full max-w-xl h-[750px] max-h-[90vh] rounded-2xl bg-card border border-border shadow-2xl flex flex-col">
+      <div className="relative z-10 w-full max-w-xl h-187.5 max-h-[90vh] rounded-2xl bg-card border border-border shadow-2xl flex flex-col">
         {/* Header */}
         <div className="flex items-start justify-between gap-4 p-5 border-b border-border">
           <div>

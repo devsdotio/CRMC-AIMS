@@ -65,6 +65,40 @@ export function useCreateAssetMutation(): UseMutationResult<Asset, Error, Create
 
   return useMutation({
     mutationFn: (payload) => assetsApi.createAsset(payload),
+    onMutate: async (newAsset) => {
+      await queryClient.cancelQueries({ queryKey: assetQueryKeys.list() });
+
+      const previousAssets = queryClient.getQueryData<Asset[]>(assetQueryKeys.list());
+
+      const optimisticAsset: Asset = {
+        id: `temp-${Date.now()}`,
+        assetCode: newAsset.assetCode || `TEMP-${Date.now()}`,
+        name: newAsset.name || "New Asset",
+        category: newAsset.category || "computing",
+        status: newAsset.status || "active",
+        serialNumber: newAsset.serialNumber,
+        location: newAsset.location || "Unknown",
+        department: newAsset.department,
+        purchaseDate: newAsset.purchaseDate,
+        value: newAsset.value,
+        notes: newAsset.notes,
+        lastUpdated: new Date().toISOString(),
+      };
+
+      queryClient.setQueryData<Asset[]>(assetQueryKeys.list(), (old) => {
+        return old ? [...old, optimisticAsset] : [optimisticAsset];
+      });
+
+      return { previousAssets };
+    },
+    onError: (err, newAsset, context) => {
+      if (context?.previousAssets) {
+        queryClient.setQueryData(assetQueryKeys.list(), context.previousAssets);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: assetQueryKeys.all });
+    },
     onSuccess: (asset) => {
       invalidateAssetCaches(queryClient, asset.id);
     },
@@ -80,6 +114,44 @@ export function useUpdateAssetMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: ({ id, payload }) => assetsApi.updateAsset(id, payload),
+    onMutate: async ({ id, payload }) => {
+      await queryClient.cancelQueries({ queryKey: assetQueryKeys.list() });
+      await queryClient.cancelQueries({ queryKey: assetQueryKeys.detail(id) });
+
+      const previousAssets = queryClient.getQueryData<Asset[]>(assetQueryKeys.list());
+      const previousAsset = queryClient.getQueryData<Asset>(assetQueryKeys.detail(id));
+
+      if (previousAssets) {
+        queryClient.setQueryData<Asset[]>(assetQueryKeys.list(), (old) => {
+          if (!old) return old;
+          return old.map((asset) =>
+            asset.id === id ? { ...asset, ...payload, lastUpdated: new Date().toISOString() } : asset
+          );
+        });
+      }
+
+      if (previousAsset) {
+        queryClient.setQueryData<Asset>(assetQueryKeys.detail(id), {
+          ...previousAsset,
+          ...payload,
+          lastUpdated: new Date().toISOString(),
+        });
+      }
+
+      return { previousAssets, previousAsset };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousAssets) {
+        queryClient.setQueryData(assetQueryKeys.list(), context.previousAssets);
+      }
+      if (context?.previousAsset) {
+        queryClient.setQueryData(assetQueryKeys.detail(variables.id), context.previousAsset);
+      }
+    },
+    onSettled: (data, error, variables) => {
+      queryClient.invalidateQueries({ queryKey: assetQueryKeys.all });
+      queryClient.invalidateQueries({ queryKey: assetQueryKeys.detail(variables.id) });
+    },
     onSuccess: (asset) => {
       invalidateAssetCaches(queryClient, asset.id);
       queryClient.setQueryData(assetQueryKeys.detail(asset.id), asset);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { X, AlertCircle, CheckCircle2 } from "lucide-react";
+import { X, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BorrowRequest } from "@/types/borrow-requests";
 
@@ -10,7 +10,7 @@ export interface ApproveRejectDialogProps {
   mode: "approve" | "reject" | null;
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (request: BorrowRequest, mode: "approve" | "reject", reason?: string) => void;
+  onConfirm: (request: BorrowRequest, mode: "approve" | "reject", reason?: string) => void | Promise<void>;
 }
 
 interface ApproveRejectDialogFormProps {
@@ -28,6 +28,7 @@ function ApproveRejectDialogForm({
 }: ApproveRejectDialogFormProps) {
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const isApprove = mode === "approve";
@@ -40,22 +41,29 @@ function ApproveRejectDialogForm({
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") {
+      if (e.key === "Escape" && !isSubmitting) {
         onClose();
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  }, [onClose, isSubmitting]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isApprove && !reason.trim()) {
       setError("Please provide a brief reason for rejecting this request.");
       return;
     }
-    onConfirm(request, mode, reason.trim());
-    onClose();
+    
+    setIsSubmitting(true);
+    try {
+      await onConfirm(request, mode, reason.trim());
+      onClose();
+    } catch (err: any) {
+      setError(err.message || "An error occurred. Please try again.");
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -152,14 +160,19 @@ function ApproveRejectDialogForm({
             </button>
             <button
               type="submit"
+              disabled={isSubmitting}
               className={cn(
-                "px-4 py-2 text-xs font-semibold rounded-md transition-colors cursor-pointer shadow-xs",
+                "inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-md transition-colors shadow-xs",
+                isSubmitting ? "opacity-70 cursor-not-allowed" : "cursor-pointer hover:opacity-90",
                 isApprove
-                  ? "bg-accent text-accent-foreground hover:opacity-90"
-                  : "border border-status-outofservice-bg bg-status-outofservice-bg text-white hover:opacity-90"
+                  ? "bg-accent text-accent-foreground"
+                  : "border border-status-outofservice-bg bg-status-outofservice-bg text-white"
               )}
             >
-              {isApprove ? "Confirm Approval" : "Confirm Rejection"}
+              {isSubmitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {isApprove 
+                ? (isSubmitting ? "Approving..." : "Confirm Approval") 
+                : (isSubmitting ? "Rejecting..." : "Confirm Rejection")}
             </button>
           </div>
         </form>

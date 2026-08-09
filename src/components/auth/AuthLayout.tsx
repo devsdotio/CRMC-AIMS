@@ -8,14 +8,14 @@ interface AuthLayoutProps {
 
 export function AuthLayout({ children }: AuthLayoutProps) {
   return (
-    <div className="flex h-screen w-full items-center justify-center p-[10px] bg-card text-foreground">
-      <div className="flex flex-col lg:flex-row w-full h-full bg-card rounded-md">
+    <div className="flex h-screen w-full items-center justify-center bg-card text-foreground">
+      <div className="flex flex-col lg:flex-row w-full h-full bg-card overflow-hidden">
         {/* Left/Top Branding Panel */}
-        <div className="relative flex flex-col justify-between w-full lg:w-1/2 bg-[#1B2140] text-white p-8 lg:p-12 xl:p-16 shrink-0 overflow-hidden rounded-lg">
+        <div className="relative flex flex-col justify-between w-full lg:w-1/2 bg-[#1B2140] text-white p-8 lg:p-12 xl:p-16 shrink-0 overflow-hidden">
           {/* Background Decorative Accent Elements */}
           <div className="absolute -top-24 -left-24 w-96 h-96 bg-[#FF4E45]/10 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-white/[0.02] rounded-full border border-white/5 pointer-events-none" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-125 h-125 bg-white/2 rounded-full border border-white/5 pointer-events-none" />
 
           {/* Header / Logo */}
           <div className="relative z-10 flex items-center gap-3">

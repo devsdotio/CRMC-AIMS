@@ -195,9 +195,9 @@ export function BorrowLogDetailPanel({
                     <span className="absolute -left-1.5 top-1.5 h-3 w-3 rounded-full border-2 border-bg bg-accent" />
                     <div className="flex items-center justify-between text-xs">
                       <span className="font-bold text-text capitalize">{h.action.replace("_", " ")}</span>
-                      <time className="text-[11px] text-text-secondary">{h.timestamp}</time>
+                      <time className="text-[11px] text-text-secondary">{new Date(h.timestamp).toLocaleString("en-PH")}</time>
                     </div>
-                    <p className="text-xs text-text-secondary mt-0.5">Actor: {h.actor}</p>
+                    <p className="text-xs text-text-secondary mt-0.5">Actor: {h.actorName}</p>
                     {h.notes && (
                       <p className="text-xs text-text bg-bg-subtle p-2 rounded mt-1 border border-border">
                         {h.notes}

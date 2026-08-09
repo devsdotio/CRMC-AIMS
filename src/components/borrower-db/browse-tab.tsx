@@ -33,7 +33,8 @@ export function BrowseTab({ onRequest }: BrowseTabProps) {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   const { data: assets = [], isLoading: assetsLoading } = useAssetsQuery();
-  const { data: consumables = [], isLoading: consumablesLoading } = useConsumablesQuery();
+  const { data: paginatedData, isLoading: consumablesLoading } = useConsumablesQuery();
+  const consumables = paginatedData?.data ?? [];
   const loading = assetsLoading || consumablesLoading;
 
   const items = useMemo(() => {

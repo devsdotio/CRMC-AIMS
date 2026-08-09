@@ -3,7 +3,16 @@
 import { Search, FilterX, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BorrowRequestFilterState } from "@/types/borrow-requests";
-import { MOCK_DEPARTMENTS } from "./mock-data";
+const DEPARTMENTS = [
+  "All Departments",
+  "IT Support",
+  "Emergency",
+  "Surgery",
+  "Pediatrics",
+  "Cardiology",
+  "Administration",
+  "Radiology",
+];
 
 export interface RequestFiltersProps {
   filters: BorrowRequestFilterState;
@@ -58,7 +67,7 @@ export function RequestFilters({
                 "focus:outline-none focus:ring-2 focus:ring-accent focus:bg-bg transition-colors"
               )}
             >
-              {MOCK_DEPARTMENTS.map((dept) => (
+              {DEPARTMENTS.map((dept) => (
                 <option key={dept} value={dept}>
                   {dept}
                 </option>

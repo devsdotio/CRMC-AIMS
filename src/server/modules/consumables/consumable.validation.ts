@@ -14,6 +14,8 @@ export const listConsumablesQuerySchema = z.object({
   category: consumableCategorySchema.optional(),
   stockLevel: stockLevelSchema.optional(),
   search: z.string().trim().max(200).optional(),
+  page: z.coerce.number().int().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
 });
 
 export const createConsumableSchema = z.object({

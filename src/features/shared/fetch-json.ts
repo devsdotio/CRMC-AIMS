@@ -4,6 +4,7 @@
  */
 
 type ApiResponse<T> = { data: T };
+type PaginatedResponse<T> = { data: T; meta: { total: number; page: number; limit: number; totalPages: number; counts?: Record<string, number> } };
 type ApiErrorResponse = { error?: string };
 
 export async function fetchJson<T>(
@@ -37,4 +38,4 @@ export async function fetchJson<T>(
   return (await response.json()) as T;
 }
 
-export type { ApiResponse };
+export type { ApiResponse, PaginatedResponse };

@@ -69,12 +69,12 @@ export function OverdueAssetsWidget({
             </p>
           )}
         </div>
-        <Link
+        {/* <Link
           href="/borrow-log?filter=overdue"
           className="flex items-center gap-0.5 text-xs font-medium text-accent hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
         >
           View all <ChevronRight className="h-3.5 w-3.5" />
-        </Link>
+        </Link> */}
       </div>
 
       {/* Body */}

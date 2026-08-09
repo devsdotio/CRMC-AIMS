@@ -8,18 +8,27 @@ import { useMeQuery } from "@/features/users/client";
 import { useDashboardSnapshotQuery } from "@/features/dashboard/client/use-dashboard";
 import { ROLE_DEFINITIONS } from "@/constants/roles";
 
+import type { UserRole } from "@/types/users";
+
 interface DashboardLayoutProps {
   children: React.ReactNode;
+  initialProfile?: {
+    name: string;
+    email: string;
+    role: UserRole;
+  };
 }
 
-export default function DashboardLayout({ children }: DashboardLayoutProps) {
+export default function DashboardLayout({ children, initialProfile }: DashboardLayoutProps) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const { data: me, isLoading: meLoading } = useMeQuery();
   const { data: snapshot } = useDashboardSnapshotQuery();
 
-  const userName = me?.name ?? (meLoading ? "Loading…" : "Unknown user");
-  const userEmail = me?.email ?? "";
-  const userRoleLabel = me ? ROLE_DEFINITIONS[me.role].title : meLoading ? "…" : "—";
+  const userName = me?.name ?? initialProfile?.name ?? (meLoading ? "Loading…" : "Unknown user");
+  const userEmail = me?.email ?? initialProfile?.email ?? "";
+  
+  const currentRole = me?.role ?? initialProfile?.role;
+  const userRoleLabel = currentRole ? ROLE_DEFINITIONS[currentRole].title : meLoading ? "…" : "—";
   
   const pendingCount = snapshot?.summary.pendingApprovals ?? 0;
   const overdueCount = snapshot?.summary.overdueAssets ?? 0;
@@ -32,7 +41,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         <Sidebar 
           userName={userName} 
           userEmail={userEmail} 
-          userRole={me?.role}
+          userRole={currentRole}
           pendingCount={pendingCount}
           overdueCount={overdueCount}
           lowStockCount={lowStockCount}
@@ -61,7 +70,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             className="border-r-0 w-full h-full"
             userName={userName}
             userEmail={userEmail}
-            userRole={me?.role}
+            userRole={currentRole}
             pendingCount={pendingCount}
             overdueCount={overdueCount}
             lowStockCount={lowStockCount}

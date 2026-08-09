@@ -31,7 +31,9 @@ export function useConsumablesQuery(filters?: {
   category?: ConsumableItem["category"];
   stockLevel?: "all" | "healthy" | "low" | "critical";
   search?: string;
-}): UseQueryResult<ConsumableItem[], Error> {
+  page?: number;
+  limit?: number;
+}): UseQueryResult<import("@/types/filters").PaginatedResponse<ConsumableItem>, Error> {
   return useQuery({
     queryKey: consumableQueryKeys.list(filters),
     queryFn: () => consumablesApi.list(filters),

@@ -43,5 +43,15 @@ export default async function PrivateLayout({
   // Throttled presence stamp (does not throw).
   await new UserService().recordActivity(user.id);
 
-  return <DashboardLayout>{children}</DashboardLayout>;
+  return (
+    <DashboardLayout
+      initialProfile={{
+        name: profile.fullName,
+        email: profile.email,
+        role: profile.role as AppRole,
+      }}
+    >
+      {children}
+    </DashboardLayout>
+  );
 }

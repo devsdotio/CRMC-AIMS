@@ -21,12 +21,14 @@ export const borrowRequestStatusEnum = pgEnum("borrow_request_status", [
   "pending",
   "approved",
   "rejected",
+  "released",
+  "unreleased",
   "returned",
 ]);
 
 export type BorrowRequestHistoryEntry = {
   id: string;
-  action: "submitted" | "approved" | "rejected" | "returned";
+  action: "submitted" | "approved" | "rejected" | "released" | "unreleased" | "returned";
   actor: string;
   timestamp: string;
   note?: string;
@@ -61,6 +63,7 @@ export const borrowRequests = pgTable(
 
     notes: text("notes"),
     rejectionReason: text("rejection_reason"),
+    pickedUpBy: text("picked_up_by"),
 
     history: jsonb("history")
       .$type<BorrowRequestHistoryEntry[]>()

@@ -74,16 +74,20 @@ function historyEntry(
 export class ConsumableService {
   constructor(private readonly repo = new ConsumableRepository()) {}
 
-  async list(rawQuery: unknown): Promise<ConsumableDTO[]> {
+  async list(rawQuery: unknown): Promise<import("@/types/filters").PaginatedResponse<ConsumableDTO>> {
     const filters = listConsumablesQuerySchema.parse(rawQuery ?? {});
-    let rows = await this.repo.list({
+    const result = await this.repo.list({
       category: filters.category,
       search: filters.search,
       stockLevel: filters.stockLevel === "critical" ? "critical" : undefined,
+      page: filters.page,
+      limit: filters.limit,
     });
 
+    let dtos = result.data.map(toDTO);
+
     if (filters.stockLevel && filters.stockLevel !== "all") {
-      rows = rows.filter((row) => {
+      dtos = dtos.filter((row) => {
         const severity = getStockSeverity(row.currentQty, row.minThreshold);
         if (filters.stockLevel === "healthy") return severity === "healthy";
         if (filters.stockLevel === "low") return severity === "low";
@@ -92,7 +96,10 @@ export class ConsumableService {
       });
     }
 
-    return rows.map(toDTO);
+    return {
+      ...result,
+      data: dtos,
+    };
   }
 
   async getById(rawId: string): Promise<ConsumableDTO> {

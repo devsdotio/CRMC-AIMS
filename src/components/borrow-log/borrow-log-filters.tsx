@@ -3,7 +3,16 @@
 import { Search, FilterX, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BorrowLogFilterState } from "@/types/borrow-log";
-import { MOCK_DEPARTMENTS } from "./mock-data";
+const DEPARTMENTS = [
+  "All Departments",
+  "IT Support",
+  "Emergency",
+  "Surgery",
+  "Pediatrics",
+  "Cardiology",
+  "Administration",
+  "Radiology",
+];
 
 export interface BorrowLogFiltersProps {
   filters: BorrowLogFilterState;
@@ -55,7 +64,7 @@ export function BorrowLogFilters({
               onChange={(e) => onFilterChange({ department: e.target.value })}
               className="h-9 px-3 text-xs bg-bg-subtle border border-border rounded-lg text-text font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent focus:bg-bg transition-colors"
             >
-              {MOCK_DEPARTMENTS.map((dept) => (
+              {DEPARTMENTS.map((dept) => (
                 <option key={dept} value={dept}>
                   {dept}
                 </option>

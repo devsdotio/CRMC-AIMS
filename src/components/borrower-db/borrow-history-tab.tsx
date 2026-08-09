@@ -263,7 +263,7 @@ export function BorrowHistoryTab() {
                               </span>
                               <span className="text-text-secondary">
                                 {" "}
-                                — {entry.actor} · {entry.timestamp}
+                                — {entry.actorName} · {new Date(entry.timestamp).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}
                               </span>
                               {entry.notes && (
                                 <p className="text-text-secondary/80 mt-0.5">

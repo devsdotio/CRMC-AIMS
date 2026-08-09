@@ -8,3 +8,4 @@ export * from "./borrow-requests";
 export * from "./borrow-transactions";
 export * from "./consumables";
 export * from "./maintenance-logs";
+export * from "./audit-logs";

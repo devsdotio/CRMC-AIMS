@@ -2,7 +2,8 @@
  
 import { getCategoryStyle } from "@/constants/categories";
 
-import { Check, X, Calendar, User, Building2, Tag } from "lucide-react";
+import { useState } from "react";
+import { Check, X, Calendar, User, Building2, Tag, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BorrowRequest,  RequestStatus } from "@/types/borrow-requests";
 
@@ -11,13 +12,18 @@ export interface RequestListItemProps {
   onSelect: (request: BorrowRequest) => void;
   onApprove: (request: BorrowRequest) => void;
   onReject: (request: BorrowRequest) => void;
+  onRelease?: (request: BorrowRequest) => void | Promise<void>;
+  onReturn?: (request: BorrowRequest) => void | Promise<void>;
+  onMarkUnreleased?: (request: BorrowRequest) => void | Promise<void>;
 }
 
 const STATUS_STYLES: Record<RequestStatus, { bg: string; text: string; label: string }> = {
-  pending:  { bg: "bg-status-repair-bg/20",     text: "text-status-repair-text font-bold",      label: "Pending Review" },
-  approved: { bg: "bg-status-active-bg/20",     text: "text-status-active-text font-bold",      label: "Approved" },
-  rejected: { bg: "bg-status-outofservice-bg/20", text: "text-status-outofservice-text font-bold", label: "Rejected" },
-  returned: { bg: "bg-status-retired-bg/20",    text: "text-status-retired-text font-bold",     label: "Returned" },
+  pending:    { bg: "bg-status-repair-bg/20",       text: "text-status-repair-text font-bold",      label: "Pending Review" },
+  approved:   { bg: "bg-status-active-bg/20",       text: "text-status-active-text font-bold",      label: "Approved" },
+  rejected:   { bg: "bg-status-outofservice-bg/20", text: "text-status-outofservice-text font-bold", label: "Rejected" },
+  released:   { bg: "bg-status-active-bg/20",       text: "text-status-active-text font-bold",      label: "Released" },
+  unreleased: { bg: "bg-bg-subtle",                 text: "text-text-secondary font-bold",          label: "Unreleased" },
+  returned:   { bg: "bg-status-active-bg/20",       text: "text-status-active-text font-bold",      label: "Returned" },
 };
 
 export function RequestListItem({
@@ -25,9 +31,25 @@ export function RequestListItem({
   onSelect,
   onApprove,
   onReject,
+  onRelease,
+  onReturn,
+  onMarkUnreleased,
 }: RequestListItemProps) {
+  const [isMarkingUnreleased, setIsMarkingUnreleased] = useState(false);
+  
   const categoryMeta = getCategoryStyle(request.category);
   const statusMeta = STATUS_STYLES[request.status];
+
+  const handleMarkUnreleased = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!onMarkUnreleased) return;
+    setIsMarkingUnreleased(true);
+    try {
+      await onMarkUnreleased(request);
+    } finally {
+      setIsMarkingUnreleased(false);
+    }
+  };
 
   return (
     <div
@@ -93,7 +115,17 @@ export function RequestListItem({
       </div>
 
       {/* Right Column: Status Tag & Inline Actions */}
-      <div className="flex items-center gap-3 shrink-0 self-end md:self-center">
+      <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+        {/* Picked Up By Pill (only for Released) */}
+        {request.status === "released" && request.pickedUpBy && (
+          <span
+            className="inline-flex items-center gap-1.5 justify-center px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-bg-subtle text-text-secondary border border-border"
+          >
+            <User className="h-3 w-3" />
+            <span className="font-normal opacity-80">Picker:</span> {request.pickedUpBy}
+          </span>
+        )}
+
         {/* Status Badge */}
         <span
           className={cn(
@@ -133,6 +165,50 @@ export function RequestListItem({
             >
               <X className="h-3.5 w-3.5" />
               Reject
+            </button>
+          </div>
+        )}
+
+        {/* Inline Actions (only for Approved requests) */}
+        {request.status === "approved" && onRelease && (
+          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onRelease) onRelease(request);
+              }}
+              aria-label={`Mark request ${request.requestCode} as released`}
+              className={cn(
+                "inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-semibold",
+                "shadow-xs transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1",
+                "bg-accent text-accent-foreground hover:opacity-90 focus-visible:ring-accent"
+              )}
+            >
+              <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
+              Release
+            </button>
+          </div>
+        )}
+
+        {/* Inline Actions (only for Released requests) */}
+        {request.status === "released" && onReturn && (
+          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onReturn) onReturn(request);
+              }}
+              aria-label={`Mark request ${request.requestCode} as returned`}
+              className={cn(
+                "inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-semibold",
+                "shadow-xs transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1",
+                "bg-accent text-accent-foreground hover:opacity-90 focus-visible:ring-accent"
+              )}
+            >
+              <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
+              Mark Returned
             </button>
           </div>
         )}

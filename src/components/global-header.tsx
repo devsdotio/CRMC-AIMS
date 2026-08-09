@@ -187,7 +187,7 @@ export default function GlobalHeader({
       {/* Right: Search, Notifications, Quick Actions, User Profile */}
       <div className="flex items-center gap-2 md:gap-3 shrink-0">
         {/* Dynamic Search Bar */}
-        <div className="relative hidden md:block w-60 lg:w-72">
+        {/* <div className="relative hidden md:block w-60 lg:w-72">
           <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-[#5A5F73]">
             <Search className="w-4 h-4" />
           </span>
@@ -210,17 +210,17 @@ export default function GlobalHeader({
               ⌘K
             </kbd>
           )}
-        </div>
+        </div> */}
 
         {/* Vertical Divider */}
-        <div className="h-6 w-px bg-[#E3E5EC] mx-0.5 hidden sm:block" />
+        {/* <div className="h-6 w-px bg-[#E3E5EC] mx-0.5 hidden sm:block" /> */}
 
         {/* Signed-in user identity */}
         <div
           className="hidden sm:flex items-center gap-2 px-2 py-1 rounded-full bg-[#F2F3F7] border border-[#E3E5EC] max-w-56"
           title={userName ? `${userName} · ${userRoleLabel}` : userRoleLabel}
         >
-          <div className="flex items-center justify-center w-6 h-6 rounded-full bg-[#1B2140] text-white text-[10px] font-bold shrink-0">
+          <div className="flex items-center justify-center w-6 h-6 rounded-full bg-[#2A3260] text-white text-[10px] font-bold shrink-0">
             <User className="w-3.5 h-3.5" />
           </div>
           <div className="min-w-0 pr-1">

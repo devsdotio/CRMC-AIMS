@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { UserPlus, AlertCircle } from "lucide-react";
 import type { UserAccount, UserFilterState, UserRole } from "@/types/users";
-import { INITIAL_MOCK_USERS, CURRENT_USER_ID } from "@/components/users/mock-data";
+
 import { UserFilters } from "@/components/users/user-filters";
 import { UserTable } from "@/components/users/user-table";
 import { UserDetailPanel } from "@/components/users/user-detail-panel";
@@ -55,7 +55,7 @@ export default function UsersPage() {
 
   const filteredUsers = useMemo(() => {
     return users.filter((u) => {
-      if (filters.searchQuery.trim()) {
+      if (filters.searchQuery?.trim()) {
         const query = filters.searchQuery.toLowerCase();
         const matchName = u.name.toLowerCase().includes(query);
         const matchEmail = u.email.toLowerCase().includes(query);

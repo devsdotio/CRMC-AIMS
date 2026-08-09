@@ -14,11 +14,17 @@ export class ConsumableController {
     try {
       await requireActor();
       const url = new URL(request.url);
+      
+      const pageParam = url.searchParams.get("page");
+      const limitParam = url.searchParams.get("limit");
+
       return ok(
         await this.service.list({
           category: url.searchParams.get("category") ?? undefined,
           stockLevel: url.searchParams.get("stockLevel") ?? undefined,
           search: url.searchParams.get("search") ?? undefined,
+          page: pageParam ? parseInt(pageParam, 10) : undefined,
+          limit: limitParam ? parseInt(limitParam, 10) : undefined,
         })
       );
     } catch (error) {
