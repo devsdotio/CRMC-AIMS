@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useTransition } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2, ArrowRight } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { AuthCard } from './AuthCard';
@@ -37,6 +37,7 @@ function getRedirectErrorMessage(errorKey: string | null): string | null {
 }
 
 export function SignInForm() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const emailInputRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
