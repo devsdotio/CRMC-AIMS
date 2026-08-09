@@ -43,6 +43,13 @@
       "when": 1786121000000,
       "tag": "0005_accountability_guards",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786122000000,
+      "tag": "0006_borrow_transactions_history",
+      "breakpoints": true
     }
   ]
 }
