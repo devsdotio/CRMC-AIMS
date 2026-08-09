@@ -8,7 +8,7 @@ import {
   type UseQueryResult,
 } from "@tanstack/react-query";
 
-import type { UserAccount } from "@/components/users/types";
+import type { UserAccount } from "@/types/users";
 import {
   toUserAccount,
   usersApi,

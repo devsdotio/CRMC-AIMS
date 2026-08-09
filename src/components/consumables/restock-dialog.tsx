@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { X, PlusCircle, Check } from "lucide-react";
-import type { ConsumableItem } from "./types";
+
+import type { ConsumableItem } from "@/types/inventory";
 
 export interface RestockDialogProps {
   item: ConsumableItem | null;

@@ -1,6 +1,6 @@
 "use client";
 
-import type { SimpleAssetItem } from "../types";
+import type { SimpleAssetItem } from "@/types/reports";
 
 interface AssetInventoryViewProps {
   assets: SimpleAssetItem[];

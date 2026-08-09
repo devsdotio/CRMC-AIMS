@@ -5,7 +5,7 @@ import type {
   CreateAssetInput,
   ReturnAssetInput,
   UpdateAssetInput,
-} from "@/features/assets/types";
+} from "@/types/assets";
 import type { AssetRow, NewAssetRow } from "@/server/db/schema";
 
 export type {

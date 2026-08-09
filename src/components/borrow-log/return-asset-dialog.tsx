@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { X, RotateCcw, AlertTriangle, Check } from "lucide-react";
-import type { BorrowLogRecord, ReturnCondition } from "./types";
+import type { BorrowLogRecord, ReturnCondition } from "@/types/borrow-log";
 import { ConditionSelect } from "./condition-select";
 
 export interface ReturnAssetDialogProps {

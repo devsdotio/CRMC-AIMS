@@ -1,4 +1,4 @@
-import type { BorrowRequest } from "./types";
+import type { BorrowRequest } from "@/types/borrow-requests";
 
 export const MOCK_DEPARTMENTS = [
   "All Departments",
@@ -26,7 +26,7 @@ export const INITIAL_MOCK_REQUESTS: BorrowRequest[] = [
     quantity: 2,
     purpose: "Off-site technical training seminar for regional IT staff.",
     requestedAt: "2026-07-26T08:30:00Z",
-    relativeTime: "2 days ago",
+
     expectedReturnDate: "2026-08-02",
     status: "pending",
     notes: "Requires pre-installed VPN and development software tools.",
@@ -53,7 +53,7 @@ export const INITIAL_MOCK_REQUESTS: BorrowRequest[] = [
     quantity: 1,
     purpose: "Quarterly financial review presentation with department heads.",
     requestedAt: "2026-07-26T14:00:00Z",
-    relativeTime: "2 days ago",
+
     expectedReturnDate: "2026-07-30",
     status: "pending",
     notes: "Includes HDMI cable and wireless clicker remote.",
@@ -80,7 +80,7 @@ export const INITIAL_MOCK_REQUESTS: BorrowRequest[] = [
     quantity: 1,
     purpose: "Temporary ergonomic setup for onboarding specialist.",
     requestedAt: "2026-07-27T09:15:00Z",
-    relativeTime: "Yesterday",
+
     expectedReturnDate: "2026-08-10",
     status: "pending",
     history: [
@@ -106,7 +106,7 @@ export const INITIAL_MOCK_REQUESTS: BorrowRequest[] = [
     quantity: 3,
     purpose: "Facility AV routing setup in Conference Room B.",
     requestedAt: "2026-07-27T11:00:00Z",
-    relativeTime: "Yesterday",
+
     expectedReturnDate: "2026-07-31",
     status: "pending",
     history: [
@@ -132,7 +132,7 @@ export const INITIAL_MOCK_REQUESTS: BorrowRequest[] = [
     quantity: 1,
     purpose: "Transporting medical conference supplies to satellite clinic.",
     requestedAt: "2026-07-28T07:45:00Z",
-    relativeTime: "5h ago",
+
     expectedReturnDate: "2026-07-29",
     status: "pending",
     history: [
@@ -158,7 +158,7 @@ export const INITIAL_MOCK_REQUESTS: BorrowRequest[] = [
     quantity: 1,
     purpose: "Coverage of hospital anniversary ceremony and press launch.",
     requestedAt: "2026-07-20T10:00:00Z",
-    relativeTime: "8 days ago",
+
     expectedReturnDate: "2026-07-24",
     status: "approved",
     history: [
@@ -190,7 +190,7 @@ export const INITIAL_MOCK_REQUESTS: BorrowRequest[] = [
     quantity: 1,
     purpose: "Budget modeling and audit report compilation.",
     requestedAt: "2026-07-18T13:20:00Z",
-    relativeTime: "10 days ago",
+
     expectedReturnDate: "2026-07-25",
     status: "approved",
     history: [
@@ -222,7 +222,7 @@ export const INITIAL_MOCK_REQUESTS: BorrowRequest[] = [
     quantity: 2,
     purpose: "Board meeting overflow seating.",
     requestedAt: "2026-07-15T09:00:00Z",
-    relativeTime: "13 days ago",
+
     expectedReturnDate: "2026-07-16",
     status: "rejected",
     rejectionReason: "Item reserved for Board of Directors annual general assembly on requested dates.",
@@ -255,7 +255,7 @@ export const INITIAL_MOCK_REQUESTS: BorrowRequest[] = [
     quantity: 1,
     purpose: "Community health outreach program announcement in Barangay Central.",
     requestedAt: "2026-07-10T08:00:00Z",
-    relativeTime: "18 days ago",
+
     expectedReturnDate: "2026-07-12",
     status: "returned",
     history: [

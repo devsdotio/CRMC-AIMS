@@ -26,7 +26,7 @@ import type {
   CreateAssetInput,
   ReturnAssetInput,
   UpdateAssetInput,
-} from "@/features/assets/types";
+} from "@/types/assets";
 
 function invalidateAssetCaches(
   queryClient: ReturnType<typeof useQueryClient>,

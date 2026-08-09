@@ -9,7 +9,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { SimpleReportCategory } from "./types";
+import type { SimpleReportCategory } from "@/types/reports";
 
 interface ReportsNavTabsProps {
   activeTab: SimpleReportCategory;

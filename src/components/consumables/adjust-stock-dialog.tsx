@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { X, SlidersHorizontal, AlertTriangle, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { ConsumableItem } from "./types";
+import type { ConsumableItem } from "@/types/inventory";
 
 export interface AdjustStockDialogProps {
   item: ConsumableItem | null;

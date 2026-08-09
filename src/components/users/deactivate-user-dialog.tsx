@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { X, UserX } from "lucide-react";
-import type { UserAccount } from "./types";
+import type { UserAccount } from "@/types/users";
 
 export interface DeactivateUserDialogProps {
   user: UserAccount | null;

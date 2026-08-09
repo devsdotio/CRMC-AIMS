@@ -1,7 +1,7 @@
 "use client";
 
-import { Landmark } from "lucide-react";
-import type { SimpleAcquisitionItem } from "../types";
+import {  Landmark } from "lucide-react";
+import type { SimpleAcquisitionItem } from "@/types/reports";
 
 interface ProcurementReportViewProps {
   acquisitions: SimpleAcquisitionItem[];

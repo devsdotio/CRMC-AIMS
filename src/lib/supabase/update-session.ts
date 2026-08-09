@@ -14,7 +14,7 @@ const PUBLIC_API_PATHS = [
   "/api/docs/spec",
 ] as const;
 
-/** Sign-in errors that must win over "session → dashboard" bounce. */
+/** Sign-in errors that must win over "session → home" bounce. */
 const STAY_ON_SIGN_IN_ERRORS = new Set([
   "no_profile",
   "deactivated",
@@ -75,8 +75,8 @@ export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const errorParam = request.nextUrl.searchParams.get("error");
 
-  // Authenticated users on auth pages → workspace, except gate-failure errors
-  // (otherwise: dashboard ←→ sign-in redirect loop).
+  // Authenticated users on auth pages → role-aware home (src/app/page.tsx).
+  // Keep them on /sign-in when a gate-failure error is present (avoids bounce loop).
   if (user && isPublicPage(pathname)) {
     if (
       pathname === "/sign-in" &&
@@ -87,7 +87,9 @@ export async function updateSession(request: NextRequest) {
     }
 
     const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
+    // Prefer `/` over `/dashboard`: home resolves borrower vs staff routes.
+    // Clearing search drops error= flags so they are not re-applied after recovery.
+    url.pathname = "/";
     url.search = "";
     return NextResponse.redirect(url);
   }

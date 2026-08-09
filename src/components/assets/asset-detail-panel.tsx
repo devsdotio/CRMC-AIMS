@@ -3,8 +3,9 @@
 import { useEffect, useRef } from "react";
 import { X, Edit3, Wrench, MapPin, User, Tag, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Asset, AssetCategory, AssetStatus } from "./types";
+import type { Asset,  AssetStatus } from "@/types/assets";
 import { QRCodeDisplay } from "./qr-code-display";
+import { getCategoryStyle } from "@/constants/categories";
 
 export interface AssetDetailPanelProps {
   asset: Asset | null;
@@ -13,13 +14,6 @@ export interface AssetDetailPanelProps {
   onEdit: (asset: Asset) => void;
   onMarkMaintenance: (asset: Asset) => void;
 }
-
-const CATEGORY_STYLES: Record<AssetCategory, { bg: string; text: string; label: string }> = {
-  transport: { bg: "bg-category-transport-bg", text: "text-category-transport-text", label: "Transport" },
-  computing: { bg: "bg-category-computing-bg", text: "text-category-computing-text", label: "Computing" },
-  av:        { bg: "bg-category-av-bg",        text: "text-category-av-text",        label: "AV Equipment" },
-  furniture: { bg: "bg-category-furniture-bg", text: "text-category-furniture-text", label: "Furniture" },
-};
 
 const STATUS_STYLES: Record<AssetStatus, { bg: string; text: string; label: string }> = {
   active:         { bg: "bg-status-active-bg/20",     text: "text-status-active-text font-bold",      label: "Active" },
@@ -49,7 +43,7 @@ export function AssetDetailPanel({
 
   if (!isOpen || !asset) return null;
 
-  const categoryMeta = CATEGORY_STYLES[asset.category];
+  const categoryMeta = getCategoryStyle(asset.category);
   const statusMeta = STATUS_STYLES[asset.status];
 
   return (

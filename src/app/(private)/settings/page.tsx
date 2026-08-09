@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { SettingsSection, CategoryItem, UserProfile, SystemBackupStatus } from "@/components/settings/types";
+import type { SettingsSection, CategoryItem, UserProfile, SystemBackupStatus } from "@/types/settings";
 import { SettingsNav } from "@/components/settings/settings-nav";
 import { AccountSection } from "@/components/settings/account-section";
 import { CategoriesSection } from "@/components/settings/categories-section";

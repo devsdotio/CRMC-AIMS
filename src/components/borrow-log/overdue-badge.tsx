@@ -21,7 +21,7 @@ export function OverdueBadge({
       className={cn(
         "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold tabular-nums whitespace-nowrap",
         isCritical
-          ? "bg-status-outofservice-bg/20 text-status-outofservice-text border border-status-outofservice-bg/30"
+          ? "bg-status-outofservice-bg/10 text-status-outofservice-bg dark:text-status-outofservice-text border border-status-outofservice-bg/30"
           : "bg-status-repair-bg/20 text-status-repair-text border border-status-repair-bg/30",
         className
       )}

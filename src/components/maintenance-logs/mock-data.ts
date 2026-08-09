@@ -1,4 +1,4 @@
-import type { MaintenanceLogRecord } from "./types";
+import type { MaintenanceLogRecord } from "@/types/maintenance-logs";
 
 export const INITIAL_MOCK_MAINTENANCE_LOGS: MaintenanceLogRecord[] = [
   {

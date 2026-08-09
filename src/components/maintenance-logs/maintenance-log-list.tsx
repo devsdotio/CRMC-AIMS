@@ -1,7 +1,7 @@
 "use client";
 
 import { Wrench } from "lucide-react";
-import type { MaintenanceLogRecord } from "./types";
+import type { MaintenanceLogRecord } from "@/types/maintenance-logs";
 import { MaintenanceLogListItem } from "./maintenance-log-list-item";
 
 export interface MaintenanceLogListProps {

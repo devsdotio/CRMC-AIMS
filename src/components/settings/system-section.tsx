@@ -1,6 +1,6 @@
 "use client";
 
-import type { SystemBackupStatus } from "./types";
+import type { SystemBackupStatus } from "@/types/settings";
 import { DataExportCard } from "./data-export-card";
 import { BackupStatusCard } from "./backup-status-card";
 

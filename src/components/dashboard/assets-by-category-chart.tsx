@@ -1,5 +1,5 @@
 "use client";
-
+import { getCategoryStyle } from "@/constants/categories";
 import { BarChart2 } from "lucide-react";
 import {
   BarChart,
@@ -29,35 +29,15 @@ export interface AssetsByCategoryChartProps {
 
 // ─── Category tokens ─────────────────────────────────────────────────────────
 
-const CATEGORY_STYLES: Record<
-  AssetCategory,
-  { bg: string; text: string; cssVar: string }
-> = {
-  transport: {
-    bg:     "bg-category-transport-bg",
-    text:   "text-category-transport-text",
-    cssVar: "var(--category-transport-bg)",
-  },
-  computing: {
-    bg:     "bg-category-computing-bg",
-    text:   "text-category-computing-text",
-    cssVar: "var(--category-computing-bg)",
-  },
-  av: {
-    bg:     "bg-category-av-bg",
-    text:   "text-category-av-text",
-    cssVar: "var(--category-av-bg)",
-  },
-  furniture: {
-    bg:     "bg-category-furniture-bg",
-    text:   "text-category-furniture-text",
-    cssVar: "var(--category-furniture-bg)",
-  },
-};
-
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
+function Skeleton({
+  className,
+  style,
+}: {
+  className?: string;
+  style?: React.CSSProperties;
+}) {
   return (
     <div
       className={cn("animate-pulse rounded bg-border", className)}
@@ -68,7 +48,10 @@ function Skeleton({ className, style }: { className?: string; style?: React.CSSP
 }
 
 // Custom tooltip — typed as plain object to avoid recharts version variance
-function CustomTooltip({ active, payload }: {
+function CustomTooltip({
+  active,
+  payload,
+}: {
   active?: boolean;
   payload?: Array<{ value: number; payload: { label: string } }>;
 }) {
@@ -86,7 +69,10 @@ function CustomTooltip({ active, payload }: {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function AssetsByCategoryChart({ data, loading = false }: AssetsByCategoryChartProps) {
+export function AssetsByCategoryChart({
+  data,
+  loading = false,
+}: AssetsByCategoryChartProps) {
   const total = data.reduce((sum, d) => sum + d.count, 0);
 
   return (
@@ -96,7 +82,10 @@ export function AssetsByCategoryChart({ data, loading = false }: AssetsByCategor
     >
       {/* Header */}
       <div className="px-5 py-4 border-b border-border">
-        <h2 id="assets-by-category-heading" className="text-sm font-semibold text-text">
+        <h2
+          id="assets-by-category-heading"
+          className="text-sm font-semibold text-text"
+        >
           Assets by Category
         </h2>
         {!loading && (
@@ -116,14 +105,19 @@ export function AssetsByCategoryChart({ data, loading = false }: AssetsByCategor
                   <Skeleton className="h-3.5 w-24" />
                   <Skeleton className="h-3.5 w-8" />
                 </div>
-                <Skeleton className="h-7 rounded-md" style={{ width: `${60 + i * 10}%` }} />
+                <Skeleton
+                  className="h-7 rounded-md"
+                  style={{ width: `${60 + i * 10}%` }}
+                />
               </div>
             ))}
           </div>
         ) : data.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
             <BarChart2 className="h-8 w-8 text-border" />
-            <p className="text-sm text-text-secondary">No asset data to display yet.</p>
+            <p className="text-sm text-text-secondary">
+              No asset data to display yet.
+            </p>
           </div>
         ) : (
           <>
@@ -140,18 +134,33 @@ export function AssetsByCategoryChart({ data, loading = false }: AssetsByCategor
                     type="category"
                     dataKey="label"
                     width={80}
-                    tick={{ fontSize: 12, fill: "var(--color-text-secondary)", fontWeight: 500 }}
+                    tick={{
+                      fontSize: 12,
+                      fill: "var(--color-text-secondary)",
+                      fontWeight: 500,
+                    }}
                     axisLine={false}
                     tickLine={false}
                   />
-                  <Tooltip content={<CustomTooltip />} cursor={{ fill: "var(--color-bg-subtle)" }} />
+                  <Tooltip
+                    content={<CustomTooltip />}
+                    cursor={{ fill: "var(--color-bg-subtle)" }}
+                  />
                   <Bar
                     dataKey="count"
                     radius={[0, 4, 4, 0]}
-                    label={{ position: "right", fontSize: 11, fill: "var(--color-text-secondary)", fontWeight: 600 }}
+                    label={{
+                      position: "right",
+                      fontSize: 11,
+                      fill: "var(--color-text-secondary)",
+                      fontWeight: 600,
+                    }}
                   >
                     {data.map((entry) => (
-                      <Cell key={entry.category} fill={CATEGORY_STYLES[entry.category].cssVar} />
+                      <Cell
+                        key={entry.category}
+                        fill={getCategoryStyle(entry.category).cssVar}
+                      />
                     ))}
                   </Bar>
                 </BarChart>
@@ -161,7 +170,9 @@ export function AssetsByCategoryChart({ data, loading = false }: AssetsByCategor
             {/* Accessible text summary */}
             <ul className="sr-only" aria-label="Asset count by category">
               {data.map((d) => (
-                <li key={d.category}>{d.label}: {d.count} assets</li>
+                <li key={d.category}>
+                  {d.label}: {d.count} assets
+                </li>
               ))}
             </ul>
 
@@ -172,8 +183,8 @@ export function AssetsByCategoryChart({ data, loading = false }: AssetsByCategor
                   key={d.category}
                   className={cn(
                     "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium",
-                    CATEGORY_STYLES[d.category].bg,
-                    CATEGORY_STYLES[d.category].text,
+                    getCategoryStyle(d.category).bg,
+                    getCategoryStyle(d.category).text,
                   )}
                 >
                   {d.label}

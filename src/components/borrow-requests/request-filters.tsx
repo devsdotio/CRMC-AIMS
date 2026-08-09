@@ -2,12 +2,12 @@
 
 import { Search, FilterX, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { FilterState } from "./types";
+import type { BorrowRequestFilterState } from "@/types/borrow-requests";
 import { MOCK_DEPARTMENTS } from "./mock-data";
 
 export interface RequestFiltersProps {
-  filters: FilterState;
-  onFilterChange: (updated: Partial<FilterState>) => void;
+  filters: BorrowRequestFilterState;
+  onFilterChange: (updated: Partial<BorrowRequestFilterState>) => void;
   onResetFilters: () => void;
 }
 

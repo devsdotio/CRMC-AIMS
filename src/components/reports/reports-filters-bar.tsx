@@ -1,7 +1,7 @@
 "use client";
 
 import { Search, RotateCcw } from "lucide-react";
-import type { SimpleReportFilterState } from "./types";
+import type { SimpleReportFilterState } from "@/types/reports";
 
 interface ReportsFiltersBarProps {
   filters: SimpleReportFilterState;

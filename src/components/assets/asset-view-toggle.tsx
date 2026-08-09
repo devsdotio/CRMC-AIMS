@@ -2,7 +2,7 @@
 
 import { LayoutGrid, List } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { ViewMode } from "./types";
+import type { ViewMode } from "@/types/assets";
 
 export interface AssetViewToggleProps {
   viewMode: ViewMode;

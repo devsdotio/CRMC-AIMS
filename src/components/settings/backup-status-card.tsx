@@ -2,7 +2,7 @@
 
 import { HardDrive, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { SystemBackupStatus } from "./types";
+import type { SystemBackupStatus } from "@/types/settings";
 
 export interface BackupStatusCardProps {
   backupStatus: SystemBackupStatus;

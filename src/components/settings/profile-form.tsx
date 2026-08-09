@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Check, Save } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { UserProfile } from "./types";
+import type { UserProfile } from "@/types/settings";
 
 export interface ProfileFormProps {
   profile: UserProfile;

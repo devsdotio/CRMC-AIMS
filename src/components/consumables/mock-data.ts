@@ -1,4 +1,4 @@
-import type { ConsumableItem } from "./types";
+import type { ConsumableItem } from "@/types/inventory";
 
 export const CONSUMABLE_CATEGORIES: { id: string; label: string }[] = [
   { id: "all", label: "All Categories" },

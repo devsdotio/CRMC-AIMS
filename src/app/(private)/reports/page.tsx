@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import type { SimpleReportCategory, SimpleReportFilterState, SimpleUserRole } from "@/components/reports/types";
+import type { SimpleReportCategory, SimpleReportFilterState, SimpleUserRole } from "@/types/reports";
 import {
   MOCK_SIMPLE_ASSETS,
   MOCK_SIMPLE_BORROWINGS,

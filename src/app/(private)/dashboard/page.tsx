@@ -6,6 +6,7 @@ import { OverdueAssetsWidget } from "@/components/dashboard/overdue-assets-widge
 import { LowStockWidget } from "@/components/dashboard/low-stock-widget";
 import { AssetsByCategoryChart } from "@/components/dashboard/assets-by-category-chart";
 import { RecentActivityFeed } from "@/components/dashboard/recent-activity-feed";
+
 import {
   MOCK_STAT_CARDS,
   MOCK_PENDING_REQUESTS,

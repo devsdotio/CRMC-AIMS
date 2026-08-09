@@ -1,7 +1,7 @@
 "use client";
 
 import { Plus } from "lucide-react";
-import type { CategoryItem, CategoryType } from "./types";
+import type { CategoryItem, CategoryType } from "@/types/settings";
 import { CategoryListItem } from "./category-list-item";
 
 export interface CategoryListProps {

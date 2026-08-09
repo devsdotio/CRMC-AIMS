@@ -3,19 +3,18 @@
 import { useState, useEffect } from "react";
 import { X, Edit, AlertTriangle, Check, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { UserAccount, UserRole, UserStatus } from "./types";
-import { INVITABLE_ROLES, ROLE_DEFINITIONS } from "./types";
+import type { UserAccount, UserRole, UserStatus } from "@/types/users";
+import { ROLE_DEFINITIONS, INVITABLE_ROLES } from "@/constants/roles";
 
-export type EditUserSaveInput = {
+export interface EditUserSaveInput {
   id: string;
   name: string;
   email: string;
   role: UserRole;
   department: string;
   status: UserStatus;
-  /** When set (and non-empty), replaces the user's password. */
   password?: string;
-};
+}
 
 export interface EditUserDialogProps {
   user: UserAccount | null;

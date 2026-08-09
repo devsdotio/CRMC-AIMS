@@ -11,7 +11,7 @@ import {
   index,
 } from "drizzle-orm/pg-core";
 
-import type { MaintenanceLogEntry } from "@/features/assets/types";
+import type { MaintenanceLogEntry } from "@/types/assets";
 
 /**
  * Enums mirror the frontend Asset contract

@@ -1,9 +1,11 @@
 "use client";
+ 
+import { getCategoryStyle } from "@/constants/categories";
 
 import { CheckCircle2, User, Calendar, Tag, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { MaintenanceLogRecord } from "./types";
-import type { AssetCategory } from "@/components/assets/types";
+import type { MaintenanceLogRecord } from "@/types/maintenance-logs";
+
 import { ConditionTag } from "./condition-tag";
 
 export interface MaintenanceLogListItemProps {
@@ -12,19 +14,12 @@ export interface MaintenanceLogListItemProps {
   onResolve: (record: MaintenanceLogRecord) => void;
 }
 
-const CATEGORY_STYLES: Record<AssetCategory, { bg: string; text: string; label: string }> = {
-  transport: { bg: "bg-category-transport-bg", text: "text-category-transport-text", label: "Transport" },
-  computing: { bg: "bg-category-computing-bg", text: "text-category-computing-text", label: "Computing" },
-  av:        { bg: "bg-category-av-bg",        text: "text-category-av-text",        label: "AV Equipment" },
-  furniture: { bg: "bg-category-furniture-bg", text: "text-category-furniture-text", label: "Furniture" },
-};
-
 export function MaintenanceLogListItem({
   record,
   onSelect,
   onResolve,
 }: MaintenanceLogListItemProps) {
-  const categoryMeta = CATEGORY_STYLES[record.category];
+  const categoryMeta = getCategoryStyle(record.category);
 
   return (
     <div

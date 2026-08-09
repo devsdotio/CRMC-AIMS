@@ -2,7 +2,7 @@
 
 import { AlertOctagon, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getStockSeverity } from "./types";
+import { getStockSeverity } from "./utils";
 
 export interface StockLevelBarProps {
   currentQty: number;

@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, UserPlus, Check, Eye, EyeOff } from "lucide-react";
+import { X, UserPlus,  Send, EyeOff, Eye, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { UserRole } from "./types";
-import { INVITABLE_ROLES, ROLE_DEFINITIONS } from "./types";
+import type { UserRole } from "@/types/users";
+import { ROLE_DEFINITIONS, INVITABLE_ROLES } from "@/constants/roles";
 
 export interface CreateUserDialogProps {
   isOpen: boolean;
