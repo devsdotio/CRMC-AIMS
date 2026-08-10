@@ -13,11 +13,13 @@ import { ConsumableDetailPanel } from "@/components/consumables/consumable-detai
 import { AddEditConsumableDialog } from "@/components/consumables/add-edit-consumable-dialog";
 import { RestockDialog } from "@/components/consumables/restock-dialog";
 import { AdjustStockDialog } from "@/components/consumables/adjust-stock-dialog";
+import { useSuppliersQuery } from "@/features/suppliers/client";
 
 export default function ConsumablesPage() {
   const [items, setItems] = useState<ConsumableItem[]>(INITIAL_MOCK_CONSUMABLES);
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
   const [isLoading, setIsLoading] = useState(true);
+  const { data: suppliers = [] } = useSuppliersQuery({ activeOnly: true });
 
   // Filter & Sort State
   const [filters, setFilters] = useState<ConsumableFilterState>({
@@ -139,8 +141,15 @@ export default function ConsumablesPage() {
     }
   };
 
-  const handleConfirmRestock = (itemId: string, qtyReceived: number, notes?: string) => {
+  const handleConfirmRestock = (input: {
+    itemId: string;
+    qtyReceived: number;
+    unitCost: number;
+    supplierId?: string | null;
+    notes?: string;
+  }) => {
     const today = new Date().toISOString().split("T")[0];
+    const { itemId, qtyReceived, unitCost, notes, supplierId } = input;
     setItems((prev) =>
       prev.map((i) => {
         if (i.id !== itemId) return i;
@@ -156,7 +165,11 @@ export default function ConsumablesPage() {
               type: "restock",
               quantityChange: qtyReceived,
               actor: "Property Custodian",
-              notes: notes || `Restock shipment received (+${qtyReceived} ${i.unit})`,
+              notes:
+                notes ||
+                `Restock shipment received (+${qtyReceived} ${i.unit})`,
+              unitCost: unitCost.toFixed(2),
+              supplierId: supplierId || undefined,
             },
             ...i.history,
           ],
@@ -312,6 +325,7 @@ export default function ConsumablesPage() {
       <RestockDialog
         item={restockState.item}
         allItems={items}
+        suppliers={suppliers}
         isOpen={restockState.isOpen}
         onClose={() => setRestockState({ isOpen: false, item: null })}
         onConfirmRestock={handleConfirmRestock}

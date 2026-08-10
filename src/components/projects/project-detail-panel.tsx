@@ -212,7 +212,7 @@ export function ProjectDetailPanel({
                 <div>
                   <p className="text-xs font-bold text-text">Expenses & materials</p>
                   <p className="text-[11px] text-text-secondary mt-0.5">
-                    Coming next — misc costs, then inventory consumables with supplier pricing.
+                    Coming next — misc costs, then inventory consumables priced from purchase lots.
                   </p>
                 </div>
               </div>

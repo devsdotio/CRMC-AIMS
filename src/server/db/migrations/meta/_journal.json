@@ -57,6 +57,13 @@
       "when": 1786341780628,
       "tag": "0007_icy_bill_hollister",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786343000000,
+      "tag": "0008_suppliers_purchase_lots",
+      "breakpoints": true
     }
   ]
 }

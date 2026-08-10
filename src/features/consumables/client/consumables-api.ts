@@ -31,6 +31,15 @@ export type StockMovementPayload = {
   notes?: string;
 };
 
+export type RestockPayload = {
+  quantity: number;
+  unitCost: string | number;
+  supplierId?: string | null;
+  reason?: string;
+  notes?: string;
+  purchasedOn?: string;
+};
+
 export type StockAdjustPayload = {
   quantityChange: number;
   reason: string;
@@ -82,7 +91,7 @@ export const consumablesApi = {
 
   async restock(
     id: string,
-    payload: StockMovementPayload
+    payload: RestockPayload
   ): Promise<ConsumableItem> {
     const res = await fetchJson<ApiResponse<ConsumableItem>>(
       `/api/consumables/${id}/restock`,

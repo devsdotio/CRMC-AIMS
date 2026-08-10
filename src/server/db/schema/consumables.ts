@@ -32,6 +32,11 @@ export type StockHistoryEntry = {
   actor: string;
   reason?: string;
   notes?: string;
+  /** Present on cost-tracked restocks (phase 1.5+). */
+  unitCost?: string;
+  supplierId?: string;
+  supplierName?: string;
+  lotCode?: string;
 };
 
 export const consumables = pgTable(

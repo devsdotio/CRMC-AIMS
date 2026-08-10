@@ -23,6 +23,7 @@ import {
   ShoppingBag,
   History,
   FolderKanban,
+  Truck,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -124,7 +125,8 @@ export default function Sidebar({
         { name: "Borrow History", href: "/borrower-db/history", icon: History, roles: ["borrower"] },
         { name: "Assets", href: "/assets", icon: Package, roles: ["superadmin", "admin", "staff"] },
         { name: "Borrow & Return Log", href: "/borrow-log", icon: Repeat, badge: overdueCount, badgeTone: "warning", roles: ["superadmin", "admin", "staff"] },
-        { name: "Inventory", href: "/consumables", icon: Boxes, badge: lowStockCount, badgeTone: "warning", roles: ["superadmin", "admin", "staff"] }
+        { name: "Inventory", href: "/consumables", icon: Boxes, badge: lowStockCount, badgeTone: "warning", roles: ["superadmin", "admin", "staff"] },
+        { name: "Suppliers", href: "/suppliers", icon: Truck, roles: ["superadmin", "admin", "staff"] },
       ],
     },
     {
