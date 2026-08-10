@@ -17,6 +17,7 @@ import {
   AlertTriangle,
   Boxes,
   Undo2,
+  Wrench,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type {
@@ -34,6 +35,7 @@ import {
   useProjectAssetsQuery,
   useProjectExpensesQuery,
   useProjectMaterialMutation,
+  useReportProjectAssetDamageMutation,
   useReturnProjectAssetMutation,
   useUpdateProjectExpenseMutation,
 } from "@/features/projects/client";
@@ -51,6 +53,10 @@ import {
   AssignAssetDialog,
   type AssignAssetFormInput,
 } from "./assign-asset-dialog";
+import {
+  ReportDamageDialog,
+  type ReportDamageFormInput,
+} from "./report-damage-dialog";
 
 export interface ProjectDetailPanelProps {
   project: Project | null;
@@ -94,6 +100,7 @@ export function ProjectDetailPanel({
   const useMaterial = useProjectMaterialMutation();
   const assignAsset = useAssignProjectAssetMutation();
   const returnAsset = useReturnProjectAssetMutation();
+  const reportDamage = useReportProjectAssetDamageMutation();
   const {
     data: consumables = [],
     isLoading: consumablesLoading,
@@ -102,6 +109,9 @@ export function ProjectDetailPanel({
     data: assets = [],
     isLoading: assetsLoading,
   } = useAssetsQuery("active");
+  const {
+    data: allAssets = [],
+  } = useAssetsQuery();
   const {
     data: assignments = [],
     isLoading: assignmentsLoading,
@@ -112,6 +122,8 @@ export function ProjectDetailPanel({
   >(undefined);
   const [materialOpen, setMaterialOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
+  const [damageTarget, setDamageTarget] =
+    useState<ProjectAssetAssignment | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -121,19 +133,21 @@ export function ProjectDetailPanel({
         isOpen &&
         editExpense === undefined &&
         !materialOpen &&
-        !assignOpen
+        !assignOpen &&
+        !damageTarget
       )
         onClose();
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose, editExpense, materialOpen, assignOpen]);
+  }, [isOpen, onClose, editExpense, materialOpen, assignOpen, damageTarget]);
 
   useEffect(() => {
     if (!isOpen) {
       setEditExpense(undefined);
       setMaterialOpen(false);
       setAssignOpen(false);
+      setDamageTarget(null);
       setActionError(null);
     }
   }, [isOpen]);
@@ -207,6 +221,29 @@ export function ProjectDetailPanel({
       );
     }
   };
+
+  const handleDamageSubmit = async (input: ReportDamageFormInput) => {
+    if (!damageTarget) return;
+    setActionError(null);
+    await reportDamage.mutateAsync({
+      projectId: project.id,
+      assignmentId: damageTarget.id,
+      mode: input.mode,
+      amount:
+        input.mode === "write_off" && input.amount
+          ? input.amount
+          : undefined,
+      assetStatus:
+        input.mode === "write_off" ? input.assetStatus : undefined,
+      notes: input.notes,
+    });
+  };
+
+  const damageDefaultValue = (() => {
+    if (!damageTarget) return null;
+    const match = allAssets.find((a) => a.id === damageTarget.assetId);
+    return match?.value ?? null;
+  })();
 
   const handleDeleteExpense = async (line: ProjectExpenseLine) => {
     const msg =
@@ -430,6 +467,7 @@ export function ProjectDetailPanel({
                   const amount = Number(line.amount);
                   const isCredit = amount < 0;
                   const isMaterial = line.lineType === "consumable";
+                  const isWriteOff = line.lineType === "asset_writeoff";
                   return (
                     <li
                       key={line.id}
@@ -445,6 +483,12 @@ export function ProjectDetailPanel({
                               <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-accent/15 text-accent">
                                 <Boxes className="h-2.5 w-2.5" />
                                 Inventory
+                              </span>
+                            )}
+                            {isWriteOff && (
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-status-outofservice-bg/40 text-status-outofservice-text">
+                                <AlertTriangle className="h-2.5 w-2.5" />
+                                Write-off
                               </span>
                             )}
                           </div>
@@ -531,7 +575,8 @@ export function ProjectDetailPanel({
               )}
             </div>
             <p className="text-[10px] text-text-secondary">
-              Custody only — does not add to project spent (write-off is later).
+              Custody only until write-off. Report damage to flag repair or charge
+              a write-off expense + maintenance log.
             </p>
 
             {assignmentsLoading ? (
@@ -594,18 +639,30 @@ export function ProjectDetailPanel({
                           )}
                         </div>
                         {project.isMutable && isOpenAssignment && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              void handleReturnAsset(row);
-                            }}
-                            disabled={returnAsset.isPending}
-                            className="inline-flex items-center gap-1 shrink-0 h-7 px-2 text-[10px] font-bold rounded-md border border-border bg-bg hover:bg-bg-subtle cursor-pointer disabled:opacity-50"
-                            aria-label={`Return ${row.assetName}`}
-                          >
-                            <Undo2 className="h-3 w-3" />
-                            Return
-                          </button>
+                          <div className="flex flex-col gap-1 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                void handleReturnAsset(row);
+                              }}
+                              disabled={returnAsset.isPending}
+                              className="inline-flex items-center gap-1 h-7 px-2 text-[10px] font-bold rounded-md border border-border bg-bg hover:bg-bg-subtle cursor-pointer disabled:opacity-50"
+                              aria-label={`Return ${row.assetName}`}
+                            >
+                              <Undo2 className="h-3 w-3" />
+                              Return
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDamageTarget(row)}
+                              disabled={reportDamage.isPending}
+                              className="inline-flex items-center gap-1 h-7 px-2 text-[10px] font-bold rounded-md border border-border bg-bg hover:bg-bg-subtle cursor-pointer disabled:opacity-50"
+                              aria-label={`Report damage for ${row.assetName}`}
+                            >
+                              <Wrench className="h-3 w-3" />
+                              Damage
+                            </button>
+                          </div>
                         )}
                       </div>
                     </li>
@@ -658,6 +715,14 @@ export function ProjectDetailPanel({
         loadingAssets={assetsLoading}
         onClose={() => setAssignOpen(false)}
         onSubmit={handleAssignAsset}
+      />
+
+      <ReportDamageDialog
+        isOpen={Boolean(damageTarget)}
+        assignment={damageTarget}
+        defaultValue={damageDefaultValue}
+        onClose={() => setDamageTarget(null)}
+        onSubmit={handleDamageSubmit}
       />
     </div>
   );

@@ -12,8 +12,7 @@ import { projects } from "./projects";
 
 /**
  * Project custody for coded assets (no borrower account / borrow request).
- * Does not count as project expense while still returnable (Phase 4).
- * Write-off path is reserved for Phase 5.
+ * Assigned = custody only (no project spend). Written off via Phase 5 damage report.
  */
 export const projectAssetAssignmentStatusEnum = pgEnum(
   "project_asset_assignment_status",

@@ -21,6 +21,7 @@ export const maintenanceConditionEnum = pgEnum("maintenance_condition", [
 export const maintenanceSourceEnum = pgEnum("maintenance_source", [
   "return_checkout",
   "manual_flag",
+  "project_assignment",
 ]);
 
 /**

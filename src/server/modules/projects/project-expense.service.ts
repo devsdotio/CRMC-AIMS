@@ -290,7 +290,7 @@ export class ProjectExpenseService {
       existing.lineType !== "adjustment"
     ) {
       throw new ConflictError(
-        "Inventory material lines cannot be edited. Delete the line to reverse the stock charge, then re-add."
+        "Inventory and write-off lines cannot be edited. Delete/reverse where supported, or record an adjustment."
       );
     }
 
@@ -366,7 +366,7 @@ export class ProjectExpenseService {
     }
 
     throw new ConflictError(
-      "This expense line type cannot be deleted in this phase."
+      "Write-off expense lines cannot be deleted. Use an adjustment credit if the charge was incorrect."
     );
   }
 

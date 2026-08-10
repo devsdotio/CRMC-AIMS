@@ -7,7 +7,11 @@ const conditionSchema = z.enum([
   "damaged",
   "resolved",
 ]);
-const sourceSchema = z.enum(["return_checkout", "manual_flag"]);
+const sourceSchema = z.enum([
+  "return_checkout",
+  "manual_flag",
+  "project_assignment",
+]);
 
 export const listMaintenanceQuerySchema = z.object({
   openOnly: z

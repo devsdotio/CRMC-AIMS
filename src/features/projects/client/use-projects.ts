@@ -18,6 +18,7 @@ import {
   type AssignProjectAssetPayload,
   type CreateProjectExpensePayload,
   type CreateProjectPayload,
+  type ReportProjectAssetDamagePayload,
   type ReturnProjectAssetPayload,
   type UpdateProjectExpensePayload,
   type UpdateProjectPayload,
@@ -26,6 +27,8 @@ import {
 import { projectQueryKeys } from "./query-keys";
 import { consumableQueryKeys } from "@/features/consumables/client/query-keys";
 import { assetQueryKeys } from "@/features/assets/client/query-keys";
+import { maintenanceQueryKeys } from "@/features/maintenance-logs/client/query-keys";
+import type { ProjectAssetDamageReport } from "./projects-api";
 
 function invalidateProjects(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: projectQueryKeys.all });
@@ -195,6 +198,27 @@ export function useReturnProjectAssetMutation(): UseMutationResult<
     onSuccess: () => {
       invalidateProjects(queryClient);
       queryClient.invalidateQueries({ queryKey: assetQueryKeys.all });
+    },
+  });
+}
+
+export function useReportProjectAssetDamageMutation(): UseMutationResult<
+  ProjectAssetDamageReport,
+  Error,
+  {
+    projectId: string;
+    assignmentId: string;
+  } & ReportProjectAssetDamagePayload
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ projectId, assignmentId, ...payload }) =>
+      projectsApi.reportAssetDamage(projectId, assignmentId, payload),
+    onSuccess: () => {
+      invalidateProjects(queryClient);
+      queryClient.invalidateQueries({ queryKey: assetQueryKeys.all });
+      queryClient.invalidateQueries({ queryKey: maintenanceQueryKeys.all });
     },
   });
 }

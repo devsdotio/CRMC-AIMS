@@ -17,7 +17,7 @@ import { projects } from "./projects";
  * Project spend ledger:
  * - Phase 2: miscellaneous + adjustment
  * - Phase 3: consumable (auto stock checkout + FIFO lot cost)
- * - Later: material free-text, asset_writeoff
+ * - Phase 5: asset_writeoff (broken/lost on project)
  *
  * Signed `amount`: positive = spend, negative = credit/refund (adjustments).
  */
@@ -54,6 +54,12 @@ export type ProjectExpenseMetadata = {
   consumableCode?: string;
   consumableName?: string;
   consumableUnit?: string;
+  /** Phase 5 write-off linkage */
+  assignmentId?: string;
+  assetCode?: string;
+  assetName?: string;
+  maintenanceLogCode?: string;
+  writeOffDisposition?: "out_of_service" | "retired";
 };
 
 export const projectExpenseLines = pgTable(

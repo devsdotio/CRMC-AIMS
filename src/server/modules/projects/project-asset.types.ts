@@ -20,6 +20,16 @@ export type ProjectAssetAssignmentDTO = {
   returnNotes: string | null;
 };
 
+/** Result of Phase 5 damage report (maintenance or write-off). */
+export type ProjectAssetDamageReportDTO = {
+  assignment: ProjectAssetAssignmentDTO;
+  mode: "maintenance" | "write_off";
+  maintenanceLogCode: string;
+  /** Present when mode is write_off and a ledger line was created. */
+  expenseId: string | null;
+  expenseAmount: string | null;
+};
+
 export interface IProjectAssetAssignmentRepository {
   findById(id: string): Promise<ProjectAssetAssignmentRow | null>;
   listByProject(

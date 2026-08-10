@@ -181,6 +181,27 @@ export class ProjectController {
       return handleError(error);
     }
   }
+
+  async reportAssetDamage(
+    request: NextRequest | Request,
+    projectId: string,
+    assignmentId: string
+  ) {
+    try {
+      const session = await requireUserManager();
+      const body = await request.json();
+      return ok(
+        await this.projectAssets.reportDamage(
+          projectId,
+          assignmentId,
+          body,
+          session.actor
+        )
+      );
+    } catch (error) {
+      return handleError(error);
+    }
+  }
 }
 
 export const projectController = new ProjectController();

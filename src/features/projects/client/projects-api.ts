@@ -51,6 +51,23 @@ export type ReturnProjectAssetPayload = {
   notes?: string | null;
 };
 
+export type ReportProjectAssetDamagePayload = {
+  mode: "maintenance" | "write_off";
+  amount?: string | number | null;
+  assetStatus?: "out_of_service" | "retired";
+  description?: string | null;
+  incurredOn?: string;
+  notes: string;
+};
+
+export type ProjectAssetDamageReport = {
+  assignment: ProjectAssetAssignment;
+  mode: "maintenance" | "write_off";
+  maintenanceLogCode: string;
+  expenseId: string | null;
+  expenseAmount: string | null;
+};
+
 export const projectsApi = {
   async list(params?: {
     search?: string;
@@ -196,6 +213,21 @@ export const projectsApi = {
       {
         method: "POST",
         body: JSON.stringify(payload ?? {}),
+      }
+    );
+    return response.data;
+  },
+
+  async reportAssetDamage(
+    projectId: string,
+    assignmentId: string,
+    payload: ReportProjectAssetDamagePayload
+  ): Promise<ProjectAssetDamageReport> {
+    const response = await fetchJson<ApiResponse<ProjectAssetDamageReport>>(
+      `/api/projects/${projectId}/assets/${assignmentId}/damage`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
       }
     );
     return response.data;
