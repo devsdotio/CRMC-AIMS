@@ -120,7 +120,11 @@ export function MaintenanceLogDetailPanel({
               <div className="flex items-center justify-between">
                 <span className="text-text-secondary">Entry Source:</span>
                 <span className="font-semibold text-text">
-                  {record.source === "return_checkout" ? "Automated via Borrow Return Check-In" : "Manual Custodian Flag"}
+                  {record.source === "return_checkout"
+                    ? "Automated via Borrow Return Check-In"
+                    : record.source === "project_assignment"
+                      ? "Project asset damage report"
+                      : "Manual Custodian Flag"}
                 </span>
               </div>
 
