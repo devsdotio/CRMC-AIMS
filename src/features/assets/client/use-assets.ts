@@ -74,7 +74,7 @@ export function useCreateAssetMutation(): UseMutationResult<Asset, Error, Create
         id: `temp-${Date.now()}`,
         assetCode: newAsset.assetCode || `TEMP-${Date.now()}`,
         name: newAsset.name || "New Asset",
-        category: newAsset.category || "computing",
+        category: newAsset.category || "",
         status: newAsset.status || "active",
         assignmentType: newAsset.assignmentType || "borrowable",
         serialNumber: newAsset.serialNumber,

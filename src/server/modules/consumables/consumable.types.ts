@@ -4,7 +4,7 @@ export type ConsumableDTO = {
   id: string;
   itemCode: string;
   name: string;
-  category: "paper" | "ink_toner" | "cleaning" | "office_supplies" | "medical";
+  category: string;
   unit: string;
   currentQty: number;
   minThreshold: number;

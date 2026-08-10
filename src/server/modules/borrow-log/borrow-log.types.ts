@@ -13,7 +13,7 @@ export type BorrowLogDTO = {
   department: string;
   assetCode: string;
   assetName: string;
-  category: "transport" | "computing" | "av" | "furniture";
+  category: string;
   releasedAt: string;
   dueDate: string;
   returnedAt?: string;

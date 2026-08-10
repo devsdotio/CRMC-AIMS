@@ -12,7 +12,7 @@ export type BorrowRequestDTO = {
   department: string;
   itemDescription: string;
   assetCode?: string;
-  category: "transport" | "computing" | "av" | "furniture";
+  category: string;
   quantity: number;
   purpose: string;
   requestedAt: string;

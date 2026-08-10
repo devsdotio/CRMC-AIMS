@@ -143,7 +143,7 @@ export default function ConsumablesPage() {
       await createMutation.mutateAsync({
         itemCode: itemData.itemCode,
         name: itemData.name || "New Supply Item",
-        category: itemData.category || "office_supplies",
+        category: itemData.category || "",
         unit: itemData.unit || "reams",
         currentQty: itemData.currentQty ?? 50,
         minThreshold: itemData.minThreshold ?? 15,

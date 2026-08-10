@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Search, FilterX, ArrowUpDown, Tag, AlertCircle, ChevronDown, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { AssetFilterState, AssetCategory, AssetStatus } from "@/types/assets";
+import type { AssetFilterState, AssetStatus } from "@/types/assets";
 import { useCategoriesQuery } from "@/features/categories/client/use-categories";
 import { getSwatchForName } from "@/components/settings/category-list-item";
 
@@ -116,7 +116,7 @@ export function AssetFilters({
     filters.categories.length +
     filters.statuses.length;
 
-  const toggleCategory = (catId: AssetCategory) => {
+  const toggleCategory = (catId: string) => {
     const exists = filters.categories.includes(catId);
     const updated = exists
       ? filters.categories.filter((c) => c !== catId)

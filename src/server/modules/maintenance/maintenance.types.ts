@@ -5,7 +5,7 @@ export type MaintenanceLogDTO = {
   logCode: string;
   assetCode: string;
   assetName: string;
-  category: "transport" | "computing" | "av" | "furniture";
+  category: string;
   condition: "good" | "needs_maintenance" | "damaged" | "resolved";
   source: "return_checkout" | "manual_flag" | "project_assignment";
   dateLogged: string;

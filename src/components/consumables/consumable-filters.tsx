@@ -1,15 +1,10 @@
 "use client";
 
+import { useMemo } from "react";
 import { Search, FilterX, ArrowUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ConsumableFilterState } from "@/types/inventory";
-const CONSUMABLE_CATEGORIES = [
-  { id: "all", label: "All Categories" },
-  { id: "office_supplies", label: "Office Supplies" },
-  { id: "cleaning", label: "Cleaning Supplies" },
-  { id: "medical", label: "Medical Disposables" },
-  { id: "it_peripherals", label: "IT Peripherals" },
-];
+import { useCategoriesQuery } from "@/features/categories/client/use-categories";
 
 export interface ConsumableFiltersProps {
   filters: ConsumableFilterState;
@@ -24,6 +19,14 @@ export function ConsumableFilters({
   onFilterChange,
   onResetFilters,
 }: ConsumableFiltersProps) {
+  const { data: allCategories = [] } = useCategoriesQuery();
+  const categoryOptions = useMemo(() => {
+    const names = allCategories
+      .filter((c) => c.type === "consumable")
+      .map((c) => ({ id: c.name, label: c.name }));
+    return [{ id: "all", label: "All Categories" }, ...names];
+  }, [allCategories]);
+
   const isFiltered =
     Boolean(filters.searchQuery) ||
     (Boolean(filters.category) && filters.category !== "all") ||
@@ -62,7 +65,7 @@ export function ConsumableFilters({
               onChange={(e) => onFilterChange({ category: e.target.value })}
               className="h-9 px-3 text-xs bg-bg-subtle border border-border rounded-lg text-text font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent focus:bg-bg transition-colors"
             >
-              {CONSUMABLE_CATEGORIES.map((cat) => (
+              {categoryOptions.map((cat) => (
                 <option key={cat.id} value={cat.id}>
                   {cat.label}
                 </option>
