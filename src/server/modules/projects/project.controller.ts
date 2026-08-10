@@ -90,6 +90,18 @@ export class ProjectController {
     }
   }
 
+  async useConsumable(request: NextRequest | Request, projectId: string) {
+    try {
+      const session = await requireUserManager();
+      const body = await request.json();
+      return created(
+        await this.expenses.useConsumable(projectId, body, session.actor)
+      );
+    } catch (error) {
+      return handleError(error);
+    }
+  }
+
   async updateExpense(
     request: NextRequest | Request,
     projectId: string,
@@ -106,8 +118,8 @@ export class ProjectController {
 
   async deleteExpense(projectId: string, expenseId: string) {
     try {
-      await requireUserManager();
-      await this.expenses.delete(projectId, expenseId);
+      const session = await requireUserManager();
+      await this.expenses.delete(projectId, expenseId, session.actor);
       return noContent();
     } catch (error) {
       return handleError(error);

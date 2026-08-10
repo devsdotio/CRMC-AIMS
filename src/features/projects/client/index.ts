@@ -4,6 +4,7 @@ export type {
   CreateProjectPayload,
   UpdateProjectExpensePayload,
   UpdateProjectPayload,
+  UseProjectMaterialPayload,
 } from "./projects-api";
 export { projectQueryKeys } from "./query-keys";
 export {
@@ -12,6 +13,7 @@ export {
   useDeleteProjectExpenseMutation,
   useDeleteProjectMutation,
   useProjectExpensesQuery,
+  useProjectMaterialMutation,
   useProjectsQuery,
   useUpdateProjectExpenseMutation,
   useUpdateProjectMutation,

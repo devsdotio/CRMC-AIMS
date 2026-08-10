@@ -1,10 +1,19 @@
-import type { ProjectExpenseLineRow } from "@/server/db/schema";
+import type {
+  ProjectExpenseLineRow,
+  ProjectExpenseMetadata,
+  StockHistoryEntry,
+} from "@/server/db/schema";
 import type { ActorContext } from "@/server/shared/auth";
 import { todayDateString } from "@/server/shared/codes";
 import {
+  BadRequestError,
   ConflictError,
   NotFoundError,
 } from "@/server/shared/errors";
+import { withTransaction } from "@/server/db/transaction";
+import { ConsumableRepository } from "@/server/modules/consumables/consumable.repository";
+import { PurchaseLotRepository } from "@/server/modules/purchase-lots/purchase-lot.repository";
+
 import { ProjectRepository } from "./project.repository";
 import { ProjectExpenseRepository } from "./project-expense.repository";
 import type { ProjectExpenseLineDTO } from "./project-expense.types";
@@ -12,6 +21,7 @@ import {
   createProjectExpenseSchema,
   expenseIdSchema,
   updateProjectExpenseSchema,
+  useConsumableOnProjectSchema,
 } from "./project-expense.validation";
 import { projectIdSchema } from "./project.validation";
 
@@ -23,6 +33,7 @@ function formatMoney(value: string | null | undefined): string | null {
 }
 
 function toDTO(row: ProjectExpenseLineRow): ProjectExpenseLineDTO {
+  const metadata = (row.metadata ?? {}) as ProjectExpenseMetadata;
   return {
     id: row.id,
     projectId: row.projectId,
@@ -40,13 +51,36 @@ function toDTO(row: ProjectExpenseLineRow): ProjectExpenseLineDTO {
     recordedByName: row.recordedByName,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+    consumableCode: metadata.consumableCode ?? null,
+    consumableName: metadata.consumableName ?? null,
+    consumableUnit: metadata.consumableUnit ?? null,
+  };
+}
+
+function stockHistoryEntry(
+  type: StockHistoryEntry["type"],
+  quantityChange: number,
+  actor: string,
+  reason?: string,
+  notes?: string
+): StockHistoryEntry {
+  return {
+    id: crypto.randomUUID(),
+    date: todayDateString(),
+    type,
+    quantityChange,
+    actor,
+    ...(reason ? { reason } : {}),
+    ...(notes ? { notes } : {}),
   };
 }
 
 export class ProjectExpenseService {
   constructor(
     private readonly expenses = new ProjectExpenseRepository(),
-    private readonly projects = new ProjectRepository()
+    private readonly projects = new ProjectRepository(),
+    private readonly consumables = new ConsumableRepository(),
+    private readonly lots = new PurchaseLotRepository()
   ) {}
 
   private async requireMutableProject(projectId: string) {
@@ -93,11 +127,148 @@ export class ProjectExpenseService {
       assetId: null,
       incurredOn: input.incurredOn ?? todayDateString(),
       notes: input.notes ?? null,
+      metadata: {},
       recordedByUserId: actor.userId,
       recordedByName: actor.displayName,
     });
 
     return toDTO(row);
+  }
+
+  /**
+   * Phase 3: charge inventory to a project.
+   * - Always deducts consumable stock
+   * - Costs via FIFO purchase lots (uncosted remainder at ₱0 if no lots)
+   * - Writes a non-editable consumable expense line (delete reverses stock)
+   */
+  async useConsumable(
+    rawProjectId: string,
+    rawInput: unknown,
+    actor: ActorContext
+  ): Promise<ProjectExpenseLineDTO> {
+    const projectId = projectIdSchema.parse(rawProjectId);
+    const project = await this.requireMutableProject(projectId);
+    const input = useConsumableOnProjectSchema.parse(rawInput);
+
+    return withTransaction(async (tx) => {
+      const item = await this.consumables.findByIdForUpdate(
+        input.consumableId,
+        tx
+      );
+      if (!item) throw new NotFoundError("Consumable", input.consumableId);
+
+      if (item.currentQty < input.quantity) {
+        throw new BadRequestError(
+          `Insufficient stock. Available: ${item.currentQty} ${item.unit}.`
+        );
+      }
+
+      let remaining = input.quantity;
+      let totalCost = 0;
+      const lotAllocations: NonNullable<
+        ProjectExpenseMetadata["lotAllocations"]
+      > = [];
+
+      const availableLots = await this.lots.listAvailableForConsumableFifo(
+        item.id,
+        tx
+      );
+
+      for (const lot of availableLots) {
+        if (remaining <= 0) break;
+        const take = Math.min(remaining, lot.quantityRemaining);
+        if (take <= 0) continue;
+
+        const unit = Number(lot.unitCost);
+        const lineTotal = unit * take;
+        totalCost += lineTotal;
+        lotAllocations.push({
+          lotId: lot.id,
+          lotCode: lot.lotCode,
+          quantity: take,
+          unitCost: unit.toFixed(2),
+          total: lineTotal.toFixed(2),
+        });
+
+        await this.lots.updateRemaining(
+          lot.id,
+          lot.quantityRemaining - take,
+          tx
+        );
+        remaining -= take;
+      }
+
+      if (remaining > 0) {
+        lotAllocations.push({
+          lotId: null,
+          lotCode: null,
+          quantity: remaining,
+          unitCost: "0.00",
+          total: "0.00",
+          uncosted: true,
+        });
+      }
+
+      const averageUnit =
+        input.quantity > 0
+          ? (totalCost / input.quantity).toFixed(2)
+          : "0.00";
+      const amount = totalCost.toFixed(2);
+
+      const metadata: ProjectExpenseMetadata = {
+        lotAllocations,
+        consumableCode: item.itemCode,
+        consumableName: item.name,
+        consumableUnit: item.unit,
+      };
+
+      const description =
+        input.description?.trim() ||
+        `${item.name} (${item.itemCode}) × ${input.quantity} ${item.unit}`;
+
+      const history = [
+        ...(Array.isArray(item.history) ? item.history : []),
+        stockHistoryEntry(
+          "checkout",
+          -input.quantity,
+          actor.displayName,
+          "Project material use",
+          input.notes ??
+            `Charged to ${project.projectCode} — ${project.name}`
+        ),
+      ];
+
+      await this.consumables.update(
+        item.id,
+        {
+          currentQty: item.currentQty - input.quantity,
+          history,
+        },
+        tx
+      );
+
+      const row = await this.expenses.create(
+        {
+          projectId,
+          lineType: "consumable",
+          category: "miscellaneous",
+          description,
+          amount,
+          quantity: String(input.quantity),
+          unitCost: averageUnit,
+          consumableId: item.id,
+          assetId: null,
+          incurredOn: input.incurredOn ?? todayDateString(),
+          notes: input.notes ?? null,
+          metadata,
+          recordedByUserId: actor.userId,
+          recordedByName: actor.displayName,
+        },
+        tx
+      );
+
+      return toDTO(row);
+    });
   }
 
   async update(
@@ -114,20 +285,19 @@ export class ProjectExpenseService {
       throw new NotFoundError("Project expense", expenseId);
     }
 
-    // Phase 2 only manages misc/adjustment lines
     if (
       existing.lineType !== "miscellaneous" &&
       existing.lineType !== "adjustment"
     ) {
       throw new ConflictError(
-        "This expense line is managed by a later workflow and cannot be edited here."
+        "Inventory material lines cannot be edited. Delete the line to reverse the stock charge, then re-add."
       );
     }
 
     const input = updateProjectExpenseSchema.parse(rawInput);
     const nextLineType = input.lineType ?? existing.lineType;
     if (nextLineType !== "miscellaneous" && nextLineType !== "adjustment") {
-      throw new ConflictError("Invalid line type for this phase.");
+      throw new ConflictError("Invalid line type for manual expenses.");
     }
 
     if (
@@ -169,7 +339,8 @@ export class ProjectExpenseService {
 
   async delete(
     rawProjectId: string,
-    rawExpenseId: string
+    rawExpenseId: string,
+    actor?: ActorContext
   ): Promise<void> {
     const projectId = projectIdSchema.parse(rawProjectId);
     const expenseId = expenseIdSchema.parse(rawExpenseId);
@@ -181,15 +352,81 @@ export class ProjectExpenseService {
     }
 
     if (
-      existing.lineType !== "miscellaneous" &&
-      existing.lineType !== "adjustment"
+      existing.lineType === "miscellaneous" ||
+      existing.lineType === "adjustment"
     ) {
-      throw new ConflictError(
-        "This expense line is managed by a later workflow and cannot be deleted here."
-      );
+      const deleted = await this.expenses.delete(expenseId);
+      if (!deleted) throw new NotFoundError("Project expense", expenseId);
+      return;
     }
 
-    const deleted = await this.expenses.delete(expenseId);
-    if (!deleted) throw new NotFoundError("Project expense", expenseId);
+    if (existing.lineType === "consumable") {
+      await this.reverseConsumableExpense(existing, actor);
+      return;
+    }
+
+    throw new ConflictError(
+      "This expense line type cannot be deleted in this phase."
+    );
+  }
+
+  private async reverseConsumableExpense(
+    existing: ProjectExpenseLineRow,
+    actor?: ActorContext
+  ): Promise<void> {
+    const qty = Math.round(Number(existing.quantity ?? 0));
+    if (!existing.consumableId || !Number.isFinite(qty) || qty <= 0) {
+      await this.expenses.delete(existing.id);
+      return;
+    }
+
+    await withTransaction(async (tx) => {
+      const item = await this.consumables.findByIdForUpdate(
+        existing.consumableId!,
+        tx
+      );
+      if (!item) {
+        // Item removed — still remove expense so ledger matches project
+        await this.expenses.delete(existing.id, tx);
+        return;
+      }
+
+      const metadata = (existing.metadata ?? {}) as ProjectExpenseMetadata;
+      const allocations = metadata.lotAllocations ?? [];
+
+      for (const alloc of allocations) {
+        if (!alloc.lotId || alloc.quantity <= 0) continue;
+        const lot = await this.lots.findById(alloc.lotId, tx);
+        if (!lot) continue;
+        await this.lots.updateRemaining(
+          lot.id,
+          lot.quantityRemaining + alloc.quantity,
+          tx
+        );
+      }
+
+      const actorName = actor?.displayName ?? "System";
+      const history = [
+        ...(Array.isArray(item.history) ? item.history : []),
+        stockHistoryEntry(
+          "restock",
+          qty,
+          actorName,
+          "Project material line removed",
+          `Reversed expense ${existing.id}`
+        ),
+      ];
+
+      await this.consumables.update(
+        item.id,
+        {
+          currentQty: item.currentQty + qty,
+          history,
+        },
+        tx
+      );
+
+      await this.expenses.delete(existing.id, tx);
+    });
   }
 }

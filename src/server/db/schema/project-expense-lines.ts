@@ -1,6 +1,8 @@
+import { sql } from "drizzle-orm";
 import {
   date,
   index,
+  jsonb,
   numeric,
   pgEnum,
   pgTable,
@@ -12,8 +14,10 @@ import {
 import { projects } from "./projects";
 
 /**
- * Project spend ledger. Phase 2 ships miscellaneous + adjustment lines.
- * Later: consumable / material / asset_writeoff row types reuse this table.
+ * Project spend ledger:
+ * - Phase 2: miscellaneous + adjustment
+ * - Phase 3: consumable (auto stock checkout + FIFO lot cost)
+ * - Later: material free-text, asset_writeoff
  *
  * Signed `amount`: positive = spend, negative = credit/refund (adjustments).
  */
@@ -34,6 +38,23 @@ export const projectExpenseCategoryEnum = pgEnum("project_expense_category", [
   "adjustment",
   "miscellaneous",
 ]);
+
+/** FIFO lot draws for consumable expense lines — used to reverse stock. */
+export type ProjectExpenseLotAllocation = {
+  lotId: string | null;
+  lotCode?: string | null;
+  quantity: number;
+  unitCost: string;
+  total: string;
+  uncosted?: boolean;
+};
+
+export type ProjectExpenseMetadata = {
+  lotAllocations?: ProjectExpenseLotAllocation[];
+  consumableCode?: string;
+  consumableName?: string;
+  consumableUnit?: string;
+};
 
 export const projectExpenseLines = pgTable(
   "project_expense_lines",
@@ -64,6 +85,11 @@ export const projectExpenseLines = pgTable(
     incurredOn: date("incurred_on", { mode: "string" }).notNull(),
     notes: text("notes"),
 
+    metadata: jsonb("metadata")
+      .$type<ProjectExpenseMetadata>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+
     recordedByUserId: uuid("recorded_by_user_id").notNull(),
     recordedByName: text("recorded_by_name").notNull(),
 
@@ -78,6 +104,7 @@ export const projectExpenseLines = pgTable(
     index("project_expense_lines_project_id_idx").on(table.projectId),
     index("project_expense_lines_incurred_on_idx").on(table.incurredOn),
     index("project_expense_lines_category_idx").on(table.category),
+    index("project_expense_lines_consumable_id_idx").on(table.consumableId),
   ]
 );
 

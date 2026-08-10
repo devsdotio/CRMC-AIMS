@@ -15,8 +15,10 @@ import {
   type CreateProjectPayload,
   type UpdateProjectExpensePayload,
   type UpdateProjectPayload,
+  type UseProjectMaterialPayload,
 } from "./projects-api";
 import { projectQueryKeys } from "./query-keys";
+import { consumableQueryKeys } from "@/features/consumables/client/query-keys";
 
 function invalidateProjects(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: projectQueryKeys.all });
@@ -92,6 +94,24 @@ export function useCreateProjectExpenseMutation(): UseMutationResult<
   });
 }
 
+export function useProjectMaterialMutation(): UseMutationResult<
+  ProjectExpenseLine,
+  Error,
+  { projectId: string; payload: UseProjectMaterialPayload }
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ projectId, payload }) =>
+      projectsApi.useMaterial(projectId, payload),
+    onSuccess: () => {
+      invalidateProjects(queryClient);
+      // Stock changed — refresh inventory caches if present
+      queryClient.invalidateQueries({ queryKey: consumableQueryKeys.all });
+    },
+  });
+}
+
 export function useUpdateProjectExpenseMutation(): UseMutationResult<
   ProjectExpenseLine,
   Error,
@@ -120,6 +140,9 @@ export function useDeleteProjectExpenseMutation(): UseMutationResult<
   return useMutation({
     mutationFn: ({ projectId, expenseId }) =>
       projectsApi.deleteExpense(projectId, expenseId),
-    onSuccess: () => invalidateProjects(queryClient),
+    onSuccess: () => {
+      invalidateProjects(queryClient);
+      queryClient.invalidateQueries({ queryKey: consumableQueryKeys.all });
+    },
   });
 }

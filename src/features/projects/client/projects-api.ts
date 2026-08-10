@@ -33,6 +33,14 @@ export type CreateProjectExpensePayload = {
 
 export type UpdateProjectExpensePayload = Partial<CreateProjectExpensePayload>;
 
+export type UseProjectMaterialPayload = {
+  consumableId: string;
+  quantity: number;
+  description?: string | null;
+  incurredOn?: string;
+  notes?: string | null;
+};
+
 export const projectsApi = {
   async list(params?: {
     search?: string;
@@ -94,6 +102,20 @@ export const projectsApi = {
   ): Promise<ProjectExpenseLine> {
     const response = await fetchJson<ApiResponse<ProjectExpenseLine>>(
       `/api/projects/${projectId}/expenses`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }
+    );
+    return response.data;
+  },
+
+  async useMaterial(
+    projectId: string,
+    payload: UseProjectMaterialPayload
+  ): Promise<ProjectExpenseLine> {
+    const response = await fetchJson<ApiResponse<ProjectExpenseLine>>(
+      `/api/projects/${projectId}/materials`,
       {
         method: "POST",
         body: JSON.stringify(payload),

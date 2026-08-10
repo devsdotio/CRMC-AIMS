@@ -61,6 +61,9 @@ export interface ProjectExpenseLine {
   recordedByName: string;
   createdAt: string;
   updatedAt: string;
+  consumableCode?: string | null;
+  consumableName?: string | null;
+  consumableUnit?: string | null;
 }
 
 export interface ProjectFilterState extends BaseFilterState {

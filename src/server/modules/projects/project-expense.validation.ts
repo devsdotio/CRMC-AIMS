@@ -107,5 +107,17 @@ export const updateProjectExpenseSchema = z
 
 export const expenseIdSchema = z.string().uuid("Invalid expense id.");
 
+/** Charge inventory stock onto a project (auto-checkout + FIFO cost). */
+export const useConsumableOnProjectSchema = z.object({
+  consumableId: z.string().uuid("Invalid consumable id."),
+  quantity: z.number().int().positive("Quantity must be a positive integer."),
+  description: z.string().trim().max(500).optional().nullable(),
+  incurredOn: dateSchema.optional(),
+  notes: z.string().trim().max(4000).optional().nullable(),
+});
+
 export type CreateProjectExpenseBody = z.infer<typeof createProjectExpenseSchema>;
 export type UpdateProjectExpenseBody = z.infer<typeof updateProjectExpenseSchema>;
+export type UseConsumableOnProjectBody = z.infer<
+  typeof useConsumableOnProjectSchema
+>;

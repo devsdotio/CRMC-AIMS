@@ -223,6 +223,7 @@ CREATE TABLE public.project_expense_lines (
   asset_id uuid,
   incurred_on date NOT NULL,
   notes text,
+  metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
   recorded_by_user_id uuid NOT NULL,
   recorded_by_name text NOT NULL,
   created_at timestamp with time zone NOT NULL DEFAULT now(),

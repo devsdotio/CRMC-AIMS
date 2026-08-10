@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, or } from "drizzle-orm";
+import { and, asc, desc, eq, gt, ilike, or } from "drizzle-orm";
 
 import { getDb } from "@/server/db";
 import type { DbSession } from "@/server/db/transaction";
@@ -70,6 +70,41 @@ export class PurchaseLotRepository implements IPurchaseLotRepository {
 
     if (conditions.length === 0) return base;
     return base.where(and(...conditions));
+  }
+
+  /**
+   * Oldest-first lots with remaining qty (FIFO), row locks for concurrent draws.
+   */
+  async listAvailableForConsumableFifo(
+    consumableId: string,
+    session: DbSession
+  ): Promise<PurchaseLotRow[]> {
+    return session
+      .select()
+      .from(purchaseLots)
+      .where(
+        and(
+          eq(purchaseLots.consumableId, consumableId),
+          eq(purchaseLots.itemType, "consumable"),
+          gt(purchaseLots.quantityRemaining, 0)
+        )
+      )
+      .orderBy(asc(purchaseLots.purchasedOn), asc(purchaseLots.createdAt))
+      .for("update");
+  }
+
+  async updateRemaining(
+    id: string,
+    quantityRemaining: number,
+    session?: DbSession
+  ): Promise<PurchaseLotRow | null> {
+    const db = this.db(session);
+    const [row] = await db
+      .update(purchaseLots)
+      .set({ quantityRemaining, updatedAt: new Date() })
+      .where(eq(purchaseLots.id, id))
+      .returning();
+    return row ?? null;
   }
 
   async create(

@@ -15,6 +15,7 @@ import {
   Trash2,
   Lock,
   AlertTriangle,
+  Boxes,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Project, ProjectExpenseLine } from "@/types/projects";
@@ -25,12 +26,18 @@ import {
   useCreateProjectExpenseMutation,
   useDeleteProjectExpenseMutation,
   useProjectExpensesQuery,
+  useProjectMaterialMutation,
   useUpdateProjectExpenseMutation,
 } from "@/features/projects/client";
+import { useConsumablesQuery } from "@/features/consumables/client";
 import {
   AddEditExpenseDialog,
   type ExpenseFormInput,
 } from "./add-edit-expense-dialog";
+import {
+  AddMaterialDialog,
+  type MaterialFormInput,
+} from "./add-material-dialog";
 
 export interface ProjectDetailPanelProps {
   project: Project | null;
@@ -71,23 +78,36 @@ export function ProjectDetailPanel({
   const createExpense = useCreateProjectExpenseMutation();
   const updateExpense = useUpdateProjectExpenseMutation();
   const deleteExpense = useDeleteProjectExpenseMutation();
+  const useMaterial = useProjectMaterialMutation();
+  const {
+    data: consumables = [],
+    isLoading: consumablesLoading,
+  } = useConsumablesQuery();
 
   const [editExpense, setEditExpense] = useState<
     ProjectExpenseLine | null | undefined
   >(undefined);
+  const [materialOpen, setMaterialOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && isOpen && editExpense === undefined) onClose();
+      if (
+        e.key === "Escape" &&
+        isOpen &&
+        editExpense === undefined &&
+        !materialOpen
+      )
+        onClose();
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose, editExpense]);
+  }, [isOpen, onClose, editExpense, materialOpen]);
 
   useEffect(() => {
     if (!isOpen) {
       setEditExpense(undefined);
+      setMaterialOpen(false);
       setActionError(null);
     }
   }, [isOpen]);
@@ -121,8 +141,24 @@ export function ProjectDetailPanel({
     }
   };
 
+  const handleMaterialSubmit = async (input: MaterialFormInput) => {
+    setActionError(null);
+    await useMaterial.mutateAsync({
+      projectId: project.id,
+      payload: {
+        consumableId: input.consumableId,
+        quantity: input.quantity,
+        notes: input.notes || null,
+      },
+    });
+  };
+
   const handleDeleteExpense = async (line: ProjectExpenseLine) => {
-    if (!window.confirm(`Delete expense “${line.description}”?`)) return;
+    const msg =
+      line.lineType === "consumable"
+        ? `Remove material charge “${line.description}”? Stock and purchase lots will be restored.`
+        : `Delete expense “${line.description}”?`;
+    if (!window.confirm(msg)) return;
     setActionError(null);
     try {
       await deleteExpense.mutateAsync({
@@ -290,19 +326,29 @@ export function ProjectDetailPanel({
           )}
 
           <section className="space-y-2">
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
               <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary">
-                Expenses
+                Expenses & materials
               </h3>
               {project.isMutable && (
-                <button
-                  type="button"
-                  onClick={() => setEditExpense(null)}
-                  className="inline-flex items-center gap-1 h-7 px-2.5 text-[11px] font-bold rounded-md bg-accent text-accent-foreground cursor-pointer"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  Add
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setMaterialOpen(true)}
+                    className="inline-flex items-center gap-1 h-7 px-2.5 text-[11px] font-bold rounded-md border border-border bg-bg text-text hover:bg-bg-subtle cursor-pointer"
+                  >
+                    <Boxes className="h-3.5 w-3.5" />
+                    Materials
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditExpense(null)}
+                    className="inline-flex items-center gap-1 h-7 px-2.5 text-[11px] font-bold rounded-md bg-accent text-accent-foreground cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Misc
+                  </button>
+                </div>
               )}
             </div>
 
@@ -319,14 +365,16 @@ export function ProjectDetailPanel({
               </div>
             ) : expenses.length === 0 ? (
               <p className="text-[11px] text-text-secondary border border-dashed border-border rounded-lg p-3">
-                No expenses yet. Log travel, snacks, fees, or other unexpected
-                costs here. Inventory materials come in a later phase.
+                No spend yet. Use <strong>Materials</strong> for inventory (stock
+                checkout + lot cost) or <strong>Misc</strong> for travel, snacks,
+                fees, and adjustments.
               </p>
             ) : (
               <ul className="space-y-2">
                 {expenses.map((line) => {
                   const amount = Number(line.amount);
                   const isCredit = amount < 0;
+                  const isMaterial = line.lineType === "consumable";
                   return (
                     <li
                       key={line.id}
@@ -334,12 +382,31 @@ export function ProjectDetailPanel({
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <div className="font-bold text-text truncate">
-                            {line.description}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-bold text-text truncate">
+                              {line.description}
+                            </span>
+                            {isMaterial && (
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-accent/15 text-accent">
+                                <Boxes className="h-2.5 w-2.5" />
+                                Inventory
+                              </span>
+                            )}
                           </div>
                           <div className="text-[10px] text-text-secondary mt-0.5">
-                            {PROJECT_EXPENSE_CATEGORY_LABELS[line.category]} ·{" "}
-                            {line.incurredOn}
+                            {isMaterial
+                              ? [
+                                  line.quantity != null
+                                    ? `qty ${Number(line.quantity)}`
+                                    : null,
+                                  line.unitCost != null
+                                    ? `@ ${formatPhp(line.unitCost)}`
+                                    : null,
+                                  line.incurredOn,
+                                ]
+                                  .filter(Boolean)
+                                  .join(" · ")
+                              : `${PROJECT_EXPENSE_CATEGORY_LABELS[line.category]} · ${line.incurredOn}`}
                             {line.recordedByName
                               ? ` · ${line.recordedByName}`
                               : ""}
@@ -359,26 +426,29 @@ export function ProjectDetailPanel({
                           {project.isMutable &&
                             (line.lineType === "miscellaneous" ||
                               line.lineType === "adjustment") && (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => setEditExpense(line)}
-                                  className="p-1 rounded-md border border-border hover:bg-bg cursor-pointer"
-                                  aria-label="Edit expense"
-                                >
-                                  <Pencil className="h-3 w-3" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    void handleDeleteExpense(line);
-                                  }}
-                                  className="p-1 rounded-md border border-border text-status-outofservice-text hover:bg-status-outofservice-bg/10 cursor-pointer"
-                                  aria-label="Delete expense"
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </button>
-                              </>
+                              <button
+                                type="button"
+                                onClick={() => setEditExpense(line)}
+                                className="p-1 rounded-md border border-border hover:bg-bg cursor-pointer"
+                                aria-label="Edit expense"
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </button>
+                            )}
+                          {project.isMutable &&
+                            (line.lineType === "miscellaneous" ||
+                              line.lineType === "adjustment" ||
+                              line.lineType === "consumable") && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  void handleDeleteExpense(line);
+                                }}
+                                className="p-1 rounded-md border border-border text-status-outofservice-text hover:bg-status-outofservice-bg/10 cursor-pointer"
+                                aria-label="Delete expense"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </button>
                             )}
                         </div>
                       </div>
@@ -431,6 +501,14 @@ export function ProjectDetailPanel({
         expense={editExpense ?? null}
         onClose={() => setEditExpense(undefined)}
         onSubmit={handleExpenseSubmit}
+      />
+
+      <AddMaterialDialog
+        isOpen={materialOpen}
+        items={consumables}
+        loadingItems={consumablesLoading}
+        onClose={() => setMaterialOpen(false)}
+        onSubmit={handleMaterialSubmit}
       />
     </div>
   );

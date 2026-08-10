@@ -71,6 +71,13 @@
       "when": 1786344000000,
       "tag": "0009_project_expense_lines",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786345000000,
+      "tag": "0010_expense_lot_metadata",
+      "breakpoints": true
     }
   ]
 }

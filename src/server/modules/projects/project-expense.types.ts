@@ -33,6 +33,9 @@ export type ProjectExpenseLineDTO = {
   recordedByName: string;
   createdAt: string;
   updatedAt: string;
+  consumableCode?: string | null;
+  consumableName?: string | null;
+  consumableUnit?: string | null;
 };
 
 export type ListExpenseFilters = {
