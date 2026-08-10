@@ -1,5 +1,6 @@
 import type { User } from "@supabase/supabase-js";
 import { eq } from "drizzle-orm";
+import { headers } from "next/headers";
 
 import { createClient } from "@/lib/supabase/server";
 import { getDb } from "@/server/db";
@@ -15,6 +16,16 @@ import {
   isStaffShellRole,
   isUserManagerRole,
 } from "@/server/shared/roles";
+
+/** Extracts raw JWT from `Authorization: Bearer <token>` when present. */
+async function getBearerToken(): Promise<string | null> {
+  const headerStore = await headers();
+  const authorization = headerStore.get("authorization");
+  if (!authorization) return null;
+  const match = authorization.match(/^Bearer\s+(.+)$/i);
+  const token = match?.[1]?.trim();
+  return token || null;
+}
 
 /**
  * Accountability actor derived ONLY from a verified Supabase session + profile.
@@ -54,14 +65,23 @@ async function loadProfile(userId: string): Promise<ProfileRow | null> {
 
 /**
  * Verifies the request has a valid Supabase session.
+ *
+ * Accepts either:
+ * - HTTP-only session cookies (browser / SSR), or
+ * - `Authorization: Bearer <access_token>` (Swagger, scripts, API clients)
+ *
  * Use at the start of protected Route Handlers / controllers.
  */
 export async function requireUser(): Promise<User> {
   const supabase = await createClient();
+  const bearer = await getBearerToken();
+
   const {
     data: { user },
     error,
-  } = await supabase.auth.getUser();
+  } = bearer
+    ? await supabase.auth.getUser(bearer)
+    : await supabase.auth.getUser();
 
   if (error || !user) {
     throw new UnauthorizedError();

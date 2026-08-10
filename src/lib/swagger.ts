@@ -6,18 +6,69 @@ export function getApiDocs() {
     definition: {
       openapi: "3.0.0",
       info: {
-        title: "CRMC-AIMS",
+        title: "CRMC-AIMS API",
         version: "1.0.0",
-        description:
-          "API for tracking coded assets and consumables in the CRMC custodian workflow.",
+        description: [
+          "API for CRMC Asset & Inventory Management System.",
+          "",
+          "## Authentication",
+          "",
+          "Most endpoints require an authenticated **staff / admin / borrower** session.",
+          "",
+          "### In Swagger UI",
+          "1. Click **Authorize**.",
+          "2. Under **bearerAuth (OAuth2 password)**, enter your account **email** as username and your **password**.",
+          "3. Click **Authorize** — Swagger stores the access token and sends `Authorization: Bearer <token>` on Try it out.",
+          "",
+          "Alternatively call `POST /api/auth/sign-in`, then paste `data.session.accessToken` into **Authorize → bearerJwt (http, Bearer)**.",
+          "",
+          "Sign-in also sets HTTP-only Supabase cookies (useful when calling from the browser).",
+          "",
+          "### Roles",
+          "- `superadmin` — bootstrap / platform",
+          "- `admin` — user management + operations",
+          "- `staff` — property custodian operations",
+          "- `borrower` — request / borrow portal only",
+        ].join("\n"),
       },
       tags: [
+        {
+          name: "Auth",
+          description:
+            "Sign-in, sign-out, session profile, and OAuth2 token for Swagger.",
+        },
         { name: "System", description: "System and health endpoints" },
         { name: "Assets", description: "Coded asset operations" },
         { name: "Consumables", description: "Consumable stock operations" },
         { name: "Requests", description: "Borrow and release requests" },
         { name: "Dashboard", description: "Admin dashboard data" },
+        { name: "Users", description: "User account administration" },
+        { name: "Projects", description: "Projects, expenses, and assignments" },
       ],
+      // Default: require JWT (OAuth2 password *or* raw Bearer JWT).
+      security: [{ bearerAuth: [] }, { bearerJwt: [] }],
+      components: {
+        securitySchemes: {
+          bearerAuth: {
+            type: "oauth2",
+            description:
+              "Password flow against POST /api/auth/token. Use your account email as username.",
+            flows: {
+              password: {
+                tokenUrl: "/api/auth/token",
+                scopes: {},
+              },
+            },
+          },
+          bearerJwt: {
+            type: "http",
+            scheme: "bearer",
+            bearerFormat: "JWT",
+            description:
+              "Paste `data.session.accessToken` from POST /api/auth/sign-in.",
+          },
+        },
+      },
     },
   });
 }

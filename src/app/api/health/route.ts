@@ -6,6 +6,7 @@ import { NextResponse } from "next/server";
  *   get:
  *     summary: Health check endpoint
  *     tags: [System]
+ *     security: []
  *     responses:
  *       200:
  *         description: API is available

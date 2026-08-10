@@ -1,10 +1,11 @@
-import { userController } from "@/server/modules/users";
+import { authController } from "@/server/modules/auth";
 
 /**
  * @swagger
  * /api/me:
  *   get:
- *     summary: Current authenticated profile (role, name, email)
+ *     summary: Current authenticated profile (alias of GET /api/auth/me)
+ *     description: Kept for existing client hooks. Prefer `/api/auth/me` for new work.
  *     tags: [Auth]
  *     responses:
  *       200:
@@ -15,5 +16,5 @@ import { userController } from "@/server/modules/users";
  *         description: No profile or deactivated
  */
 export async function GET() {
-  return userController.me();
+  return authController.me();
 }

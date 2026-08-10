@@ -1,7 +1,6 @@
 import type { NextRequest } from "next/server";
 
 import {
-  requireActor,
   requireSession,
   requireUserManager,
 } from "@/server/shared/auth";
@@ -15,16 +14,6 @@ import { UserService } from "./user.service";
 
 export class UserController {
   constructor(private readonly userService: UserService = new UserService()) {}
-
-  async me() {
-    try {
-      const actor = await requireActor();
-      const data = await this.userService.getMe(actor);
-      return ok(data);
-    } catch (error) {
-      return handleError(error);
-    }
-  }
 
   async listUsers(request: NextRequest | Request) {
     try {

@@ -5,14 +5,22 @@ const PUBLIC_PAGE_PATHS = ["/sign-in", "/forgot-password"] as const;
 
 /**
  * Unauthenticated API/UI paths.
- * Swagger is allowlisted for local/dev convenience — remove before production
- * if the docs surface is deleted.
+ * Swagger + auth entrypoints are public so docs can load and issue tokens.
  */
 const PUBLIC_API_PATHS = [
   "/api/health",
   "/api/docs",
   "/api/docs/spec",
+  "/api/auth/sign-in",
+  "/api/auth/token",
 ] as const;
+
+/** True when the client presents a Bearer JWT (Swagger / API tools). */
+function hasBearerAuthorization(request: NextRequest): boolean {
+  const authorization = request.headers.get("authorization");
+  if (!authorization) return false;
+  return /^Bearer\s+\S+/i.test(authorization);
+}
 
 /** Sign-in errors that must win over "session → home" bounce. */
 const STAY_ON_SIGN_IN_ERRORS = new Set([
@@ -98,8 +106,14 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Unauthenticated — allowlisted pages/APIs pass; everything else is gated
-  if (!user && !isPublicPage(pathname) && !isPublicApi(pathname)) {
+  // Unauthenticated — allowlisted pages/APIs + Bearer-bearing API calls pass;
+  // route handlers still call requireUser() / requireSession() to verify JWT.
+  if (
+    !user &&
+    !isPublicPage(pathname) &&
+    !isPublicApi(pathname) &&
+    !(isApiPath(pathname) && hasBearerAuthorization(request))
+  ) {
     if (isApiPath(pathname)) {
       return NextResponse.json(
         { error: "Authentication required." },
