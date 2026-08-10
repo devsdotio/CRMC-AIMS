@@ -121,9 +121,11 @@ export default function AssetsPage() {
       await createMutation.mutateAsync({
         assetCode: assetData.assetCode || `ASSET-${Date.now()}`,
         name: assetData.name || "New Asset",
-        category: assetData.category as string,
-        status: assetData.status as AssetStatus,
-        assignmentType: assetData.assignmentType as "borrowable" | "assignable",
+        category: (assetData.category as string) || "computing",
+        status: (assetData.status as AssetStatus) || "active",
+        assignmentType:
+          (assetData.assignmentType as "borrowable" | "assignable") ||
+          "borrowable",
         serialNumber: assetData.serialNumber,
         location: assetData.location || "Central Storage",
         department: assetData.department,

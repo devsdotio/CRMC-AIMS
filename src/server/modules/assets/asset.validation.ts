@@ -1,8 +1,18 @@
 import { z } from "zod";
 
 import { ASSET_CATEGORIES, ASSET_STATUSES, ASSET_ASSIGNMENT_TYPES } from "./asset.constants";
+import { normalizeAssetCategory } from "@/lib/asset-category";
 
-export const assetCategorySchema = z.enum(ASSET_CATEGORIES);
+export const assetCategorySchema = z.preprocess(
+  (value) => {
+    if (typeof value !== "string") return value;
+    return normalizeAssetCategory(value) ?? value.trim().toLowerCase();
+  },
+  z.enum(ASSET_CATEGORIES, {
+    message:
+      "Category must be transport, computing, av, or furniture (use those codes or matching labels).",
+  })
+);
 export const assetStatusSchema = z.enum(ASSET_STATUSES);
 export const assetAssignmentTypeSchema = z.enum(ASSET_ASSIGNMENT_TYPES);
 
