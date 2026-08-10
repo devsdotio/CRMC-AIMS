@@ -21,14 +21,11 @@ import {
   ChevronsUpDown,
   ShoppingBag,
   History,
-<<<<<<< HEAD
   PanelLeftClose,
   PanelLeftOpen,
   FileText,
-=======
   FolderKanban,
   Truck,
->>>>>>> 86bd854abc164cf5eac8b7f3a1ff17de1c392755
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -140,65 +137,13 @@ export default function Sidebar({
     {
       label: "Operations",
       items: [
-<<<<<<< HEAD
-        {
-          name: "Browse Assets",
-          href: "/borrower-db",
-          icon: ShoppingBag,
-          roles: ["borrower"],
-        },
-        {
-          name: "My Requests",
-          href: "/borrower-db/requests",
-          icon: ClipboardList,
-          badge: pendingCount,
-          badgeTone: "accent",
-          roles: ["borrower"],
-        },
-        {
-          name: "Borrow History",
-          href: "/borrower-db/history",
-          icon: History,
-          roles: ["borrower"],
-        },
-        {
-          name: "Assets",
-          href: "/assets",
-          icon: Package,
-          roles: ["superadmin", "admin", "staff"],
-        },
-        {
-          name: "Inventory",
-          href: "/consumables",
-          icon: Boxes,
-          badge: lowStockCount,
-          badgeTone: "warning",
-          roles: ["superadmin", "admin", "staff"],
-        },
-        {
-          name: "Borrow Requests",
-          href: "/borrow-requests",
-          icon: ClipboardList,
-          badge: pendingCount,
-          badgeTone: "accent",
-          roles: ["superadmin", "admin", "staff"],
-        },
-        {
-          name: "Audit Logs",
-          href: "/audit-logs",
-          icon: FileText,
-          roles: ["superadmin", "admin", "staff"],
-        },
-=======
         { name: "Borrow Requests", href: "/borrow-requests", icon: ClipboardList, badge: pendingCount, badgeTone: "accent", roles: ["superadmin", "admin", "staff"] },
-        { name: "Browse Assets", href: "/borrower-db", icon: ShoppingBag, roles: ["borrower"] },
+        
         { name: "My Requests", href: "/borrower-db/requests", icon: ClipboardList, badge: pendingCount, badgeTone: "accent", roles: ["borrower"] },
         { name: "Borrow History", href: "/borrower-db/history", icon: History, roles: ["borrower"] },
         { name: "Assets", href: "/assets", icon: Package, roles: ["superadmin", "admin", "staff"] },
-        { name: "Borrow & Return Log", href: "/borrow-log", icon: Repeat, badge: overdueCount, badgeTone: "warning", roles: ["superadmin", "admin", "staff"] },
         { name: "Inventory", href: "/consumables", icon: Boxes, badge: lowStockCount, badgeTone: "warning", roles: ["superadmin", "admin", "staff"] },
         { name: "Suppliers", href: "/suppliers", icon: Truck, roles: ["superadmin", "admin", "staff"] },
->>>>>>> 86bd854abc164cf5eac8b7f3a1ff17de1c392755
       ],
     },
     {

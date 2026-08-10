@@ -1068,8 +1068,6 @@
           "primaryKey": false,
           "notNull": false
         },
-<<<<<<< HEAD
-=======
         "history": {
           "name": "history",
           "type": "jsonb",
@@ -1077,7 +1075,6 @@
           "notNull": true,
           "default": "'[]'::jsonb"
         },
->>>>>>> 86bd854abc164cf5eac8b7f3a1ff17de1c392755
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -1601,13 +1598,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-<<<<<<< HEAD
-    "public.audit_logs": {
-      "name": "audit_logs",
-=======
     "public.projects": {
       "name": "projects",
->>>>>>> 86bd854abc164cf5eac8b7f3a1ff17de1c392755
       "schema": "",
       "columns": {
         "id": {
@@ -1617,54 +1609,18 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
-<<<<<<< HEAD
-        "entity_type": {
-          "name": "entity_type",
-=======
         "project_code": {
           "name": "project_code",
->>>>>>> 86bd854abc164cf5eac8b7f3a1ff17de1c392755
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-<<<<<<< HEAD
-        "entity_id": {
-          "name": "entity_id",
-=======
         "name": {
           "name": "name",
->>>>>>> 86bd854abc164cf5eac8b7f3a1ff17de1c392755
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-<<<<<<< HEAD
-        "action": {
-          "name": "action",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "actor_name": {
-          "name": "actor_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "actor_user_id": {
-          "name": "actor_user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "timestamp": {
-          "name": "timestamp",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-=======
         "description": {
           "name": "description",
           "type": "text",
@@ -1708,7 +1664,6 @@
           "type": "numeric(14, 2)",
           "primaryKey": false,
           "notNull": false
->>>>>>> 86bd854abc164cf5eac8b7f3a1ff17de1c392755
         },
         "notes": {
           "name": "notes",
@@ -1716,27 +1671,6 @@
           "primaryKey": false,
           "notNull": false
         },
-<<<<<<< HEAD
-        "metadata": {
-          "name": "metadata",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "audit_logs_entity_idx": {
-          "name": "audit_logs_entity_idx",
-          "columns": [
-            {
-              "expression": "entity_type",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "entity_id",
-=======
         "created_by_user_id": {
           "name": "created_by_user_id",
           "type": "uuid",
@@ -1770,7 +1704,6 @@
           "columns": [
             {
               "expression": "status",
->>>>>>> 86bd854abc164cf5eac8b7f3a1ff17de1c392755
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -1781,34 +1714,11 @@
           "method": "btree",
           "with": {}
         },
-<<<<<<< HEAD
-        "audit_logs_timestamp_idx": {
-          "name": "audit_logs_timestamp_idx",
-          "columns": [
-            {
-              "expression": "timestamp",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "audit_logs_actor_idx": {
-          "name": "audit_logs_actor_idx",
-          "columns": [
-            {
-              "expression": "actor_user_id",
-=======
         "projects_start_date_idx": {
           "name": "projects_start_date_idx",
           "columns": [
             {
               "expression": "start_date",
->>>>>>> 86bd854abc164cf5eac8b7f3a1ff17de1c392755
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -1822,9 +1732,6 @@
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
-<<<<<<< HEAD
-      "uniqueConstraints": {},
-=======
       "uniqueConstraints": {
         "projects_project_code_unique": {
           "name": "projects_project_code_unique",
@@ -1834,7 +1741,6 @@
           ]
         }
       },
->>>>>>> 86bd854abc164cf5eac8b7f3a1ff17de1c392755
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -1899,11 +1805,6 @@
         "pending",
         "approved",
         "rejected",
-<<<<<<< HEAD
-        "released",
-        "unreleased",
-=======
->>>>>>> 86bd854abc164cf5eac8b7f3a1ff17de1c392755
         "returned"
       ]
     },
@@ -1961,8 +1862,6 @@
         "return_checkout",
         "manual_flag"
       ]
-<<<<<<< HEAD
-=======
     },
     "public.project_status": {
       "name": "project_status",
@@ -1974,7 +1873,6 @@
         "completed",
         "cancelled"
       ]
->>>>>>> 86bd854abc164cf5eac8b7f3a1ff17de1c392755
     }
   },
   "schemas": {},

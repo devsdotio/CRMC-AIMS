@@ -22,7 +22,7 @@ import { AdjustStockDialog } from "@/components/consumables/adjust-stock-dialog"
 import { useSuppliersQuery } from "@/features/suppliers/client";
 
 export default function ConsumablesPage() {
-  const { data: paginatedData, isLoading } = useConsumablesQuery();
+  const { data: paginatedData, isLoading: isConsumablesLoading } = useConsumablesQuery();
   const items = paginatedData?.data ?? [];
 
   const createMutation = useCreateConsumableMutation();
@@ -31,8 +31,9 @@ export default function ConsumablesPage() {
   const adjustMutation = useAdjustConsumableMutation();
 
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
-  const [isLoading, setIsLoading] = useState(true);
-  const { data: suppliers = [] } = useSuppliersQuery({ activeOnly: true });
+  const { data: suppliers = [], isLoading: isSuppliersLoading } = useSuppliersQuery({ activeOnly: true });
+  
+  const isLoading = isConsumablesLoading || isSuppliersLoading;
 
   // Filter & Sort State
   const [filters, setFilters] = useState<ConsumableFilterState>({
@@ -153,54 +154,23 @@ export default function ConsumablesPage() {
     }
   };
 
-<<<<<<< HEAD
-  const handleConfirmRestock = async (itemId: string, qtyReceived: number, notes?: string) => {
-    await restockMutation.mutateAsync({
-      id: itemId,
-      payload: {
-        quantity: qtyReceived,
-        notes,
-      },
-    });
-=======
-  const handleConfirmRestock = (input: {
+  const handleConfirmRestock = async (input: {
     itemId: string;
     qtyReceived: number;
     unitCost: number;
     supplierId?: string | null;
     notes?: string;
   }) => {
-    const today = new Date().toISOString().split("T")[0];
-    const { itemId, qtyReceived, unitCost, notes, supplierId } = input;
-    setItems((prev) =>
-      prev.map((i) => {
-        if (i.id !== itemId) return i;
-        const newQty = i.currentQty + qtyReceived;
-        return {
-          ...i,
-          currentQty: newQty,
-          lastRestocked: today,
-          history: [
-            {
-              id: `sh-${Date.now()}`,
-              date: today,
-              type: "restock",
-              quantityChange: qtyReceived,
-              actor: "Property Custodian",
-              notes:
-                notes ||
-                `Restock shipment received (+${qtyReceived} ${i.unit})`,
-              unitCost: unitCost.toFixed(2),
-              supplierId: supplierId || undefined,
-            },
-            ...i.history,
-          ],
-        };
-      })
-    );
-
->>>>>>> 86bd854abc164cf5eac8b7f3a1ff17de1c392755
-    if (selectedItem?.id === itemId) {
+    await restockMutation.mutateAsync({
+      id: input.itemId,
+      payload: {
+        quantity: input.qtyReceived,
+        unitCost: input.unitCost,
+        supplierId: input.supplierId,
+        notes: input.notes,
+      },
+    });
+    if (selectedItem?.id === input.itemId) {
       setSelectedItem(null);
     }
   };
