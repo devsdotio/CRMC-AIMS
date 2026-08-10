@@ -282,6 +282,7 @@ export function BorrowerDashboard() {
   const { openWizard } = useBorrowerPortal();
   const [isReqOpen, setIsReqOpen] = useState(false);
   const { data: snapshot, isLoading } = useDashboardSnapshotQuery();
+  const loading = isLoading || !snapshot;
 
   const stats = snapshot?.summary;
   const overdueAssets = snapshot?.overdueAssets || [];
@@ -314,7 +315,7 @@ export function BorrowerDashboard() {
       subtext: "Items currently out on loan",
       icon: Package,
       tone: "default",
-      isLoading,
+      isLoading: loading,
     },
     {
       label: "Pending Requests",
@@ -322,7 +323,7 @@ export function BorrowerDashboard() {
       subtext: stats?.pendingApprovals ? "Awaiting staff approval" : "No pending requests",
       icon: Clock,
       tone: stats && stats.pendingApprovals > 0 ? "warning" : "default",
-      isLoading,
+      isLoading: loading,
     },
     {
       label: "Overdue Items",
@@ -330,7 +331,7 @@ export function BorrowerDashboard() {
       subtext: stats?.overdueAssets ? "Past due date — return immediately" : "All items on time",
       icon: AlertTriangle,
       tone: stats && stats.overdueAssets > 0 ? "danger" : "default",
-      isLoading,
+      isLoading: loading,
     },
     {
       label: "Low Stock Consumables",
@@ -338,12 +339,12 @@ export function BorrowerDashboard() {
       subtext: "Needs attention",
       icon: Tag,
       tone: "warning",
-      isLoading,
+      isLoading: loading,
     },
   ];
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4 bg-bg-subtle max-w-full overflow-x-hidden" data-theme="light">
 
       {/* ── Greeting Banner ─────────────────────────────────────────── */}
       <div className="rounded-2xl border border-border bg-card p-6 flex flex-col sm:flex-row sm:items-center gap-4">
@@ -354,12 +355,12 @@ export function BorrowerDashboard() {
           <h1 className="text-lg font-bold text-text">Welcome to your Dashboard!</h1>
           <p className="text-sm text-text-secondary mt-0.5">
             Here&apos;s a summary of your borrowing activity. You have{" "}
-            {isLoading ? (
+            {loading ? (
               <span className="inline-block w-12 h-3.5 bg-border animate-pulse rounded align-middle" />
             ) : (
               <span className="font-semibold text-text">{stats?.activeBorrows ?? 0} item{stats?.activeBorrows !== 1 ? "s" : ""}</span>
             )} currently on loan
-            {(!isLoading && stats && stats.overdueAssets > 0) && (
+            {(!loading && stats && stats.overdueAssets > 0) && (
               <> and <span className="font-bold text-status-outofservice-bg dark:text-status-outofservice-text">{stats.overdueAssets} overdue</span></>
             )}.
           </p>
@@ -394,7 +395,7 @@ export function BorrowerDashboard() {
       </section>
 
       {/* ── Row 2: Active Items + Recent Requests ──────────────────────── */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
 
         {/* Active Borrowings (Showing Overdue from Snapshot for now) */}
         <section aria-labelledby="active-borrowings-heading">
@@ -411,7 +412,7 @@ export function BorrowerDashboard() {
               </Link>
             </div>
 
-            {isLoading ? (
+            {loading ? (
               <div className="overflow-y-auto">
                 <ActiveBorrowCardSkeleton />
                 <ActiveBorrowCardSkeleton />
@@ -452,7 +453,7 @@ export function BorrowerDashboard() {
               </Link>
             </div>
 
-            {isLoading ? (
+            {loading ? (
               <div className="overflow-y-auto">
                 <PendingRequestCardSkeleton />
                 <PendingRequestCardSkeleton />

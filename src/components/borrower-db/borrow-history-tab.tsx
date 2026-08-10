@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Tag, Calendar, ChevronDown, ChevronUp, AlertTriangle, History, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getCategoryStyle } from "@/constants/categories";
-import { OverdueBadge } from "@/components/borrow-log/overdue-badge";
+import { OverdueBadge } from "@/components/ui/overdue-badge";
 import type { PortalBorrowLogRecord } from "./types";
 import { useBorrowLogQuery } from "@/features/borrow-log/client/use-borrow-log";
 

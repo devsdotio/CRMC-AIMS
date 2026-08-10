@@ -90,8 +90,8 @@ function StepSelect({
   onChange,
   initialType,
 }: {
-  value: BrowseItem | null;
-  onChange: (item: BrowseItem) => void;
+  value: BrowseItem[];
+  onChange: (items: BrowseItem[]) => void;
   initialType?: "borrow" | "requisition" | null;
 }) {
   const [search, setSearch] = useState("");
@@ -162,12 +162,18 @@ function StepSelect({
           items.map((item) => {
             const categoryMeta = getCategoryStyle(item.category as any);
             const code = item.type === "asset" ? item.assetCode : item.itemCode;
-            const isSelected = value?.id === item.id;
+            const isSelected = value.some(v => v.id === item.id);
             return (
               <button
                 key={item.id}
                 type="button"
-                onClick={() => onChange(item as any)}
+                onClick={() => {
+                  if (isSelected) {
+                    onChange(value.filter(v => v.id !== item.id));
+                  } else {
+                    onChange([...value, item as any]);
+                  }
+                }}
                 className={cn(
                   "w-full flex items-center gap-3 px-4 py-3 text-left transition-colors",
                   "focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset",
@@ -197,43 +203,70 @@ function StepSelect({
 // ─── Step 2: Request Details ──────────────────────────────────────────────────
 
 function StepDetails({
-  item,
+  items,
   values,
   onChange,
   errors,
 }: {
-  item: BrowseItem;
-  values: Omit<WizardFormValues, "selectedItem">;
-  onChange: (patch: Partial<Omit<WizardFormValues, "selectedItem">>) => void;
+  items: BrowseItem[];
+  values: Omit<WizardFormValues, "selectedItems">;
+  onChange: (patch: Partial<Omit<WizardFormValues, "selectedItems">>) => void;
   errors: Record<string, string>;
 }) {
-  const isConsumable = item.type === "consumable";
+  const hasConsumable = items.some(i => i.type === "consumable");
+  const hasAsset = items.some(i => i.type === "asset");
 
   return (
     <div className="space-y-4">
       {/* Selected item reminder */}
-      <div className="flex items-center gap-3 rounded-lg bg-bg-subtle border border-border px-3 py-2">
-        <div
-          className={cn(
-            "h-8 w-8 shrink-0 rounded-lg flex items-center justify-center",
-            getCategoryStyle(item.category as any).bg
-          )}
-        >
-          <Tag className={cn("h-3.5 w-3.5", getCategoryStyle(item.category as any).text)} />
-        </div>
-        <div>
-          <p className="text-sm font-semibold text-text">{item.name}</p>
-          <p className="text-xs text-text-secondary font-mono">
-            {item.type === "asset" ? item.assetCode : item.itemCode}
-          </p>
-        </div>
+      <div className="space-y-2 max-h-48 overflow-y-auto">
+        {items.map(item => (
+          <div key={item.id} className="flex items-center gap-3 rounded-lg bg-bg-subtle border border-border px-3 py-2">
+            <div
+              className={cn(
+                "h-8 w-8 shrink-0 rounded-lg flex items-center justify-center",
+                getCategoryStyle(item.category as any).bg
+              )}
+            >
+              <Tag className={cn("h-3.5 w-3.5", getCategoryStyle(item.category as any).text)} />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-text">{item.name}</p>
+              <p className="text-xs text-text-secondary font-mono">
+                {item.type === "asset" ? item.assetCode : item.itemCode}
+              </p>
+            </div>
+            {item.type === "consumable" && (
+              <div className="space-y-1">
+                <input
+                  type="number"
+                  min={1}
+                  max={item.currentQty}
+                  value={values.quantities[item.id] || 1}
+                  onChange={(e) => {
+                    const newQ = { ...values.quantities, [item.id]: Math.max(1, Number(e.target.value)) };
+                    onChange({ quantities: newQ });
+                  }}
+                  className={cn(
+                    "w-20 h-8 rounded-lg border bg-card px-2 text-xs text-text focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+                    errors[`qty_${item.id}`] ? "border-status-outofservice-bg" : "border-border"
+                  )}
+                  aria-label="Quantity"
+                />
+                {errors[`qty_${item.id}`] && (
+                  <p className="text-[10px] text-status-outofservice-bg">{errors[`qty_${item.id}`]}</p>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
       </div>
 
       {/* Date range */}
-      <div className={cn("grid gap-3", isConsumable ? "grid-cols-1" : "grid-cols-2")}>
+      <div className={cn("grid gap-3", hasAsset ? "grid-cols-2" : "grid-cols-1")}>
         <div className="space-y-1">
           <label className="block text-xs font-semibold text-text uppercase tracking-wider">
-            {isConsumable ? "Date Needed" : "Date From"} <span className="text-status-outofservice-bg">*</span>
+            {!hasAsset ? "Date Needed" : "Date From"} <span className="text-status-outofservice-bg">*</span>
           </label>
           <input
             type="date"
@@ -250,7 +283,7 @@ function StepDetails({
             <p id="date-from-err" className="text-xs text-status-outofservice-bg">{errors.dateFrom}</p>
           )}
         </div>
-        {!isConsumable && (
+        {hasAsset && (
           <div className="space-y-1">
             <label className="block text-xs font-semibold text-text uppercase tracking-wider">
               Date To <span className="text-status-outofservice-bg">*</span>
@@ -272,34 +305,6 @@ function StepDetails({
           </div>
         )}
       </div>
-
-      {/* Quantity (consumables only) */}
-      {isConsumable && (
-        <div className="space-y-1">
-          <label className="block text-xs font-semibold text-text uppercase tracking-wider">
-            Quantity <span className="text-status-outofservice-bg">*</span>
-          </label>
-          <input
-            type="number"
-            min={1}
-            max={item.type === "consumable" ? item.currentQty : undefined}
-            value={values.quantity}
-            onChange={(e) => onChange({ quantity: Math.max(1, Number(e.target.value)) })}
-            className={cn(
-              "w-32 h-9 rounded-lg border bg-card px-3 text-sm text-text focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
-              errors.quantity ? "border-status-outofservice-bg" : "border-border"
-            )}
-          />
-          {item.type === "consumable" && (
-            <p className="text-xs text-text-secondary">
-              Available: {item.currentQty} {item.unit}(s)
-            </p>
-          )}
-          {errors.quantity && (
-            <p className="text-xs text-status-outofservice-bg">{errors.quantity}</p>
-          )}
-        </div>
-      )}
 
       {/* Purpose */}
       <div className="space-y-1">
@@ -342,9 +347,8 @@ function StepDetails({
 // ─── Step 3: Review ───────────────────────────────────────────────────────────
 
 function StepReview({ values, me }: { values: WizardFormValues, me?: MeProfile }) {
-  const { selectedItem } = values;
-  if (!selectedItem) return null;
-  const categoryMeta = getCategoryStyle(selectedItem.category as any);
+  const { selectedItems } = values;
+  if (!selectedItems || selectedItems.length === 0) return null;
 
   // Use the actual logged-in user or fallback to mock
   const requester = {
@@ -352,6 +356,8 @@ function StepReview({ values, me }: { values: WizardFormValues, me?: MeProfile }
     email: me?.email || "m.santos@aims.org",
     department: me?.department || "IT",
   };
+  
+  const hasAsset = selectedItems.some(i => i.type === "asset");
 
   return (
     <div className="space-y-6">
@@ -382,40 +388,44 @@ function StepReview({ values, me }: { values: WizardFormValues, me?: MeProfile }
           Request Details
         </h3>
         <div className="rounded-xl border border-border bg-card divide-y divide-border overflow-hidden">
-          {/* Item Info */}
-          <div className="px-4 py-3 flex items-center gap-3 bg-bg-subtle/30">
-            <div className={cn("h-10 w-10 shrink-0 rounded-xl flex items-center justify-center border", categoryMeta.bg, "border-transparent")}>
-              <Tag className={cn("h-5 w-5", categoryMeta.text)} />
-            </div>
-            <div>
-              <p className="text-sm font-bold text-text">{selectedItem.name}</p>
-              <p className="text-xs text-text-secondary font-mono mt-0.5">
-                {selectedItem.type === "asset" ? selectedItem.assetCode : selectedItem.itemCode}
-                {" · "}
-                {categoryMeta.label}
-              </p>
-            </div>
-          </div>
+          {selectedItems.map((item, idx) => {
+             const categoryMeta = getCategoryStyle(item.category as any);
+             return (
+               <div key={item.id} className="px-4 py-3 flex items-center gap-3 bg-bg-subtle/30">
+                 <div className={cn("h-10 w-10 shrink-0 rounded-xl flex items-center justify-center border", categoryMeta.bg, "border-transparent")}>
+                   <Tag className={cn("h-5 w-5", categoryMeta.text)} />
+                 </div>
+                 <div className="flex-1">
+                   <p className="text-sm font-bold text-text">{item.name}</p>
+                   <p className="text-xs text-text-secondary font-mono mt-0.5">
+                     {item.type === "asset" ? item.assetCode : item.itemCode}
+                     {" · "}
+                     {categoryMeta.label}
+                   </p>
+                 </div>
+                 {item.type === "consumable" && (
+                   <div className="text-right">
+                     <p className="text-xs text-text-secondary font-medium">Qty</p>
+                     <p className="font-semibold text-text">{values.quantities[item.id] || 1}</p>
+                   </div>
+                 )}
+               </div>
+             )
+          })}
 
           {/* Dates & Qty */}
           <div className="px-4 py-3 grid grid-cols-2 gap-y-3 gap-x-6 text-sm">
             <div>
-              <p className="text-xs text-text-secondary font-medium">{selectedItem.type === "consumable" ? "Date Needed" : "Checkout Date"}</p>
+              <p className="text-xs text-text-secondary font-medium">{!hasAsset ? "Date Needed" : "Checkout Date"}</p>
               <p className="font-semibold text-text mt-0.5">{values.dateFrom}</p>
             </div>
-            {selectedItem.type === "asset" && (
+            {hasAsset && (
               <div>
                 <p className="text-xs text-text-secondary font-medium">Expected Return Date</p>
                 <div className="flex items-center gap-1 mt-0.5">
                   <Calendar className="h-3.5 w-3.5 text-status-outofservice-bg" />
                   <p className="font-bold text-status-outofservice-bg">{values.dateTo}</p>
                 </div>
-              </div>
-            )}
-            {selectedItem.type === "consumable" && (
-              <div>
-                <p className="text-xs text-text-secondary font-medium">Quantity</p>
-                <p className="font-semibold text-text mt-0.5">{values.quantity} {selectedItem.unit ? ` ${selectedItem.unit}(s)` : ""}</p>
               </div>
             )}
           </div>
@@ -454,7 +464,7 @@ function StepReview({ values, me }: { values: WizardFormValues, me?: MeProfile }
 interface NewBorrowRequestWizardProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  prefilledItem?: BrowseItem | null;
+  prefilledItems?: BrowseItem[];
   initialType?: "borrow" | "requisition" | null;
   onSuccess: (newRequest: PortalBorrowRequest) => void;
 }
@@ -462,18 +472,18 @@ interface NewBorrowRequestWizardProps {
 export function NewBorrowRequestWizard({
   open,
   onOpenChange,
-  prefilledItem,
+  prefilledItems,
   initialType,
   onSuccess,
 }: NewBorrowRequestWizardProps) {
   const [step, setStep] = useState<RequestWizardStep>(
-    prefilledItem ? "details" : "select"
+    prefilledItems && prefilledItems.length > 0 ? "details" : "select"
   );
   const [values, setValues] = useState<WizardFormValues>({
-    selectedItem: prefilledItem ?? null,
+    selectedItems: prefilledItems ?? [],
     dateFrom: today(),
     dateTo: nextWeek(),
-    quantity: 1,
+    quantities: {},
     purpose: "",
     notes: "",
   });
@@ -485,12 +495,12 @@ export function NewBorrowRequestWizard({
 
   useEffect(() => {
     if (open) {
-      setStep(prefilledItem ? "details" : "select");
+      setStep(prefilledItems && prefilledItems.length > 0 ? "details" : "select");
       setValues({
-        selectedItem: prefilledItem ?? null,
+        selectedItems: prefilledItems ?? [],
         dateFrom: today(),
         dateTo: nextWeek(),
-        quantity: 1,
+        quantities: {},
         purpose: "",
         notes: "",
       });
@@ -498,25 +508,30 @@ export function NewBorrowRequestWizard({
       setErrorMessage("");
       resetMutation();
     }
-  }, [open, prefilledItem, resetMutation]);
+  }, [open, prefilledItems, resetMutation]);
 
   const patchValues = useCallback(
     (patch: Partial<WizardFormValues>) => setValues((p) => ({ ...p, ...patch })),
     []
   );
 
-  const canAdvanceSelect = !!values.selectedItem;
+  const canAdvanceSelect = values.selectedItems.length > 0;
 
   function validateDetails(): Record<string, string> {
     const errs: Record<string, string> = {};
     if (!values.dateFrom) errs.dateFrom = "Start date is required.";
-    if (values.selectedItem?.type === "asset") {
+    const hasAsset = values.selectedItems.some(i => i.type === "asset");
+    if (hasAsset) {
       if (!values.dateTo) errs.dateTo = "End date is required.";
       else if (values.dateTo < values.dateFrom) errs.dateTo = "End date must be on or after start date.";
     }
     if (!values.purpose.trim()) errs.purpose = "Purpose is required.";
-    if (values.selectedItem?.type === "consumable" && values.quantity < 1)
-      errs.quantity = "Quantity must be at least 1.";
+    values.selectedItems.forEach((item) => {
+      if (item.type === "consumable") {
+        const q = values.quantities[item.id] || 0;
+        if (q < 1) errs[`qty_${item.id}`] = "Quantity must be at least 1.";
+      }
+    });
     return errs;
   }
 
@@ -541,33 +556,27 @@ export function NewBorrowRequestWizard({
     setErrorMessage("");
 
     try {
-      const newRequest = await createRequest({
-        requesterUserId: me?.id,
-        requesterName: me?.name || "Maria Santos",
-        requesterEmail: me?.email || "m.santos@aims.org",
-        department: me?.department || "IT",
-        itemDescription: values.selectedItem!.name,
-        assetId: values.selectedItem?.type === "asset" ? values.selectedItem.id : undefined,
-        assetCode: values.selectedItem?.type === "asset" ? values.selectedItem.assetCode : undefined,
-        category: values.selectedItem!.category as any,
-        quantity: values.selectedItem?.type === "consumable" ? values.quantity : 1,
-        purpose: values.purpose,
-        expectedReturnDate: values.dateTo,
-        notes: values.notes || undefined,
-      });
+      const createdRequests = await Promise.all(
+        values.selectedItems.map(item => 
+          createRequest({
+            requesterUserId: me?.id,
+            requesterName: me?.name || "Maria Santos",
+            requesterEmail: me?.email || "m.santos@aims.org",
+            department: me?.department || "IT",
+            itemDescription: item.name,
+            assetId: item.type === "asset" ? item.id : undefined,
+            assetCode: item.type === "asset" ? item.assetCode : undefined,
+            category: item.category as any,
+            quantity: item.type === "consumable" ? (values.quantities[item.id] || 1) : 1,
+            purpose: values.purpose,
+            expectedReturnDate: values.dateTo,
+            notes: values.notes || undefined,
+          })
+        )
+      );
 
-      onSuccess(newRequest as any);
+      onSuccess(createdRequests[0] as any);
       onOpenChange(false);
-      // Reset
-      setStep(prefilledItem ? "details" : "select");
-      setValues({
-        selectedItem: prefilledItem ?? null,
-        dateFrom: today(),
-        dateTo: nextWeek(),
-        quantity: 1,
-        purpose: "",
-        notes: "",
-      });
     } catch (e: any) {
       setErrorMessage(e.message || "Failed to submit request.");
     }
@@ -595,7 +604,7 @@ export function NewBorrowRequestWizard({
         <div className="flex items-start justify-between gap-4 p-5 border-b border-border">
           <div>
             <h2 id="wizard-title" className="text-base font-bold text-text">
-              {initialType === "requisition" || values.selectedItem?.type === "consumable" ? "New Requisition Request" : "New Borrow Request"}
+              {initialType === "requisition" || values.selectedItems.some(i => i.type === "consumable") ? "New Requisition Request" : "New Borrow Request"}
             </h2>
             <div className="mt-2">
               <StepIndicator current={step} />
@@ -616,15 +625,15 @@ export function NewBorrowRequestWizard({
         <div className="flex-1 overflow-y-auto p-5">
           {step === "select" && (
             <StepSelect
-              value={values.selectedItem}
-              onChange={(item) => patchValues({ selectedItem: item })}
+              value={values.selectedItems}
+              onChange={(items) => patchValues({ selectedItems: items })}
               initialType={initialType}
             />
           )}
-          {step === "details" && values.selectedItem && (
+          {step === "details" && values.selectedItems.length > 0 && (
             <StepDetails
-              item={values.selectedItem}
-              values={{ dateFrom: values.dateFrom, dateTo: values.dateTo, quantity: values.quantity, purpose: values.purpose, notes: values.notes }}
+              items={values.selectedItems}
+              values={{ dateFrom: values.dateFrom, dateTo: values.dateTo, quantities: values.quantities, purpose: values.purpose, notes: values.notes }}
               onChange={patchValues}
               errors={fieldErrors}
             />

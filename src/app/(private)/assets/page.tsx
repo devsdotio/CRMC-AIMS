@@ -7,7 +7,7 @@ import {
   useCreateAssetMutation, 
   useUpdateAssetMutation 
 } from "@/features/assets/client/use-assets";
-import type { Asset, ViewMode, AssetFilterState } from "@/types/assets";
+import type { Asset, ViewMode, AssetFilterState, AssetStatus } from "@/types/assets";
 import { AssetFilters } from "@/components/assets/asset-filters";
 import { AssetViewToggle } from "@/components/assets/asset-view-toggle";
 import { AssetGrid } from "@/components/assets/asset-grid";
@@ -117,8 +117,9 @@ export default function AssetsPage() {
       await createMutation.mutateAsync({
         assetCode: assetData.assetCode || `ASSET-${Date.now()}`,
         name: assetData.name || "New Asset",
-        category: assetData.category || "computing",
-        status: assetData.status || "active",
+        category: assetData.category as string,
+        status: assetData.status as AssetStatus,
+        assignmentType: assetData.assignmentType as "borrowable" | "assignable",
         serialNumber: assetData.serialNumber,
         location: assetData.location || "Central Storage",
         department: assetData.department,

@@ -18,6 +18,11 @@ export const ASSET_STATUSES = [
   "retired",
 ] as const;
 
+export const ASSET_ASSIGNMENT_TYPES = [
+  "borrowable",
+  "assignable",
+] as const;
+
 export const MAINTENANCE_TYPES = [
   "inspection",
   "repair",

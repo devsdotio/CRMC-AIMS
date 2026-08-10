@@ -76,6 +76,7 @@ export function useCreateAssetMutation(): UseMutationResult<Asset, Error, Create
         name: newAsset.name || "New Asset",
         category: newAsset.category || "computing",
         status: newAsset.status || "active",
+        assignmentType: newAsset.assignmentType || "borrowable",
         serialNumber: newAsset.serialNumber,
         location: newAsset.location || "Unknown",
         department: newAsset.department,
@@ -83,6 +84,7 @@ export function useCreateAssetMutation(): UseMutationResult<Asset, Error, Create
         value: newAsset.value,
         notes: newAsset.notes,
         lastUpdated: new Date().toISOString(),
+        maintenanceHistory: [],
       };
 
       queryClient.setQueryData<Asset[]>(assetQueryKeys.list(), (old) => {

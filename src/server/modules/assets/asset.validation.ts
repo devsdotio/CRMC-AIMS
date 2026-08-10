@@ -1,9 +1,10 @@
 import { z } from "zod";
 
-import { ASSET_CATEGORIES, ASSET_STATUSES } from "./asset.constants";
+import { ASSET_CATEGORIES, ASSET_STATUSES, ASSET_ASSIGNMENT_TYPES } from "./asset.constants";
 
 export const assetCategorySchema = z.enum(ASSET_CATEGORIES);
 export const assetStatusSchema = z.enum(ASSET_STATUSES);
+export const assetAssignmentTypeSchema = z.enum(ASSET_ASSIGNMENT_TYPES);
 
 export const createAssetSchema = z.object({
   assetCode: z.string().trim().min(1, "assetCode is required.").max(64),
@@ -12,6 +13,7 @@ export const createAssetSchema = z.object({
   /** Omitted status defaults to `active` in the service (not via Zod default),
    * so update schemas can safely `.partial()` without forcing status. */
   status: assetStatusSchema.optional(),
+  assignmentType: assetAssignmentTypeSchema.optional(),
   location: z.string().trim().min(1, "location is required.").max(255),
   serialNumber: z.string().trim().max(120).optional(),
   currentHolder: z.string().trim().max(255).optional(),

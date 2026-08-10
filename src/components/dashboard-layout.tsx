@@ -88,7 +88,7 @@ export default function DashboardLayout({ children, initialProfile }: DashboardL
           userRoleLabel={userRoleLabel}
         />
 
-        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 bg-[#F2F3F7] focus:outline-hidden">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden p-3 bg-[#F2F3F7] focus:outline-hidden">
           {children}
         </main>
       </div>

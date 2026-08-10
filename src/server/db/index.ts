@@ -29,10 +29,12 @@ export function getDb(): Database {
 
   /**
    * Small pool: Next route handlers share the process; transactions need headroom.
+   * In development, Next.js spawns multiple workers which can quickly exhaust 
+   * the Supabase pooler limit if max is too high.
    * keepAlive + connect_timeout avoid hung statements on flaky network to Supabase.
    */
   const client = postgres(connectionString, {
-    max: 10,
+    max: process.env.NODE_ENV === "development" ? 2 : 10,
     idle_timeout: 20,
     connect_timeout: 15,
     prepare: false,

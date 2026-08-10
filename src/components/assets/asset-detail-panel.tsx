@@ -131,6 +131,14 @@ export function AssetDetailPanel({
                   <span className={cn("px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider", statusMeta.bg, statusMeta.text)}>
                     {statusMeta.label}
                   </span>
+                  <span className={cn(
+                    "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border",
+                    asset.assignmentType === "assignable" 
+                      ? "border-status-repair-text text-status-repair-text bg-status-repair-bg/10" 
+                      : "border-accent text-accent bg-accent/10"
+                  )}>
+                    {asset.assignmentType === "assignable" ? "Assignable" : "Borrowable"}
+                  </span>
                 </div>
               </div>
 

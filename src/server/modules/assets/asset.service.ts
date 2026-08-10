@@ -75,6 +75,7 @@ export function toAssetDTO(row: AssetRow): Asset {
     name: row.name,
     category: row.category,
     status: row.status,
+    assignmentType: row.assignmentType,
     serialNumber: row.serialNumber ?? undefined,
     location: row.location,
     currentHolder: row.currentHolder ?? undefined,
@@ -139,6 +140,7 @@ export class AssetService {
         name: input.name,
         category: input.category,
         status: input.status ?? "active",
+        assignmentType: input.assignmentType ?? "borrowable",
         location: input.location,
         serialNumber: input.serialNumber ?? null,
         currentHolder: input.currentHolder ?? null,
@@ -202,6 +204,7 @@ export class AssetService {
         ...(input.name !== undefined ? { name: input.name } : {}),
         ...(input.category !== undefined ? { category: input.category } : {}),
         ...(input.status !== undefined ? { status: input.status } : {}),
+        ...(input.assignmentType !== undefined ? { assignmentType: input.assignmentType } : {}),
         ...(input.location !== undefined ? { location: input.location } : {}),
         ...(input.serialNumber !== undefined
           ? { serialNumber: input.serialNumber }

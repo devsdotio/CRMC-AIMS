@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { X, PackagePlus, Edit } from "lucide-react";
 
-import type { Asset, AssetCategory, AssetStatus } from "@/types/assets";
+import type { Asset, AssetCategory, AssetStatus, AssetAssignmentType } from "@/types/assets";
 import { QRCodeDisplay } from "./qr-code-display";
 import { useCategoriesQuery } from "@/features/categories/client/use-categories";
 
@@ -42,6 +42,9 @@ function AddEditAssetDialogForm({
   );
   const [status, setStatus] = useState<AssetStatus | "">(
     () => initialAsset?.status ?? ""
+  );
+  const [assignmentType, setAssignmentType] = useState<AssetAssignmentType>(
+    () => initialAsset?.assignmentType ?? "borrowable"
   );
   const [assetCode, setAssetCode] = useState(
     () => initialAsset?.assetCode ?? "Pending..."
@@ -111,6 +114,7 @@ function AddEditAssetDialogForm({
         name: name.trim(),
         category: category as AssetCategory,
         status: status as AssetStatus,
+        assignmentType,
         serialNumber: serialNumber.trim() || undefined,
         location: location.trim(),
         department: department.trim() || undefined,
@@ -226,6 +230,36 @@ function AddEditAssetDialogForm({
                     <option value="out_of_service">Out of Service</option>
                     <option value="retired">Retired</option>
                   </select>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label htmlFor="assignment-type-select" className="block text-xs font-semibold text-text">
+                  Assignment Type <span className="text-accent">*</span>
+                </label>
+                <div className="flex gap-4 items-center h-9">
+                  <label className="flex items-center gap-2 text-xs text-text cursor-pointer">
+                    <input
+                      type="radio"
+                      name="assignmentType"
+                      value="borrowable"
+                      checked={assignmentType === "borrowable"}
+                      onChange={(e) => setAssignmentType(e.target.value as AssetAssignmentType)}
+                      className="text-accent focus:ring-accent"
+                    />
+                    Borrowable (Short-term)
+                  </label>
+                  <label className="flex items-center gap-2 text-xs text-text cursor-pointer">
+                    <input
+                      type="radio"
+                      name="assignmentType"
+                      value="assignable"
+                      checked={assignmentType === "assignable"}
+                      onChange={(e) => setAssignmentType(e.target.value as AssetAssignmentType)}
+                      className="text-accent focus:ring-accent"
+                    />
+                    Assignable (Long-term)
+                  </label>
                 </div>
               </div>
 

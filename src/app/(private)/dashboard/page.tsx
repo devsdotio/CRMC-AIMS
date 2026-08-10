@@ -20,67 +20,71 @@ export default function DashboardPage() {
   const approveMutation = useApproveBorrowRequestMutation();
   const rejectMutation = useRejectBorrowRequestMutation();
 
-  if (isLoading || !snapshot) {
-    return <div className="p-8 text-center text-text-secondary">Loading dashboard...</div>;
-  }
+  const loading = isLoading || !snapshot;
 
   const stats: StatCardProps[] = [
     {
       label: "Active Borrows",
-      value: snapshot.summary.activeBorrows,
+      value: snapshot?.summary.activeBorrows ?? null,
       contextLine: "Currently borrowed items",
       icon: Box,
       variant: "default",
+      loading,
     },
     {
       label: "Pending Approvals",
-      value: snapshot.summary.pendingApprovals,
+      value: snapshot?.summary.pendingApprovals ?? null,
       contextLine: "Requires immediate attention",
       icon: ClipboardList,
       variant: "default",
+      loading,
     },
     {
       label: "Overdue Returns",
-      value: snapshot.summary.overdueAssets,
+      value: snapshot?.summary.overdueAssets ?? null,
       contextLine: "Past due date",
       icon: AlertCircle,
       variant: "danger",
+      loading,
     },
     {
       label: "Low Stock Items",
-      value: snapshot.summary.lowStockItems,
+      value: snapshot?.summary.lowStockItems ?? null,
       contextLine: "Needs reordering",
       icon: AlertCircle,
       variant: "warning",
+      loading,
     },
   ];
 
   return (
-    <div className="flex flex-col gap-6 bg-bg-subtle max-w-full overflow-x-hidden" data-theme="light">
+    <div className="flex flex-col gap-4 bg-bg-subtle max-w-full overflow-x-hidden" data-theme="light">
       {/* ── Row 1: KPI stat cards ─────────────────────────────────── */}
       <StatCardsGrid stats={stats} />
 
       {/* ── Row 2: Pending Approvals + Low Stock ─────────────────── */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_360px]">
         <PendingApprovalsWidget
-          requests={snapshot.pendingRequests}
+          requests={snapshot?.pendingRequests || []}
+          loading={loading}
           onApprove={(id) => approveMutation.mutate({ id })}
           onReject={(id) => rejectMutation.mutate({ id, reason: "Rejected from dashboard" })}
         />
-        <LowStockWidget items={snapshot.lowStockItems} />
+        <LowStockWidget items={snapshot?.lowStockItems || []} loading={loading} />
       </div>
 
       {/* ── Row 3: Overdue Assets + Category Chart ────────────────── */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_360px]">
         <OverdueAssetsWidget
-          assets={snapshot.overdueAssets}
+          assets={snapshot?.overdueAssets || []}
+          loading={loading}
           onSendReminder={(id) => console.log("Remind", id)} // Feature not yet implemented
         />
-        <AssetsByCategoryChart data={snapshot.categoryDistribution as any} />
+        <AssetsByCategoryChart data={snapshot?.categoryDistribution as any || []} loading={loading} />
       </div>
 
       {/* ── Row 4: Recent Activity Feed (full width) ─────────────── */}
-      <RecentActivityFeed entries={snapshot.recentActivity} />
+      <RecentActivityFeed entries={snapshot?.recentActivity || []} loading={loading} />
     </div>
   );
 }

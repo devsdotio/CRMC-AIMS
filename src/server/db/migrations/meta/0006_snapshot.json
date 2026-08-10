@@ -1,6 +1,6 @@
 {
-  "id": "10496968-fea4-4cfb-8b7c-dcaf5d063324",
-  "prevId": "0003_profiles_last_active",
+  "id": "f4063a67-7820-43f2-aa3d-ba83d41c00ff",
+  "prevId": "901a57b8-4c8b-4718-867f-c903c221349b",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -41,6 +41,14 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'active'"
+        },
+        "assignment_type": {
+          "name": "assignment_type",
+          "type": "asset_assignment_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'borrowable'"
         },
         "serial_number": {
           "name": "serial_number",
@@ -549,6 +557,25 @@
           "primaryKey": false,
           "notNull": false
         },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'asset'"
+        },
+        "color_token": {
+          "name": "color_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by_user_id": {
+          "name": "created_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -565,7 +592,21 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {},
+      "foreignKeys": {
+        "categories_created_by_user_id_profiles_user_id_fk": {
+          "name": "categories_created_by_user_id_profiles_user_id_fk",
+          "tableFrom": "categories",
+          "tableTo": "profiles",
+          "columnsFrom": [
+            "created_by_user_id"
+          ],
+          "columnsTo": [
+            "user_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -794,6 +835,12 @@
         },
         "rejection_reason": {
           "name": "rejection_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "picked_up_by": {
+          "name": "picked_up_by",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -1714,6 +1761,14 @@
     }
   },
   "enums": {
+    "public.asset_assignment_type": {
+      "name": "asset_assignment_type",
+      "schema": "public",
+      "values": [
+        "borrowable",
+        "assignable"
+      ]
+    },
     "public.asset_category": {
       "name": "asset_category",
       "schema": "public",
@@ -1772,6 +1827,8 @@
         "pending",
         "approved",
         "rejected",
+        "released",
+        "unreleased",
         "returned"
       ]
     },

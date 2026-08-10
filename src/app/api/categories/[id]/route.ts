@@ -6,9 +6,10 @@ import { requireActor } from "@/server/shared/auth";
 
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const actor = await requireActor();
     const db = getDb();
     const body = await request.json();
@@ -25,7 +26,7 @@ export async function PUT(
         updatedAt: new Date(),
       })
       .where(and(
-        eq(categories.id, params.id),
+        eq(categories.id, id),
         eq(categories.createdByUserId, actor.userId)
       ))
       .returning();
@@ -51,16 +52,17 @@ export async function PUT(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const actor = await requireActor();
     const db = getDb();
     
     const [deletedCategory] = await db
       .delete(categories)
       .where(and(
-        eq(categories.id, params.id),
+        eq(categories.id, id),
         eq(categories.createdByUserId, actor.userId)
       ))
       .returning();
