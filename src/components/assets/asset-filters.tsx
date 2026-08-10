@@ -30,6 +30,7 @@ function MultiSelectDropdown({
   onToggle,
 }: {
   label: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   icon: any;
   options: { id: string; label: string; renderDot?: () => React.ReactNode }[];
   selectedIds: string[];

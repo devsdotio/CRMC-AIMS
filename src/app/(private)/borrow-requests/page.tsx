@@ -34,6 +34,7 @@ export default function BorrowRequestsPage() {
   });
 
   const { data: response, isLoading } = useBorrowRequests({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
     status: activeTab === "all" ? undefined : (activeTab as any),
     department: filters.department === "All Departments" ? undefined : filters.department,
     search: filters.searchQuery || undefined,

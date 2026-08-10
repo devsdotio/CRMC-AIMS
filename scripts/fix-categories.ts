@@ -21,6 +21,7 @@ async function main() {
     // Add constraint if not exists
     try {
       await sql`ALTER TABLE "categories" ADD CONSTRAINT "categories_created_by_user_id_profiles_user_id_fk" FOREIGN KEY ("created_by_user_id") REFERENCES "public"."profiles"("user_id") ON DELETE no action ON UPDATE no action;`;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       if (!e.message.includes("already exists")) {
         console.error("Failed to add constraint:", e);

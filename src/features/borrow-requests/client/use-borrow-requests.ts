@@ -70,8 +70,10 @@ export function useCreateBorrowRequestMutation(): UseMutationResult<
       );
 
       // 2. Optimistically update dashboard snapshot
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
       qc.setQueriesData<any>(
         { queryKey: dashboardQueryKeys.snapshot() },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (old: any) => {
           if (!old) return old;
           return {
@@ -112,6 +114,7 @@ export function useApproveBorrowRequestMutation(): UseMutationResult<
     mutationFn: ({ id, payload }) => borrowRequestsApi.approve(id, payload),
     onSuccess: (_, { id }) => {
       // Optimistically update dashboard
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
       qc.setQueriesData<any>({ queryKey: dashboardQueryKeys.snapshot() }, (old: any) => {
         if (!old) return old;
         return {
@@ -120,6 +123,7 @@ export function useApproveBorrowRequestMutation(): UseMutationResult<
             ...old.summary,
             pendingApprovals: Math.max(0, (old.summary?.pendingApprovals || 1) - 1),
           },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
           pendingRequests: (old.pendingRequests || []).filter((r: any) => r.id !== id),
         };
       });
@@ -139,6 +143,7 @@ export function useRejectBorrowRequestMutation(): UseMutationResult<
     mutationFn: ({ id, reason }) => borrowRequestsApi.reject(id, reason),
     onSuccess: (_, { id }) => {
       // Optimistically update dashboard
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
       qc.setQueriesData<any>({ queryKey: dashboardQueryKeys.snapshot() }, (old: any) => {
         if (!old) return old;
         return {
@@ -147,6 +152,7 @@ export function useRejectBorrowRequestMutation(): UseMutationResult<
             ...old.summary,
             pendingApprovals: Math.max(0, (old.summary?.pendingApprovals || 1) - 1),
           },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
           pendingRequests: (old.pendingRequests || []).filter((r: any) => r.id !== id),
         };
       });
@@ -171,6 +177,7 @@ export function useReleaseBorrowRequestMutation(): UseMutationResult<
         return old.map(req => req.id === id ? { ...req, status: "released" } : req);
       });
       qc.setQueriesData<BorrowRequest>({ queryKey: borrowRequestQueryKeys.detail(id) }, (old) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if (!old || Array.isArray(old)) return old as any;
         return { ...old, status: "released" };
       });
@@ -210,6 +217,7 @@ export function useMarkReturnedBorrowRequestMutation(): UseMutationResult<
         return old.map(req => req.id === id ? { ...req, status: "returned" } : req);
       });
       qc.setQueriesData<BorrowRequest>({ queryKey: borrowRequestQueryKeys.detail(id) }, (old) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if (!old || Array.isArray(old)) return old as any;
         return { ...old, status: "returned" };
       });

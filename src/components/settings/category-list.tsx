@@ -45,7 +45,7 @@ export function CategoryList({
         {categories.length === 0 ? (
           <div className="col-span-full py-8 text-center bg-bg-subtle/50 rounded-xl border border-dashed border-border flex flex-col items-center justify-center">
             <p className="text-xs font-medium text-text-secondary">No categories found.</p>
-            <p className="text-[11px] text-text-secondary/70 mt-1">Click "Add Category" to create one.</p>
+            <p className="text-[11px] text-text-secondary/70 mt-1">Click &quot;Add Category&quot; to create one.</p>
           </div>
         ) : (
           categories.map((cat) => (

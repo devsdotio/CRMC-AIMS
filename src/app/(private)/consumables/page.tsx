@@ -23,7 +23,7 @@ import { useSuppliersQuery } from "@/features/suppliers/client";
 
 export default function ConsumablesPage() {
   const { data: paginatedData, isLoading: isConsumablesLoading } = useConsumablesQuery();
-  const items = paginatedData?.data ?? [];
+  const items = useMemo(() => paginatedData?.data ?? [], [paginatedData?.data]);
 
   const createMutation = useCreateConsumableMutation();
   const updateMutation = useUpdateConsumableMutation();

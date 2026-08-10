@@ -123,7 +123,9 @@ export function MyRequestsTab() {
           filtered.map((request) => (
             <MyRequestItem
               key={request.id}
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
               request={request as any}
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
               onCancel={(r) => setCancelTarget(r as any)}
             />
           ))

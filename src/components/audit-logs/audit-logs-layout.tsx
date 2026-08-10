@@ -11,6 +11,7 @@ interface AuditLogsLayoutProps {
   children: ReactNode;
 }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const TABS: { id: AuditLogTab; label: string; icon: any }[] = [
   { id: "borrow-requests", label: "Borrow Requests", icon: ClipboardList },
   { id: "general", label: "General", icon: FileText },

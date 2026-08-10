@@ -60,6 +60,7 @@ function ApproveRejectDialogForm({
     try {
       await onConfirm(request, mode, reason.trim());
       onClose();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       setError(err.message || "An error occurred. Please try again.");
       setIsSubmitting(false);

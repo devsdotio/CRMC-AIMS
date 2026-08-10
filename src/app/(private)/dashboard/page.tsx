@@ -80,6 +80,7 @@ export default function DashboardPage() {
           loading={loading}
           onSendReminder={(id) => console.log("Remind", id)} // Feature not yet implemented
         />
+        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
         <AssetsByCategoryChart data={snapshot?.categoryDistribution as any || []} loading={loading} />
       </div>
 

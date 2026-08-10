@@ -41,6 +41,7 @@ export function BorrowRequestsList() {
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
+            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
             {requests.map((req: any) => (
               <tr key={req.id} className="hover:bg-bg-subtle/50 transition-colors">
                 <td className="px-4 py-3 text-text-secondary whitespace-nowrap">

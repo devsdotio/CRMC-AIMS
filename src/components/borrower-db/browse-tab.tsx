@@ -32,7 +32,7 @@ export function BrowseTab() {
 
   const { data: assets = [], isLoading: assetsLoading } = useAssetsQuery();
   const { data: paginatedData, isLoading: consumablesLoading } = useConsumablesQuery();
-  const consumables = paginatedData?.data ?? [];
+  const consumables = useMemo(() => paginatedData?.data ?? [], [paginatedData?.data]);
   const loading = assetsLoading || consumablesLoading;
 
   const items = useMemo(() => {

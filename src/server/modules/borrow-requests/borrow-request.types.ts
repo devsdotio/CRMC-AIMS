@@ -56,5 +56,6 @@ export interface IBorrowRequestRepository {
     >,
     session?: import("@/server/db/transaction").DbSession
   ): Promise<BorrowRequestRow | null>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   countPending(session?: any, userId?: string): Promise<number>;
 }

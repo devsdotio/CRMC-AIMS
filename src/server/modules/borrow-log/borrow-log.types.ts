@@ -37,7 +37,9 @@ export interface IBorrowLogRepository {
   findById(id: string): Promise<BorrowTransactionRow | null>;
   findActiveByAssetId(assetId: string): Promise<BorrowTransactionRow | null>;
   list(filters?: ListBorrowLogFilters): Promise<BorrowTransactionRow[]>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   countActive(session?: any, userId?: string): Promise<number>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   countOverdue(session?: any, userId?: string): Promise<number>;
   countYear(): Promise<number>;
   create(

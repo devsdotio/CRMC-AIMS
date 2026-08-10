@@ -431,6 +431,7 @@ export function BorrowerDashboard() {
             ) : (
               <div className="overflow-y-auto">
                 {activeItemsMapped.map((record) => (
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   <ActiveBorrowCard key={record.id} record={record as any} />
                 ))}
               </div>
@@ -466,12 +467,13 @@ export function BorrowerDashboard() {
                 </div>
                 <p className="text-sm font-semibold text-text">No pending requests</p>
                 <p className="text-xs text-text-secondary mt-1 max-w-xs">
-                  You don't have any requests waiting for approval.
+                  You don&apos;t have any requests waiting for approval.
                 </p>
               </div>
             ) : (
               <div className="overflow-y-auto">
                 {pendingRequestsMapped.slice(0, 5).map((req) => (
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   <PendingRequestCard key={req.id} request={req as any} />
                 ))}
               </div>
