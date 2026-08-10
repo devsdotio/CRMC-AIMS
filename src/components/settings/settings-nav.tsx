@@ -1,6 +1,6 @@
 "use client";
 
-import { User, Tags, Server } from "lucide-react";
+import { User, Tags } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { SettingsSection } from "@/types/settings";
 import type { UserRole } from "@/types/users";
@@ -36,13 +36,6 @@ export function SettingsNav({
       label: "Categories",
       description: "Manage institutional asset and supply categories",
       icon: Tags,
-      adminOnly: true,
-    },
-    {
-      id: "system",
-      label: "System & Backups",
-      description: "Data exports and automated backup configuration",
-      icon: Server,
       adminOnly: true,
     },
   ];

@@ -88,22 +88,29 @@ export function AssetTableRow({ asset, onSelect }: AssetTableRowProps) {
 
       {/* Status Badge */}
       <td className="px-3 py-3.5 whitespace-nowrap">
-        <span
-          className={cn(
-            "inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold tabular-nums",
-            statusMeta.bg,
-            statusMeta.text,
+        <div className="flex items-center gap-2">
+          {asset.currentHolder && (
+            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-accent/20 text-accent">
+              Borrowed
+            </span>
           )}
-        >
-          {statusMeta.label}
-        </span>
+          <span
+            className={cn(
+              "inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold tabular-nums",
+              statusMeta.bg,
+              statusMeta.text,
+            )}
+          >
+            {statusMeta.label}
+          </span>
+        </div>
       </td>
 
       {/* Holder / Location */}
       <td className="px-3 py-3.5 text-xs">
         {asset.currentHolder ? (
           <span className="font-semibold text-text block truncate">
-            {asset.currentHolder} ({asset.department})
+            Borrowed by: {asset.currentHolder} {asset.department ? `(${asset.department})` : ""}
           </span>
         ) : (
           <span className="font-semibold text-status-active-text block">

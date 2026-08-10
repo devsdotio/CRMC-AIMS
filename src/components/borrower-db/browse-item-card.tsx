@@ -1,13 +1,13 @@
 "use client";
 
-import { Tag, MapPin, AlertCircle, PackageX } from "lucide-react";
+import { Tag, MapPin, AlertCircle, PackageX, ShoppingCart, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getCategoryStyle } from "@/constants/categories";
 import type { BrowseItem } from "./types";
+import { useBorrowerPortal } from "./context";
 
 interface BrowseItemCardProps {
   item: BrowseItem;
-  onRequest: (item: BrowseItem) => void;
   viewMode: "grid" | "list";
 }
 
@@ -97,10 +97,12 @@ export function BrowseItemCardSkeleton({ viewMode }: { viewMode: "grid" | "list"
   );
 }
 
-export function BrowseItemCard({ item, onRequest, viewMode }: BrowseItemCardProps) {
+export function BrowseItemCard({ item, viewMode }: BrowseItemCardProps) {
   const categoryMeta = getCategoryStyle(item.category);
   const statusBadge = getStatusBadge(item);
   const available = isItemAvailable(item);
+  const { cart, toggleCartItem } = useBorrowerPortal();
+  const inCart = !!cart.find(c => c.id === item.id);
 
   const code = item.type === "asset" ? item.assetCode : item.itemCode;
   const unavailableReason = item.unavailableReason;
@@ -159,24 +161,24 @@ export function BrowseItemCard({ item, onRequest, viewMode }: BrowseItemCardProp
           >
             {statusBadge.label}
           </span>
-          {available ? (
-            <button
-              type="button"
-              onClick={() => onRequest(item)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-accent text-accent-foreground hover:opacity-90 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
-            >
-              Request to Borrow
-            </button>
-          ) : (
-            <div
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-bg-subtle text-text-secondary border border-border cursor-not-allowed"
-              title={unavailableReason ?? "This item is not available for borrowing."}
-              aria-disabled="true"
-            >
-              <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              Unavailable
-            </div>
-          )}
+          <button
+            type="button"
+            onClick={() => toggleCartItem(item)}
+            className={cn(
+              "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 transition-opacity hover:opacity-90",
+              inCart 
+                ? "bg-bg-subtle text-text-secondary border border-border focus-visible:ring-text-secondary"
+                : available
+                  ? "bg-accent text-accent-foreground focus-visible:ring-accent"
+                  : "bg-bg-subtle text-text border border-border focus-visible:ring-text-secondary"
+            )}
+          >
+            {inCart ? (
+              <>
+                <Check className="h-3.5 w-3.5" /> Added
+              </>
+            ) : available ? "Add to Request" : "Queue Request"}
+          </button>
         </div>
       </div>
     );
@@ -238,26 +240,24 @@ export function BrowseItemCard({ item, onRequest, viewMode }: BrowseItemCardProp
       {!item.notes && <div className="flex-1" />}
 
       {/* Action */}
-      {available ? (
-        <button
-          type="button"
-          onClick={() => onRequest(item)}
-          className="mt-auto w-full h-9 inline-flex items-center justify-center gap-1.5 rounded-lg text-xs font-semibold bg-accent text-accent-foreground hover:opacity-90 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 shadow-sm"
-        >
-          Request to Borrow
-        </button>
-      ) : (
-        <div
-          className="mt-auto w-full h-9 inline-flex items-center justify-center gap-1.5 rounded-lg text-xs font-medium bg-bg-subtle text-text-secondary border border-border cursor-not-allowed"
-          title={unavailableReason ?? "This item is not available for borrowing."}
-          aria-disabled="true"
-          role="button"
-          aria-label={`${item.name} is unavailable: ${unavailableReason ?? "not available"}`}
-        >
-          <PackageX className="h-3.5 w-3.5 shrink-0" aria-hidden />
-          Unavailable
-        </div>
-      )}
+      <button
+        type="button"
+        onClick={() => toggleCartItem(item)}
+        className={cn(
+          "mt-auto w-full h-9 inline-flex items-center justify-center gap-1.5 rounded-lg text-xs font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 transition-opacity hover:opacity-90 shadow-sm",
+          inCart
+            ? "bg-bg-subtle text-text-secondary border border-border focus-visible:ring-text-secondary"
+            : available
+              ? "bg-accent text-accent-foreground focus-visible:ring-accent"
+              : "bg-bg-subtle text-text border border-border focus-visible:ring-text-secondary"
+        )}
+      >
+        {inCart ? (
+          <>
+            <Check className="h-3.5 w-3.5" /> Added to Request
+          </>
+        ) : available ? "Add to Request" : "Queue Request"}
+      </button>
 
       {/* Unavailable reason tooltip hint */}
       {!available && unavailableReason && (

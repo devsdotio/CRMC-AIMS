@@ -2,9 +2,15 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { Plus, PlusCircle } from "lucide-react";
+import {
+  useConsumablesQuery,
+  useCreateConsumableMutation,
+  useUpdateConsumableMutation,
+  useRestockConsumableMutation,
+  useAdjustConsumableMutation,
+} from "@/features/consumables/client/use-consumables";
 import type { ConsumableItem, ConsumableFilterState } from "@/types/inventory";
 import { getStockSeverity } from "@/components/consumables/utils";
-import { INITIAL_MOCK_CONSUMABLES } from "@/components/consumables/mock-data";
 import { ConsumableFilters } from "@/components/consumables/consumable-filters";
 import { AssetViewToggle } from "@/components/assets/asset-view-toggle"; // Reused view mode toggle
 import { ConsumableGrid } from "@/components/consumables/consumable-grid";
@@ -16,10 +22,18 @@ import { AdjustStockDialog } from "@/components/consumables/adjust-stock-dialog"
 import { useSuppliersQuery } from "@/features/suppliers/client";
 
 export default function ConsumablesPage() {
-  const [items, setItems] = useState<ConsumableItem[]>(INITIAL_MOCK_CONSUMABLES);
+  const { data: paginatedData, isLoading: isConsumablesLoading } = useConsumablesQuery();
+  const items = useMemo(() => paginatedData?.data ?? [], [paginatedData?.data]);
+
+  const createMutation = useCreateConsumableMutation();
+  const updateMutation = useUpdateConsumableMutation();
+  const restockMutation = useRestockConsumableMutation();
+  const adjustMutation = useAdjustConsumableMutation();
+
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
-  const [isLoading, setIsLoading] = useState(true);
-  const { data: suppliers = [] } = useSuppliersQuery({ activeOnly: true });
+  const { data: suppliers = [], isLoading: isSuppliersLoading } = useSuppliersQuery({ activeOnly: true });
+  
+  const isLoading = isConsumablesLoading || isSuppliersLoading;
 
   // Filter & Sort State
   const [filters, setFilters] = useState<ConsumableFilterState>({
@@ -44,17 +58,11 @@ export default function ConsumablesPage() {
     item: null,
   });
 
-  // Initial load simulation
-  useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 400);
-    return () => clearTimeout(timer);
-  }, []);
-
   // Filter & Sort Items
   const filteredItems = useMemo(() => {
     const result = items.filter((item) => {
       // 1. Search Query
-      if (filters.searchQuery.trim()) {
+      if (filters.searchQuery?.trim()) {
         const query = filters.searchQuery.toLowerCase();
         const matchName = item.name.toLowerCase().includes(query);
         const matchCode = item.itemCode.toLowerCase().includes(query);
@@ -112,20 +120,28 @@ export default function ConsumablesPage() {
     });
   };
 
-  const handleSaveConsumable = (itemData: Partial<ConsumableItem>) => {
+  const handleSaveConsumable = async (itemData: Partial<ConsumableItem>) => {
     if (addEditState.item) {
       // Edit
-      setItems((prev) =>
-        prev.map((i) => (i.id === itemData.id ? ({ ...i, ...itemData } as ConsumableItem) : i))
-      );
-      if (selectedItem?.id === itemData.id) {
-        setSelectedItem((prev) => (prev ? ({ ...prev, ...itemData } as ConsumableItem) : null));
+      await updateMutation.mutateAsync({
+        id: addEditState.item.id,
+        payload: {
+          name: itemData.name,
+          category: itemData.category,
+          unit: itemData.unit,
+          minThreshold: itemData.minThreshold,
+          location: itemData.location,
+          supplier: itemData.supplier,
+          notes: itemData.notes,
+        },
+      });
+      if (selectedItem?.id === addEditState.item.id) {
+        setSelectedItem(null);
       }
     } else {
       // Create
-      const newItem: ConsumableItem = {
-        id: itemData.id || `con-${Date.now()}`,
-        itemCode: itemData.itemCode || `CON-${Math.floor(1000 + Math.random() * 9000)}`,
+      await createMutation.mutateAsync({
+        itemCode: itemData.itemCode,
         name: itemData.name || "New Supply Item",
         category: itemData.category || "office_supplies",
         unit: itemData.unit || "reams",
@@ -133,102 +149,48 @@ export default function ConsumablesPage() {
         minThreshold: itemData.minThreshold ?? 15,
         location: itemData.location || "Supply Storage Bay A1",
         supplier: itemData.supplier,
-        lastRestocked: new Date().toISOString().split("T")[0],
         notes: itemData.notes,
-        history: [],
-      };
-      setItems((prev) => [newItem, ...prev]);
+      });
     }
   };
 
-  const handleConfirmRestock = (input: {
+  const handleConfirmRestock = async (input: {
     itemId: string;
     qtyReceived: number;
     unitCost: number;
     supplierId?: string | null;
     notes?: string;
   }) => {
-    const today = new Date().toISOString().split("T")[0];
-    const { itemId, qtyReceived, unitCost, notes, supplierId } = input;
-    setItems((prev) =>
-      prev.map((i) => {
-        if (i.id !== itemId) return i;
-        const newQty = i.currentQty + qtyReceived;
-        return {
-          ...i,
-          currentQty: newQty,
-          lastRestocked: today,
-          history: [
-            {
-              id: `sh-${Date.now()}`,
-              date: today,
-              type: "restock",
-              quantityChange: qtyReceived,
-              actor: "Property Custodian",
-              notes:
-                notes ||
-                `Restock shipment received (+${qtyReceived} ${i.unit})`,
-              unitCost: unitCost.toFixed(2),
-              supplierId: supplierId || undefined,
-            },
-            ...i.history,
-          ],
-        };
-      })
-    );
-
-    if (selectedItem?.id === itemId) {
-      setSelectedItem((prev) =>
-        prev
-          ? {
-              ...prev,
-              currentQty: prev.currentQty + qtyReceived,
-              lastRestocked: today,
-            }
-          : null
-      );
+    await restockMutation.mutateAsync({
+      id: input.itemId,
+      payload: {
+        quantity: input.qtyReceived,
+        unitCost: input.unitCost,
+        supplierId: input.supplierId,
+        notes: input.notes,
+      },
+    });
+    if (selectedItem?.id === input.itemId) {
+      setSelectedItem(null);
     }
   };
 
-  const handleConfirmAdjust = (
+  const handleConfirmAdjust = async (
     itemId: string,
     adjustmentDelta: number,
     reason: string,
     notes?: string
   ) => {
-    const today = new Date().toISOString().split("T")[0];
-    setItems((prev) =>
-      prev.map((i) => {
-        if (i.id !== itemId) return i;
-        const newQty = Math.max(0, i.currentQty + adjustmentDelta);
-        return {
-          ...i,
-          currentQty: newQty,
-          history: [
-            {
-              id: `sh-${Date.now()}`,
-              date: today,
-              type: "adjustment",
-              quantityChange: adjustmentDelta,
-              actor: "Property Custodian",
-              reason,
-              notes,
-            },
-            ...i.history,
-          ],
-        };
-      })
-    );
-
+    await adjustMutation.mutateAsync({
+      id: itemId,
+      payload: {
+        quantityChange: adjustmentDelta,
+        reason,
+        notes,
+      },
+    });
     if (selectedItem?.id === itemId) {
-      setSelectedItem((prev) =>
-        prev
-          ? {
-              ...prev,
-              currentQty: Math.max(0, prev.currentQty + adjustmentDelta),
-            }
-          : null
-      );
+      setSelectedItem(null);
     }
   };
 

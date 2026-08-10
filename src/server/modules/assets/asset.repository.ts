@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, count } from "drizzle-orm";
 
 import { getDb } from "@/server/db";
 import type { DbSession } from "@/server/db/transaction";
@@ -13,6 +13,22 @@ import type { IAssetRepository, ListAssetsFilters } from "./asset.types";
 export class AssetRepository implements IAssetRepository {
   private db(session?: DbSession) {
     return session ?? getDb();
+  }
+
+  async getCategoryDistribution(session?: DbSession): Promise<{ category: string; count: number }[]> {
+    const db = this.db(session);
+    const rows = await db
+      .select({
+        category: assets.category,
+        value: count(),
+      })
+      .from(assets)
+      .groupBy(assets.category);
+    
+    return rows.map((r) => ({
+      category: r.category,
+      count: Number(r.value),
+    }));
   }
 
   async findMany(

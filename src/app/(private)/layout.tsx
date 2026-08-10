@@ -79,5 +79,15 @@ export default async function PrivateLayout({
   // Best-effort presence (never block entry)
   void new UserService().recordActivity(user.id);
 
-  return <DashboardLayout>{children}</DashboardLayout>;
+  return (
+    <DashboardLayout
+      initialProfile={{
+        name: profile.fullName,
+        email: profile.email,
+        role: profile.role as AppRole,
+      }}
+    >
+      {children}
+    </DashboardLayout>
+  );
 }

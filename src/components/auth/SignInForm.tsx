@@ -9,6 +9,7 @@ import { AuthCard } from './AuthCard';
 import { PasswordInput } from './PasswordInput';
 import { FormAlert } from './FormAlert';
 import { SignInFormValues, AuthFormState } from "@/types/auth";
+import { useQueryClient } from "@tanstack/react-query";
 
 function safeNextPath(raw: string | null): string {
   if (!raw || !raw.startsWith('/') || raw.startsWith('//')) {
@@ -41,6 +42,7 @@ export function SignInForm() {
   const searchParams = useSearchParams();
   const emailInputRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
+  const queryClient = useQueryClient();
 
   const [formValues, setFormValues] = useState<SignInFormValues>({
     email: '',
@@ -164,6 +166,9 @@ export function SignInForm() {
         });
         return;
       }
+
+      // Clear any stale react-query cache from a previous session
+      queryClient.clear();
 
       setFormState({
         isLoading: true, // Keep loading active while fetching profile and transitioning

@@ -9,9 +9,7 @@ export default function BrowsePage() {
 
   return (
     <section id="tabpanel-browse" role="tabpanel" aria-labelledby="tab-browse">
-      <BrowseTab
-        onRequest={(item: BrowseItem) => openWizard(item)}
-      />
+      <BrowseTab />
     </section>
   );
 }

@@ -148,33 +148,23 @@ export class DashboardService {
       this.borrowLog.countOverdue(),
       this.requests.list({ status: "pending" }),
       this.borrowLog.list({ status: "overdue" }),
-      this.consumables.list({}),
-      this.assets.findMany({}),
+      this.consumables.getLowStockItems(limit),
+      this.assets.getCategoryDistribution(),
       this.listRecentLifecycle(limit),
     ]);
 
-    const lowStock = allConsumables
-      .filter((c) => c.currentQty <= Math.ceil(c.minThreshold * 1.2))
-      .sort((a, b) => a.currentQty - b.currentQty)
-      .slice(0, limit)
-      .map((c) => ({
-        id: c.id,
-        itemName: c.name,
-        currentQty: c.currentQty,
-        minThreshold: c.minThreshold,
-        unit: c.unit,
-      }));
+    const lowStock = allConsumables.map((c) => ({
+      id: c.id,
+      itemName: c.name,
+      currentQty: c.currentQty,
+      minThreshold: c.minThreshold,
+      unit: c.unit,
+    }));
 
-    const categoryMap = new Map<string, number>();
-    for (const a of allAssets) {
-      categoryMap.set(a.category, (categoryMap.get(a.category) ?? 0) + 1);
-    }
-    const categoryDistribution: DashboardCategoryCount[] = [
-      ...categoryMap.entries(),
-    ].map(([category, count]) => ({
-      category,
-      label: CATEGORY_LABELS[category] ?? category,
-      count,
+    const categoryDistribution: DashboardCategoryCount[] = allAssets.map((c) => ({
+      category: c.category,
+      label: CATEGORY_LABELS[c.category] ?? c.category,
+      count: c.count,
     }));
 
     return {

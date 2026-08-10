@@ -2,8 +2,12 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { Plus } from "lucide-react";
-import type { Asset, ViewMode, AssetFilterState } from "@/types/assets";
-import { INITIAL_MOCK_ASSETS } from "@/components/assets/mock-data";
+import { 
+  useAssetsQuery, 
+  useCreateAssetMutation, 
+  useUpdateAssetMutation 
+} from "@/features/assets/client/use-assets";
+import type { Asset, ViewMode, AssetFilterState, AssetStatus } from "@/types/assets";
 import { AssetFilters } from "@/components/assets/asset-filters";
 import { AssetViewToggle } from "@/components/assets/asset-view-toggle";
 import { AssetGrid } from "@/components/assets/asset-grid";
@@ -12,9 +16,11 @@ import { AssetDetailPanel } from "@/components/assets/asset-detail-panel";
 import { AddEditAssetDialog } from "@/components/assets/add-edit-asset-dialog";
 
 export default function AssetsPage() {
-  const [assets, setAssets] = useState<Asset[]>(INITIAL_MOCK_ASSETS);
+  const { data: assets = [], isLoading } = useAssetsQuery();
+  const createMutation = useCreateAssetMutation();
+  const updateMutation = useUpdateAssetMutation();
+
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
-  const [isLoading, setIsLoading] = useState(true);
 
   // Filter & Sort State
   const [filters, setFilters] = useState<AssetFilterState>({
@@ -32,17 +38,11 @@ export default function AssetsPage() {
     asset: null,
   });
 
-  // Initial load simulation
-  useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 400);
-    return () => clearTimeout(timer);
-  }, []);
-
   // Filter & Sort Assets
   const filteredAssets = useMemo(() => {
     const result = assets.filter((asset) => {
       // 1. Search Query
-      if (filters.searchQuery.trim()) {
+      if (filters.searchQuery?.trim()) {
         const query = filters.searchQuery.toLowerCase();
         const matchName = asset.name.toLowerCase().includes(query);
         const matchCode = asset.assetCode.toLowerCase().includes(query);
@@ -92,59 +92,41 @@ export default function AssetsPage() {
     });
   };
 
-  const handleSaveAsset = (assetData: Partial<Asset>) => {
+  const handleSaveAsset = async (assetData: Partial<Asset>) => {
     if (addEditState.asset) {
       // Edit
-      setAssets((prev) =>
-        prev.map((item) => (item.id === assetData.id ? ({ ...item, ...assetData } as Asset) : item))
-      );
-      if (selectedAsset?.id === assetData.id) {
-        setSelectedAsset((prev) => (prev ? ({ ...prev, ...assetData } as Asset) : null));
+      await updateMutation.mutateAsync({
+        id: addEditState.asset.id,
+        payload: {
+          name: assetData.name,
+          category: assetData.category,
+          status: assetData.status,
+          serialNumber: assetData.serialNumber,
+          location: assetData.location,
+          department: assetData.department,
+          purchaseDate: assetData.purchaseDate,
+          value: assetData.value,
+          notes: assetData.notes,
+        },
+      });
+      if (selectedAsset?.id === addEditState.asset.id) {
+        setSelectedAsset(null);
       }
     } else {
       // Create
-      const newAsset: Asset = {
-        id: assetData.id || `ast-${Date.now()}`,
-        assetCode: assetData.assetCode || "CP-999",
+      await createMutation.mutateAsync({
+        assetCode: assetData.assetCode || `ASSET-${Date.now()}`,
         name: assetData.name || "New Asset",
-        category: assetData.category || "computing",
-        status: assetData.status || "active",
+        category: assetData.category as string,
+        status: assetData.status as AssetStatus,
+        assignmentType: assetData.assignmentType as "borrowable" | "assignable",
         serialNumber: assetData.serialNumber,
         location: assetData.location || "Central Storage",
         department: assetData.department,
         purchaseDate: assetData.purchaseDate,
         value: assetData.value,
         notes: assetData.notes,
-        lastUpdated: new Date().toISOString().split("T")[0],
-        maintenanceHistory: [],
-      };
-      setAssets((prev) => [newAsset, ...prev]);
-    }
-  };
-
-  const handleMarkMaintenance = (asset: Asset) => {
-    setAssets((prev) =>
-      prev.map((item) => {
-        if (item.id !== asset.id) return item;
-        return {
-          ...item,
-          status: "needs_repair",
-          lastUpdated: new Date().toISOString().split("T")[0],
-          maintenanceHistory: [
-            ...item.maintenanceHistory,
-            {
-              id: `m-${Date.now()}`,
-              date: new Date().toISOString().split("T")[0],
-              type: "flagged",
-              description: "Flagged for maintenance inspection by Custodian.",
-              technician: "Property Custodian",
-            },
-          ],
-        };
-      })
-    );
-    if (selectedAsset?.id === asset.id) {
-      setSelectedAsset((prev) => (prev ? { ...prev, status: "needs_repair" } : null));
+      });
     }
   };
 
@@ -216,7 +198,6 @@ export default function AssetsPage() {
           setSelectedAsset(null);
           setAddEditState({ isOpen: true, asset });
         }}
-        onMarkMaintenance={handleMarkMaintenance}
       />
 
       {/* ── Add / Edit Asset Dialog ───────────────────────────────────── */}

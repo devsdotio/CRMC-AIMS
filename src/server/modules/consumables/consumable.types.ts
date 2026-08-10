@@ -15,7 +15,9 @@ export type ConsumableDTO = {
   history: StockHistoryEntry[];
 };
 
-export type ListConsumableFilters = {
+import type { PaginationParams, PaginatedResponse } from "@/types/filters";
+
+export type ListConsumableFilters = PaginationParams & {
   category?: ConsumableDTO["category"];
   stockLevel?: "all" | "healthy" | "low" | "critical";
   search?: string;
@@ -24,9 +26,10 @@ export type ListConsumableFilters = {
 export interface IConsumableRepository {
   findById(id: string): Promise<ConsumableRow | null>;
   findByCode(itemCode: string): Promise<ConsumableRow | null>;
-  list(filters?: ListConsumableFilters): Promise<ConsumableRow[]>;
+  list(filters?: ListConsumableFilters): Promise<PaginatedResponse<ConsumableRow>>;
   countYear(): Promise<number>;
   countLowStock(): Promise<number>;
+  getLowStockItems(limit: number): Promise<ConsumableRow[]>;
   create(
     data: Omit<
       import("@/server/db/schema").NewConsumableRow,

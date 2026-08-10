@@ -6,6 +6,8 @@ export const borrowRequestStatusSchema = z.enum([
   "pending",
   "approved",
   "rejected",
+  "released",
+  "unreleased",
   "returned",
 ]);
 
@@ -14,6 +16,10 @@ export const listBorrowRequestsQuerySchema = z.object({
   department: z.string().trim().max(120).optional(),
   search: z.string().trim().max(200).optional(),
   requesterUserId: z.string().uuid().optional(),
+  page: z.coerce.number().int().min(1).optional().default(1),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(20),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
 
 export const createBorrowRequestSchema = z.object({
@@ -44,9 +50,26 @@ export const rejectBorrowRequestSchema = z.object({
   reason: z.string().trim().min(1, "Rejection reason is required.").max(1000),
 });
 
+export const releaseBorrowRequestSchema = z.object({
+  note: z.string().trim().max(1000).optional(),
+  pickedUpBy: z.string().trim().min(1, "Name of person who picked up the item is required.").max(255),
+});
+
+export const markUnreleasedBorrowRequestSchema = z.object({
+  note: z.string().trim().max(1000).optional(),
+});
+
+export const returnBorrowRequestSchema = z.object({
+  note: z.string().trim().max(1000).optional(),
+  returnedBy: z.string().trim().min(1, "Name of person who returned the item is required.").max(255),
+});
+
 export const borrowRequestIdSchema = z.string().uuid("Invalid request id.");
 
 export type CreateBorrowRequestBody = z.infer<typeof createBorrowRequestSchema>;
 export type ApproveBorrowRequestBody = z.infer<typeof approveBorrowRequestSchema>;
 export type RejectBorrowRequestBody = z.infer<typeof rejectBorrowRequestSchema>;
+export type ReleaseBorrowRequestBody = z.infer<typeof releaseBorrowRequestSchema>;
+export type MarkUnreleasedBorrowRequestBody = z.infer<typeof markUnreleasedBorrowRequestSchema>;
+export type ReturnBorrowRequestBody = z.infer<typeof returnBorrowRequestSchema>;
 export type ListBorrowRequestsQuery = z.infer<typeof listBorrowRequestsQuerySchema>;

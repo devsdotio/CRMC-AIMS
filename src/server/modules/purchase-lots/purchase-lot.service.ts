@@ -75,7 +75,7 @@ export class PurchaseLotService {
     session?: DbSession
   ): Promise<PurchaseLotDTO> {
     let supplierName = input.supplierName ?? null;
-    let supplierId = input.supplierId ?? null;
+    const supplierId = input.supplierId ?? null;
 
     if (supplierId) {
       const supplier = await this.suppliers.findById(supplierId, session);

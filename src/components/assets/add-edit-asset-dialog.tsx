@@ -3,25 +3,19 @@
 import { useState, useEffect } from "react";
 import { X, PackagePlus, Edit } from "lucide-react";
 
-import type { Asset, AssetCategory, AssetStatus } from "@/types/assets";
+import type { Asset, AssetCategory, AssetStatus, AssetAssignmentType } from "@/types/assets";
 import { QRCodeDisplay } from "./qr-code-display";
+import { useCategoriesQuery } from "@/features/categories/client/use-categories";
 
 export interface AddEditAssetDialogProps {
   isOpen: boolean;
   initialAsset?: Asset | null;
   onClose: () => void;
-  onSave: (assetData: Partial<Asset>) => void;
+  onSave: (assetData: Partial<Asset>) => Promise<void> | void;
 }
 
-const CATEGORY_PREFIXES: Record<AssetCategory, string> = {
-  computing: "CP",
-  av: "AV",
-  transport: "TR",
-  furniture: "FN",
-};
-
-function generateAssetCode(category: AssetCategory = "computing"): string {
-  const prefix = CATEGORY_PREFIXES[category];
+function generateAssetCode(categoryName: string = "Unknown"): string {
+  const prefix = categoryName.substring(0, 2).toUpperCase() || "AS";
   const randomNum = Math.floor(100 + Math.random() * 900);
   return `${prefix}-${randomNum}`;
 }
@@ -29,7 +23,7 @@ function generateAssetCode(category: AssetCategory = "computing"): string {
 interface AddEditAssetDialogFormProps {
   initialAsset?: Asset | null;
   onClose: () => void;
-  onSave: (assetData: Partial<Asset>) => void;
+  onSave: (assetData: Partial<Asset>) => Promise<void> | void;
 }
 
 function AddEditAssetDialogForm({
@@ -40,38 +34,46 @@ function AddEditAssetDialogForm({
   const isEditing = Boolean(initialAsset);
 
   const [name, setName] = useState(() => initialAsset?.name ?? "");
-  const [category, setCategory] = useState<AssetCategory>(
-    () => initialAsset?.category ?? "computing"
+  const { data: allCategories, isLoading: categoriesLoading } = useCategoriesQuery();
+  const assetCategories = allCategories?.filter(c => c.type === 'asset') || [];
+  
+  const [category, setCategory] = useState<AssetCategory | "">(
+    () => initialAsset?.category ?? ""
   );
-  const [status, setStatus] = useState<AssetStatus>(
-    () => initialAsset?.status ?? "active"
+  const [status, setStatus] = useState<AssetStatus | "">(
+    () => initialAsset?.status ?? ""
+  );
+  const [assignmentType, setAssignmentType] = useState<AssetAssignmentType>(
+    () => initialAsset?.assignmentType ?? "borrowable"
   );
   const [assetCode, setAssetCode] = useState(
-    () => initialAsset?.assetCode ?? generateAssetCode("computing")
+    () => initialAsset?.assetCode ?? "Pending..."
   );
   const [serialNumber, setSerialNumber] = useState(
     () => initialAsset?.serialNumber ?? ""
   );
   const [location, setLocation] = useState(
-    () => initialAsset?.location ?? "IT Office — Rm 302"
+    () => initialAsset?.location ?? ""
   );
   const [department] = useState(
-    () => initialAsset?.department ?? "IT"
+    () => initialAsset?.department ?? ""
   );
   const [notes, setNotes] = useState(() => initialAsset?.notes ?? "");
   const [value, setValue] = useState(() =>
     initialAsset?.value ? String(initialAsset.value) : ""
   );
   const [purchaseDate, setPurchaseDate] = useState(
-    () =>
-      initialAsset?.purchaseDate ?? new Date().toISOString().split("T")[0]
+    () => initialAsset?.purchaseDate ?? ""
   );
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleCategoryChange = (newCat: AssetCategory) => {
+  const handleCategoryChange = (newCat: AssetCategory | "") => {
     setCategory(newCat);
-    if (!isEditing) {
+    if (!isEditing && newCat) {
       setAssetCode(generateAssetCode(newCat));
+    } else if (!isEditing && !newCat) {
+      setAssetCode("Pending...");
     }
   };
 
@@ -85,10 +87,18 @@ function AddEditAssetDialogForm({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
       setError("Please enter the asset name.");
+      return;
+    }
+    if (!category) {
+      setError("Please select an asset category.");
+      return;
+    }
+    if (!status) {
+      setError("Please select an initial condition.");
       return;
     }
     if (!location.trim()) {
@@ -96,21 +106,29 @@ function AddEditAssetDialogForm({
       return;
     }
 
-    onSave({
-      id: initialAsset ? initialAsset.id : `ast-${Date.now()}`,
-      assetCode,
-      name: name.trim(),
-      category,
-      status,
-      serialNumber: serialNumber.trim() || undefined,
-      location: location.trim(),
-      department: department.trim() || undefined,
-      notes: notes.trim() || undefined,
-      value: value ? Number(value) : undefined,
-      purchaseDate: purchaseDate || undefined,
-      lastUpdated: new Date().toISOString().split("T")[0],
-    });
-    onClose();
+    try {
+      setIsSubmitting(true);
+      await onSave({
+        id: initialAsset ? initialAsset.id : `ast-${Date.now()}`,
+        assetCode,
+        name: name.trim(),
+        category: category as AssetCategory,
+        status: status as AssetStatus,
+        assignmentType,
+        serialNumber: serialNumber.trim() || undefined,
+        location: location.trim(),
+        department: department.trim() || undefined,
+        notes: notes.trim() || undefined,
+        value: value ? Number(value) : undefined,
+        purchaseDate: purchaseDate || undefined,
+        lastUpdated: new Date().toISOString().split("T")[0],
+      });
+      onClose();
+    } catch (err) {
+      setError("An error occurred while saving. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -121,7 +139,7 @@ function AddEditAssetDialogForm({
         role="dialog"
         aria-modal="true"
         aria-labelledby="dialog-title"
-        className="relative w-full max-w-xl rounded-2xl border border-border bg-bg p-6 shadow-2xl z-10 animate-in fade-in zoom-in-95 duration-150 my-8"
+        className="relative w-full max-w-4xl rounded-2xl border border-border bg-bg p-6 shadow-2xl z-10 animate-in fade-in zoom-in-95 duration-150 my-8"
       >
         <div className="flex items-center justify-between gap-3 mb-5 border-b border-border pb-4">
           <div className="flex items-center gap-2.5">
@@ -148,149 +166,196 @@ function AddEditAssetDialogForm({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-[1fr_160px] gap-4 items-start p-3.5 rounded-xl border border-border bg-bg-subtle">
-            <div className="space-y-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-text-secondary block">
-                Generated Asset Tag Code
-              </span>
-              <span className="font-mono text-base font-bold text-text bg-bg px-3 py-1.5 rounded border border-border inline-block">
-                {assetCode}
-              </span>
-              <p className="text-[11px] text-text-secondary">
-                Prefix matches selected category ({CATEGORY_PREFIXES[category]}).
-              </p>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_260px] gap-6">
+            {/* Left Column - All Inputs */}
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <label htmlFor="asset-name-input" className="block text-xs font-semibold text-text">
+                  Asset Name <span className="text-accent">*</span>
+                </label>
+                <input
+                  id="asset-name-input"
+                  type="text"
+                  value={name}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    if (error) setError("");
+                  }}
+                  placeholder="e.g. MacBook Pro 16-inch, Canon DSLR Camera"
+                  className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label htmlFor="category-select" className="block text-xs font-semibold text-text">
+                    Asset Category <span className="text-accent">*</span>
+                  </label>
+                  <select
+                    id="category-select"
+                    value={category}
+                    onChange={(e) => handleCategoryChange(e.target.value as AssetCategory | "")}
+                    className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text font-medium focus:outline-none focus:ring-2 focus:ring-accent"
+                    disabled={categoriesLoading}
+                  >
+                    <option value="" disabled>Select a category...</option>
+                    {categoriesLoading ? (
+                      <option value="" disabled>Loading categories...</option>
+                    ) : assetCategories.length > 0 ? (
+                      assetCategories.map((c) => (
+                        <option key={c.id} value={c.name}>
+                          {c.name}
+                        </option>
+                      ))
+                    ) : (
+                      <option value="computing">Computing</option>
+                    )}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label htmlFor="status-select" className="block text-xs font-semibold text-text">
+                    Initial Condition <span className="text-accent">*</span>
+                  </label>
+                  <select
+                    id="status-select"
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value as AssetStatus | "")}
+                    className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text font-medium focus:outline-none focus:ring-2 focus:ring-accent"
+                  >
+                    <option value="" disabled>Select condition...</option>
+                    <option value="active">Active (Serviceable)</option>
+                    <option value="needs_repair">Needs Repair</option>
+                    <option value="out_of_service">Out of Service</option>
+                    <option value="retired">Retired</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label htmlFor="assignment-type-select" className="block text-xs font-semibold text-text">
+                  Assignment Type <span className="text-accent">*</span>
+                </label>
+                <div className="flex gap-4 items-center h-9">
+                  <label className="flex items-center gap-2 text-xs text-text cursor-pointer">
+                    <input
+                      type="radio"
+                      name="assignmentType"
+                      value="borrowable"
+                      checked={assignmentType === "borrowable"}
+                      onChange={(e) => setAssignmentType(e.target.value as AssetAssignmentType)}
+                      className="text-accent focus:ring-accent"
+                    />
+                    Borrowable (Short-term)
+                  </label>
+                  <label className="flex items-center gap-2 text-xs text-text cursor-pointer">
+                    <input
+                      type="radio"
+                      name="assignmentType"
+                      value="assignable"
+                      checked={assignmentType === "assignable"}
+                      onChange={(e) => setAssignmentType(e.target.value as AssetAssignmentType)}
+                      className="text-accent focus:ring-accent"
+                    />
+                    Assignable (Long-term)
+                  </label>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label htmlFor="serial-input" className="block text-xs font-semibold text-text">
+                    Serial Number
+                  </label>
+                  <input
+                    id="serial-input"
+                    type="text"
+                    value={serialNumber}
+                    onChange={(e) => setSerialNumber(e.target.value)}
+                    placeholder="e.g. SN-DL-98214-X"
+                    className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg font-mono text-text placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label htmlFor="location-input" className="block text-xs font-semibold text-text">
+                    Primary Location <span className="text-accent">*</span>
+                  </label>
+                  <input
+                    id="location-input"
+                    type="text"
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    placeholder="e.g. IT Office — Rm 302"
+                    className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label htmlFor="value-input" className="block text-xs font-semibold text-text">
+                    Inventory Value (₱)
+                  </label>
+                  <input
+                    id="value-input"
+                    type="number"
+                    value={value}
+                    onChange={(e) => setValue(e.target.value)}
+                    placeholder="e.g. 58000"
+                    className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label htmlFor="date-input" className="block text-xs font-semibold text-text">
+                    Acquisition Date
+                  </label>
+                  <input
+                    id="date-input"
+                    type="date"
+                    value={purchaseDate}
+                    onChange={(e) => setPurchaseDate(e.target.value)}
+                    className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label htmlFor="notes-input" className="block text-xs font-semibold text-text">
+                  Description / Custody Notes
+                </label>
+                <textarea
+                  id="notes-input"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={4}
+                  placeholder="Add specific configuration details, included accessories, or warranty notes…"
+                  className="w-full p-2.5 text-xs bg-bg border border-border rounded-lg text-text placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent resize-none"
+                />
+              </div>
             </div>
 
-            <div className="flex justify-center md:justify-end">
-              <QRCodeDisplay assetCode={assetCode} assetName={name || "New Asset"} size={90} className="p-2 space-y-1 scale-90 origin-top" />
+            {/* Right Column - Barcode */}
+            <div className="flex flex-col">
+              <div className="flex flex-col items-center justify-center p-5 rounded-xl border border-border bg-bg-subtle text-center gap-4">
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-text-secondary block">
+                    Generated Asset Tag
+                  </span>
+                  <span className="font-mono text-base font-bold text-text bg-bg px-3 py-1 rounded border border-border inline-block shadow-xs">
+                    {assetCode}
+                  </span>
+                  <p className="text-[10px] text-text-secondary mt-1.5 max-w-45 mx-auto leading-relaxed">
+                    Prefix generated from category ({category ? category.substring(0, 2).toUpperCase() : "??"}).
+                  </p>
+                </div>
+                <div className="shrink-0 bg-bg p-2.5 rounded-xl border border-border shadow-xs">
+                  <QRCodeDisplay assetCode={assetCode} assetName={name || "New Asset"} size={120} className="scale-100" />
+                </div>
+              </div>
             </div>
-          </div>
-
-          <div className="space-y-1">
-            <label htmlFor="asset-name-input" className="block text-xs font-semibold text-text">
-              Asset Name <span className="text-accent">*</span>
-            </label>
-            <input
-              id="asset-name-input"
-              type="text"
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                if (error) setError("");
-              }}
-              placeholder="e.g. MacBook Pro 16-inch, Canon DSLR Camera"
-              className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label htmlFor="category-select" className="block text-xs font-semibold text-text">
-                Asset Category <span className="text-accent">*</span>
-              </label>
-              <select
-                id="category-select"
-                value={category}
-                onChange={(e) => handleCategoryChange(e.target.value as AssetCategory)}
-                className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text font-medium focus:outline-none focus:ring-2 focus:ring-accent"
-              >
-                <option value="computing">Computing</option>
-                <option value="av">AV Equipment</option>
-                <option value="transport">Transport</option>
-                <option value="furniture">Furniture</option>
-              </select>
-            </div>
-
-            <div className="space-y-1">
-              <label htmlFor="status-select" className="block text-xs font-semibold text-text">
-                Initial Condition Status <span className="text-accent">*</span>
-              </label>
-              <select
-                id="status-select"
-                value={status}
-                onChange={(e) => setStatus(e.target.value as AssetStatus)}
-                className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text font-medium focus:outline-none focus:ring-2 focus:ring-accent"
-              >
-                <option value="active">Active (Serviceable)</option>
-                <option value="needs_repair">Needs Repair</option>
-                <option value="out_of_service">Out of Service</option>
-                <option value="retired">Retired</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label htmlFor="serial-input" className="block text-xs font-semibold text-text">
-                Serial Number (Optional)
-              </label>
-              <input
-                id="serial-input"
-                type="text"
-                value={serialNumber}
-                onChange={(e) => setSerialNumber(e.target.value)}
-                placeholder="e.g. SN-DL-98214-X"
-                className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg font-mono text-text placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label htmlFor="location-input" className="block text-xs font-semibold text-text">
-                Primary Location <span className="text-accent">*</span>
-              </label>
-              <input
-                id="location-input"
-                type="text"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="e.g. IT Office — Rm 302"
-                className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label htmlFor="value-input" className="block text-xs font-semibold text-text">
-                Inventory Value (₱)
-              </label>
-              <input
-                id="value-input"
-                type="number"
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                placeholder="e.g. 58000"
-                className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label htmlFor="date-input" className="block text-xs font-semibold text-text">
-                Acquisition Date
-              </label>
-              <input
-                id="date-input"
-                type="date"
-                value={purchaseDate}
-                onChange={(e) => setPurchaseDate(e.target.value)}
-                className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <label htmlFor="notes-input" className="block text-xs font-semibold text-text">
-              Description / Custody Notes
-            </label>
-            <textarea
-              id="notes-input"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={2}
-              placeholder="Add specific configuration details, included accessories, or warranty notes…"
-              className="w-full p-2.5 text-xs bg-bg border border-border rounded-lg text-text placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent"
-            />
           </div>
 
           {error && <p className="text-xs font-bold text-status-outofservice-text">{error}</p>}
@@ -299,15 +364,24 @@ function AddEditAssetDialogForm({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-semibold text-text-secondary hover:text-text rounded-md border border-border bg-bg transition-colors cursor-pointer"
+              disabled={isSubmitting}
+              className="px-4 py-2 text-xs font-semibold text-text-secondary hover:text-text rounded-md border border-border bg-bg transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 text-xs font-semibold rounded-md bg-accent text-accent-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+              disabled={isSubmitting}
+              className="relative px-4 py-2 text-xs font-semibold rounded-md bg-accent text-accent-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs disabled:opacity-70 disabled:cursor-not-allowed min-w-35"
             >
-              {isEditing ? "Save Changes" : "Create Asset Tag Record"}
+              <span className={`flex items-center justify-center gap-2 ${isSubmitting ? 'opacity-0' : 'opacity-100'}`}>
+                {isEditing ? "Save Changes" : "Create Asset Tag Record"}
+              </span>
+              {isSubmitting && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="h-4 w-4 rounded-full border-2 border-accent-foreground border-r-transparent animate-spin" />
+                </div>
+              )}
             </button>
           </div>
         </form>

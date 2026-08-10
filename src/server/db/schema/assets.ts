@@ -25,6 +25,11 @@ export const assetCategoryEnum = pgEnum("asset_category", [
   "furniture",
 ]);
 
+export const assetAssignmentTypeEnum = pgEnum("asset_assignment_type", [
+  "borrowable",
+  "assignable",
+]);
+
 export const assetStatusEnum = pgEnum("asset_status", [
   "active",
   "needs_repair",
@@ -58,6 +63,7 @@ export const assets = pgTable(
     name: text("name").notNull(),
     category: assetCategoryEnum("category").notNull(),
     status: assetStatusEnum("status").notNull().default("active"),
+    assignmentType: assetAssignmentTypeEnum("assignment_type").notNull().default("borrowable"),
 
     serialNumber: text("serial_number"),
     location: text("location").notNull(),

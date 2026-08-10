@@ -3,7 +3,13 @@
 import { Search, FilterX, ArrowUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ConsumableFilterState } from "@/types/inventory";
-import { CONSUMABLE_CATEGORIES } from "./mock-data";
+const CONSUMABLE_CATEGORIES = [
+  { id: "all", label: "All Categories" },
+  { id: "office_supplies", label: "Office Supplies" },
+  { id: "cleaning", label: "Cleaning Supplies" },
+  { id: "medical", label: "Medical Disposables" },
+  { id: "it_peripherals", label: "IT Peripherals" },
+];
 
 export interface ConsumableFiltersProps {
   filters: ConsumableFilterState;

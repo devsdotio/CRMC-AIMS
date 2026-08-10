@@ -91,7 +91,7 @@ export function StatCard({
     <div
       className={cn(
         "group relative flex flex-col justify-between overflow-hidden rounded-lg border p-5 transition-all duration-300 select-none",
-        "h-full min-h-[160px] bg-card text-text shadow-sm hover:shadow-md",
+        "h-full min-h-40 bg-card text-text shadow-sm hover:shadow-md",
         // Uniform white card background with distinct operational borders & accents
         isOverdue
           ? "border-status-outofservice-bg/60 hover:border-status-outofservice-bg"
@@ -251,7 +251,7 @@ export interface StatCardsGridProps {
 export function StatCardsGrid({ stats }: StatCardsGridProps) {
   return (
     <section aria-label="Key operational telemetry metrics">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map((s, i) => (
           <StatCard key={i} {...s} />
         ))}

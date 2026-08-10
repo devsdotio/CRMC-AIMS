@@ -7,7 +7,7 @@ import { CancelRequestDialog } from "./cancel-request-dialog";
 import type { PortalBorrowRequest, RequestStatusFilter } from "./types";
 import { useState } from "react";
 
-import { useBorrowRequestsQuery, useRejectBorrowRequestMutation } from "@/features/borrow-requests/client/use-borrow-requests";
+import { useBorrowRequests, useRejectBorrowRequestMutation } from "@/features/borrow-requests/client/use-borrow-requests";
 
 const STATUS_FILTERS: { key: RequestStatusFilter; label: string }[] = [
   { key: "all", label: "All" },
@@ -21,7 +21,8 @@ export function MyRequestsTab() {
   const [statusFilter, setStatusFilter] = useState<RequestStatusFilter>("all");
   const [cancelTarget, setCancelTarget] = useState<PortalBorrowRequest | null>(null);
 
-  const { data: requests = [], isLoading: loading } = useBorrowRequestsQuery();
+  const { data: response, isLoading: loading } = useBorrowRequests();
+  const requests = response?.data ?? [];
   const { mutate: cancelRequest } = useRejectBorrowRequestMutation();
 
   const handleCancelConfirmed = (requestId: string) => {
@@ -122,7 +123,9 @@ export function MyRequestsTab() {
           filtered.map((request) => (
             <MyRequestItem
               key={request.id}
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
               request={request as any}
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
               onCancel={(r) => setCancelTarget(r as any)}
             />
           ))

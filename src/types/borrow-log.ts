@@ -1,4 +1,5 @@
 import type { AssetCategory } from './shared';
+import type { AuditLogRow } from "@/server/db/schema/audit-logs";
 
 
 export type { AssetCategory };
@@ -9,14 +10,6 @@ export type LogStatus = "active" | "overdue" | "returned";
 export type ReturnCondition = "good" | "damaged" | "needs_repair";
 
 export type LogTabFilter = "active" | "overdue" | "returned" | "all";
-
-export interface LogAuditEntry {
-  id: string;
-  action: "released" | "returned" | "flagged_repair" | "reminder_sent";
-  actor: string;
-  timestamp: string;
-  notes?: string;
-}
 
 export interface BorrowLogRecord {
   id: string;
@@ -38,7 +31,7 @@ export interface BorrowLogRecord {
   conditionNotes?: string;
   releasedBy: string;
   receivedBy?: string;
-  history: LogAuditEntry[];
+  history: AuditLogRow[];
 }
 
 export interface BorrowLogFilterState extends BaseFilterState, DateRangeFilter {

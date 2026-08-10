@@ -8,10 +8,7 @@ import type { BrowseItem } from "./types";
 
 import { useAssetsQuery } from "@/features/assets/client/use-assets";
 import { useConsumablesQuery } from "@/features/consumables/client/use-consumables";
-
-interface BrowseTabProps {
-  onRequest: (item: BrowseItem) => void;
-}
+import { useBorrowerPortal } from "./context";
 
 const CATEGORY_FILTERS = [
   { key: "all", label: "All" },
@@ -26,19 +23,23 @@ const CATEGORY_FILTERS = [
 
 type CategoryKey = (typeof CATEGORY_FILTERS)[number]["key"];
 
-export function BrowseTab({ onRequest }: BrowseTabProps) {
+export function BrowseTab() {
+  const { cart, openWizard } = useBorrowerPortal();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<CategoryKey>("all");
   const [availableOnly, setAvailableOnly] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   const { data: assets = [], isLoading: assetsLoading } = useAssetsQuery();
-  const { data: consumables = [], isLoading: consumablesLoading } = useConsumablesQuery();
+  const { data: paginatedData, isLoading: consumablesLoading } = useConsumablesQuery();
+  const consumables = useMemo(() => paginatedData?.data ?? [], [paginatedData?.data]);
   const loading = assetsLoading || consumablesLoading;
 
   const items = useMemo(() => {
     return [
-      ...assets.map(a => ({
+      ...assets
+        .filter(a => a.assignmentType === "borrowable")
+        .map(a => ({
         id: a.id,
         name: a.name,
         category: a.category,
@@ -236,7 +237,6 @@ export function BrowseTab({ onRequest }: BrowseTabProps) {
             <BrowseItemCard
               key={item.id}
               item={item}
-              onRequest={onRequest}
               viewMode="grid"
             />
           ))}
@@ -247,10 +247,25 @@ export function BrowseTab({ onRequest }: BrowseTabProps) {
             <BrowseItemCard
               key={item.id}
               item={item}
-              onRequest={onRequest}
               viewMode="list"
             />
           ))}
+        </div>
+      )}
+
+      {/* Floating Cart Bar */}
+      {cart.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-card border border-border shadow-2xl rounded-full px-4 py-3 flex items-center gap-4 z-40">
+          <div className="text-sm font-semibold text-text">
+            {cart.length} item{cart.length !== 1 ? "s" : ""} selected
+          </div>
+          <button
+            type="button"
+            onClick={() => openWizard(cart)}
+            className="px-4 py-2 bg-accent text-accent-foreground rounded-full text-xs font-semibold hover:opacity-90 transition-opacity"
+          >
+            Checkout Request
+          </button>
         </div>
       )}
     </div>

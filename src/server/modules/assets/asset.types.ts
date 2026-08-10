@@ -17,11 +17,13 @@ export type {
   UpdateAssetInput,
 };
 
+import type { PaginationParams, PaginatedResponse } from "@/types/filters";
+
 /**
  * List filters supported by GET /api/assets.
  * Client-side filtering (search, multi-status, sort) stays in the UI for now.
  */
-export interface ListAssetsFilters {
+export interface ListAssetsFilters extends PaginationParams {
   status?: AssetStatus;
 }
 
@@ -30,6 +32,7 @@ export interface ListAssetsFilters {
  * repositories can be swapped or mocked in tests.
  */
 export interface IAssetRepository {
+  getCategoryDistribution(): Promise<{ category: string; count: number }[]>;
   findMany(filters?: ListAssetsFilters): Promise<AssetRow[]>;
   findById(id: string): Promise<AssetRow | null>;
   findByAssetCode(assetCode: string): Promise<AssetRow | null>;
