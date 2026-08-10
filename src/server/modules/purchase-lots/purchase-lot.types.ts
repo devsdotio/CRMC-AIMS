@@ -23,6 +23,8 @@ export type PurchaseLotDTO = {
   recordedByName: string;
   createdAt: string;
   updatedAt: string;
+  /** Print/scan payload: `CRMC-AIMS-LOT:{lotCode}` */
+  qrPayload: string;
 };
 
 export type ListPurchaseLotFilters = {

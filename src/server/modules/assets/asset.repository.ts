@@ -1,4 +1,4 @@
-import { asc, eq, count } from "drizzle-orm";
+import { and, asc, count, eq, ilike, isNull, or } from "drizzle-orm";
 
 import { getDb } from "@/server/db";
 import type { DbSession } from "@/server/db/transaction";
@@ -15,7 +15,9 @@ export class AssetRepository implements IAssetRepository {
     return session ?? getDb();
   }
 
-  async getCategoryDistribution(session?: DbSession): Promise<{ category: string; count: number }[]> {
+  async getCategoryDistribution(
+    session?: DbSession
+  ): Promise<{ category: string; count: number }[]> {
     const db = this.db(session);
     const rows = await db
       .select({
@@ -24,7 +26,7 @@ export class AssetRepository implements IAssetRepository {
       })
       .from(assets)
       .groupBy(assets.category);
-    
+
     return rows.map((r) => ({
       category: r.category,
       count: Number(r.value),
@@ -36,21 +38,46 @@ export class AssetRepository implements IAssetRepository {
     session?: DbSession
   ): Promise<AssetRow[]> {
     const db = this.db(session);
+    const conditions = [];
 
     if (filters?.status) {
-      return db
-        .select()
-        .from(assets)
-        .where(eq(assets.status, filters.status))
-        .orderBy(asc(assets.createdAt));
+      conditions.push(eq(assets.status, filters.status));
+    }
+    if (filters?.modelId) {
+      conditions.push(eq(assets.modelId, filters.modelId));
+    }
+    if (filters?.category?.trim()) {
+      conditions.push(eq(assets.category, filters.category.trim()));
+    }
+    if (filters?.availableOnly) {
+      conditions.push(eq(assets.status, "active"));
+      conditions.push(isNull(assets.currentHolder));
+    }
+    if (filters?.search?.trim()) {
+      const q = `%${filters.search.trim()}%`;
+      conditions.push(
+        or(
+          ilike(assets.assetCode, q),
+          ilike(assets.name, q),
+          ilike(assets.serialNumber, q),
+          ilike(assets.location, q),
+          ilike(assets.currentHolder, q)
+        )!
+      );
     }
 
-    return db.select().from(assets).orderBy(asc(assets.createdAt));
+    const base = db.select().from(assets).orderBy(asc(assets.createdAt));
+    if (conditions.length === 0) return base;
+    return base.where(and(...conditions));
   }
 
   async findById(id: string, session?: DbSession): Promise<AssetRow | null> {
     const db = this.db(session);
-    const [row] = await db.select().from(assets).where(eq(assets.id, id)).limit(1);
+    const [row] = await db
+      .select()
+      .from(assets)
+      .where(eq(assets.id, id))
+      .limit(1);
     return row ?? null;
   }
 
@@ -79,6 +106,18 @@ export class AssetRepository implements IAssetRepository {
       .where(eq(assets.assetCode, assetCode))
       .limit(1);
     return row ?? null;
+  }
+
+  async findByModelId(
+    modelId: string,
+    session?: DbSession
+  ): Promise<AssetRow[]> {
+    const db = this.db(session);
+    return db
+      .select()
+      .from(assets)
+      .where(eq(assets.modelId, modelId))
+      .orderBy(asc(assets.assetCode));
   }
 
   async create(

@@ -33,11 +33,25 @@ export type StockHistoryEntry = {
   actor: string;
   reason?: string;
   notes?: string;
-  /** Present on cost-tracked restocks (phase 1.5+). */
+  /** Present on cost-tracked restocks and lot-aware checkouts. */
   unitCost?: string;
   supplierId?: string;
   supplierName?: string;
   lotCode?: string;
+  /** Frozen total for this release line (qty × unitCost at scan time). */
+  totalCost?: string;
+  /** Multi-lot FIFO allocations when checkout spans lots. */
+  lotAllocations?: Array<{
+    lotId: string | null;
+    lotCode: string | null;
+    quantity: number;
+    unitCost: string;
+    total: string;
+    supplierId?: string | null;
+    supplierName?: string | null;
+    uncosted?: boolean;
+  }>;
+  recipientName?: string;
 };
 
 export const consumables = pgTable(

@@ -87,12 +87,24 @@ async function fetchJson<T>(input: RequestInfo | URL, init?: RequestInit): Promi
 }
 
 export const assetsApi = {
-  async listAssets(status?: AssetStatus): Promise<Asset[]> {
+  async listAssets(
+    status?: AssetStatus,
+    filters?: {
+      modelId?: string;
+      category?: string;
+      search?: string;
+      availableOnly?: boolean;
+    }
+  ): Promise<Asset[]> {
     const searchParams = new URLSearchParams();
 
     if (status) {
       searchParams.set("status", status);
     }
+    if (filters?.modelId) searchParams.set("modelId", filters.modelId);
+    if (filters?.category) searchParams.set("category", filters.category);
+    if (filters?.search) searchParams.set("search", filters.search);
+    if (filters?.availableOnly) searchParams.set("availableOnly", "true");
 
     const queryString = searchParams.toString();
     const path = queryString.length > 0 ? `/api/assets?${queryString}` : "/api/assets";
@@ -105,12 +117,49 @@ export const assetsApi = {
     return response.data;
   },
 
+  async getAssetByCode(code: string): Promise<Asset> {
+    const path = `/api/assets/by-code?code=${encodeURIComponent(code)}`;
+    const response = await fetchJson<ApiResponse<Asset>>(path, { method: "GET" });
+    return response.data;
+  },
+
   async createAsset(payload: CreateAssetInput): Promise<Asset> {
     const response = await fetchJson<ApiResponse<Asset>>("/api/assets", {
       method: "POST",
       body: JSON.stringify(payload),
     });
 
+    return response.data;
+  },
+
+  async bulkCreate(payload: Record<string, unknown>) {
+    const response = await fetchJson<
+      ApiResponse<{
+        model: unknown;
+        units: Asset[];
+        createdCount: number;
+      }>
+    >("/api/assets/bulk", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    return response.data;
+  },
+
+  async resolveScan(code: string) {
+    const response = await fetchJson<
+      ApiResponse<{
+        kind: "asset";
+        code: string;
+        qrPayload: string;
+        asset: Asset;
+        suggestedAction: "release" | "return" | "project" | "blocked";
+        reason?: string;
+      }>
+    >("/api/assets/scan/resolve", {
+      method: "POST",
+      body: JSON.stringify({ code }),
+    });
     return response.data;
   },
 
@@ -136,12 +185,32 @@ export const assetsApi = {
     return response.data;
   },
 
+  async scanRelease(
+    payload: ReleaseAssetInput & { code: string }
+  ): Promise<Asset> {
+    const response = await fetchJson<ApiResponse<Asset>>("/api/assets/scan/release", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    return response.data;
+  },
+
   async returnAsset(id: string, payload: ReturnAssetInput): Promise<Asset> {
     const response = await fetchJson<ApiResponse<Asset>>(`/api/assets/${id}/return`, {
       method: "POST",
       body: JSON.stringify(payload),
     });
 
+    return response.data;
+  },
+
+  async scanReturn(
+    payload: ReturnAssetInput & { code: string }
+  ): Promise<Asset> {
+    const response = await fetchJson<ApiResponse<Asset>>("/api/assets/scan/return", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
     return response.data;
   },
 

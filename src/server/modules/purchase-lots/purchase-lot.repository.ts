@@ -31,6 +31,32 @@ export class PurchaseLotRepository implements IPurchaseLotRepository {
     return row ?? null;
   }
 
+  async findByLotCode(
+    lotCode: string,
+    session?: DbSession
+  ): Promise<PurchaseLotRow | null> {
+    const db = this.db(session);
+    const [row] = await db
+      .select()
+      .from(purchaseLots)
+      .where(eq(purchaseLots.lotCode, lotCode))
+      .limit(1);
+    return row ?? null;
+  }
+
+  async findByLotCodeForUpdate(
+    lotCode: string,
+    session: DbSession
+  ): Promise<PurchaseLotRow | null> {
+    const [row] = await session
+      .select()
+      .from(purchaseLots)
+      .where(eq(purchaseLots.lotCode, lotCode))
+      .for("update")
+      .limit(1);
+    return row ?? null;
+  }
+
   async list(
     filters: ListPurchaseLotFilters = {},
     session?: DbSession

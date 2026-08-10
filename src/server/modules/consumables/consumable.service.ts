@@ -10,7 +10,13 @@ import {
   NotFoundError,
 } from "@/server/shared/errors";
 import { withTransaction } from "@/server/db/transaction";
-import { PurchaseLotService } from "@/server/modules/purchase-lots/purchase-lot.service";
+import { parseScanPayload } from "@/server/shared/qr";
+import {
+  PurchaseLotService,
+  type LotCostAllocation,
+} from "@/server/modules/purchase-lots/purchase-lot.service";
+import type { PurchaseLotDTO } from "@/server/modules/purchase-lots/purchase-lot.types";
+import { scanReleaseLotSchema } from "@/server/modules/purchase-lots/purchase-lot.validation";
 import { CategoryRepository } from "@/server/modules/categories/category.repository";
 
 import { ConsumableRepository } from "./consumable.repository";
@@ -65,7 +71,13 @@ function historyEntry(
   extra?: Partial<
     Pick<
       StockHistoryEntry,
-      "unitCost" | "supplierId" | "supplierName" | "lotCode"
+      | "unitCost"
+      | "supplierId"
+      | "supplierName"
+      | "lotCode"
+      | "totalCost"
+      | "lotAllocations"
+      | "recipientName"
     >
   >
 ): StockHistoryEntry {
@@ -279,6 +291,20 @@ export class ConsumableService {
         );
       }
 
+      // FIFO cost snapshot — preserves supplier pricing for reports even if
+      // unit costs change on later restocks.
+      const allocations = await this.purchaseLots.consumeFifo(
+        existing.id,
+        input.quantity,
+        tx
+      );
+
+      const totalCost = allocations.reduce(
+        (sum, a) => sum + Number(a.total),
+        0
+      );
+      const primary = allocations.find((a) => !a.uncosted) ?? allocations[0];
+
       const history = [
         ...(Array.isArray(existing.history) ? existing.history : []),
         historyEntry(
@@ -286,7 +312,15 @@ export class ConsumableService {
           -input.quantity,
           actor.displayName,
           input.reason,
-          input.notes
+          input.notes,
+          {
+            unitCost: primary?.unitCost,
+            supplierId: primary?.supplierId ?? undefined,
+            supplierName: primary?.supplierName ?? undefined,
+            lotCode: primary?.lotCode ?? undefined,
+            totalCost: totalCost.toFixed(2),
+            lotAllocations: allocations,
+          }
         ),
       ];
 
@@ -300,6 +334,102 @@ export class ConsumableService {
       );
       if (!updated) throw new NotFoundError("Consumable", id);
       return toDTO(updated);
+    });
+  }
+
+  /**
+   * QR scan release against a *specific* supplier purchase lot.
+   * Quantity is entered after scan; cost/supplier are frozen from the lot row.
+   */
+  async releaseFromLot(
+    rawInput: unknown,
+    actor: ActorContext
+  ): Promise<{
+    consumable: ConsumableDTO;
+    lot: PurchaseLotDTO;
+    allocation: LotCostAllocation;
+  }> {
+    const input = scanReleaseLotSchema.parse(rawInput);
+    const parsed = parseScanPayload(input.code);
+    if (!parsed.code) {
+      throw new BadRequestError("Lot code is required.");
+    }
+
+    return withTransaction(async (tx) => {
+      // Resolve lot without consuming yet — then lock consumable stock first
+      // so we never drain a lot when the stock item is short.
+      const preview = await this.purchaseLots.getByCode(parsed.code);
+      if (preview.itemType !== "consumable") {
+        throw new BadRequestError(
+          "Only consumable purchase lots support quantity release via scan."
+        );
+      }
+      if (!preview.consumableId) {
+        throw new BadRequestError(
+          "This purchase lot is not linked to a consumable item."
+        );
+      }
+      if (preview.quantityRemaining < input.quantity) {
+        throw new BadRequestError(
+          `Insufficient remaining in lot ${preview.lotCode}. Available: ${preview.quantityRemaining}.`
+        );
+      }
+
+      const existing = await this.repo.findByIdForUpdate(
+        preview.consumableId,
+        tx
+      );
+      if (!existing) {
+        throw new NotFoundError("Consumable", preview.consumableId);
+      }
+
+      if (existing.currentQty < input.quantity) {
+        throw new BadRequestError(
+          `Insufficient stock on ${existing.itemCode}. Available: ${existing.currentQty} ${existing.unit}.`
+        );
+      }
+
+      const { lot, allocation } = await this.purchaseLots.consumeFromLot(
+        preview.lotCode,
+        input.quantity,
+        tx
+      );
+
+      const history = [
+        ...(Array.isArray(existing.history) ? existing.history : []),
+        historyEntry(
+          "checkout",
+          -input.quantity,
+          actor.displayName,
+          input.reason,
+          input.notes,
+          {
+            unitCost: allocation.unitCost,
+            supplierId: allocation.supplierId ?? undefined,
+            supplierName: allocation.supplierName ?? undefined,
+            lotCode: allocation.lotCode ?? undefined,
+            totalCost: allocation.total,
+            lotAllocations: [allocation],
+            recipientName: input.recipientName,
+          }
+        ),
+      ];
+
+      const updated = await this.repo.update(
+        existing.id,
+        {
+          currentQty: existing.currentQty - input.quantity,
+          history,
+        },
+        tx
+      );
+      if (!updated) throw new NotFoundError("Consumable", existing.id);
+
+      return {
+        consumable: toDTO(updated),
+        lot,
+        allocation,
+      };
     });
   }
 

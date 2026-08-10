@@ -21,6 +21,8 @@ export interface Asset {
   category: AssetCategory;
   status: AssetStatus;
   assignmentType: AssetAssignmentType;
+  /** Parent product model when unit belongs to a multi-copy catalog entry. */
+  modelId?: string;
   serialNumber?: string;
   location: string;
   currentHolder?: string;
@@ -32,6 +34,8 @@ export interface Asset {
   notes?: string;
   lastUpdated: string;
   maintenanceHistory: MaintenanceLogEntry[];
+  /** Canonical QR payload (`CRMC-AIMS:{assetCode}`) for printers / scanners. */
+  qrPayload?: string;
 }
 
 export interface AssetFilterState extends BaseFilterState {
@@ -50,6 +54,7 @@ export type CreateAssetInput = Pick<
   Partial<
     Pick<
       Asset,
+      | "modelId"
       | "serialNumber"
       | "department"
       | "purchaseDate"

@@ -8,17 +8,27 @@ import {
   ok,
 } from "@/server/shared/http";
 
+import { AssetModelService } from "./asset.model.service";
 import { AssetService } from "./asset.service";
 
 export class AssetController {
-  constructor(private readonly assetService: AssetService = new AssetService()) {}
+  constructor(
+    private readonly assetService: AssetService = new AssetService(),
+    private readonly modelService: AssetModelService = new AssetModelService()
+  ) {}
 
   async listAssets(request: NextRequest | Request) {
     try {
       await requireActor();
       const url = new URL(request.url);
-      const status = url.searchParams.get("status") ?? undefined;
-      const data = await this.assetService.listAssets({ status });
+      const data = await this.assetService.listAssets({
+        status: url.searchParams.get("status") ?? undefined,
+        modelId: url.searchParams.get("modelId") ?? undefined,
+        category: url.searchParams.get("category") ?? undefined,
+        search: url.searchParams.get("search") ?? undefined,
+        availableOnly:
+          url.searchParams.get("availableOnly") ?? undefined,
+      });
       return ok(data);
     } catch (error) {
       return handleError(error);
@@ -36,10 +46,53 @@ export class AssetController {
     }
   }
 
+  async bulkCreate(request: NextRequest | Request) {
+    try {
+      const session = await requireAssetOperator();
+      const body = await request.json();
+      const data = await this.assetService.bulkCreate(body, session.actor);
+      return created(data);
+    } catch (error) {
+      return handleError(error);
+    }
+  }
+
   async getAsset(id: string) {
     try {
       await requireActor();
       const data = await this.assetService.getAssetById(id);
+      return ok(data);
+    } catch (error) {
+      return handleError(error);
+    }
+  }
+
+  async getByCode(request: NextRequest | Request) {
+    try {
+      await requireActor();
+      const url = new URL(request.url);
+      const code = url.searchParams.get("code") ?? "";
+      const data = await this.assetService.getAssetByCode(code);
+      return ok(data);
+    } catch (error) {
+      return handleError(error);
+    }
+  }
+
+  async resolveScan(request: NextRequest | Request) {
+    try {
+      const session = await requireAssetOperator();
+      const body = await request.json().catch(() => ({}));
+      const code =
+        typeof body === "object" &&
+        body &&
+        "code" in body &&
+        typeof (body as { code: unknown }).code === "string"
+          ? (body as { code: string }).code
+          : new URL(request.url).searchParams.get("code") ?? "";
+      const data = await this.assetService.resolveScan(code);
+      // session gate keeps resolve staff-only for custody privacy
+      void session;
       return ok(data);
     } catch (error) {
       return handleError(error);
@@ -83,11 +136,33 @@ export class AssetController {
     }
   }
 
+  async scanRelease(request: NextRequest | Request) {
+    try {
+      const session = await requireAssetOperator();
+      const body = await request.json();
+      const data = await this.assetService.scanRelease(body, session.actor);
+      return ok(data);
+    } catch (error) {
+      return handleError(error);
+    }
+  }
+
   async returnAsset(request: NextRequest | Request, id: string) {
     try {
       const session = await requireAssetOperator();
       const body = await request.json();
       const data = await this.assetService.returnAsset(id, body, session.actor);
+      return ok(data);
+    } catch (error) {
+      return handleError(error);
+    }
+  }
+
+  async scanReturn(request: NextRequest | Request) {
+    try {
+      const session = await requireAssetOperator();
+      const body = await request.json();
+      const data = await this.assetService.scanReturn(body, session.actor);
       return ok(data);
     } catch (error) {
       return handleError(error);
@@ -125,6 +200,83 @@ export class AssetController {
         Number.isFinite(limit) ? limit : undefined
       );
       return ok(data);
+    } catch (error) {
+      return handleError(error);
+    }
+  }
+
+  // ── Asset models (product catalog) ───────────────────────────────────
+
+  async listModels(request: NextRequest | Request) {
+    try {
+      await requireActor();
+      const url = new URL(request.url);
+      return ok(
+        await this.modelService.list({
+          category: url.searchParams.get("category") ?? undefined,
+          search: url.searchParams.get("search") ?? undefined,
+        })
+      );
+    } catch (error) {
+      return handleError(error);
+    }
+  }
+
+  async createModel(request: NextRequest | Request) {
+    try {
+      const session = await requireAssetOperator();
+      const body = await request.json();
+      return created(await this.modelService.create(body, session.actor));
+    } catch (error) {
+      return handleError(error);
+    }
+  }
+
+  async getModel(id: string) {
+    try {
+      await requireActor();
+      return ok(await this.modelService.getById(id));
+    } catch (error) {
+      return handleError(error);
+    }
+  }
+
+  async updateModel(request: NextRequest | Request, id: string) {
+    try {
+      await requireAssetOperator();
+      const body = await request.json();
+      return ok(await this.modelService.update(id, body));
+    } catch (error) {
+      return handleError(error);
+    }
+  }
+
+  async deleteModel(id: string) {
+    try {
+      await requireAssetOperator();
+      await this.modelService.delete(id);
+      return noContent();
+    } catch (error) {
+      return handleError(error);
+    }
+  }
+
+  async listModelUnits(id: string) {
+    try {
+      await requireActor();
+      return ok(await this.assetService.listUnitsForModel(id));
+    } catch (error) {
+      return handleError(error);
+    }
+  }
+
+  async registerModelUnits(request: NextRequest | Request, id: string) {
+    try {
+      const session = await requireAssetOperator();
+      const body = await request.json();
+      return created(
+        await this.assetService.registerUnits(id, body, session.actor)
+      );
     } catch (error) {
       return handleError(error);
     }

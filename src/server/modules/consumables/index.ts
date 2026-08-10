@@ -90,6 +90,17 @@ export class ConsumableController {
       return handleError(error);
     }
   }
+
+  /** QR scan release from a supplier purchase lot (consumable batch). */
+  async releaseFromLot(request: NextRequest | Request) {
+    try {
+      const session = await requireAssetOperator();
+      const body = await request.json();
+      return ok(await this.service.releaseFromLot(body, session.actor));
+    } catch (error) {
+      return handleError(error);
+    }
+  }
 }
 
 export const consumableController = new ConsumableController();

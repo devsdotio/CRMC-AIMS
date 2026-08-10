@@ -20,6 +20,8 @@ export const createAssetSchema = z.object({
    * so update schemas can safely `.partial()` without forcing status. */
   status: assetStatusSchema.optional(),
   assignmentType: assetAssignmentTypeSchema.optional(),
+  /** Link unit to a multi-copy product model (optional). */
+  modelId: z.string().uuid().optional().nullable(),
   location: z.string().trim().min(1, "location is required.").max(255),
   serialNumber: z.string().trim().max(120).optional(),
   department: z.string().trim().max(120).optional(),
@@ -72,6 +74,17 @@ export const flagMaintenanceSchema = z.object({
 
 export const listAssetsQuerySchema = z.object({
   status: assetStatusSchema.optional(),
+  modelId: z.string().uuid().optional(),
+  category: categoryLabelSchema.optional(),
+  search: z.string().trim().max(200).optional(),
+  availableOnly: z
+    .union([z.boolean(), z.enum(["true", "false", "1", "0"])])
+    .optional()
+    .transform((v) => {
+      if (v === undefined) return undefined;
+      if (typeof v === "boolean") return v;
+      return v === "true" || v === "1";
+    }),
 });
 
 export const assetIdSchema = z.string().uuid("Asset id must be a valid UUID.");

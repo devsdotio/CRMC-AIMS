@@ -7,6 +7,7 @@ import type {
   UpdateAssetInput,
 } from "@/types/assets";
 import type { AssetRow, NewAssetRow } from "@/server/db/schema";
+import { encodeAssetQr } from "@/server/shared/qr";
 
 export type {
   Asset,
@@ -17,14 +18,34 @@ export type {
   UpdateAssetInput,
 };
 
-import type { PaginationParams, PaginatedResponse } from "@/types/filters";
+import type { PaginationParams } from "@/types/filters";
 
 /**
  * List filters supported by GET /api/assets.
- * Client-side filtering (search, multi-status, sort) stays in the UI for now.
  */
 export interface ListAssetsFilters extends PaginationParams {
   status?: AssetStatus;
+  modelId?: string;
+  category?: string;
+  search?: string;
+  /** When true, only units with no current holder. */
+  availableOnly?: boolean;
+}
+
+/**
+ * Asset API DTO with QR + model link for scanners and multi-unit catalog.
+ */
+export type AssetDTOWithMeta = Asset & {
+  modelId?: string;
+  qrPayload: string;
+};
+
+export function withAssetMeta(asset: Asset & { modelId?: string | null }): AssetDTOWithMeta {
+  return {
+    ...asset,
+    modelId: asset.modelId ?? undefined,
+    qrPayload: encodeAssetQr(asset.assetCode),
+  };
 }
 
 /**
@@ -36,6 +57,7 @@ export interface IAssetRepository {
   findMany(filters?: ListAssetsFilters): Promise<AssetRow[]>;
   findById(id: string): Promise<AssetRow | null>;
   findByAssetCode(assetCode: string): Promise<AssetRow | null>;
+  findByModelId(modelId: string): Promise<AssetRow[]>;
   create(
     data: Omit<NewAssetRow, "id" | "createdAt" | "updatedAt" | "lastUpdated"> &
       Partial<Pick<NewAssetRow, "lastUpdated">>

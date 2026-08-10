@@ -40,18 +40,12 @@ export const assetStatusEnum = pgEnum("asset_status", [
  * Coded capital equipment registry — one row per physical asset
  * (the QR-tagged unit the custodian manages).
  *
- * Borrow lifecycle (who has it) is tracked via `currentHolder` for now.
- * A dedicated borrow_transactions table will own that later; release/
- * return mutations will then write there instead of mutating holder alone.
+ * Multiple units of the same product share an optional `modelId`
+ * (e.g. 30 × Epson 310 Printer). Each unit still has a unique asset_code / QR.
  *
- * Every accountable mutation also appends an immutable row to
- * `asset_lifecycle_events` (status changes, holder transitions, staff actor).
- *
- * Maintenance history is stored as jsonb matching MaintenanceLogEntry[]
- * until a first-class maintenance_logs table is introduced.
- *
- * Optional `supplierId` points at the vendors registry; multi-price history
- * is recorded on `purchase_lots` when acquisition cost is known.
+ * Custody: `currentHolder` + `borrow_transactions` (borrowable) or
+ * project assignments (assignable). Lifecycle audit → `asset_lifecycle_events`.
+ * Acquisition cost history → `purchase_lots`.
  */
 export const assets = pgTable(
   "assets",
@@ -63,6 +57,12 @@ export const assets = pgTable(
     category: text("category").notNull(),
     status: assetStatusEnum("status").notNull().default("active"),
     assignmentType: assetAssignmentTypeEnum("assignment_type").notNull().default("borrowable"),
+
+    /**
+     * Optional catalog parent (`asset_models`). Null for one-off units
+     * that were registered without a bulk model.
+     */
+    modelId: uuid("model_id"),
 
     serialNumber: text("serial_number"),
     location: text("location").notNull(),
@@ -95,6 +95,7 @@ export const assets = pgTable(
     index("assets_category_idx").on(table.category),
     index("assets_location_idx").on(table.location),
     index("assets_supplier_id_idx").on(table.supplierId),
+    index("assets_model_id_idx").on(table.modelId),
   ]
 );
 
