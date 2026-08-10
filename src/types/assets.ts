@@ -51,10 +51,10 @@ export type CreateAssetInput = Pick<
     Pick<
       Asset,
       | "serialNumber"
-      | "currentHolder"
       | "department"
       | "purchaseDate"
       | "value"
+      | "supplierId"
       | "imageUrl"
       | "notes"
       | "lastUpdated"
@@ -67,4 +67,5 @@ export type UpdateAssetInput = Partial<CreateAssetInput>;
 export type ReturnAssetInput = {
   condition: string;
   status?: AssetStatus;
+  flagMaintenance?: boolean;
 };

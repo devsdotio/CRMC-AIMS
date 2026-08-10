@@ -26,7 +26,10 @@ export function AssignAssetDialog({
   const assignable = useMemo(
     () =>
       assets.filter(
-        (a) => a.status === "active" && !a.currentHolder
+        (a) =>
+          a.status === "active" &&
+          !a.currentHolder &&
+          a.assignmentType === "assignable"
       ),
     [assets]
   );
@@ -134,7 +137,8 @@ export function AssignAssetDialog({
               <div className="h-9 rounded-lg bg-border animate-pulse" />
             ) : assignable.length === 0 ? (
               <p className="text-[11px] text-text-secondary border border-dashed border-border rounded-lg p-3">
-                No free active assets available. Return or free an asset first.
+                No free <strong>assignable</strong> assets available. Set assignment
+                type to Assignable and ensure the asset is active with no holder.
               </p>
             ) : (
               <select

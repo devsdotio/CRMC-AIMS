@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { Edit3, MapPin, User, Tag, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { custodyBadgeLabel } from "@/lib/assets-custody";
 import type { Asset,  AssetStatus } from "@/types/assets";
 import { QRCodeDisplay } from "./qr-code-display";
 import { getCategoryStyle } from "@/constants/categories";
@@ -121,7 +122,7 @@ export function AssetDetailPanel({
                 <div className="flex gap-2">
                   {asset.currentHolder ? (
                     <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-accent/20 text-accent uppercase tracking-wider">
-                      Borrowed
+                      {custodyBadgeLabel(asset.currentHolder)}
                     </span>
                   ) : (
                     <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-status-active-bg/20 text-status-active-text uppercase tracking-wider">

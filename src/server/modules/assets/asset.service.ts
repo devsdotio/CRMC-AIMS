@@ -1,6 +1,7 @@
 import type { Asset, MaintenanceLogEntry } from "@/types/assets";
 import type { AssetRow } from "@/server/db/schema";
 import {
+  BadRequestError,
   ConflictError,
   NotFoundError,
 } from "@/server/shared/errors";
@@ -12,6 +13,7 @@ import { BorrowLogRepository } from "@/server/modules/borrow-log/borrow-log.repo
 import { MaintenanceRepository } from "@/server/modules/maintenance/maintenance.repository";
 import { PurchaseLotService } from "@/server/modules/purchase-lots/purchase-lot.service";
 import { SupplierRepository } from "@/server/modules/suppliers/supplier.repository";
+import { ProjectAssetAssignmentRepository } from "@/server/modules/projects/project-asset.repository";
 
 import { AssetLifecycleService } from "./asset.lifecycle.service";
 import { buildAssetFieldChanges } from "./asset.lifecycle.types";
@@ -97,6 +99,7 @@ const TRACKED_UPDATE_FIELDS: (keyof AssetRow)[] = [
   "name",
   "category",
   "status",
+  "assignmentType",
   "serialNumber",
   "location",
   "currentHolder",
@@ -116,7 +119,8 @@ export class AssetService {
     private readonly borrowLogRepo: BorrowLogRepository = new BorrowLogRepository(),
     private readonly maintenanceRepo: MaintenanceRepository = new MaintenanceRepository(),
     private readonly purchaseLots: PurchaseLotService = new PurchaseLotService(),
-    private readonly suppliers: SupplierRepository = new SupplierRepository()
+    private readonly suppliers: SupplierRepository = new SupplierRepository(),
+    private readonly projectAssignments: ProjectAssetAssignmentRepository = new ProjectAssetAssignmentRepository()
   ) {}
 
   async listAssets(rawQuery: unknown): Promise<Asset[]> {
@@ -155,9 +159,11 @@ export class AssetService {
             name: input.name,
             category: input.category,
             status: input.status ?? "active",
+            assignmentType: input.assignmentType ?? "borrowable",
             location: input.location,
             serialNumber: input.serialNumber ?? null,
-            currentHolder: input.currentHolder ?? null,
+            // Custody only via release / project assign — never invent a holder on create.
+            currentHolder: null,
             department: input.department ?? null,
             purchaseDate: input.purchaseDate ?? null,
             value: input.value !== undefined ? input.value.toFixed(2) : null,
@@ -232,11 +238,11 @@ export class AssetService {
       throw new NotFoundError("Asset", id);
     }
 
-    // Custody field is not patchable — only release/return may change holder.
-    if (input.currentHolder !== undefined) {
-      throw new ConflictError(
-        "currentHolder cannot be set via asset update. Use release/return so the custody ledger is updated."
-      );
+    if (input.supplierId) {
+      const supplier = await this.suppliers.findById(input.supplierId);
+      if (!supplier || supplier.status !== "active") {
+        throw new NotFoundError("Supplier", input.supplierId);
+      }
     }
 
     try {
@@ -322,9 +328,10 @@ export class AssetService {
     }
 
     const open = await this.borrowLogRepo.findActiveByAssetId(id);
-    if (open || existing.currentHolder) {
+    const openProject = await this.projectAssignments.findOpenByAssetId(id);
+    if (open || openProject || existing.currentHolder) {
       throw new ConflictError(
-        "Cannot delete an asset that is currently checked out. Return it first."
+        "Cannot delete an asset that is currently checked out or assigned to a project. Return it first."
       );
     }
 
@@ -368,6 +375,12 @@ export class AssetService {
       throw new NotFoundError("Asset", id);
     }
 
+    if (existing.assignmentType === "assignable") {
+      throw new BadRequestError(
+        "This asset is assignable (project custody). Assign it from a project, not via borrow release."
+      );
+    }
+
     await this.borrowLogs.release(
       {
         assetId: id,
@@ -406,6 +419,17 @@ export class AssetService {
 
     const open = await this.borrowLogRepo.findActiveByAssetId(id);
     if (!open) {
+      const projectOpen = await this.projectAssignments.findOpenByAssetId(id);
+      if (projectOpen) {
+        throw new ConflictError(
+          "This asset is assigned to a project. Return it from the project detail panel (Assigned assets), not the borrow return API."
+        );
+      }
+      if (existing.currentHolder) {
+        throw new ConflictError(
+          `Asset shows holder “${existing.currentHolder}” but has no active borrow log. Return via the project assignment or fix the custody record.`
+        );
+      }
       throw new ConflictError(
         "No active borrow log for this asset. Use the borrow return path to keep the custody ledger consistent."
       );
@@ -481,6 +505,12 @@ export class AssetService {
       }
 
       if (existing.currentHolder) {
+        const projectOpen = await this.projectAssignments.findOpenByAssetId(id);
+        if (projectOpen) {
+          throw new ConflictError(
+            "Asset is on a project. Use Report damage on the project panel to flag repair or write off while in project custody."
+          );
+        }
         throw new ConflictError(
           "Asset is currently released. Return it (with repair condition) instead of flagging in isolation."
         );

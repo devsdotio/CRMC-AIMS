@@ -152,6 +152,12 @@ export class BorrowLogService {
       throw new ConflictError("Asset is not available for release.");
     }
 
+    if (asset.assignmentType === "assignable") {
+      throw new ConflictError(
+        "This asset is project-assignable. Release via project assignment is not a borrower checkout."
+      );
+    }
+
     const open = await this.repo.findActiveByAssetId(asset.id, tx);
     if (open) {
       throw new ConflictError("Asset already has an active borrow log.");

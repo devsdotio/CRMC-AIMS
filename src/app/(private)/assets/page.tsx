@@ -101,6 +101,10 @@ export default function AssetsPage() {
           name: assetData.name,
           category: assetData.category,
           status: assetData.status,
+          assignmentType: assetData.assignmentType as
+            | "borrowable"
+            | "assignable"
+            | undefined,
           serialNumber: assetData.serialNumber,
           location: assetData.location,
           department: assetData.department,

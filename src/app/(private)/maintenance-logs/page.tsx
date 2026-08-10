@@ -9,6 +9,7 @@ import {
   useCreateMaintenanceLogMutation,
   useResolveMaintenanceLogMutation,
 } from "@/features/maintenance-logs/client/use-maintenance-logs";
+import { useAssetsQuery } from "@/features/assets/client";
 import { MaintenanceLogFilters } from "@/components/maintenance-logs/maintenance-log-filters";
 import { MaintenanceLogList } from "@/components/maintenance-logs/maintenance-log-list";
 import { MaintenanceLogDetailPanel } from "@/components/maintenance-logs/maintenance-log-detail-panel";
@@ -17,6 +18,7 @@ import { ResolveMaintenanceDialog } from "@/components/maintenance-logs/resolve-
 
 export default function MaintenanceLogsPage() {
   const { data: records = [], isLoading } = useMaintenanceLogsQuery();
+  const { data: assets = [], isLoading: assetsLoading } = useAssetsQuery();
   const flagMutation = useCreateMaintenanceLogMutation();
   const resolveMutation = useResolveMaintenanceLogMutation();
 
@@ -112,6 +114,7 @@ export default function MaintenanceLogsPage() {
   };
 
   const handleConfirmFlag = async (flagData: {
+    assetId: string;
     assetCode: string;
     assetName: string;
     category: AssetCategory;
@@ -120,10 +123,14 @@ export default function MaintenanceLogsPage() {
     scheduledDate?: string;
   }) => {
     await flagMutation.mutateAsync({
-      assetId: flagData.assetCode, // Note: the mock UI passes assetCode instead of assetId, we'll map it to assetId for the mutation
+      assetId: flagData.assetId,
       assetCode: flagData.assetCode,
       assetName: flagData.assetName,
-      category: flagData.category as "computing" | "transport" | "av" | "furniture",
+      category: flagData.category as
+        | "computing"
+        | "transport"
+        | "av"
+        | "furniture",
       condition: flagData.condition,
       notes: flagData.notes,
       scheduledDate: flagData.scheduledDate,
@@ -216,6 +223,8 @@ export default function MaintenanceLogsPage() {
       <FlagForMaintenanceDialog
         isOpen={flagDialogOpen}
         onClose={() => setFlagDialogOpen(false)}
+        assets={assets}
+        loadingAssets={assetsLoading}
         onConfirmFlag={handleConfirmFlag}
       />
 

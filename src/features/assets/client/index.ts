@@ -1,7 +1,5 @@
 /**
- * Assets client data layer — prepared for UI integration, not wired yet.
- *
- * Includes lifecycle ledger reads and accountable mutations (actor = session).
+ * Assets client data layer — list/CRUD + lifecycle + custody mutations.
  */
 
 export {

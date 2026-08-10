@@ -2,6 +2,10 @@
 import { getCategoryStyle } from "@/constants/categories";
 import { Tag, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  custodyBadgeLabel,
+  custodyDetailLabel,
+} from "@/lib/assets-custody";
 import type { Asset,  AssetStatus } from "@/types/assets";
 
 export interface AssetTableRowProps {
@@ -91,7 +95,7 @@ export function AssetTableRow({ asset, onSelect }: AssetTableRowProps) {
         <div className="flex items-center gap-2">
           {asset.currentHolder && (
             <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-accent/20 text-accent">
-              Borrowed
+              {custodyBadgeLabel(asset.currentHolder)}
             </span>
           )}
           <span
@@ -109,8 +113,12 @@ export function AssetTableRow({ asset, onSelect }: AssetTableRowProps) {
       {/* Holder / Location */}
       <td className="px-3 py-3.5 text-xs">
         {asset.currentHolder ? (
-          <span className="font-semibold text-text block truncate">
-            Borrowed by: {asset.currentHolder} {asset.department ? `(${asset.department})` : ""}
+          <span
+            className="font-semibold text-text block truncate"
+            title={asset.currentHolder}
+          >
+            {custodyDetailLabel(asset.currentHolder)}
+            {asset.department ? ` (${asset.department})` : ""}
           </span>
         ) : (
           <span className="font-semibold text-status-active-text block">

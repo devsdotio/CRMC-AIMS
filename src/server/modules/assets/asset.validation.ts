@@ -16,7 +16,6 @@ export const createAssetSchema = z.object({
   assignmentType: assetAssignmentTypeSchema.optional(),
   location: z.string().trim().min(1, "location is required.").max(255),
   serialNumber: z.string().trim().max(120).optional(),
-  currentHolder: z.string().trim().max(255).optional(),
   department: z.string().trim().max(120).optional(),
   purchaseDate: z
     .string()

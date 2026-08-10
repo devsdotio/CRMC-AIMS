@@ -130,6 +130,11 @@ export class ProjectAssetService {
           "Only active assets can be assigned to a project."
         );
       }
+      if (asset.assignmentType !== "assignable") {
+        throw new BadRequestError(
+          "Only assignable assets can be assigned to a project. Mark the asset as Assignable first."
+        );
+      }
       if (asset.currentHolder) {
         throw new ConflictError(
           `Asset is already in custody of “${asset.currentHolder}”. Return it first.`

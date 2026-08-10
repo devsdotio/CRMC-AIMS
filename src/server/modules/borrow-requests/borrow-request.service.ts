@@ -20,6 +20,8 @@ import type {
 } from "./borrow-request.types";
 import { AssetRepository } from "../assets/asset.repository";
 import { AuditLogRepository } from "../audit-logs/audit-logs.repository";
+import { BorrowLogService } from "../borrow-log/borrow-log.service";
+import { BorrowLogRepository } from "../borrow-log/borrow-log.repository";
 import { withTransaction } from "@/server/db/transaction";
 import {
   approveBorrowRequestSchema,
@@ -86,7 +88,9 @@ export class BorrowRequestService {
   constructor(
     private readonly repo: IBorrowRequestRepository = new BorrowRequestRepository(),
     private readonly auditLogs = new AuditLogRepository(),
-    private readonly assetRepo = new AssetRepository()
+    private readonly assetRepo = new AssetRepository(),
+    private readonly borrowLogs = new BorrowLogService(),
+    private readonly borrowLogRepo = new BorrowLogRepository()
   ) {}
 
   async list(
@@ -194,6 +198,11 @@ export class BorrowRequestService {
       if (asset && asset.currentHolder) {
         throw new ConflictError(`Cannot approve: Asset is currently borrowed by ${asset.currentHolder}. It will remain in pending status until available.`);
       }
+      if (asset && asset.assignmentType === "assignable") {
+        throw new BadRequestError(
+          "This asset is project-assignable and cannot be approved for borrow checkout."
+        );
+      }
     }
 
     const updated = await withTransaction(async (tx) => {
@@ -272,42 +281,63 @@ export class BorrowRequestService {
       throw new ConflictError("Only approved requests can be released.");
     }
 
-    const noteWithPicker = input.note 
-      ? `Released to: ${input.pickedUpBy}. ${input.note}` 
+    const noteWithPicker = input.note
+      ? `Released to: ${input.pickedUpBy}. ${input.note}`
       : `Released to: ${input.pickedUpBy}`;
+
+    // Open accountable borrow log first while request is still approved.
+    if (existing.assetId) {
+      const asset = await this.assetRepo.findById(existing.assetId);
+      if (!asset) throw new NotFoundError("Asset", existing.assetId);
+      if (asset.assignmentType === "assignable") {
+        throw new BadRequestError(
+          "This asset is project-assignable and cannot be released as a borrow checkout."
+        );
+      }
+      await this.borrowLogs.release(
+        {
+          assetId: existing.assetId,
+          requestId: existing.id,
+          borrowerName: input.pickedUpBy,
+          borrowerEmail: existing.requesterEmail,
+          borrowerPhone: existing.requesterPhone || "",
+          department: existing.department,
+          dueDate: this.borrowLogs.defaultDueDate(),
+          notes: noteWithPicker,
+          borrowerUserId: existing.requesterUserId ?? undefined,
+        },
+        actor
+      );
+    }
 
     const history = [
       ...(Array.isArray(existing.history) ? existing.history : []),
       historyEntry("released", actor.displayName, noteWithPicker),
     ];
 
-    if (existing.assetId) {
-      const asset = await this.assetRepo.findById(existing.assetId);
-      if (asset && asset.currentHolder) {
-        throw new ConflictError(`Cannot release: Asset is currently borrowed by ${asset.currentHolder}.`);
-      }
-    }
-
     const updated = await withTransaction(async (tx) => {
-      const up = await this.repo.update(id, {
-        status: "released",
-        pickedUpBy: input.pickedUpBy,
-        history,
-      }, tx);
+      const up = await this.repo.update(
+        id,
+        {
+          status: "released",
+          pickedUpBy: input.pickedUpBy,
+          history,
+        },
+        tx
+      );
       if (!up) throw new NotFoundError("Borrow request", id);
 
-      if (up.assetId) {
-        await this.assetRepo.update(up.assetId, { currentHolder: input.pickedUpBy }, tx);
-      }
-
-      await this.auditLogs.create({
-        entityType: "borrow_request",
-        entityId: up.id,
-        action: "released",
-        actorName: actor.displayName,
-        actorUserId: actor.userId,
-        notes: noteWithPicker,
-      }, tx);
+      await this.auditLogs.create(
+        {
+          entityType: "borrow_request",
+          entityId: up.id,
+          action: "released",
+          actorName: actor.displayName,
+          actorUserId: actor.userId,
+          notes: noteWithPicker,
+        },
+        tx
+      );
 
       return up;
     });
@@ -366,9 +396,34 @@ export class BorrowRequestService {
       throw new BadRequestError("Only released requests can be marked returned.");
     }
 
-    const noteWithReturner = input.note 
-      ? `Returned by: ${input.returnedBy}. ${input.note}` 
+    const noteWithReturner = input.note
+      ? `Returned by: ${input.returnedBy}. ${input.note}`
       : `Returned by: ${input.returnedBy}`;
+
+    // Close active borrow log (clears holder + lifecycle) when this request released an asset.
+    if (existing.assetId) {
+      const open = await this.borrowLogRepo.findActiveByAssetId(existing.assetId);
+      if (open) {
+        await this.borrowLogs.returnLog(
+          open.id,
+          {
+            condition: "good",
+            conditionNotes: noteWithReturner,
+            flagMaintenance: false,
+          },
+          actor
+        );
+      } else {
+        // Legacy release without log — clear holder so registry is usable again.
+        const asset = await this.assetRepo.findById(existing.assetId);
+        if (asset?.currentHolder) {
+          await this.assetRepo.update(existing.assetId, {
+            currentHolder: null,
+            lastUpdated: new Date(),
+          });
+        }
+      }
+    }
 
     const history = [
       ...(Array.isArray(existing.history) ? existing.history : []),
@@ -376,24 +431,27 @@ export class BorrowRequestService {
     ];
 
     const updated = await withTransaction(async (tx) => {
-      const up = await this.repo.update(id, {
-        status: "returned",
-        history,
-      }, tx);
+      const up = await this.repo.update(
+        id,
+        {
+          status: "returned",
+          history,
+        },
+        tx
+      );
       if (!up) throw new NotFoundError("Borrow request", id);
 
-      if (up.assetId) {
-        await this.assetRepo.update(up.assetId, { currentHolder: null }, tx);
-      }
-
-      await this.auditLogs.create({
-        entityType: "borrow_request",
-        entityId: up.id,
-        action: "returned",
-        actorName: actor.displayName,
-        actorUserId: actor.userId,
-        notes: noteWithReturner,
-      }, tx);
+      await this.auditLogs.create(
+        {
+          entityType: "borrow_request",
+          entityId: up.id,
+          action: "returned",
+          actorName: actor.displayName,
+          actorUserId: actor.userId,
+          notes: noteWithReturner,
+        },
+        tx
+      );
 
       return up;
     });
