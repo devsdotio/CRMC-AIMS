@@ -1,0 +1,71 @@
+import type { NextRequest } from "next/server";
+
+import { requireUserManager } from "@/server/shared/auth";
+import { created, handleError, noContent, ok } from "@/server/shared/http";
+
+import { ProjectService } from "./project.service";
+
+/**
+ * Admin/superadmin project registry.
+ * Staff cannot mutate projects (decision: manager-only CRUD).
+ */
+export class ProjectController {
+  constructor(private readonly service: ProjectService = new ProjectService()) {}
+
+  async list(request: NextRequest | Request) {
+    try {
+      await requireUserManager();
+      const url = new URL(request.url);
+      return ok(
+        await this.service.list({
+          search: url.searchParams.get("search") ?? undefined,
+          status: url.searchParams.get("status") ?? undefined,
+        })
+      );
+    } catch (error) {
+      return handleError(error);
+    }
+  }
+
+  async get(id: string) {
+    try {
+      await requireUserManager();
+      return ok(await this.service.getById(id));
+    } catch (error) {
+      return handleError(error);
+    }
+  }
+
+  async create(request: NextRequest | Request) {
+    try {
+      const session = await requireUserManager();
+      const body = await request.json();
+      return created(await this.service.create(body, session.actor));
+    } catch (error) {
+      return handleError(error);
+    }
+  }
+
+  async update(request: NextRequest | Request, id: string) {
+    try {
+      await requireUserManager();
+      const body = await request.json();
+      return ok(await this.service.update(id, body));
+    } catch (error) {
+      return handleError(error);
+    }
+  }
+
+  async delete(id: string) {
+    try {
+      await requireUserManager();
+      await this.service.delete(id);
+      return noContent();
+    } catch (error) {
+      return handleError(error);
+    }
+  }
+}
+
+export const projectController = new ProjectController();
+export { ProjectService } from "./project.service";

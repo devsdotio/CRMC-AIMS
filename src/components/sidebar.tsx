@@ -22,6 +22,7 @@ import {
   ChevronsUpDown,
   ShoppingBag,
   History,
+  FolderKanban,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -129,6 +130,7 @@ export default function Sidebar({
     {
       label: "Administration",
       items: [
+        { name: "Projects", href: "/projects", icon: FolderKanban, roles: ["superadmin", "admin"] },
         { name: "Users & Roles", href: "/users", icon: Users, roles: ["superadmin", "admin"] },
         { name: "Settings", href: "/settings", icon: Settings, roles: ["superadmin", "admin"] },
       ],
