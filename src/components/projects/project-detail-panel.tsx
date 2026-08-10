@@ -16,20 +16,29 @@ import {
   Lock,
   AlertTriangle,
   Boxes,
+  Undo2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Project, ProjectExpenseLine } from "@/types/projects";
+import type {
+  Project,
+  ProjectAssetAssignment,
+  ProjectExpenseLine,
+} from "@/types/projects";
 import { PROJECT_EXPENSE_CATEGORY_LABELS } from "@/types/projects";
 import { ProjectStatusBadge } from "./project-status-badge";
 import { formatPhp } from "./format-money";
 import {
+  useAssignProjectAssetMutation,
   useCreateProjectExpenseMutation,
   useDeleteProjectExpenseMutation,
+  useProjectAssetsQuery,
   useProjectExpensesQuery,
   useProjectMaterialMutation,
+  useReturnProjectAssetMutation,
   useUpdateProjectExpenseMutation,
 } from "@/features/projects/client";
 import { useConsumablesQuery } from "@/features/consumables/client";
+import { useAssetsQuery } from "@/features/assets/client";
 import {
   AddEditExpenseDialog,
   type ExpenseFormInput,
@@ -38,6 +47,10 @@ import {
   AddMaterialDialog,
   type MaterialFormInput,
 } from "./add-material-dialog";
+import {
+  AssignAssetDialog,
+  type AssignAssetFormInput,
+} from "./assign-asset-dialog";
 
 export interface ProjectDetailPanelProps {
   project: Project | null;
@@ -79,15 +92,26 @@ export function ProjectDetailPanel({
   const updateExpense = useUpdateProjectExpenseMutation();
   const deleteExpense = useDeleteProjectExpenseMutation();
   const useMaterial = useProjectMaterialMutation();
+  const assignAsset = useAssignProjectAssetMutation();
+  const returnAsset = useReturnProjectAssetMutation();
   const {
     data: consumables = [],
     isLoading: consumablesLoading,
   } = useConsumablesQuery();
+  const {
+    data: assets = [],
+    isLoading: assetsLoading,
+  } = useAssetsQuery("active");
+  const {
+    data: assignments = [],
+    isLoading: assignmentsLoading,
+  } = useProjectAssetsQuery(isOpen && project ? project.id : null, "all");
 
   const [editExpense, setEditExpense] = useState<
     ProjectExpenseLine | null | undefined
   >(undefined);
   const [materialOpen, setMaterialOpen] = useState(false);
+  const [assignOpen, setAssignOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -96,18 +120,20 @@ export function ProjectDetailPanel({
         e.key === "Escape" &&
         isOpen &&
         editExpense === undefined &&
-        !materialOpen
+        !materialOpen &&
+        !assignOpen
       )
         onClose();
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose, editExpense, materialOpen]);
+  }, [isOpen, onClose, editExpense, materialOpen, assignOpen]);
 
   useEffect(() => {
     if (!isOpen) {
       setEditExpense(undefined);
       setMaterialOpen(false);
+      setAssignOpen(false);
       setActionError(null);
     }
   }, [isOpen]);
@@ -151,6 +177,35 @@ export function ProjectDetailPanel({
         notes: input.notes || null,
       },
     });
+  };
+
+  const handleAssignAsset = async (input: AssignAssetFormInput) => {
+    setActionError(null);
+    await assignAsset.mutateAsync({
+      projectId: project.id,
+      assetId: input.assetId,
+      notes: input.notes || null,
+    });
+  };
+
+  const handleReturnAsset = async (row: ProjectAssetAssignment) => {
+    if (
+      !window.confirm(
+        `Return “${row.assetName}” (${row.assetCode}) from this project?`
+      )
+    )
+      return;
+    setActionError(null);
+    try {
+      await returnAsset.mutateAsync({
+        projectId: project.id,
+        assignmentId: row.id,
+      });
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : "Failed to return asset."
+      );
+    }
   };
 
   const handleDeleteExpense = async (line: ProjectExpenseLine) => {
@@ -460,18 +515,104 @@ export function ProjectDetailPanel({
           </section>
 
           <section className="space-y-2">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary">
-              Assigned assets
-            </h3>
-            <div className="rounded-lg border border-dashed border-border p-3 flex items-start gap-2.5 opacity-70">
-              <Package className="h-4 w-4 text-text-secondary shrink-0 mt-0.5" />
-              <div>
-                <p className="text-xs font-bold text-text">Coming later</p>
-                <p className="text-[11px] text-text-secondary mt-0.5">
-                  Project custody (assign/return) without a borrower account.
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary">
+                Assigned assets
+              </h3>
+              {project.isMutable && (
+                <button
+                  type="button"
+                  onClick={() => setAssignOpen(true)}
+                  className="inline-flex items-center gap-1 h-7 px-2.5 text-[11px] font-bold rounded-md bg-accent text-accent-foreground cursor-pointer"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Assign
+                </button>
+              )}
+            </div>
+            <p className="text-[10px] text-text-secondary">
+              Custody only — does not add to project spent (write-off is later).
+            </p>
+
+            {assignmentsLoading ? (
+              <div className="space-y-2 animate-pulse">
+                <div className="h-12 bg-border rounded-lg" />
+                <div className="h-12 bg-border rounded-lg" />
+              </div>
+            ) : assignments.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border p-3 flex items-start gap-2.5">
+                <Package className="h-4 w-4 text-text-secondary shrink-0 mt-0.5" />
+                <p className="text-[11px] text-text-secondary">
+                  No assets assigned. Use <strong>Assign</strong> for free active
+                  inventory assets.
                 </p>
               </div>
-            </div>
+            ) : (
+              <ul className="space-y-2">
+                {assignments.map((row) => {
+                  const isOpenAssignment = row.status === "assigned";
+                  return (
+                    <li
+                      key={row.id}
+                      className="rounded-lg border border-border bg-bg-subtle/40 px-3 py-2.5 text-xs"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-bold text-text truncate">
+                              {row.assetName}
+                            </span>
+                            <span
+                              className={cn(
+                                "px-1.5 py-0.5 rounded text-[9px] font-bold uppercase",
+                                isOpenAssignment
+                                  ? "bg-accent/15 text-accent"
+                                  : row.status === "written_off"
+                                    ? "bg-status-outofservice-bg/40 text-status-outofservice-text"
+                                    : "bg-bg-subtle border border-border text-text-secondary"
+                              )}
+                            >
+                              {row.status.replace("_", " ")}
+                            </span>
+                          </div>
+                          <div className="text-[10px] text-text-secondary mt-0.5 font-mono">
+                            {row.assetCode}
+                            {" · "}
+                            assigned{" "}
+                            {new Date(row.assignedAt).toLocaleDateString()}
+                            {row.assignedByName
+                              ? ` · ${row.assignedByName}`
+                              : ""}
+                            {row.returnedAt
+                              ? ` · returned ${new Date(row.returnedAt).toLocaleDateString()}`
+                              : ""}
+                          </div>
+                          {row.notes && (
+                            <p className="text-[10px] text-text-secondary mt-1">
+                              {row.notes}
+                            </p>
+                          )}
+                        </div>
+                        {project.isMutable && isOpenAssignment && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              void handleReturnAsset(row);
+                            }}
+                            disabled={returnAsset.isPending}
+                            className="inline-flex items-center gap-1 shrink-0 h-7 px-2 text-[10px] font-bold rounded-md border border-border bg-bg hover:bg-bg-subtle cursor-pointer disabled:opacity-50"
+                            aria-label={`Return ${row.assetName}`}
+                          >
+                            <Undo2 className="h-3 w-3" />
+                            Return
+                          </button>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </section>
         </div>
 
@@ -509,6 +650,14 @@ export function ProjectDetailPanel({
         loadingItems={consumablesLoading}
         onClose={() => setMaterialOpen(false)}
         onSubmit={handleMaterialSubmit}
+      />
+
+      <AssignAssetDialog
+        isOpen={assignOpen}
+        assets={assets}
+        loadingAssets={assetsLoading}
+        onClose={() => setAssignOpen(false)}
+        onSubmit={handleAssignAsset}
       />
     </div>
   );

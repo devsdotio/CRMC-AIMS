@@ -8,17 +8,24 @@ import {
   type UseQueryResult,
 } from "@tanstack/react-query";
 
-import type { Project, ProjectExpenseLine } from "@/types/projects";
+import type {
+  Project,
+  ProjectAssetAssignment,
+  ProjectExpenseLine,
+} from "@/types/projects";
 import {
   projectsApi,
+  type AssignProjectAssetPayload,
   type CreateProjectExpensePayload,
   type CreateProjectPayload,
+  type ReturnProjectAssetPayload,
   type UpdateProjectExpensePayload,
   type UpdateProjectPayload,
   type UseProjectMaterialPayload,
 } from "./projects-api";
 import { projectQueryKeys } from "./query-keys";
 import { consumableQueryKeys } from "@/features/consumables/client/query-keys";
+import { assetQueryKeys } from "@/features/assets/client/query-keys";
 
 function invalidateProjects(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: projectQueryKeys.all });
@@ -143,6 +150,51 @@ export function useDeleteProjectExpenseMutation(): UseMutationResult<
     onSuccess: () => {
       invalidateProjects(queryClient);
       queryClient.invalidateQueries({ queryKey: consumableQueryKeys.all });
+    },
+  });
+}
+
+export function useProjectAssetsQuery(
+  projectId: string | null | undefined,
+  status?: "assigned" | "returned" | "written_off" | "all"
+): UseQueryResult<ProjectAssetAssignment[], Error> {
+  return useQuery({
+    queryKey: projectQueryKeys.assets(projectId ?? "", status),
+    queryFn: () => projectsApi.listAssets(projectId!, status),
+    enabled: Boolean(projectId),
+  });
+}
+
+export function useAssignProjectAssetMutation(): UseMutationResult<
+  ProjectAssetAssignment,
+  Error,
+  { projectId: string } & AssignProjectAssetPayload
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ projectId, ...payload }) =>
+      projectsApi.assignAsset(projectId, payload),
+    onSuccess: () => {
+      invalidateProjects(queryClient);
+      queryClient.invalidateQueries({ queryKey: assetQueryKeys.all });
+    },
+  });
+}
+
+export function useReturnProjectAssetMutation(): UseMutationResult<
+  ProjectAssetAssignment,
+  Error,
+  { projectId: string; assignmentId: string } & ReturnProjectAssetPayload
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ projectId, assignmentId, notes }) =>
+      projectsApi.returnAsset(projectId, assignmentId, { notes }),
+    onSuccess: () => {
+      invalidateProjects(queryClient);
+      queryClient.invalidateQueries({ queryKey: assetQueryKeys.all });
     },
   });
 }

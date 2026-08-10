@@ -10,5 +10,6 @@ export * from "./consumables";
 export * from "./maintenance-logs";
 export * from "./projects";
 export * from "./project-expense-lines";
+export * from "./project-asset-assignments";
 export * from "./suppliers";
 export * from "./purchase-lots";

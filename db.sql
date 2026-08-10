@@ -273,3 +273,24 @@ CREATE TABLE public.purchase_lots (
   CONSTRAINT purchase_lots_asset_id_assets_id_fk FOREIGN KEY (asset_id) REFERENCES public.assets(id),
   CONSTRAINT purchase_lots_supplier_id_suppliers_id_fk FOREIGN KEY (supplier_id) REFERENCES public.suppliers(id)
 );
+CREATE TABLE public.project_asset_assignments (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  project_id uuid NOT NULL,
+  asset_id uuid NOT NULL,
+  asset_code text NOT NULL,
+  asset_name text NOT NULL,
+  status USER-DEFINED NOT NULL DEFAULT 'assigned'::project_asset_assignment_status,
+  assigned_at timestamp with time zone NOT NULL DEFAULT now(),
+  returned_at timestamp with time zone,
+  assigned_by_user_id uuid NOT NULL,
+  assigned_by_name text NOT NULL,
+  returned_by_user_id uuid,
+  returned_by_name text,
+  notes text,
+  return_notes text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT project_asset_assignments_pkey PRIMARY KEY (id),
+  CONSTRAINT project_asset_assignments_project_id_projects_id_fk FOREIGN KEY (project_id) REFERENCES public.projects(id),
+  CONSTRAINT project_asset_assignments_asset_id_assets_id_fk FOREIGN KEY (asset_id) REFERENCES public.assets(id)
+);

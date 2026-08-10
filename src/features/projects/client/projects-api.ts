@@ -1,5 +1,6 @@
 import type {
   Project,
+  ProjectAssetAssignment,
   ProjectExpenseCategory,
   ProjectExpenseLine,
   ProjectStatus,
@@ -38,6 +39,15 @@ export type UseProjectMaterialPayload = {
   quantity: number;
   description?: string | null;
   incurredOn?: string;
+  notes?: string | null;
+};
+
+export type AssignProjectAssetPayload = {
+  assetId: string;
+  notes?: string | null;
+};
+
+export type ReturnProjectAssetPayload = {
   notes?: string | null;
 };
 
@@ -144,5 +154,50 @@ export const projectsApi = {
       `/api/projects/${projectId}/expenses/${expenseId}`,
       { method: "DELETE" }
     );
+  },
+
+  async listAssets(
+    projectId: string,
+    status?: "assigned" | "returned" | "written_off" | "all"
+  ): Promise<ProjectAssetAssignment[]> {
+    const sp = new URLSearchParams();
+    if (status) sp.set("status", status);
+    const qs = sp.toString();
+    const response = await fetchJson<ApiResponse<ProjectAssetAssignment[]>>(
+      qs
+        ? `/api/projects/${projectId}/assets?${qs}`
+        : `/api/projects/${projectId}/assets`,
+      { method: "GET" }
+    );
+    return response.data;
+  },
+
+  async assignAsset(
+    projectId: string,
+    payload: AssignProjectAssetPayload
+  ): Promise<ProjectAssetAssignment> {
+    const response = await fetchJson<ApiResponse<ProjectAssetAssignment>>(
+      `/api/projects/${projectId}/assets`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }
+    );
+    return response.data;
+  },
+
+  async returnAsset(
+    projectId: string,
+    assignmentId: string,
+    payload?: ReturnProjectAssetPayload
+  ): Promise<ProjectAssetAssignment> {
+    const response = await fetchJson<ApiResponse<ProjectAssetAssignment>>(
+      `/api/projects/${projectId}/assets/${assignmentId}/return`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload ?? {}),
+      }
+    );
+    return response.data;
   },
 };

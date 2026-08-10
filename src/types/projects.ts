@@ -66,6 +66,26 @@ export interface ProjectExpenseLine {
   consumableUnit?: string | null;
 }
 
+export type ProjectAssetAssignmentStatus =
+  | "assigned"
+  | "returned"
+  | "written_off";
+
+export interface ProjectAssetAssignment {
+  id: string;
+  projectId: string;
+  assetId: string;
+  assetCode: string;
+  assetName: string;
+  status: ProjectAssetAssignmentStatus;
+  assignedAt: string;
+  returnedAt: string | null;
+  assignedByName: string;
+  returnedByName: string | null;
+  notes: string | null;
+  returnNotes: string | null;
+}
+
 export interface ProjectFilterState extends BaseFilterState {
   status: string;
 }
