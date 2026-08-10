@@ -4,13 +4,16 @@ import { requireUserManager } from "@/server/shared/auth";
 import { created, handleError, noContent, ok } from "@/server/shared/http";
 
 import { ProjectService } from "./project.service";
+import { ProjectExpenseService } from "./project-expense.service";
 
 /**
- * Admin/superadmin project registry.
- * Staff cannot mutate projects (decision: manager-only CRUD).
+ * Admin/superadmin project registry + expense ledger.
  */
 export class ProjectController {
-  constructor(private readonly service: ProjectService = new ProjectService()) {}
+  constructor(
+    private readonly service: ProjectService = new ProjectService(),
+    private readonly expenses: ProjectExpenseService = new ProjectExpenseService()
+  ) {}
 
   async list(request: NextRequest | Request) {
     try {
@@ -65,7 +68,53 @@ export class ProjectController {
       return handleError(error);
     }
   }
+
+  async listExpenses(projectId: string) {
+    try {
+      await requireUserManager();
+      return ok(await this.expenses.listForProject(projectId));
+    } catch (error) {
+      return handleError(error);
+    }
+  }
+
+  async createExpense(request: NextRequest | Request, projectId: string) {
+    try {
+      const session = await requireUserManager();
+      const body = await request.json();
+      return created(
+        await this.expenses.create(projectId, body, session.actor)
+      );
+    } catch (error) {
+      return handleError(error);
+    }
+  }
+
+  async updateExpense(
+    request: NextRequest | Request,
+    projectId: string,
+    expenseId: string
+  ) {
+    try {
+      await requireUserManager();
+      const body = await request.json();
+      return ok(await this.expenses.update(projectId, expenseId, body));
+    } catch (error) {
+      return handleError(error);
+    }
+  }
+
+  async deleteExpense(projectId: string, expenseId: string) {
+    try {
+      await requireUserManager();
+      await this.expenses.delete(projectId, expenseId);
+      return noContent();
+    } catch (error) {
+      return handleError(error);
+    }
+  }
 }
 
 export const projectController = new ProjectController();
 export { ProjectService } from "./project.service";
+export { ProjectExpenseService } from "./project-expense.service";

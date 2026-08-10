@@ -9,7 +9,7 @@ export type ProjectStatus =
 
 /**
  * Public contract for project registry rows.
- * `totalSpent` is 0 until expense lines ship (Phase 2+).
+ * `totalSpent` is the sum of project_expense_lines.amount (signed).
  * Money fields are fixed 2-decimal strings (PHP).
  */
 export type ProjectDTO = {

@@ -8,18 +8,34 @@ import {
   type UseQueryResult,
 } from "@tanstack/react-query";
 
-import type { Project } from "@/types/projects";
+import type { Project, ProjectExpenseLine } from "@/types/projects";
 import {
   projectsApi,
+  type CreateProjectExpensePayload,
   type CreateProjectPayload,
+  type UpdateProjectExpensePayload,
   type UpdateProjectPayload,
 } from "./projects-api";
 import { projectQueryKeys } from "./query-keys";
+
+function invalidateProjects(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: projectQueryKeys.all });
+}
 
 export function useProjectsQuery(): UseQueryResult<Project[], Error> {
   return useQuery({
     queryKey: projectQueryKeys.list(),
     queryFn: () => projectsApi.list(),
+  });
+}
+
+export function useProjectExpensesQuery(
+  projectId: string | null | undefined
+): UseQueryResult<ProjectExpenseLine[], Error> {
+  return useQuery({
+    queryKey: projectQueryKeys.expenses(projectId ?? ""),
+    queryFn: () => projectsApi.listExpenses(projectId!),
+    enabled: Boolean(projectId),
   });
 }
 
@@ -32,9 +48,7 @@ export function useCreateProjectMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => projectsApi.create(payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: projectQueryKeys.all });
-    },
+    onSuccess: () => invalidateProjects(queryClient),
   });
 }
 
@@ -47,9 +61,7 @@ export function useUpdateProjectMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: ({ id, payload }) => projectsApi.update(id, payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: projectQueryKeys.all });
-    },
+    onSuccess: () => invalidateProjects(queryClient),
   });
 }
 
@@ -62,8 +74,52 @@ export function useDeleteProjectMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (id) => projectsApi.delete(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: projectQueryKeys.all });
-    },
+    onSuccess: () => invalidateProjects(queryClient),
+  });
+}
+
+export function useCreateProjectExpenseMutation(): UseMutationResult<
+  ProjectExpenseLine,
+  Error,
+  { projectId: string; payload: CreateProjectExpensePayload }
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ projectId, payload }) =>
+      projectsApi.createExpense(projectId, payload),
+    onSuccess: () => invalidateProjects(queryClient),
+  });
+}
+
+export function useUpdateProjectExpenseMutation(): UseMutationResult<
+  ProjectExpenseLine,
+  Error,
+  {
+    projectId: string;
+    expenseId: string;
+    payload: UpdateProjectExpensePayload;
+  }
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ projectId, expenseId, payload }) =>
+      projectsApi.updateExpense(projectId, expenseId, payload),
+    onSuccess: () => invalidateProjects(queryClient),
+  });
+}
+
+export function useDeleteProjectExpenseMutation(): UseMutationResult<
+  void,
+  Error,
+  { projectId: string; expenseId: string }
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ projectId, expenseId }) =>
+      projectsApi.deleteExpense(projectId, expenseId),
+    onSuccess: () => invalidateProjects(queryClient),
   });
 }

@@ -1,4 +1,9 @@
-import type { Project, ProjectStatus } from "@/types/projects";
+import type {
+  Project,
+  ProjectExpenseCategory,
+  ProjectExpenseLine,
+  ProjectStatus,
+} from "@/types/projects";
 import { fetchJson, type ApiResponse } from "@/features/shared/fetch-json";
 
 export type CreateProjectPayload = {
@@ -14,6 +19,19 @@ export type CreateProjectPayload = {
 };
 
 export type UpdateProjectPayload = Partial<CreateProjectPayload>;
+
+export type CreateProjectExpensePayload = {
+  lineType?: "miscellaneous" | "adjustment";
+  category?: ProjectExpenseCategory;
+  description: string;
+  amount: string | number;
+  quantity?: string | number | null;
+  unitCost?: string | number | null;
+  incurredOn?: string;
+  notes?: string | null;
+};
+
+export type UpdateProjectExpensePayload = Partial<CreateProjectExpensePayload>;
 
 export const projectsApi = {
   async list(params?: {
@@ -60,5 +78,49 @@ export const projectsApi = {
 
   async delete(id: string): Promise<void> {
     await fetchJson<void>(`/api/projects/${id}`, { method: "DELETE" });
+  },
+
+  async listExpenses(projectId: string): Promise<ProjectExpenseLine[]> {
+    const response = await fetchJson<ApiResponse<ProjectExpenseLine[]>>(
+      `/api/projects/${projectId}/expenses`,
+      { method: "GET" }
+    );
+    return response.data;
+  },
+
+  async createExpense(
+    projectId: string,
+    payload: CreateProjectExpensePayload
+  ): Promise<ProjectExpenseLine> {
+    const response = await fetchJson<ApiResponse<ProjectExpenseLine>>(
+      `/api/projects/${projectId}/expenses`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }
+    );
+    return response.data;
+  },
+
+  async updateExpense(
+    projectId: string,
+    expenseId: string,
+    payload: UpdateProjectExpensePayload
+  ): Promise<ProjectExpenseLine> {
+    const response = await fetchJson<ApiResponse<ProjectExpenseLine>>(
+      `/api/projects/${projectId}/expenses/${expenseId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      }
+    );
+    return response.data;
+  },
+
+  async deleteExpense(projectId: string, expenseId: string): Promise<void> {
+    await fetchJson<void>(
+      `/api/projects/${projectId}/expenses/${expenseId}`,
+      { method: "DELETE" }
+    );
   },
 };

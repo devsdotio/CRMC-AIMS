@@ -8,6 +8,7 @@ import {
 } from "@/server/shared/errors";
 
 import { ProjectRepository } from "./project.repository";
+import { ProjectExpenseRepository } from "./project-expense.repository";
 import type { ProjectDTO } from "./project.types";
 import {
   createProjectSchema,
@@ -36,10 +37,9 @@ function budgetRemaining(
   return (b - s).toFixed(2);
 }
 
-function toDTO(row: ProjectRow): ProjectDTO {
+function toDTO(row: ProjectRow, totalSpent: string): ProjectDTO {
   const budget = formatMoney(row.budget);
-  // Phase 2+ will sum project_expense_lines here.
-  const totalSpent = ZERO;
+  const spent = formatMoney(totalSpent) ?? ZERO;
 
   return {
     id: row.id,
@@ -53,8 +53,8 @@ function toDTO(row: ProjectRow): ProjectDTO {
     endDate: row.endDate ?? null,
     budget,
     notes: row.notes ?? null,
-    totalSpent,
-    budgetRemaining: budgetRemaining(budget, totalSpent),
+    totalSpent: spent,
+    budgetRemaining: budgetRemaining(budget, spent),
     createdByUserId: row.createdByUserId,
     createdByName: row.createdByName,
     createdAt: row.createdAt.toISOString(),
@@ -81,26 +81,38 @@ function assertValidDateRange(
 }
 
 export class ProjectService {
-  constructor(private readonly repo = new ProjectRepository()) {}
+  constructor(
+    private readonly repo = new ProjectRepository(),
+    private readonly expenses = new ProjectExpenseRepository()
+  ) {}
+
+  private async spentFor(projectId: string): Promise<string> {
+    const map = await this.expenses.sumAmountsByProjectIds([projectId]);
+    return map.get(projectId) ?? ZERO;
+  }
+
+  private async spentMap(projectIds: string[]): Promise<Map<string, string>> {
+    return this.expenses.sumAmountsByProjectIds(projectIds);
+  }
 
   async list(rawQuery: unknown): Promise<ProjectDTO[]> {
     const filters = listProjectsQuerySchema.parse(rawQuery ?? {});
     const rows = await this.repo.list(filters);
-    return rows.map(toDTO);
+    const spent = await this.spentMap(rows.map((r) => r.id));
+    return rows.map((row) => toDTO(row, spent.get(row.id) ?? ZERO));
   }
 
   async getById(rawId: string): Promise<ProjectDTO> {
     const id = projectIdSchema.parse(rawId);
     const row = await this.repo.findById(id);
     if (!row) throw new NotFoundError("Project", id);
-    return toDTO(row);
+    return toDTO(row, await this.spentFor(id));
   }
 
   async create(rawInput: unknown, actor: ActorContext): Promise<ProjectDTO> {
     const input = createProjectSchema.parse(rawInput);
     assertValidDateRange(input.startDate, input.endDate);
 
-    // Completing at create time freezes the project immediately — allow but warn via isMutable.
     const row = await this.repo.create({
       projectCode: generateOperationalCode("PRJ"),
       name: input.name,
@@ -116,13 +128,10 @@ export class ProjectService {
       createdByName: actor.displayName,
     });
 
-    return toDTO(row);
+    return toDTO(row, ZERO);
   }
 
-  async update(
-    rawId: string,
-    rawInput: unknown
-  ): Promise<ProjectDTO> {
+  async update(rawId: string, rawInput: unknown): Promise<ProjectDTO> {
     const id = projectIdSchema.parse(rawId);
     const input = updateProjectSchema.parse(rawInput);
 
@@ -153,7 +162,7 @@ export class ProjectService {
     });
 
     if (!updated) throw new NotFoundError("Project", id);
-    return toDTO(updated);
+    return toDTO(updated, await this.spentFor(id));
   }
 
   async delete(rawId: string): Promise<void> {

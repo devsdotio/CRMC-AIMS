@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   X,
   Pencil,
@@ -11,13 +11,26 @@ import {
   User,
   FileText,
   Package,
-  Boxes,
+  Plus,
+  Trash2,
   Lock,
+  AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Project } from "@/types/projects";
+import type { Project, ProjectExpenseLine } from "@/types/projects";
+import { PROJECT_EXPENSE_CATEGORY_LABELS } from "@/types/projects";
 import { ProjectStatusBadge } from "./project-status-badge";
 import { formatPhp } from "./format-money";
+import {
+  useCreateProjectExpenseMutation,
+  useDeleteProjectExpenseMutation,
+  useProjectExpensesQuery,
+  useUpdateProjectExpenseMutation,
+} from "@/features/projects/client";
+import {
+  AddEditExpenseDialog,
+  type ExpenseFormInput,
+} from "./add-edit-expense-dialog";
 
 export interface ProjectDetailPanelProps {
   project: Project | null;
@@ -50,16 +63,78 @@ export function ProjectDetailPanel({
   onEdit,
 }: ProjectDetailPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const {
+    data: expenses = [],
+    isLoading: expensesLoading,
+  } = useProjectExpensesQuery(isOpen && project ? project.id : null);
+
+  const createExpense = useCreateProjectExpenseMutation();
+  const updateExpense = useUpdateProjectExpenseMutation();
+  const deleteExpense = useDeleteProjectExpenseMutation();
+
+  const [editExpense, setEditExpense] = useState<
+    ProjectExpenseLine | null | undefined
+  >(undefined);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && isOpen) onClose();
+      if (e.key === "Escape" && isOpen && editExpense === undefined) onClose();
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, editExpense]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setEditExpense(undefined);
+      setActionError(null);
+    }
+  }, [isOpen]);
 
   if (!isOpen || !project) return null;
+
+  const overBudget =
+    project.budgetRemaining != null && Number(project.budgetRemaining) < 0;
+
+  const handleExpenseSubmit = async (input: ExpenseFormInput) => {
+    setActionError(null);
+    const payload = {
+      lineType: input.lineType,
+      category: input.category,
+      description: input.description,
+      amount: input.amount,
+      incurredOn: input.incurredOn || undefined,
+      notes: input.notes || null,
+    };
+    if (editExpense) {
+      await updateExpense.mutateAsync({
+        projectId: project.id,
+        expenseId: editExpense.id,
+        payload,
+      });
+    } else {
+      await createExpense.mutateAsync({
+        projectId: project.id,
+        payload,
+      });
+    }
+  };
+
+  const handleDeleteExpense = async (line: ProjectExpenseLine) => {
+    if (!window.confirm(`Delete expense “${line.description}”?`)) return;
+    setActionError(null);
+    try {
+      await deleteExpense.mutateAsync({
+        projectId: project.id,
+        expenseId: line.id,
+      });
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : "Failed to delete expense."
+      );
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs transition-opacity duration-200">
@@ -115,6 +190,12 @@ export function ProjectDetailPanel({
                   <Wallet className="h-3.5 w-3.5" />
                   Budget overview
                 </span>
+                {overBudget && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-status-outofservice-text">
+                    <AlertTriangle className="h-3 w-3" />
+                    Over budget
+                  </span>
+                )}
               </div>
               <div className="grid grid-cols-3 gap-2 text-center">
                 <div>
@@ -137,7 +218,14 @@ export function ProjectDetailPanel({
                   <div className="text-[10px] text-text-secondary font-medium">
                     Remaining
                   </div>
-                  <div className="text-sm font-bold font-mono tabular-nums text-text">
+                  <div
+                    className={cn(
+                      "text-sm font-bold font-mono tabular-nums",
+                      overBudget
+                        ? "text-status-outofservice-text"
+                        : "text-text"
+                    )}
+                  >
                     {project.budgetRemaining != null
                       ? formatPhp(project.budgetRemaining)
                       : "—"}
@@ -201,29 +289,117 @@ export function ProjectDetailPanel({
             </section>
           )}
 
-          {/* Phase 2 / 3 / 4 placeholders keep the shell ready without fake data */}
+          <section className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary">
+                Expenses
+              </h3>
+              {project.isMutable && (
+                <button
+                  type="button"
+                  onClick={() => setEditExpense(null)}
+                  className="inline-flex items-center gap-1 h-7 px-2.5 text-[11px] font-bold rounded-md bg-accent text-accent-foreground cursor-pointer"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add
+                </button>
+              )}
+            </div>
+
+            {actionError && (
+              <p className="text-[11px] text-status-outofservice-text">
+                {actionError}
+              </p>
+            )}
+
+            {expensesLoading ? (
+              <div className="space-y-2 animate-pulse">
+                <div className="h-12 bg-border rounded-lg" />
+                <div className="h-12 bg-border rounded-lg" />
+              </div>
+            ) : expenses.length === 0 ? (
+              <p className="text-[11px] text-text-secondary border border-dashed border-border rounded-lg p-3">
+                No expenses yet. Log travel, snacks, fees, or other unexpected
+                costs here. Inventory materials come in a later phase.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {expenses.map((line) => {
+                  const amount = Number(line.amount);
+                  const isCredit = amount < 0;
+                  return (
+                    <li
+                      key={line.id}
+                      className="rounded-lg border border-border bg-bg-subtle/40 px-3 py-2.5 text-xs"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="font-bold text-text truncate">
+                            {line.description}
+                          </div>
+                          <div className="text-[10px] text-text-secondary mt-0.5">
+                            {PROJECT_EXPENSE_CATEGORY_LABELS[line.category]} ·{" "}
+                            {line.incurredOn}
+                            {line.recordedByName
+                              ? ` · ${line.recordedByName}`
+                              : ""}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span
+                            className={cn(
+                              "font-mono font-bold tabular-nums",
+                              isCredit
+                                ? "text-status-active-text"
+                                : "text-text"
+                            )}
+                          >
+                            {formatPhp(line.amount)}
+                          </span>
+                          {project.isMutable &&
+                            (line.lineType === "miscellaneous" ||
+                              line.lineType === "adjustment") && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditExpense(line)}
+                                  className="p-1 rounded-md border border-border hover:bg-bg cursor-pointer"
+                                  aria-label="Edit expense"
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    void handleDeleteExpense(line);
+                                  }}
+                                  className="p-1 rounded-md border border-border text-status-outofservice-text hover:bg-status-outofservice-bg/10 cursor-pointer"
+                                  aria-label="Delete expense"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
+                              </>
+                            )}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+
           <section className="space-y-2">
             <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary">
-              Linked activity
+              Assigned assets
             </h3>
-            <div className="rounded-lg border border-dashed border-border p-4 space-y-3">
-              <div className="flex items-start gap-2.5 opacity-70">
-                <Boxes className="h-4 w-4 text-text-secondary shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-xs font-bold text-text">Expenses & materials</p>
-                  <p className="text-[11px] text-text-secondary mt-0.5">
-                    Coming next — misc costs, then inventory consumables priced from purchase lots.
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-2.5 opacity-70">
-                <Package className="h-4 w-4 text-text-secondary shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-xs font-bold text-text">Assigned assets</p>
-                  <p className="text-[11px] text-text-secondary mt-0.5">
-                    Coming later — project custody (assign/return) without a borrower account.
-                  </p>
-                </div>
+            <div className="rounded-lg border border-dashed border-border p-3 flex items-start gap-2.5 opacity-70">
+              <Package className="h-4 w-4 text-text-secondary shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-bold text-text">Coming later</p>
+                <p className="text-[11px] text-text-secondary mt-0.5">
+                  Project custody (assign/return) without a borrower account.
+                </p>
               </div>
             </div>
           </section>
@@ -249,6 +425,13 @@ export function ProjectDetailPanel({
           )}
         </div>
       </aside>
+
+      <AddEditExpenseDialog
+        isOpen={editExpense !== undefined}
+        expense={editExpense ?? null}
+        onClose={() => setEditExpense(undefined)}
+        onSubmit={handleExpenseSubmit}
+      />
     </div>
   );
 }

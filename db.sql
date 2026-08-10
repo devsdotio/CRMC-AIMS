@@ -210,6 +210,26 @@ CREATE TABLE public.projects (
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT projects_pkey PRIMARY KEY (id)
 );
+CREATE TABLE public.project_expense_lines (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  project_id uuid NOT NULL,
+  line_type USER-DEFINED NOT NULL DEFAULT 'miscellaneous'::project_expense_line_type,
+  category USER-DEFINED NOT NULL DEFAULT 'miscellaneous'::project_expense_category,
+  description text NOT NULL,
+  amount numeric NOT NULL,
+  quantity numeric,
+  unit_cost numeric,
+  consumable_id uuid,
+  asset_id uuid,
+  incurred_on date NOT NULL,
+  notes text,
+  recorded_by_user_id uuid NOT NULL,
+  recorded_by_name text NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT project_expense_lines_pkey PRIMARY KEY (id),
+  CONSTRAINT project_expense_lines_project_id_projects_id_fk FOREIGN KEY (project_id) REFERENCES public.projects(id)
+);
 CREATE TABLE public.suppliers (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   supplier_code text NOT NULL UNIQUE,
