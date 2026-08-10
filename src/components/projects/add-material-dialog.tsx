@@ -24,10 +24,10 @@ export function AddMaterialDialog({
   onClose: () => void;
   onSubmit: (input: MaterialFormInput) => void | Promise<void>;
 }) {
-  const available = useMemo(
-    () => items.filter((i) => i.currentQty > 0),
-    [items]
-  );
+  const available = useMemo(() => {
+    const list = Array.isArray(items) ? items : [];
+    return list.filter((i) => i.currentQty > 0);
+  }, [items]);
   const [consumableId, setConsumableId] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [notes, setNotes] = useState("");

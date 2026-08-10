@@ -102,9 +102,10 @@ export function ProjectDetailPanel({
   const returnAsset = useReturnProjectAssetMutation();
   const reportDamage = useReportProjectAssetDamageMutation();
   const {
-    data: consumables = [],
+    data: consumablesPage,
     isLoading: consumablesLoading,
-  } = useConsumablesQuery();
+  } = useConsumablesQuery({ limit: 100 });
+  const consumables = consumablesPage?.data ?? [];
   const {
     data: assets = [],
     isLoading: assetsLoading,
