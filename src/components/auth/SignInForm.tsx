@@ -26,6 +26,12 @@ const REDIRECT_ERROR_MESSAGES: Record<string, string> = {
     'Borrower accounts cannot access the staff workspace yet. Contact Property Custodian for updates.',
 };
 
+const STAY_ON_SIGN_IN_ERRORS = new Set([
+  'no_profile',
+  'deactivated',
+  'borrower_portal',
+]);
+
 function getRedirectErrorMessage(errorKey: string | null): string | null {
   if (!errorKey) return null;
   return REDIRECT_ERROR_MESSAGES[errorKey] ?? 'Unable to access the application.';
@@ -65,6 +71,33 @@ export function SignInForm() {
   useEffect(() => {
     emailInputRef.current?.focus();
   }, []);
+
+  /**
+   * Clear residual Supabase session when the private shell rejected entry.
+   * Server Components cannot reliably attach signOut cookies to redirects.
+   */
+  useEffect(() => {
+    if (!paramErrorKey || !STAY_ON_SIGN_IN_ERRORS.has(paramErrorKey)) {
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const supabase = createClient();
+        await supabase.auth.signOut();
+      } catch {
+        // Best-effort
+      }
+      if (!cancelled) {
+        // Drop auth cookies from a stuck bounce loop even if signOut is partial
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [paramErrorKey]);
 
   const validateEmail = (email: string) => {
     if (!email.trim()) return 'Email address is required.';

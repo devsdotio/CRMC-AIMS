@@ -24,6 +24,7 @@ export const createAssetSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/, "purchaseDate must be YYYY-MM-DD.")
     .optional(),
   value: z.number().nonnegative().optional(),
+  supplierId: z.string().uuid().optional().nullable(),
   imageUrl: z.string().trim().max(2048).optional(),
   notes: z.string().trim().max(4000).optional(),
 });

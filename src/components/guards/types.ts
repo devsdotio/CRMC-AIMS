@@ -1,10 +1,10 @@
-export type MockRole = 'admin' | 'borrower';
+import type { AppRole } from "@/server/shared/roles";
 
 export interface GuardConfig {
-  allowedRoles: MockRole[];
-  /** 
-   * Safe fallback route when no mock_role cookie is present or role is indeterminate 
-   * @default "/sign-in"
+  allowedRoles: AppRole[];
+  /**
+   * Override when role is not allowed (default: role-aware home).
+   * @default home for the signed-in role
    */
   fallbackRoute?: string;
 }

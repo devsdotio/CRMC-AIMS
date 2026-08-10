@@ -50,6 +50,9 @@ export const assetStatusEnum = pgEnum("asset_status", [
  *
  * Maintenance history is stored as jsonb matching MaintenanceLogEntry[]
  * until a first-class maintenance_logs table is introduced.
+ *
+ * Optional `supplierId` points at the vendors registry; multi-price history
+ * is recorded on `purchase_lots` when acquisition cost is known.
  */
 export const assets = pgTable(
   "assets",
@@ -68,6 +71,7 @@ export const assets = pgTable(
     department: text("department"),
     purchaseDate: date("purchase_date", { mode: "string" }),
     value: numeric("value", { precision: 14, scale: 2 }),
+    supplierId: uuid("supplier_id"),
     imageUrl: text("image_url"),
     notes: text("notes"),
 
@@ -91,6 +95,7 @@ export const assets = pgTable(
     index("assets_status_idx").on(table.status),
     index("assets_category_idx").on(table.category),
     index("assets_location_idx").on(table.location),
+    index("assets_supplier_id_idx").on(table.supplierId),
   ]
 );
 

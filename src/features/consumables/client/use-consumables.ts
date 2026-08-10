@@ -17,6 +17,7 @@ import {
   consumablesApi,
   type CreateConsumablePayload,
   type ConsumableItem,
+  type RestockPayload,
   type StockAdjustPayload,
   type StockMovementPayload,
   type UpdateConsumablePayload,
@@ -78,7 +79,7 @@ export function useUpdateConsumableMutation(): UseMutationResult<
 export function useRestockConsumableMutation(): UseMutationResult<
   ConsumableItem,
   Error,
-  { id: string; payload: StockMovementPayload }
+  { id: string; payload: RestockPayload }
 > {
   const qc = useQueryClient();
   return useMutation({

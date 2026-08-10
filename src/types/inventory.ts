@@ -19,6 +19,10 @@ export interface StockHistoryEntry {
   actor: string;
   reason?: string;
   notes?: string;
+  unitCost?: string;
+  supplierId?: string;
+  supplierName?: string;
+  lotCode?: string;
 }
 
 export interface ConsumableItem {

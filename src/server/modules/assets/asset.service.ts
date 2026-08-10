@@ -10,6 +10,8 @@ import { withTransaction } from "@/server/db/transaction";
 import { BorrowLogService } from "@/server/modules/borrow-log/borrow-log.service";
 import { BorrowLogRepository } from "@/server/modules/borrow-log/borrow-log.repository";
 import { MaintenanceRepository } from "@/server/modules/maintenance/maintenance.repository";
+import { PurchaseLotService } from "@/server/modules/purchase-lots/purchase-lot.service";
+import { SupplierRepository } from "@/server/modules/suppliers/supplier.repository";
 
 import { AssetLifecycleService } from "./asset.lifecycle.service";
 import { buildAssetFieldChanges } from "./asset.lifecycle.types";
@@ -82,6 +84,7 @@ export function toAssetDTO(row: AssetRow): Asset {
     department: row.department ?? undefined,
     purchaseDate: row.purchaseDate ?? undefined,
     value: parseValue(row.value),
+    supplierId: row.supplierId ?? undefined,
     imageUrl: row.imageUrl ?? undefined,
     notes: row.notes ?? undefined,
     lastUpdated: toDateString(row.lastUpdated),
@@ -100,6 +103,7 @@ const TRACKED_UPDATE_FIELDS: (keyof AssetRow)[] = [
   "department",
   "purchaseDate",
   "value",
+  "supplierId",
   "imageUrl",
   "notes",
 ];
@@ -110,7 +114,9 @@ export class AssetService {
     private readonly lifecycleService: AssetLifecycleService = new AssetLifecycleService(),
     private readonly borrowLogs: BorrowLogService = new BorrowLogService(),
     private readonly borrowLogRepo: BorrowLogRepository = new BorrowLogRepository(),
-    private readonly maintenanceRepo: MaintenanceRepository = new MaintenanceRepository()
+    private readonly maintenanceRepo: MaintenanceRepository = new MaintenanceRepository(),
+    private readonly purchaseLots: PurchaseLotService = new PurchaseLotService(),
+    private readonly suppliers: SupplierRepository = new SupplierRepository()
   ) {}
 
   async listAssets(rawQuery: unknown): Promise<Asset[]> {
@@ -133,43 +139,78 @@ export class AssetService {
   async createAsset(rawInput: unknown, actor: ActorContext): Promise<Asset> {
     const input: CreateAssetBody = createAssetSchema.parse(rawInput);
 
+    if (input.supplierId) {
+      const supplier = await this.suppliers.findById(input.supplierId);
+      if (!supplier || supplier.status !== "active") {
+        throw new NotFoundError("Supplier", input.supplierId);
+      }
+    }
+
     try {
-      const now = new Date();
-      const row = await this.assetRepository.create({
-        assetCode: input.assetCode,
-        name: input.name,
-        category: input.category,
-        status: input.status ?? "active",
-        assignmentType: input.assignmentType ?? "borrowable",
-        location: input.location,
-        serialNumber: input.serialNumber ?? null,
-        currentHolder: input.currentHolder ?? null,
-        department: input.department ?? null,
-        purchaseDate: input.purchaseDate ?? null,
-        value: input.value !== undefined ? input.value.toFixed(2) : null,
-        imageUrl: input.imageUrl ?? null,
-        notes: input.notes ?? null,
-        maintenanceHistory: [],
-        lastUpdated: now,
-      });
-
-      await this.lifecycleService.record({
-        assetId: row.id,
-        assetCode: row.assetCode,
-        eventType: "created",
-        actor,
-        toStatus: row.status,
-        toHolder: row.currentHolder,
-        payload: {
-          snapshot: {
-            name: row.name,
-            category: row.category,
-            location: row.location,
+      return await withTransaction(async (tx) => {
+        const now = new Date();
+        const row = await this.assetRepository.create(
+          {
+            assetCode: input.assetCode,
+            name: input.name,
+            category: input.category,
+            status: input.status ?? "active",
+            location: input.location,
+            serialNumber: input.serialNumber ?? null,
+            currentHolder: input.currentHolder ?? null,
+            department: input.department ?? null,
+            purchaseDate: input.purchaseDate ?? null,
+            value: input.value !== undefined ? input.value.toFixed(2) : null,
+            supplierId: input.supplierId ?? null,
+            imageUrl: input.imageUrl ?? null,
+            notes: input.notes ?? null,
+            maintenanceHistory: [],
+            lastUpdated: now,
           },
-        },
-      });
+          tx
+        );
 
-      return toAssetDTO(row);
+        await this.lifecycleService.record(
+          {
+            assetId: row.id,
+            assetCode: row.assetCode,
+            eventType: "created",
+            actor,
+            toStatus: row.status,
+            toHolder: row.currentHolder,
+            payload: {
+              snapshot: {
+                name: row.name,
+                category: row.category,
+                location: row.location,
+              },
+            },
+          },
+          tx
+        );
+
+        // Record acquisition cost history when unit value is known.
+        if (input.value !== undefined) {
+          await this.purchaseLots.recordLot(
+            {
+              itemType: "asset",
+              assetId: row.id,
+              itemCode: row.assetCode,
+              itemName: row.name,
+              supplierId: input.supplierId ?? null,
+              quantity: 1,
+              unitCost: input.value.toFixed(2),
+              purchasedOn: input.purchaseDate ?? todayDateString(),
+              notes: input.notes ?? null,
+              recordedByUserId: actor.userId,
+              recordedByName: actor.displayName,
+            },
+            tx
+          );
+        }
+
+        return toAssetDTO(row);
+      });
     } catch (error) {
       if (isPgUniqueViolation(error)) {
         throw new ConflictError("Asset code already exists.");
@@ -214,6 +255,9 @@ export class AssetService {
           ? { purchaseDate: input.purchaseDate }
           : {}),
         ...(input.value !== undefined ? { value: input.value.toFixed(2) } : {}),
+        ...(input.supplierId !== undefined
+          ? { supplierId: input.supplierId }
+          : {}),
         ...(input.imageUrl !== undefined ? { imageUrl: input.imageUrl } : {}),
         ...(input.notes !== undefined ? { notes: input.notes } : {}),
         lastUpdated: new Date(),

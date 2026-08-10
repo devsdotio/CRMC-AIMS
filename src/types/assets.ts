@@ -27,6 +27,7 @@ export interface Asset {
   department?: string;
   purchaseDate?: string;
   value?: number;
+  supplierId?: string;
   imageUrl?: string;
   notes?: string;
   lastUpdated: string;

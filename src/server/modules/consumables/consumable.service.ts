@@ -10,6 +10,7 @@ import {
   NotFoundError,
 } from "@/server/shared/errors";
 import { withTransaction } from "@/server/db/transaction";
+import { PurchaseLotService } from "@/server/modules/purchase-lots/purchase-lot.service";
 
 import { ConsumableRepository } from "./consumable.repository";
 import type { ConsumableDTO } from "./consumable.types";
@@ -17,6 +18,7 @@ import {
   consumableIdSchema,
   createConsumableSchema,
   listConsumablesQuerySchema,
+  restockSchema,
   stockAdjustSchema,
   stockMovementSchema,
   updateConsumableSchema,
@@ -58,7 +60,13 @@ function historyEntry(
   quantityChange: number,
   actor: string,
   reason?: string,
-  notes?: string
+  notes?: string,
+  extra?: Partial<
+    Pick<
+      StockHistoryEntry,
+      "unitCost" | "supplierId" | "supplierName" | "lotCode"
+    >
+  >
 ): StockHistoryEntry {
   return {
     id: crypto.randomUUID(),
@@ -68,11 +76,15 @@ function historyEntry(
     actor,
     ...(reason ? { reason } : {}),
     ...(notes ? { notes } : {}),
+    ...extra,
   };
 }
 
 export class ConsumableService {
-  constructor(private readonly repo = new ConsumableRepository()) {}
+  constructor(
+    private readonly repo = new ConsumableRepository(),
+    private readonly purchaseLots = new PurchaseLotService()
+  ) {}
 
   async list(rawQuery: unknown): Promise<import("@/types/filters").PaginatedResponse<ConsumableDTO>> {
     const filters = listConsumablesQuerySchema.parse(rawQuery ?? {});
@@ -174,11 +186,30 @@ export class ConsumableService {
     actor: ActorContext
   ): Promise<ConsumableDTO> {
     const id = consumableIdSchema.parse(rawId);
-    const input = stockMovementSchema.parse(rawInput);
+    const input = restockSchema.parse(rawInput);
 
     return withTransaction(async (tx) => {
       const existing = await this.repo.findByIdForUpdate(id, tx);
       if (!existing) throw new NotFoundError("Consumable", id);
+
+      const purchasedOn = input.purchasedOn ?? todayDateString();
+      const lot = await this.purchaseLots.recordLot(
+        {
+          itemType: "consumable",
+          consumableId: existing.id,
+          itemCode: existing.itemCode,
+          itemName: existing.name,
+          supplierId: input.supplierId ?? null,
+          quantity: input.quantity,
+          unitCost: input.unitCost,
+          purchasedOn,
+          reference: input.reason ?? null,
+          notes: input.notes ?? null,
+          recordedByUserId: actor.userId,
+          recordedByName: actor.displayName,
+        },
+        tx
+      );
 
       const history = [
         ...(Array.isArray(existing.history) ? existing.history : []),
@@ -187,7 +218,13 @@ export class ConsumableService {
           input.quantity,
           actor.displayName,
           input.reason,
-          input.notes
+          input.notes,
+          {
+            unitCost: lot.unitCost,
+            supplierId: lot.supplierId ?? undefined,
+            supplierName: lot.supplierName ?? undefined,
+            lotCode: lot.lotCode,
+          }
         ),
       ];
 
@@ -197,6 +234,7 @@ export class ConsumableService {
           currentQty: existing.currentQty + input.quantity,
           lastRestocked: new Date(),
           history,
+          ...(lot.supplierName ? { supplier: lot.supplierName } : {}),
         },
         tx
       );

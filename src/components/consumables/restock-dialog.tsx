@@ -4,18 +4,30 @@ import { useState, useEffect } from "react";
 import { X, PlusCircle, Check } from "lucide-react";
 
 import type { ConsumableItem } from "@/types/inventory";
+import type { Supplier } from "@/types/suppliers";
+import { formatPhp } from "@/components/projects/format-money";
+
+export type RestockConfirmInput = {
+  itemId: string;
+  qtyReceived: number;
+  unitCost: number;
+  supplierId?: string | null;
+  notes?: string;
+};
 
 export interface RestockDialogProps {
   item: ConsumableItem | null;
   allItems: ConsumableItem[];
+  suppliers: Supplier[];
   isOpen: boolean;
   onClose: () => void;
-  onConfirmRestock: (itemId: string, qtyReceived: number, notes?: string) => void;
+  onConfirmRestock: (input: RestockConfirmInput) => void;
 }
 
 interface RestockDialogFormProps {
   item: ConsumableItem | null;
   allItems: ConsumableItem[];
+  suppliers: Supplier[];
   onClose: () => void;
   onConfirmRestock: RestockDialogProps["onConfirmRestock"];
 }
@@ -32,6 +44,7 @@ function getInitialSelectedItemId(
 function RestockDialogForm({
   item,
   allItems,
+  suppliers,
   onClose,
   onConfirmRestock,
 }: RestockDialogFormProps) {
@@ -39,20 +52,24 @@ function RestockDialogForm({
     getInitialSelectedItemId(item, allItems)
   );
   const [qtyReceived, setQtyReceived] = useState(20);
+  const [unitCost, setUnitCost] = useState("0");
+  const [supplierId, setSupplierId] = useState("");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        onClose();
-      }
+      if (e.key === "Escape") onClose();
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
   const targetItem = allItems.find((i) => i.id === selectedItemId) || item;
+  const total =
+    Number(qtyReceived) > 0 && Number(unitCost) >= 0
+      ? Number(qtyReceived) * Number(unitCost)
+      : 0;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,8 +81,19 @@ function RestockDialogForm({
       setError("Quantity received must be greater than zero.");
       return;
     }
+    const cost = Number(unitCost);
+    if (!Number.isFinite(cost) || cost < 0) {
+      setError("Unit cost must be a non-negative amount.");
+      return;
+    }
 
-    onConfirmRestock(targetItem.id, Number(qtyReceived), notes.trim() || undefined);
+    onConfirmRestock({
+      itemId: targetItem.id,
+      qtyReceived: Number(qtyReceived),
+      unitCost: cost,
+      supplierId: supplierId || null,
+      notes: notes.trim() || undefined,
+    });
     onClose();
   };
 
@@ -85,11 +113,14 @@ function RestockDialogForm({
               <PlusCircle className="h-5 w-5" />
             </div>
             <div>
-              <h3 id="restock-dialog-title" className="text-base font-bold text-text leading-tight">
-                Log Incoming Restock Shipment
+              <h3
+                id="restock-dialog-title"
+                className="text-base font-bold text-text leading-tight"
+              >
+                Log Incoming Restock
               </h3>
               <p className="text-xs text-text-secondary mt-0.5">
-                Increase supply quantity & record delivery receipt
+                Quantity, unit cost, and optional supplier for price history
               </p>
             </div>
           </div>
@@ -106,7 +137,10 @@ function RestockDialogForm({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1">
-            <label htmlFor="restock-item-select" className="block text-xs font-semibold text-text">
+            <label
+              htmlFor="restock-item-select"
+              className="block text-xs font-semibold text-text"
+            >
               Target Consumable Item <span className="text-accent">*</span>
             </label>
             <select
@@ -127,51 +161,124 @@ function RestockDialogForm({
             <div className="p-3.5 rounded-xl border border-border bg-bg-subtle text-xs space-y-1.5">
               <div className="flex justify-between text-text-secondary">
                 <span>Current Stock:</span>
-                <span className="font-bold text-text">{targetItem.currentQty} {targetItem.unit}</span>
+                <span className="font-bold text-text">
+                  {targetItem.currentQty} {targetItem.unit}
+                </span>
               </div>
               <div className="flex justify-between text-text-secondary">
-                <span>Adding Shipment:</span>
-                <span className="font-bold text-status-active-text">+{qtyReceived || 0} {targetItem.unit}</span>
+                <span>Adding:</span>
+                <span className="font-bold text-status-active-text">
+                  +{qtyReceived || 0} {targetItem.unit}
+                </span>
+              </div>
+              <div className="flex justify-between text-text-secondary">
+                <span>Line total:</span>
+                <span className="font-bold font-mono text-text">
+                  {formatPhp(total)}
+                </span>
               </div>
               <div className="flex justify-between pt-1 border-t border-border font-bold text-text">
-                <span>New Expected Total:</span>
-                <span className="text-accent">{targetItem.currentQty + (Number(qtyReceived) || 0)} {targetItem.unit}</span>
+                <span>New stock total:</span>
+                <span className="text-accent">
+                  {targetItem.currentQty + (Number(qtyReceived) || 0)}{" "}
+                  {targetItem.unit}
+                </span>
               </div>
             </div>
           )}
 
-          <div className="space-y-1">
-            <label htmlFor="qty-received-input" className="block text-xs font-semibold text-text">
-              Quantity Received <span className="text-accent">*</span>
-            </label>
-            <input
-              id="qty-received-input"
-              type="number"
-              value={qtyReceived}
-              onChange={(e) => {
-                setQtyReceived(Number(e.target.value));
-                if (error) setError("");
-              }}
-              min={1}
-              className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg font-bold text-text focus:outline-none focus:ring-2 focus:ring-accent"
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label
+                htmlFor="qty-received-input"
+                className="block text-xs font-semibold text-text"
+              >
+                Qty received <span className="text-accent">*</span>
+              </label>
+              <input
+                id="qty-received-input"
+                type="number"
+                value={qtyReceived}
+                onChange={(e) => {
+                  setQtyReceived(Number(e.target.value));
+                  if (error) setError("");
+                }}
+                min={1}
+                className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg font-bold text-text focus:outline-none focus:ring-2 focus:ring-accent"
+              />
+            </div>
+            <div className="space-y-1">
+              <label
+                htmlFor="unit-cost-input"
+                className="block text-xs font-semibold text-text"
+              >
+                Unit cost (₱) <span className="text-accent">*</span>
+              </label>
+              <input
+                id="unit-cost-input"
+                type="number"
+                min={0}
+                step="0.01"
+                value={unitCost}
+                onChange={(e) => {
+                  setUnitCost(e.target.value);
+                  if (error) setError("");
+                }}
+                className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg font-bold text-text focus:outline-none focus:ring-2 focus:ring-accent"
+              />
+            </div>
           </div>
 
           <div className="space-y-1">
-            <label htmlFor="restock-notes-input" className="block text-xs font-semibold text-text">
-              PO # / Delivery Receipt Notes
+            <label
+              htmlFor="restock-supplier"
+              className="block text-xs font-semibold text-text"
+            >
+              Supplier
+            </label>
+            <select
+              id="restock-supplier"
+              value={supplierId}
+              onChange={(e) => setSupplierId(e.target.value)}
+              className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text font-semibold focus:outline-none focus:ring-2 focus:ring-accent"
+            >
+              <option value="">No supplier / not listed</option>
+              {suppliers.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} ({s.supplierCode})
+                </option>
+              ))}
+            </select>
+            {suppliers.length === 0 && (
+              <p className="text-[10px] text-text-secondary">
+                No active suppliers — add one under Suppliers to track vendor
+                pricing.
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-1">
+            <label
+              htmlFor="restock-notes-input"
+              className="block text-xs font-semibold text-text"
+            >
+              PO # / Delivery notes
             </label>
             <textarea
               id="restock-notes-input"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
-              placeholder="e.g. PO #8841 Received via PaperLine delivery"
+              placeholder="e.g. PO #8841"
               className="w-full p-2.5 text-xs bg-bg border border-border rounded-lg text-text placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent"
             />
           </div>
 
-          {error && <p className="text-xs font-bold text-status-outofservice-text">{error}</p>}
+          {error && (
+            <p className="text-xs font-bold text-status-outofservice-text">
+              {error}
+            </p>
+          )}
 
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
             <button
@@ -186,7 +293,7 @@ function RestockDialogForm({
               className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-md bg-accent text-accent-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
             >
               <Check className="h-4 w-4" strokeWidth={2.5} />
-              Confirm Restock Receipt
+              Confirm restock
             </button>
           </div>
         </form>
@@ -198,6 +305,7 @@ function RestockDialogForm({
 export function RestockDialog({
   item,
   allItems,
+  suppliers,
   isOpen,
   onClose,
   onConfirmRestock,
@@ -209,6 +317,7 @@ export function RestockDialog({
       key={item?.id ?? allItems[0]?.id ?? "restock"}
       item={item}
       allItems={allItems}
+      suppliers={suppliers}
       onClose={onClose}
       onConfirmRestock={onConfirmRestock}
     />

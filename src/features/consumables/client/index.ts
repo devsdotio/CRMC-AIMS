@@ -6,6 +6,7 @@ export { consumablesApi } from "./consumables-api";
 export type {
   ConsumableItem,
   CreateConsumablePayload,
+  RestockPayload,
   StockAdjustPayload,
   StockMovementPayload,
   UpdateConsumablePayload,
