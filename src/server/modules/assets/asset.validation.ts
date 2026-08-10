@@ -1,25 +1,21 @@
 import { z } from "zod";
 
-import { ASSET_CATEGORIES, ASSET_STATUSES, ASSET_ASSIGNMENT_TYPES } from "./asset.constants";
-import { normalizeAssetCategory } from "@/lib/asset-category";
+import { ASSET_STATUSES, ASSET_ASSIGNMENT_TYPES } from "./asset.constants";
 
-export const assetCategorySchema = z.preprocess(
-  (value) => {
-    if (typeof value !== "string") return value;
-    return normalizeAssetCategory(value) ?? value.trim().toLowerCase();
-  },
-  z.enum(ASSET_CATEGORIES, {
-    message:
-      "Category must be transport, computing, av, or furniture (use those codes or matching labels).",
-  })
-);
+/** Free-text category name (must match Settings → Asset categories). */
+export const categoryLabelSchema = z
+  .string()
+  .trim()
+  .min(1, "Category is required.")
+  .max(120, "Category is too long.");
+
 export const assetStatusSchema = z.enum(ASSET_STATUSES);
 export const assetAssignmentTypeSchema = z.enum(ASSET_ASSIGNMENT_TYPES);
 
 export const createAssetSchema = z.object({
   assetCode: z.string().trim().min(1, "assetCode is required.").max(64),
   name: z.string().trim().min(1, "name is required.").max(255),
-  category: assetCategorySchema,
+  category: categoryLabelSchema,
   /** Omitted status defaults to `active` in the service (not via Zod default),
    * so update schemas can safely `.partial()` without forcing status. */
   status: assetStatusSchema.optional(),

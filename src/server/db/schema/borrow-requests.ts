@@ -11,7 +11,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
-import { assets, assetCategoryEnum } from "./assets";
+import { assets } from "./assets";
 
 /**
  * Staff-facing borrow request queue (approve / reject).
@@ -54,7 +54,7 @@ export const borrowRequests = pgTable(
       onDelete: "set null",
     }),
     assetCode: text("asset_code"),
-    category: assetCategoryEnum("category").notNull(),
+    category: text("category").notNull(),
     quantity: integer("quantity").notNull().default(1),
     purpose: text("purpose").notNull(),
 

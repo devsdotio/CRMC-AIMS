@@ -1,12 +1,11 @@
 import { z } from "zod";
 
-export const consumableCategorySchema = z.enum([
-  "paper",
-  "ink_toner",
-  "cleaning",
-  "office_supplies",
-  "medical",
-]);
+/** Free-text category name (must match Settings → Consumable categories). */
+export const consumableCategorySchema = z
+  .string()
+  .trim()
+  .min(1, "Category is required.")
+  .max(120);
 
 export const stockLevelSchema = z.enum(["all", "healthy", "low", "critical"]);
 

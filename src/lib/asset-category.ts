@@ -1,71 +1,21 @@
-import { CATEGORY_STYLES } from "@/constants/categories";
-
-/** Matches PG `asset_category` and server `ASSET_CATEGORIES`. */
-export const ASSET_CATEGORY_CODES = [
-  "transport",
-  "computing",
-  "av",
-  "furniture",
-] as const;
-
-export type AssetCategoryCode = (typeof ASSET_CATEGORY_CODES)[number];
-
-/** Label for select options (stable, matches design tokens). */
-export const ASSET_CATEGORY_OPTIONS: {
-  value: AssetCategoryCode;
-  label: string;
-}[] = ASSET_CATEGORY_CODES.map((value) => ({
-  value,
-  label: CATEGORY_STYLES[value]?.label ?? value,
-}));
-
-const LABEL_ALIASES: Record<string, AssetCategoryCode> = {
-  transport: "transport",
-  vehicle: "transport",
-  vehicles: "transport",
-  computing: "computing",
-  computer: "computing",
-  computers: "computing",
-  it: "computing",
-  "it equipment": "computing",
-  av: "av",
-  "av equipment": "av",
-  audio: "av",
-  "audio visual": "av",
-  furniture: "furniture",
-};
-
 /**
- * Map free-text category names (from categories admin or legacy data)
- * onto PG `asset_category` enum codes.
+ * Prefix helper for asset codes from free-text category labels.
+ * Prefer settings category name; fall back to alphanumeric initials.
  */
-export function normalizeAssetCategory(
-  raw: string | null | undefined
-): AssetCategoryCode | null {
-  if (!raw?.trim()) return null;
-  const key = raw
-    .trim()
-    .toLowerCase()
-    .replace(/[_-]+/g, " ")
-    .replace(/\s+/g, " ");
-  if ((ASSET_CATEGORY_CODES as readonly string[]).includes(key)) {
-    return key as AssetCategoryCode;
-  }
-  if (LABEL_ALIASES[key]) return LABEL_ALIASES[key];
-
-  for (const code of ASSET_CATEGORY_CODES) {
-    const label = CATEGORY_STYLES[code]?.label?.toLowerCase();
-    if (label && label === key) return code;
-  }
-  return null;
-}
-
-export function assetCategoryCodePrefix(category: AssetCategoryCode): string {
-  const prefixes: Record<AssetCategoryCode, string> = {
+export function assetCategoryCodePrefix(category: string): string {
+  const key = category.trim().toLowerCase();
+  const presets: Record<string, string> = {
     transport: "TR",
     computing: "CP",
     av: "AV",
+    "av equipment": "AV",
     furniture: "FN",
   };
-  return prefixes[category];
+  if (presets[key]) return presets[key];
+
+  const words = key.replace(/[^a-z0-9\s]/g, " ").trim().split(/\s+/).filter(Boolean);
+  if (words.length >= 2) {
+    return (words[0][0] + words[1][0]).toUpperCase();
+  }
+  return (words[0]?.slice(0, 2) || "AS").toUpperCase();
 }

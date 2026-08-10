@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-const assetCategorySchema = z.enum(["transport", "computing", "av", "furniture"]);
+const assetCategorySchema = z
+  .string()
+  .trim()
+  .min(1, "Category is required.")
+  .max(120);
 const returnConditionSchema = z.enum(["good", "damaged", "needs_repair"]);
 
 /** DTO/query filter includes computed overdue. */

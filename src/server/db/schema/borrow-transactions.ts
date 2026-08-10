@@ -10,7 +10,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
-import { assets, assetCategoryEnum } from "./assets";
+import { assets } from "./assets";
 import { borrowRequests } from "./borrow-requests";
 
 /**
@@ -45,7 +45,7 @@ export const borrowTransactions = pgTable(
     }),
     assetCode: text("asset_code").notNull(),
     assetName: text("asset_name").notNull(),
-    category: assetCategoryEnum("category").notNull(),
+    category: text("category").notNull(),
 
     borrowerUserId: uuid("borrower_user_id"),
     borrowerName: text("borrower_name").notNull(),

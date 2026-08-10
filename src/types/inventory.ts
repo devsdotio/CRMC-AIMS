@@ -2,12 +2,7 @@ import type { BaseFilterState } from "./filters";
 
 export type StockSeverity = "healthy" | "low" | "critical";
 
-export type ConsumableCategory =
-  | "paper"
-  | "ink_toner"
-  | "cleaning"
-  | "office_supplies"
-  | "medical";
+export type ConsumableCategory = string;
 
 export type StockActionType = "restock" | "adjustment" | "checkout";
 

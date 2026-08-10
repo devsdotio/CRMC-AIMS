@@ -11,6 +11,7 @@ import {
 } from "@/server/shared/errors";
 import { withTransaction } from "@/server/db/transaction";
 import { PurchaseLotService } from "@/server/modules/purchase-lots/purchase-lot.service";
+import { CategoryRepository } from "@/server/modules/categories/category.repository";
 
 import { ConsumableRepository } from "./consumable.repository";
 import type { ConsumableDTO } from "./consumable.types";
@@ -83,8 +84,19 @@ function historyEntry(
 export class ConsumableService {
   constructor(
     private readonly repo = new ConsumableRepository(),
-    private readonly purchaseLots = new PurchaseLotService()
+    private readonly purchaseLots = new PurchaseLotService(),
+    private readonly taxonomy = new CategoryRepository()
   ) {}
+
+  private async resolveConsumableCategoryName(rawName: string): Promise<string> {
+    const found = await this.taxonomy.findByTypeAndName("consumable", rawName);
+    if (!found) {
+      throw new BadRequestError(
+        `Unknown consumable category “${rawName}”. Add it under Settings → Categories first.`
+      );
+    }
+    return found.name;
+  }
 
   async list(rawQuery: unknown): Promise<import("@/types/filters").PaginatedResponse<ConsumableDTO>> {
     const filters = listConsumablesQuerySchema.parse(rawQuery ?? {});
@@ -124,6 +136,7 @@ export class ConsumableService {
   async create(rawInput: unknown, actor: ActorContext): Promise<ConsumableDTO> {
     const input = createConsumableSchema.parse(rawInput);
     const itemCode = input.itemCode?.trim() || generateOperationalCode("CON");
+    const categoryName = await this.resolveConsumableCategoryName(input.category);
 
     const exists = await this.repo.findByCode(itemCode);
     if (exists) {
@@ -145,7 +158,7 @@ export class ConsumableService {
     const row = await this.repo.create({
       itemCode,
       name: input.name,
-      category: input.category,
+      category: categoryName,
       unit: input.unit,
       currentQty: input.currentQty,
       minThreshold: input.minThreshold,
@@ -165,9 +178,14 @@ export class ConsumableService {
     const existing = await this.repo.findById(id);
     if (!existing) throw new NotFoundError("Consumable", id);
 
+    let categoryName: string | undefined;
+    if (input.category !== undefined) {
+      categoryName = await this.resolveConsumableCategoryName(input.category);
+    }
+
     const updated = await this.repo.update(id, {
       ...(input.name !== undefined ? { name: input.name } : {}),
-      ...(input.category !== undefined ? { category: input.category } : {}),
+      ...(categoryName !== undefined ? { category: categoryName } : {}),
       ...(input.unit !== undefined ? { unit: input.unit } : {}),
       ...(input.minThreshold !== undefined
         ? { minThreshold: input.minThreshold }

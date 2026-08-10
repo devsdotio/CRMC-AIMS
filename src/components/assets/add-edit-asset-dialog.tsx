@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { X, PackagePlus, Edit } from "lucide-react";
 
 import type {
@@ -9,12 +9,8 @@ import type {
   AssetStatus,
   AssetAssignmentType,
 } from "@/types/assets";
-import {
-  ASSET_CATEGORY_OPTIONS,
-  assetCategoryCodePrefix,
-  normalizeAssetCategory,
-  type AssetCategoryCode,
-} from "@/lib/asset-category";
+import { assetCategoryCodePrefix } from "@/lib/asset-category";
+import { useCategoriesQuery } from "@/features/categories/client/use-categories";
 import { QRCodeDisplay } from "./qr-code-display";
 
 export interface AddEditAssetDialogProps {
@@ -24,7 +20,7 @@ export interface AddEditAssetDialogProps {
   onSave: (assetData: Partial<Asset>) => Promise<void> | void;
 }
 
-function generateAssetCode(category: AssetCategoryCode): string {
+function generateAssetCode(category: string): string {
   const prefix = assetCategoryCodePrefix(category);
   const randomNum = Math.floor(100 + Math.random() * 900);
   return `${prefix}-${randomNum}`;
@@ -42,11 +38,29 @@ function AddEditAssetDialogForm({
   onSave,
 }: AddEditAssetDialogFormProps) {
   const isEditing = Boolean(initialAsset);
+  const { data: allCategories = [], isLoading: categoriesLoading } =
+    useCategoriesQuery();
+  const assetCategories = useMemo(() => {
+    const fromSettings = allCategories.filter((c) => c.type === "asset");
+    // Keep edit form usable if asset has a label not currently in Settings.
+    const current = initialAsset?.category?.trim();
+    if (
+      current &&
+      !fromSettings.some(
+        (c) => c.name.toLowerCase() === current.toLowerCase()
+      )
+    ) {
+      return [
+        { id: `legacy-${current}`, name: current, type: "asset" as const },
+        ...fromSettings,
+      ];
+    }
+    return fromSettings;
+  }, [allCategories, initialAsset?.category]);
 
   const [name, setName] = useState(() => initialAsset?.name ?? "");
-  const initialCategory = normalizeAssetCategory(initialAsset?.category) ?? "";
-  const [category, setCategory] = useState<AssetCategoryCode | "">(
-    initialCategory
+  const [category, setCategory] = useState(
+    () => initialAsset?.category ?? ""
   );
   const [status, setStatus] = useState<AssetStatus | "">(
     () => initialAsset?.status ?? "active"
@@ -55,9 +69,7 @@ function AddEditAssetDialogForm({
     () => initialAsset?.assignmentType ?? "borrowable"
   );
   const [assetCode, setAssetCode] = useState(
-    () =>
-      initialAsset?.assetCode ??
-      (initialCategory ? generateAssetCode(initialCategory) : "")
+    () => initialAsset?.assetCode ?? ""
   );
   const [serialNumber, setSerialNumber] = useState(
     () => initialAsset?.serialNumber ?? ""
@@ -76,20 +88,24 @@ function AddEditAssetDialogForm({
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleCategoryChange = (newCat: AssetCategoryCode | "") => {
+  // Default select to first taxonomy option when loaded (create only).
+  useEffect(() => {
+    if (isEditing || category || assetCategories.length === 0) return;
+    const first = assetCategories[0].name;
+    setCategory(first);
+    setAssetCode((prev) => prev || generateAssetCode(first));
+  }, [assetCategories, category, isEditing]);
+
+  const handleCategoryChange = (newCat: string) => {
     setCategory(newCat);
     if (!isEditing && newCat) {
       setAssetCode(generateAssetCode(newCat));
-    } else if (!isEditing && !newCat) {
-      setAssetCode("");
     }
   };
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && !isSubmitting) {
-        onClose();
-      }
+      if (e.key === "Escape" && !isSubmitting) onClose();
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
@@ -102,7 +118,11 @@ function AddEditAssetDialogForm({
       return;
     }
     if (!category) {
-      setError("Please select an asset category.");
+      setError(
+        assetCategories.length === 0
+          ? "No asset categories yet. Add them under Settings → Categories."
+          : "Please select an asset category."
+      );
       return;
     }
     if (!status) {
@@ -116,22 +136,12 @@ function AddEditAssetDialogForm({
     const code = (
       assetCode.trim() || generateAssetCode(category)
     ).toUpperCase();
-    if (!code || code === "PENDING...") {
-      setError(
-        "Asset code could not be generated. Select a category and try again."
-      );
-      return;
-    }
-    if (value.trim() !== "" && !Number.isFinite(Number(value))) {
-      setError("Acquisition value must be a valid number.");
-      return;
-    }
 
     try {
       setIsSubmitting(true);
       setError("");
       await onSave({
-        id: initialAsset ? initialAsset.id : undefined,
+        id: initialAsset?.id,
         assetCode: code,
         name: name.trim(),
         category: category as AssetCategory,
@@ -169,7 +179,7 @@ function AddEditAssetDialogForm({
         role="dialog"
         aria-modal="true"
         aria-labelledby="dialog-title"
-        className="relative w-full max-w-4xl rounded-2xl border border-border bg-bg p-6 shadow-2xl z-10 animate-in fade-in zoom-in-95 duration-150 my-8"
+        className="relative w-full max-w-4xl rounded-2xl border border-border bg-bg p-6 shadow-2xl z-10 my-8"
       >
         <div className="flex items-center justify-between gap-3 mb-5 border-b border-border pb-4">
           <div className="flex items-center gap-2.5">
@@ -188,12 +198,10 @@ function AddEditAssetDialogForm({
                 {isEditing ? "Edit Asset Record" : "Register New Asset"}
               </h3>
               <p className="text-xs text-text-secondary mt-0.5">
-                Categories use registry codes matching the database enum:
-                transport, computing, av, furniture.
+                Categories come from Settings → Category Management.
               </p>
             </div>
           </div>
-
           <button
             type="button"
             onClick={onClose}
@@ -225,13 +233,9 @@ function AddEditAssetDialogForm({
                   id="asset-name"
                   type="text"
                   value={name}
-                  onChange={(e) => {
-                    setName(e.target.value);
-                    if (error) setError("");
-                  }}
-                  placeholder="e.g. MacBook Pro 16-inch, Canon DSLR Camera"
+                  onChange={(e) => setName(e.target.value)}
                   disabled={isSubmitting}
-                  className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent"
+                  className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent"
                 />
               </div>
 
@@ -246,22 +250,26 @@ function AddEditAssetDialogForm({
                   <select
                     id="category-select"
                     value={category}
-                    onChange={(e) =>
-                      handleCategoryChange(
-                        e.target.value as AssetCategoryCode | ""
-                      )
-                    }
-                    disabled={isSubmitting}
+                    onChange={(e) => handleCategoryChange(e.target.value)}
+                    disabled={isSubmitting || categoriesLoading}
                     className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text font-medium focus:outline-none focus:ring-2 focus:ring-accent"
                   >
-                    <option value="" disabled>
-                      Select a category...
-                    </option>
-                    {ASSET_CATEGORY_OPTIONS.map((c) => (
-                      <option key={c.value} value={c.value}>
-                        {c.label}
-                      </option>
-                    ))}
+                    {categoriesLoading ? (
+                      <option value="">Loading…</option>
+                    ) : assetCategories.length === 0 ? (
+                      <option value="">No categories — add in Settings</option>
+                    ) : (
+                      <>
+                        <option value="" disabled>
+                          Select a category…
+                        </option>
+                        {assetCategories.map((c) => (
+                          <option key={c.id} value={c.name}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </>
+                    )}
                   </select>
                 </div>
 
@@ -270,7 +278,7 @@ function AddEditAssetDialogForm({
                     htmlFor="status-select"
                     className="block text-xs font-semibold text-text"
                   >
-                    Initial Condition <span className="text-accent">*</span>
+                    Condition <span className="text-accent">*</span>
                   </label>
                   <select
                     id="status-select"
@@ -306,9 +314,8 @@ function AddEditAssetDialogForm({
                         )
                       }
                       disabled={isSubmitting}
-                      className="text-accent focus:ring-accent"
                     />
-                    Borrowable (short-term checkout)
+                    Borrowable
                   </label>
                   <label className="flex items-center gap-2 text-xs text-text cursor-pointer">
                     <input
@@ -322,9 +329,8 @@ function AddEditAssetDialogForm({
                         )
                       }
                       disabled={isSubmitting}
-                      className="text-accent focus:ring-accent"
                     />
-                    Assignable (project custody)
+                    Assignable (projects)
                   </label>
                 </div>
               </div>
@@ -342,9 +348,8 @@ function AddEditAssetDialogForm({
                     type="text"
                     value={serialNumber}
                     onChange={(e) => setSerialNumber(e.target.value)}
-                    placeholder="e.g. SN-DL-98214-X"
                     disabled={isSubmitting}
-                    className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg font-mono text-text placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent"
+                    className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg font-mono text-text focus:outline-none focus:ring-2 focus:ring-accent"
                   />
                 </div>
                 <div className="space-y-1">
@@ -359,9 +364,8 @@ function AddEditAssetDialogForm({
                     type="text"
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
-                    placeholder="e.g. Central Warehouse Rack A"
                     disabled={isSubmitting}
-                    className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent"
+                    className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent"
                   />
                 </div>
               </div>
@@ -388,7 +392,7 @@ function AddEditAssetDialogForm({
                     htmlFor="value-input"
                     className="block text-xs font-semibold text-text"
                   >
-                    Acquisition Value (₱)
+                    Value (₱)
                   </label>
                   <input
                     id="value-input"
@@ -397,9 +401,8 @@ function AddEditAssetDialogForm({
                     step="0.01"
                     value={value}
                     onChange={(e) => setValue(e.target.value)}
-                    placeholder="0.00"
                     disabled={isSubmitting}
-                    className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg font-mono text-text placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent"
+                    className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg font-mono text-text focus:outline-none focus:ring-2 focus:ring-accent"
                   />
                 </div>
               </div>
@@ -417,8 +420,7 @@ function AddEditAssetDialogForm({
                   onChange={(e) => setNotes(e.target.value)}
                   rows={3}
                   disabled={isSubmitting}
-                  placeholder="Optional remarks..."
-                  className="w-full p-2.5 text-xs bg-bg border border-border rounded-lg text-text placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent"
+                  className="w-full p-2.5 text-xs bg-bg border border-border rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent"
                 />
               </div>
             </div>
@@ -439,11 +441,7 @@ function AddEditAssetDialogForm({
                   disabled={isEditing || isSubmitting}
                   className="w-full h-9 px-3 text-xs bg-bg-subtle border border-border rounded-lg font-mono text-text focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-70"
                 />
-                <p className="text-[10px] text-text-secondary">
-                  Auto-generated from category; editable before save.
-                </p>
               </div>
-
               {assetCode ? (
                 <div className="rounded-xl border border-border bg-bg-subtle/40 p-4">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-text-secondary mb-2">
@@ -470,7 +468,7 @@ function AddEditAssetDialogForm({
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || assetCategories.length === 0}
               className="h-9 px-4 text-xs font-bold rounded-lg bg-accent text-accent-foreground hover:opacity-90 disabled:opacity-50 cursor-pointer"
             >
               {isSubmitting
@@ -493,7 +491,6 @@ export function AddEditAssetDialog({
   onSave,
 }: AddEditAssetDialogProps) {
   if (!isOpen) return null;
-
   return (
     <AddEditAssetDialogForm
       key={initialAsset?.id ?? "new"}

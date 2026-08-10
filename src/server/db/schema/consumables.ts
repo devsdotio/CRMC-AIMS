@@ -10,6 +10,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
+/** Legacy enum type; column storage is text after 0013. */
 export const consumableCategoryEnum = pgEnum("consumable_category", [
   "paper",
   "ink_toner",
@@ -46,7 +47,7 @@ export const consumables = pgTable(
 
     itemCode: text("item_code").notNull().unique(),
     name: text("name").notNull(),
-    category: consumableCategoryEnum("category").notNull(),
+    category: text("category").notNull(),
     unit: text("unit").notNull(),
     currentQty: integer("current_qty").notNull().default(0),
     minThreshold: integer("min_threshold").notNull().default(0),

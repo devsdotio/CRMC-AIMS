@@ -92,6 +92,13 @@
       "when": 1786347000000,
       "tag": "0012_project_writeoff_maintenance",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1786348000000,
+      "tag": "0013_categories_as_text",
+      "breakpoints": true
     }
   ]
 }

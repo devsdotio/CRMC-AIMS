@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-const assetCategorySchema = z.enum(["transport", "computing", "av", "furniture"]);
+const assetCategorySchema = z
+  .string()
+  .trim()
+  .min(1, "Category is required.")
+  .max(120);
 
 export const borrowRequestStatusSchema = z.enum([
   "pending",

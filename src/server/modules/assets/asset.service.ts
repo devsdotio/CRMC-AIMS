@@ -14,6 +14,7 @@ import { MaintenanceRepository } from "@/server/modules/maintenance/maintenance.
 import { PurchaseLotService } from "@/server/modules/purchase-lots/purchase-lot.service";
 import { SupplierRepository } from "@/server/modules/suppliers/supplier.repository";
 import { ProjectAssetAssignmentRepository } from "@/server/modules/projects/project-asset.repository";
+import { CategoryRepository } from "@/server/modules/categories/category.repository";
 
 import { AssetLifecycleService } from "./asset.lifecycle.service";
 import { buildAssetFieldChanges } from "./asset.lifecycle.types";
@@ -120,8 +121,19 @@ export class AssetService {
     private readonly maintenanceRepo: MaintenanceRepository = new MaintenanceRepository(),
     private readonly purchaseLots: PurchaseLotService = new PurchaseLotService(),
     private readonly suppliers: SupplierRepository = new SupplierRepository(),
-    private readonly projectAssignments: ProjectAssetAssignmentRepository = new ProjectAssetAssignmentRepository()
+    private readonly projectAssignments: ProjectAssetAssignmentRepository = new ProjectAssetAssignmentRepository(),
+    private readonly taxonomy: CategoryRepository = new CategoryRepository()
   ) {}
+
+  private async resolveAssetCategoryName(rawName: string): Promise<string> {
+    const found = await this.taxonomy.findByTypeAndName("asset", rawName);
+    if (!found) {
+      throw new BadRequestError(
+        `Unknown asset category “${rawName}”. Add it under Settings → Categories first.`
+      );
+    }
+    return found.name;
+  }
 
   async listAssets(rawQuery: unknown): Promise<Asset[]> {
     const filters: ListAssetsFilters = listAssetsQuerySchema.parse(rawQuery ?? {});
@@ -142,6 +154,7 @@ export class AssetService {
 
   async createAsset(rawInput: unknown, actor: ActorContext): Promise<Asset> {
     const input: CreateAssetBody = createAssetSchema.parse(rawInput);
+    const categoryName = await this.resolveAssetCategoryName(input.category);
 
     if (input.supplierId) {
       const supplier = await this.suppliers.findById(input.supplierId);
@@ -157,7 +170,7 @@ export class AssetService {
           {
             assetCode: input.assetCode,
             name: input.name,
-            category: input.category,
+            category: categoryName,
             status: input.status ?? "active",
             assignmentType: input.assignmentType ?? "borrowable",
             location: input.location,
@@ -245,11 +258,16 @@ export class AssetService {
       }
     }
 
+    let categoryName: string | undefined;
+    if (input.category !== undefined) {
+      categoryName = await this.resolveAssetCategoryName(input.category);
+    }
+
     try {
       const updated = await this.assetRepository.update(id, {
         ...(input.assetCode !== undefined ? { assetCode: input.assetCode } : {}),
         ...(input.name !== undefined ? { name: input.name } : {}),
-        ...(input.category !== undefined ? { category: input.category } : {}),
+        ...(categoryName !== undefined ? { category: categoryName } : {}),
         ...(input.status !== undefined ? { status: input.status } : {}),
         ...(input.assignmentType !== undefined ? { assignmentType: input.assignmentType } : {}),
         ...(input.location !== undefined ? { location: input.location } : {}),

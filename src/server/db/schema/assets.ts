@@ -14,9 +14,8 @@ import {
 import type { MaintenanceLogEntry } from "@/types/assets";
 
 /**
- * Enums mirror the frontend Asset contract
- * (`src/components/assets/types.ts`). Keep these in sync with
- * `src/server/modules/assets/asset.constants.ts`.
+ * Legacy enum retained for drizzle history only.
+ * Runtime category values live in `categories` (type=asset) and store as text on assets.
  */
 export const assetCategoryEnum = pgEnum("asset_category", [
   "transport",
@@ -61,7 +60,7 @@ export const assets = pgTable(
 
     assetCode: text("asset_code").notNull().unique(),
     name: text("name").notNull(),
-    category: assetCategoryEnum("category").notNull(),
+    category: text("category").notNull(),
     status: assetStatusEnum("status").notNull().default("active"),
     assignmentType: assetAssignmentTypeEnum("assignment_type").notNull().default("borrowable"),
 
