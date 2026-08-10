@@ -1,8 +1,5 @@
 "use client";
 
- * React Query hooks for consumables stock.
- */
-
 import {
   useMutation,
   useQuery,
@@ -34,7 +31,10 @@ export function useConsumablesQuery(filters?: {
   search?: string;
   page?: number;
   limit?: number;
-}): UseQueryResult<import("@/types/filters").PaginatedResponse<ConsumableItem>, Error> {
+}): UseQueryResult<
+  import("@/types/filters").PaginatedResponse<ConsumableItem>,
+  Error
+> {
   return useQuery({
     queryKey: consumableQueryKeys.list(filters),
     queryFn: () => consumablesApi.list(filters),
