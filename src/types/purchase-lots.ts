@@ -21,4 +21,6 @@ export interface PurchaseLot {
   recordedByName: string;
   createdAt: string;
   updatedAt: string;
+  /** Canonical QR payload for physical batch tags: `CRMC-AIMS-LOT:{lotCode}` */
+  qrPayload?: string;
 }

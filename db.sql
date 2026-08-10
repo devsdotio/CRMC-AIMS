@@ -21,7 +21,9 @@ CREATE TABLE public.assets (
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   assignment_type USER-DEFINED NOT NULL DEFAULT 'borrowable'::asset_assignment_type,
   supplier_id uuid,
-  CONSTRAINT assets_pkey PRIMARY KEY (id)
+  model_id uuid,
+  CONSTRAINT assets_pkey PRIMARY KEY (id),
+  CONSTRAINT assets_model_id_asset_models_id_fk FOREIGN KEY (model_id) REFERENCES public.asset_models(id)
 );
 CREATE TABLE public.categories (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -294,4 +296,22 @@ CREATE TABLE public.project_asset_assignments (
   CONSTRAINT project_asset_assignments_pkey PRIMARY KEY (id),
   CONSTRAINT project_asset_assignments_project_id_projects_id_fk FOREIGN KEY (project_id) REFERENCES public.projects(id),
   CONSTRAINT project_asset_assignments_asset_id_assets_id_fk FOREIGN KEY (asset_id) REFERENCES public.assets(id)
+);
+CREATE TABLE public.asset_models (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  model_code text NOT NULL UNIQUE,
+  name text NOT NULL,
+  category text NOT NULL,
+  description text,
+  manufacturer text,
+  default_assignment_type USER-DEFINED NOT NULL DEFAULT 'borrowable'::asset_assignment_type,
+  default_location text,
+  default_unit_value numeric,
+  image_url text,
+  notes text,
+  created_by_user_id uuid NOT NULL,
+  created_by_name text NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT asset_models_pkey PRIMARY KEY (id)
 );

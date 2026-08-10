@@ -1,8 +1,6 @@
 "use client";
 
-/**
  * React Query hooks for consumables stock.
- * Ready for page integration — UI still uses mocks until wired.
  */
 
 import {
@@ -23,9 +21,11 @@ import {
   type UpdateConsumablePayload,
 } from "./consumables-api";
 import { consumableQueryKeys } from "./query-keys";
+import { purchaseLotQueryKeys } from "@/features/purchase-lots/client/query-keys";
 
 function invalidate(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: consumableQueryKeys.all });
+  qc.invalidateQueries({ queryKey: purchaseLotQueryKeys.all });
 }
 
 export function useConsumablesQuery(filters?: {

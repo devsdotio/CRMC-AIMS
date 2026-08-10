@@ -18,6 +18,18 @@ export interface StockHistoryEntry {
   supplierId?: string;
   supplierName?: string;
   lotCode?: string;
+  totalCost?: string;
+  recipientName?: string;
+  lotAllocations?: Array<{
+    lotId: string | null;
+    lotCode: string | null;
+    quantity: number;
+    unitCost: string;
+    total: string;
+    supplierId?: string | null;
+    supplierName?: string | null;
+    uncosted?: boolean;
+  }>;
 }
 
 export interface ConsumableItem {

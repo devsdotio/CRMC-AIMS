@@ -1,9 +1,16 @@
 "use client";
 
-import { useQuery, type UseQueryResult } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseMutationResult,
+  type UseQueryResult,
+} from "@tanstack/react-query";
 
 import type { PurchaseLot } from "@/types/purchase-lots";
-import { purchaseLotsApi } from "./purchase-lots-api";
+import { consumableQueryKeys } from "@/features/consumables/client/query-keys";
+import { purchaseLotsApi, type LotReleaseResult } from "./purchase-lots-api";
 import { purchaseLotQueryKeys } from "./query-keys";
 
 export function usePurchaseLotsQuery(params?: {
@@ -18,5 +25,26 @@ export function usePurchaseLotsQuery(params?: {
     queryKey: purchaseLotQueryKeys.list(filters),
     queryFn: () => purchaseLotsApi.list(filters),
     enabled,
+  });
+}
+
+export function useReleaseFromLotMutation(): UseMutationResult<
+  LotReleaseResult,
+  Error,
+  {
+    code: string;
+    quantity: number;
+    reason?: string;
+    notes?: string;
+    recipientName?: string;
+  }
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload) => purchaseLotsApi.scanRelease(payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: purchaseLotQueryKeys.all });
+      qc.invalidateQueries({ queryKey: consumableQueryKeys.all });
+    },
   });
 }

@@ -1,3 +1,7 @@
 export { purchaseLotsApi } from "./purchase-lots-api";
+export type { LotReleaseResult } from "./purchase-lots-api";
 export { purchaseLotQueryKeys } from "./query-keys";
-export { usePurchaseLotsQuery } from "./use-purchase-lots";
+export {
+  usePurchaseLotsQuery,
+  useReleaseFromLotMutation,
+} from "./use-purchase-lots";
