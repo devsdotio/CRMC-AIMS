@@ -103,9 +103,8 @@ export default function DashboardPage() {
           loading={loading}
           onSendReminder={(id) => console.log("Remind", id)}
         />
-        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
         <AssetsByCategoryChart
-          data={(snapshot?.categoryDistribution as any) || []}
+          data={snapshot?.categoryDistribution ?? []}
           loading={loading}
         />
       </div>

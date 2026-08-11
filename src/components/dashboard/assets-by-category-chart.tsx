@@ -14,10 +14,8 @@ import { cn } from "@/lib/utils";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-export type AssetCategory = "transport" | "computing" | "av" | "furniture";
-
 export interface CategoryCount {
-  category: AssetCategory;
+  category: string;
   label: string;
   count: number;
 }

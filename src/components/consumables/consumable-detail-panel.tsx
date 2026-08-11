@@ -76,10 +76,9 @@ export function ConsumableDetailPanel({
     [lots]
   );
 
-  const historyNewestFirst = useMemo(() => {
-    if (!detailItem?.history?.length) return [];
-    return [...detailItem.history].reverse();
-  }, [detailItem?.history]);
+  const historyNewestFirst = detailItem?.history?.length
+    ? [...detailItem.history].reverse()
+    : [];
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
