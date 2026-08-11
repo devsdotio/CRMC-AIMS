@@ -110,6 +110,10 @@ export default function AssetsPage() {
           department: assetData.department,
           purchaseDate: assetData.purchaseDate,
           value: assetData.value,
+          supplierId:
+            assetData.supplierId === undefined
+              ? undefined
+              : assetData.supplierId || null,
           notes: assetData.notes,
         },
       });
@@ -131,6 +135,7 @@ export default function AssetsPage() {
         department: assetData.department,
         purchaseDate: assetData.purchaseDate,
         value: assetData.value,
+        supplierId: assetData.supplierId || undefined,
         notes: assetData.notes,
       });
     }

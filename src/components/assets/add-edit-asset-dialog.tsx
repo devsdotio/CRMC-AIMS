@@ -11,6 +11,8 @@ import type {
 } from "@/types/assets";
 import { assetCategoryCodePrefix } from "@/lib/asset-category";
 import { useCategoriesQuery } from "@/features/categories/client/use-categories";
+import { useSuppliersQuery } from "@/features/suppliers/client";
+import Link from "next/link";
 import { QRCodeDisplay } from "./qr-code-display";
 
 export interface AddEditAssetDialogProps {
@@ -40,6 +42,8 @@ function AddEditAssetDialogForm({
   const isEditing = Boolean(initialAsset);
   const { data: allCategories = [], isLoading: categoriesLoading } =
     useCategoriesQuery();
+  const { data: suppliers = [], isLoading: suppliersLoading } =
+    useSuppliersQuery({ activeOnly: true });
   const assetCategories = useMemo(() => {
     const fromSettings = allCategories.filter((c) => c.type === "asset");
     // Keep edit form usable if asset has a label not currently in Settings.
@@ -84,6 +88,9 @@ function AddEditAssetDialogForm({
   );
   const [purchaseDate, setPurchaseDate] = useState(
     () => initialAsset?.purchaseDate ?? ""
+  );
+  const [supplierId, setSupplierId] = useState(
+    () => initialAsset?.supplierId ?? ""
   );
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -153,6 +160,7 @@ function AddEditAssetDialogForm({
         notes: notes.trim() || undefined,
         value: value.trim() !== "" ? Number(value) : undefined,
         purchaseDate: purchaseDate || undefined,
+        supplierId: supplierId || null,
         lastUpdated: new Date().toISOString().split("T")[0],
       });
       onClose();
@@ -405,6 +413,48 @@ function AddEditAssetDialogForm({
                     className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg font-mono text-text focus:outline-none focus:ring-2 focus:ring-accent"
                   />
                 </div>
+              </div>
+
+              <div className="space-y-1">
+                <label
+                  htmlFor="supplier-select"
+                  className="block text-xs font-semibold text-text"
+                >
+                  Supplier
+                </label>
+                <select
+                  id="supplier-select"
+                  value={supplierId}
+                  onChange={(e) => setSupplierId(e.target.value)}
+                  disabled={isSubmitting || suppliersLoading}
+                  className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent"
+                >
+                  <option value="">None / unspecified</option>
+                  {suppliers.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                      {s.supplierCode ? ` (${s.supplierCode})` : ""}
+                    </option>
+                  ))}
+                </select>
+                {suppliers.length === 0 && !suppliersLoading ? (
+                  <p className="text-[11px] text-text-secondary">
+                    No active suppliers.{" "}
+                    <Link
+                      href="/suppliers"
+                      className="text-accent font-semibold underline-offset-2 hover:underline"
+                    >
+                      Register a supplier
+                    </Link>{" "}
+                    to track who you bought this unit from. When value is set on
+                    create, acquisition cost + supplier snap into a purchase lot.
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-text-secondary">
+                    Links to the Suppliers registry. With value set on create, a
+                    purchase lot is recorded for cost history.
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1">

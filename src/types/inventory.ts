@@ -41,7 +41,8 @@ export interface ConsumableItem {
   currentQty: number;
   minThreshold: number;
   location: string;
-  supplier?: string;
+  /** Preferred supplier display name from registry (denormalized). */
+  supplier?: string | null;
   lastRestocked: string;
   notes?: string;
   history: StockHistoryEntry[];

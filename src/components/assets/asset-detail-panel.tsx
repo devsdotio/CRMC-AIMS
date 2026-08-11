@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { Edit3, MapPin, User, Tag, Calendar } from "lucide-react";
+import { useEffect, useMemo, useRef } from "react";
+import { Edit3, MapPin, User, Tag, Calendar, Truck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { custodyBadgeLabel } from "@/lib/assets-custody";
-import type { Asset,  AssetStatus } from "@/types/assets";
+import type { Asset, AssetStatus } from "@/types/assets";
+import { useSuppliersQuery } from "@/features/suppliers/client";
 import { QRCodeDisplay } from "./qr-code-display";
 import { getCategoryStyle } from "@/constants/categories";
 
@@ -29,6 +30,14 @@ export function AssetDetailPanel({
   onEdit,
 }: AssetDetailPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const { data: suppliers = [] } = useSuppliersQuery();
+
+  const supplierName = useMemo(() => {
+    if (!asset?.supplierId) return null;
+    return (
+      suppliers.find((s) => s.id === asset.supplierId)?.name ?? null
+    );
+  }, [asset?.supplierId, suppliers]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -187,7 +196,19 @@ export function AssetDetailPanel({
                   </p>
                 </div>
 
-                {asset.value && (
+                <div>
+                  <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                    <Truck className="h-3 w-3" /> Supplier
+                  </p>
+                  <p className="text-sm font-medium text-text truncate">
+                    {supplierName ||
+                      (asset.supplierId
+                        ? "Supplier record unavailable"
+                        : "Unspecified")}
+                  </p>
+                </div>
+
+                {asset.value != null && asset.value !== undefined && (
                   <div>
                     <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1.5">
                       Inventory Value (₱)

@@ -29,7 +29,8 @@ export interface Asset {
   department?: string;
   purchaseDate?: string;
   value?: number;
-  supplierId?: string;
+  /** Linked suppliers registry id; null clears on update payloads. */
+  supplierId?: string | null;
   imageUrl?: string;
   notes?: string;
   lastUpdated: string;
@@ -67,7 +68,12 @@ export type CreateAssetInput = Pick<
     >
   >;
 
-export type UpdateAssetInput = Partial<CreateAssetInput>;
+export type UpdateAssetInput = Partial<
+  Omit<CreateAssetInput, "supplierId">
+> & {
+  /** Explicit null clears the linked supplier. */
+  supplierId?: string | null;
+};
 
 export type ReturnAssetInput = {
   condition: string;

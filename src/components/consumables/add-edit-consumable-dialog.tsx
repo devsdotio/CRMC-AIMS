@@ -4,6 +4,8 @@ import { useState, useEffect, useMemo } from "react";
 import { X, PackagePlus, Edit } from "lucide-react";
 import type { ConsumableItem, ConsumableCategory } from "@/types/inventory";
 import { useCategoriesQuery } from "@/features/categories/client/use-categories";
+import { useSuppliersQuery } from "@/features/suppliers/client";
+import Link from "next/link";
 
 export interface AddEditConsumableDialogProps {
   isOpen: boolean;
@@ -18,6 +20,15 @@ interface AddEditConsumableDialogFormProps {
   onSave: (itemData: Partial<ConsumableItem>) => void | Promise<void>;
 }
 
+function matchSupplierId(
+  suppliers: { id: string; name: string }[],
+  preferredName?: string
+): string {
+  if (!preferredName?.trim()) return "";
+  const name = preferredName.trim().toLowerCase();
+  return suppliers.find((s) => s.name.toLowerCase() === name)?.id ?? "";
+}
+
 function AddEditConsumableDialogForm({
   initialItem,
   onClose,
@@ -26,6 +37,9 @@ function AddEditConsumableDialogForm({
   const isEditing = Boolean(initialItem);
   const { data: allCategories = [], isLoading: categoriesLoading } =
     useCategoriesQuery();
+  const { data: suppliers = [], isLoading: suppliersLoading } =
+    useSuppliersQuery({ activeOnly: true });
+
   const consumableCategories = useMemo(() => {
     const fromSettings = allCategories.filter((c) => c.type === "consumable");
     const current = initialItem?.category?.trim();
@@ -53,7 +67,7 @@ function AddEditConsumableDialogForm({
   );
   const [unit, setUnit] = useState(() => initialItem?.unit ?? "reams");
   const [currentQty, setCurrentQty] = useState(
-    () => initialItem?.currentQty ?? 50
+    () => initialItem?.currentQty ?? 0
   );
   const [minThreshold, setMinThreshold] = useState(
     () => initialItem?.minThreshold ?? 15
@@ -61,10 +75,20 @@ function AddEditConsumableDialogForm({
   const [location, setLocation] = useState(
     () => initialItem?.location ?? "Supply Storage Bay A1"
   );
-  const [supplier, setSupplier] = useState(() => initialItem?.supplier ?? "");
+  /** Prefer registry id; free-text legacy names resolve on supplier list load. */
+  const [supplierId, setSupplierId] = useState("");
   const [notes, setNotes] = useState(() => initialItem?.notes ?? "");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Map legacy free-text preferred supplier → registry option when list loads.
+  useEffect(() => {
+    if (suppliers.length === 0) return;
+    setSupplierId((prev) => {
+      if (prev) return prev;
+      return matchSupplierId(suppliers, initialItem?.supplier);
+    });
+  }, [suppliers, initialItem?.supplier]);
 
   useEffect(() => {
     if (isEditing || category || consumableCategories.length === 0) return;
@@ -98,6 +122,9 @@ function AddEditConsumableDialogForm({
       return;
     }
 
+    const selectedSupplier = suppliers.find((s) => s.id === supplierId);
+    const supplierName = selectedSupplier?.name;
+
     try {
       setIsSubmitting(true);
       setError("");
@@ -112,10 +139,11 @@ function AddEditConsumableDialogForm({
         currentQty: Number(currentQty),
         minThreshold: Number(minThreshold),
         location: location.trim() || "Supply Storage Bay",
-        supplier: supplier.trim() || undefined,
+        // Registry-only: empty selection clears preferred supplier on edit
+        supplier: supplierName ?? (isEditing ? null : undefined),
         notes: notes.trim() || undefined,
         lastRestocked: new Date().toISOString().split("T")[0],
-      });
+      } as Partial<ConsumableItem>);
       onClose();
     } catch (err) {
       setError(
@@ -309,19 +337,55 @@ function AddEditConsumableDialogForm({
 
           <div className="space-y-1">
             <label
-              htmlFor="supplier-input"
+              htmlFor="supplier-select"
               className="block text-xs font-semibold text-text"
             >
-              Supplier (optional)
+              Preferred supplier
             </label>
-            <input
-              id="supplier-input"
-              type="text"
-              value={supplier}
-              onChange={(e) => setSupplier(e.target.value)}
-              disabled={isSubmitting}
+            <select
+              id="supplier-select"
+              value={supplierId}
+              onChange={(e) => setSupplierId(e.target.value)}
+              disabled={isSubmitting || suppliersLoading}
               className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent"
-            />
+            >
+              <option value="">None / unspecified</option>
+              {suppliers.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                  {s.supplierCode ? ` (${s.supplierCode})` : ""}
+                </option>
+              ))}
+            </select>
+            {/* Show legacy free-text when it doesn't match the registry */}
+            {initialItem?.supplier &&
+              !matchSupplierId(suppliers, initialItem.supplier) &&
+              !supplierId && (
+                <p className="text-[11px] text-text-secondary">
+                  Previous free-text value: “{initialItem.supplier}”. Pick a
+                  registry supplier to replace it, or leave none.
+                </p>
+              )}
+            {suppliers.length === 0 && !suppliersLoading && (
+              <p className="text-[11px] text-text-secondary">
+                No active suppliers.{" "}
+                <Link
+                  href="/suppliers"
+                  className="text-accent font-semibold underline-offset-2 hover:underline"
+                >
+                  Add suppliers
+                </Link>{" "}
+                first. Multi-supplier cost tracking happens on{" "}
+                <strong className="font-semibold text-text">Restock</strong>, not
+                on the SKU alone.
+              </p>
+            )}
+            {suppliers.length > 0 && (
+              <p className="text-[11px] text-text-secondary">
+                Preferred vendor for this item. Each restock can still use a
+                different supplier with its own unit cost (purchase lot).
+              </p>
+            )}
           </div>
 
           <div className="space-y-1">

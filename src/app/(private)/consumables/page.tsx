@@ -174,7 +174,10 @@ export default function ConsumablesPage() {
             unit: itemData.unit,
             minThreshold: itemData.minThreshold,
             location: itemData.location,
-            supplier: itemData.supplier,
+            supplier:
+              itemData.supplier === undefined
+                ? undefined
+                : itemData.supplier || null,
             notes: itemData.notes,
           },
         });
@@ -187,7 +190,7 @@ export default function ConsumablesPage() {
           currentQty: itemData.currentQty ?? 0,
           minThreshold: itemData.minThreshold ?? 15,
           location: itemData.location || "Supply Storage",
-          supplier: itemData.supplier,
+          supplier: itemData.supplier || undefined,
           notes: itemData.notes,
         });
         setSelectedId(created.id);
