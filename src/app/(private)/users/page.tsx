@@ -23,7 +23,7 @@ import {
 } from "@/features/users/client";
 
 export default function UsersPage() {
-  const { data: me, isLoading: meLoading, error: meError } = useMeQuery();
+  const { data: me, error: meError } = useMeQuery();
   const {
     data: users = [],
     isLoading: usersLoading,
@@ -38,7 +38,8 @@ export default function UsersPage() {
 
   const currentUserId = me?.id ?? "";
   const canInviteAdmin = me?.role === "superadmin";
-  const isLoading = meLoading || usersLoading;
+  // Table only waits on users list; me gates invite only.
+  const isLoading = usersLoading;
 
   const [filters, setFilters] = useState<UserFilterState>({
     searchQuery: "",
@@ -212,7 +213,7 @@ export default function UsersPage() {
         <UserTable
           users={filteredUsers}
           currentUserId={currentUserId}
-          loading={isLoading}
+          loading={isLoading && !usersError}
           onSelect={setSelectedUser}
           onEdit={setEditDialogUser}
           onDeactivate={setDeactivateDialogUser}

@@ -28,16 +28,19 @@ export function getDb(): Database {
   }
 
   /**
-   * Small pool: Next route handlers share the process; transactions need headroom.
-   * In development, Next.js spawns multiple workers which can quickly exhaust 
-   * the Supabase pooler limit if max is too high.
-   * keepAlive + connect_timeout avoid hung statements on flaky network to Supabase.
+   * Shared process pool. Too few connections + heavy parallel queries (old
+   * full-dashboard-from-layout) caused hung API routes and infinite skeletons.
+   * statement_timeout fails slow queries so the pool is not held for minutes.
    */
   const client = postgres(connectionString, {
-    max: process.env.NODE_ENV === "development" ? 2 : 10,
+    max: process.env.NODE_ENV === "development" ? 5 : 10,
     idle_timeout: 20,
-    connect_timeout: 15,
+    connect_timeout: 10,
     prepare: false,
+    connection: {
+      // ms — abort long statements so waiters can acquire a connection
+      statement_timeout: 12_000,
+    },
   });
   const db = drizzle(client, { schema });
 

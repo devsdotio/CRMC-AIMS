@@ -8,52 +8,46 @@ import {
   type UseQueryResult,
 } from "@tanstack/react-query";
 import type { CategoryItem } from "@/types/settings";
-
-type ApiResponse<T> = { data: T };
+import { fetchJson, type ApiResponse } from "@/features/shared/fetch-json";
 
 async function fetchCategories(): Promise<CategoryItem[]> {
-  const response = await fetch("/api/categories");
-  if (!response.ok) {
-    throw new Error("Failed to fetch categories");
-  }
-  const result = (await response.json()) as ApiResponse<CategoryItem[]>;
+  const result = await fetchJson<ApiResponse<CategoryItem[]>>("/api/categories");
   return result.data;
 }
 
 async function createCategory(payload: Partial<CategoryItem>): Promise<CategoryItem> {
-  const response = await fetch("/api/categories", {
+  const result = await fetchJson<ApiResponse<CategoryItem>>("/api/categories", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  if (!response.ok) throw new Error("Failed to create category");
-  const result = (await response.json()) as ApiResponse<CategoryItem>;
   return result.data;
 }
 
 async function updateCategory(payload: Partial<CategoryItem>): Promise<CategoryItem> {
-  const response = await fetch(`/api/categories/${payload.id}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  if (!response.ok) throw new Error("Failed to update category");
-  const result = (await response.json()) as ApiResponse<CategoryItem>;
+  const result = await fetchJson<ApiResponse<CategoryItem>>(
+    `/api/categories/${payload.id}`,
+    {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }
+  );
   return result.data;
 }
 
 async function deleteCategory(id: string): Promise<void> {
-  const response = await fetch(`/api/categories/${id}`, {
+  await fetchJson(`/api/categories/${id}`, {
     method: "DELETE",
   });
-  if (!response.ok) throw new Error("Failed to delete category");
 }
 
-export function useCategoriesQuery(): UseQueryResult<CategoryItem[], Error> {
+export function useCategoriesQuery(options?: {
+  enabled?: boolean;
+}): UseQueryResult<CategoryItem[], Error> {
   return useQuery({
     queryKey: ["categories"],
     queryFn: fetchCategories,
     staleTime: 5 * 60 * 1000,
+    enabled: options?.enabled ?? true,
   });
 }
 
@@ -78,7 +72,7 @@ export function useCreateCategoryMutation(): UseMutationResult<
       }
       return { previousCategories };
     },
-    onError: (err, newCategory, context) => {
+    onError: (_err, _newCategory, context) => {
       if (context?.previousCategories) {
         queryClient.setQueryData(["categories"], context.previousCategories);
       }
@@ -112,7 +106,7 @@ export function useUpdateCategoryMutation(): UseMutationResult<
       }
       return { previousCategories };
     },
-    onError: (err, updatedCategory, context) => {
+    onError: (_err, _updatedCategory, context) => {
       if (context?.previousCategories) {
         queryClient.setQueryData(["categories"], context.previousCategories);
       }
@@ -144,7 +138,7 @@ export function useDeleteCategoryMutation(): UseMutationResult<
       }
       return { previousCategories };
     },
-    onError: (err, deletedId, context) => {
+    onError: (_err, _deletedId, context) => {
       if (context?.previousCategories) {
         queryClient.setQueryData(["categories"], context.previousCategories);
       }

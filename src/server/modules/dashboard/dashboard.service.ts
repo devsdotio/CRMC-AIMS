@@ -79,6 +79,41 @@ export class DashboardService {
     private readonly assets = new AssetRepository()
   ) {}
 
+  /**
+   * Sidebar badges only — cheap COUNT queries, no full list payload.
+   * Layout used to call getSnapshot() on every private page and exhaust the DB pool.
+   */
+  async getSidebarSummary(userId?: string): Promise<DashboardSummaryDTO> {
+    if (userId) {
+      const [activeBorrows, pendingApprovals, overdueAssets] = await Promise.all([
+        this.borrowLog.countActive(undefined, userId),
+        this.requests.countPending(undefined, userId),
+        this.borrowLog.countOverdue(undefined, userId),
+      ]);
+      return {
+        activeBorrows,
+        pendingApprovals,
+        lowStockItems: 0,
+        overdueAssets,
+      };
+    }
+
+    const [activeBorrows, pendingApprovals, lowStockItems, overdueAssets] =
+      await Promise.all([
+        this.borrowLog.countActive(),
+        this.requests.countPending(),
+        this.consumables.countLowStock(),
+        this.borrowLog.countOverdue(),
+      ]);
+
+    return {
+      activeBorrows,
+      pendingApprovals,
+      lowStockItems,
+      overdueAssets,
+    };
+  }
+
   async getBorrowerSnapshot(userId: string, limit = 5): Promise<DashboardSnapshotDTO> {
     const [
       activeBorrows,

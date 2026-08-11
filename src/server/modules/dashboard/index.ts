@@ -19,6 +19,19 @@ export class DashboardController {
       return handleError(error);
     }
   }
+
+  /** Nav badges — 4 COUNTs max, not the full dashboard widgets. */
+  async sidebarSummary() {
+    try {
+      const session = await requireActor();
+      if (isAssetOperatorRole(session.role)) {
+        return ok(await this.service.getSidebarSummary());
+      }
+      return ok(await this.service.getSidebarSummary(session.userId));
+    } catch (error) {
+      return handleError(error);
+    }
+  }
 }
 
 export const dashboardController = new DashboardController();

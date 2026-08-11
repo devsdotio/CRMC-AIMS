@@ -19,7 +19,7 @@ import {
 } from "@/features/projects/client";
 
 export default function ProjectsPage() {
-  const { data: me, isLoading: meLoading, error: meError } = useMeQuery();
+  const { data: me, error: meError } = useMeQuery();
   const {
     data: projects = [],
     isLoading: projectsLoading,
@@ -32,7 +32,8 @@ export default function ProjectsPage() {
   const deleteProject = useDeleteProjectMutation();
 
   const isManager = me?.role === "superadmin" || me?.role === "admin";
-  const isLoading = meLoading || projectsLoading;
+  // Don't hold the table on me — table only needs projects list.
+  const isLoading = projectsLoading;
 
   const [filters, setFilters] = useState<ProjectFilterState>({
     searchQuery: "",
@@ -185,7 +186,7 @@ export default function ProjectsPage() {
       <main className="flex-1 overflow-y-auto min-h-0 bg-bg">
         <ProjectTable
           projects={filtered}
-          loading={isLoading}
+          loading={isLoading && !projectsError}
           onSelect={setSelected}
           onEdit={(p) => setEditTarget(p)}
           onDelete={(p) => {

@@ -15,6 +15,7 @@ import { RequestDetailPanel } from "@/components/borrow-requests/request-detail-
 import { ApproveRejectDialog } from "@/components/borrow-requests/approve-reject-dialog";
 import { ReleaseDialog } from "@/components/borrow-requests/release-dialog";
 import { ReturnDialog } from "@/components/borrow-requests/return-dialog";
+import { QueryErrorBanner } from "@/components/shared/query-error-banner";
 export default function BorrowRequestsPage() {
   const approveMutation = useApproveBorrowRequestMutation();
   const rejectMutation = useRejectBorrowRequestMutation();
@@ -33,7 +34,7 @@ export default function BorrowRequestsPage() {
     page: 1,
   });
 
-  const { data: response, isLoading } = useBorrowRequests({
+  const { data: response, isLoading, isError, error, refetch } = useBorrowRequests({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
     status: activeTab === "all" ? undefined : (activeTab as any),
     department: filters.department === "All Departments" ? undefined : filters.department,
@@ -188,12 +189,19 @@ export default function BorrowRequestsPage() {
         onResetFilters={handleResetFilters}
       />
 
+      {isError && (
+        <QueryErrorBanner
+          message={error?.message || "Failed to load borrow requests."}
+          onRetry={() => void refetch()}
+        />
+      )}
+
       {/* ── Internal Scrollable Request List Region ────────────────────── */}
       <main className="flex-1 overflow-y-auto min-h-0 bg-bg flex flex-col">
         <RequestList
           requests={requests}
           activeTab={activeTab}
-          loading={isLoading}
+          loading={isLoading && !isError}
           onSelect={setSelectedRequest}
           onApprove={handleOpenApproveModal}
           onReject={handleOpenRejectModal}

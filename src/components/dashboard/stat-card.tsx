@@ -80,7 +80,9 @@ export function StatCard({
   href,
   loading = false,
 }: StatCardProps) {
-  const isLoading = loading || value === null;
+  // Only `loading` prop drives skeleton — never treat null value as eternal load.
+  const isLoading = loading;
+  const displayValue = value ?? 0;
 
   // Determine structural urgency tier based on label and variant
   const isOverdue = label.toLowerCase().includes("overdue") || variant === "danger";
@@ -101,7 +103,7 @@ export function StatCard({
           ? "border-category-computing-text/30 hover:border-category-computing-text/60"
           : "border-border hover:border-text-secondary/40"
       )}
-      aria-label={`${label}: ${isLoading ? "loading" : value}`}
+      aria-label={`${label}: ${isLoading ? "loading" : displayValue}`}
     >
       {/* Background Operational Grid / Diagonal Pattern */}
       <div
@@ -165,7 +167,7 @@ export function StatCard({
                   : "text-text"
               )}
             >
-              {(value as number).toLocaleString()}
+              {(displayValue as number).toLocaleString()}
             </span>
             <span className="font-mono text-xs text-text-secondary uppercase">
               {isOverdue ? "units" : isLowStock ? "items" : isPending ? "reqs" : "active"}

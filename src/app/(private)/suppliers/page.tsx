@@ -143,7 +143,7 @@ export default function SuppliersPage() {
       <main className="flex-1 overflow-y-auto min-h-0 bg-bg">
         <SupplierTable
           suppliers={filtered}
-          loading={isLoading}
+          loading={isLoading && !error}
           onSelect={setSelected}
           onEdit={(s) => setEditTarget(s)}
           onDeactivate={(s) => {

@@ -22,6 +22,7 @@ export function useMeQuery(): UseQueryResult<MeProfile, Error> {
   return useQuery({
     queryKey: userQueryKeys.me(),
     queryFn: () => usersApi.getMe(),
+    staleTime: 5 * 60 * 1000,
   });
 }
 

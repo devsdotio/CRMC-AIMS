@@ -7,6 +7,7 @@ import { AccountSection } from "@/components/settings/account-section";
 import { CategoriesSection } from "@/components/settings/categories-section";
 
 import { useCategoriesQuery, useCreateCategoryMutation, useUpdateCategoryMutation, useDeleteCategoryMutation } from "@/features/categories/client/use-categories";
+import { QueryErrorBanner } from "@/components/shared/query-error-banner";
 
 // ── Mock Current User (Admin) ───────────────────────────────────────────
 const MOCK_PROFILE: UserProfile = {
@@ -37,13 +38,23 @@ export default function SettingsPage() {
   const [activeSection, setActiveSection] = useState<SettingsSection>("account");
   const [profile, setProfile] = useState<UserProfile>(MOCK_PROFILE);
 
-  const { data: allCategories, isLoading: categoriesLoading } = useCategoriesQuery();
+  // Don't hit /api/categories until the Categories section opens.
+  const {
+    data: allCategories,
+    isLoading: categoriesLoading,
+    isError: categoriesError,
+    error: categoriesErr,
+    refetch: refetchCategories,
+  } = useCategoriesQuery({
+    enabled: activeSection === "categories",
+  });
   const createCategoryMutation = useCreateCategoryMutation();
   const updateCategoryMutation = useUpdateCategoryMutation();
   const deleteCategoryMutation = useDeleteCategoryMutation();
 
-  const assetCategories = allCategories?.filter(c => c.type === 'asset') || [];
-  const consumableCategories = allCategories?.filter(c => c.type === 'consumable') || [];
+  const assetCategories = allCategories?.filter((c) => c.type === "asset") || [];
+  const consumableCategories =
+    allCategories?.filter((c) => c.type === "consumable") || [];
 
   // ── Section-level Page Title Map ───────────────────────────────────────
   const sectionMeta: Record<SettingsSection, { title: string; description: string }> = {
@@ -120,12 +131,26 @@ export default function SettingsPage() {
           )}
 
           {activeSection === "categories" && profile.role === "admin" && (
-            <CategoriesSection
-              assetCategories={assetCategories}
-              consumableCategories={consumableCategories}
-              onSaveCategory={handleSaveCategory}
-              onDeleteCategory={handleDeleteCategory}
-            />
+            <>
+              {categoriesError && (
+                <QueryErrorBanner
+                  message={
+                    categoriesErr?.message || "Failed to load categories."
+                  }
+                  onRetry={() => void refetchCategories()}
+                />
+              )}
+              {categoriesLoading && !allCategories ? (
+                <p className="text-xs text-text-secondary">Loading categories…</p>
+              ) : (
+                <CategoriesSection
+                  assetCategories={assetCategories}
+                  consumableCategories={consumableCategories}
+                  onSaveCategory={handleSaveCategory}
+                  onDeleteCategory={handleDeleteCategory}
+                />
+              )}
+            </>
           )}
 
 

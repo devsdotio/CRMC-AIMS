@@ -10,6 +10,10 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
         defaultOptions: {
           queries: {
             staleTime: 30_000,
+            // Prefer fail-fast over multi-minute skeleton: slow Supabase + retry
+            // stacks used to look like "infinite loading".
+            retry: 1,
+            retryDelay: 800,
             refetchOnWindowFocus: false,
           },
         },

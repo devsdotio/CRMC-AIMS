@@ -5,7 +5,7 @@ import Sidebar from "@/components/sidebar";
 import GlobalHeader from "@/components/global-header";
 import { cn } from "@/lib/utils";
 import { useMeQuery } from "@/features/users/client";
-import { useDashboardSnapshotQuery } from "@/features/dashboard/client/use-dashboard";
+import { useDashboardSidebarSummaryQuery } from "@/features/dashboard/client/use-dashboard";
 import { ROLE_DEFINITIONS } from "@/constants/roles";
 
 import type { UserRole } from "@/types/users";
@@ -19,28 +19,38 @@ interface DashboardLayoutProps {
   };
 }
 
-export default function DashboardLayout({ children, initialProfile }: DashboardLayoutProps) {
+export default function DashboardLayout({
+  children,
+  initialProfile,
+}: DashboardLayoutProps) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const { data: me, isLoading: meLoading } = useMeQuery();
-  const { data: snapshot } = useDashboardSnapshotQuery();
+  // Cheap COUNTs only — never pull the full dashboard snapshot from the shell
+  // (that used to starve the DB pool and freeze every page + /api/categories).
+  const { data: summary } = useDashboardSidebarSummaryQuery();
 
-  const userName = me?.name ?? initialProfile?.name ?? (meLoading ? "Loading…" : "Unknown user");
+  const userName =
+    me?.name ?? initialProfile?.name ?? (meLoading ? "Loading…" : "Unknown user");
   const userEmail = me?.email ?? initialProfile?.email ?? "";
-  
+
   const currentRole = me?.role ?? initialProfile?.role;
-  const userRoleLabel = currentRole ? ROLE_DEFINITIONS[currentRole].title : meLoading ? "…" : "—";
-  
-  const pendingCount = snapshot?.summary.pendingApprovals ?? 0;
-  const overdueCount = snapshot?.summary.overdueAssets ?? 0;
-  const lowStockCount = snapshot?.summary.lowStockItems ?? 0;
+  const userRoleLabel = currentRole
+    ? ROLE_DEFINITIONS[currentRole].title
+    : meLoading
+      ? "…"
+      : "—";
+
+  const pendingCount = summary?.pendingApprovals ?? 0;
+  const overdueCount = summary?.overdueAssets ?? 0;
+  const lowStockCount = summary?.lowStockItems ?? 0;
 
   return (
     <div className="flex h-full w-full overflow-hidden bg-[#F2F3F7] text-[#1B2140]">
       {/* Desktop Sidebar (hidden on mobile) */}
       <div className="hidden md:block h-full shrink-0">
-        <Sidebar 
-          userName={userName} 
-          userEmail={userEmail} 
+        <Sidebar
+          userName={userName}
+          userEmail={userEmail}
           userRole={currentRole}
           pendingCount={pendingCount}
           overdueCount={overdueCount}
@@ -52,7 +62,9 @@ export default function DashboardLayout({ children, initialProfile }: DashboardL
       <div
         className={cn(
           "fixed inset-0 z-50 md:hidden transition-opacity duration-300 ease-in-out",
-          isMobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+          isMobileOpen
+            ? "opacity-100 pointer-events-auto"
+            : "opacity-0 pointer-events-none"
         )}
       >
         <div

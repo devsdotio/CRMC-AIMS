@@ -14,9 +14,16 @@ import { AssetGrid } from "@/components/assets/asset-grid";
 import { AssetTable } from "@/components/assets/asset-table";
 import { AssetDetailPanel } from "@/components/assets/asset-detail-panel";
 import { AddEditAssetDialog } from "@/components/assets/add-edit-asset-dialog";
+import { QueryErrorBanner } from "@/components/shared/query-error-banner";
 
 export default function AssetsPage() {
-  const { data: assets = [], isLoading } = useAssetsQuery();
+  const {
+    data: assets = [],
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useAssetsQuery();
   const createMutation = useCreateAssetMutation();
   const updateMutation = useUpdateAssetMutation();
 
@@ -183,18 +190,25 @@ export default function AssetsPage() {
         filteredAssetsCount={filteredAssets.length}
       />
 
+      {isError && (
+        <QueryErrorBanner
+          message={error?.message || "Failed to load assets."}
+          onRetry={() => void refetch()}
+        />
+      )}
+
       {/* ── Internal Scrollable Main Content Region ───────────────────── */}
       <main className="flex-1 overflow-y-auto min-h-0 bg-bg">
         {viewMode === "grid" ? (
           <AssetGrid
             assets={filteredAssets}
-            loading={isLoading}
+            loading={isLoading && !isError}
             onSelect={setSelectedAsset}
           />
         ) : (
           <AssetTable
             assets={filteredAssets}
-            loading={isLoading}
+            loading={isLoading && !isError}
             onSelect={setSelectedAsset}
           />
         )}

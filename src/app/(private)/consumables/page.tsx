@@ -29,9 +29,10 @@ import {
   type ReleaseFromLotInput,
 } from "@/components/consumables/release-from-lot-dialog";
 import { useSuppliersQuery } from "@/features/suppliers/client";
+import { QueryErrorBanner } from "@/components/shared/query-error-banner";
 
 export default function ConsumablesPage() {
-  const { data: paginatedData, isLoading: isConsumablesLoading } =
+  const { data: paginatedData, isLoading: isConsumablesLoading, isError, error, refetch } =
     useConsumablesQuery({ limit: 100 });
   const items = useMemo(
     () => paginatedData?.data ?? [],
@@ -338,11 +339,18 @@ export default function ConsumablesPage() {
         filteredCount={filteredItems.length}
       />
 
+      {isError && (
+        <QueryErrorBanner
+          message={error?.message || "Failed to load inventory."}
+          onRetry={() => void refetch()}
+        />
+      )}
+
       <main className="flex-1 overflow-y-auto min-h-0 bg-bg">
         {viewMode === "grid" ? (
           <ConsumableGrid
             items={filteredItems}
-            loading={isLoading}
+            loading={isLoading && !isError}
             onSelect={(item) => setSelectedId(item.id)}
             onRestock={(item) => setRestockState({ isOpen: true, item })}
             onAdjust={(item) => setAdjustState({ isOpen: true, item })}
@@ -350,7 +358,7 @@ export default function ConsumablesPage() {
         ) : (
           <ConsumableTable
             items={filteredItems}
-            loading={isLoading}
+            loading={isLoading && !isError}
             onSelect={(item) => setSelectedId(item.id)}
             onRestock={(item) => setRestockState({ isOpen: true, item })}
             onAdjust={(item) => setAdjustState({ isOpen: true, item })}

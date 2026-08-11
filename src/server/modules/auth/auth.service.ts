@@ -149,12 +149,8 @@ export class AuthService {
       throw new ForbiddenError("This account has been deactivated.");
     }
 
-    // Best-effort presence stamp
-    try {
-      await this.profileRepository.touchLastActive(user.id);
-    } catch {
-      // ignore
-    }
+    // Best-effort presence stamp — never block sign-in on a slow UPDATE.
+    void this.profileRepository.touchLastActive(user.id).catch(() => undefined);
 
     return profile;
   }
