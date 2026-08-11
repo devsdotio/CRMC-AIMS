@@ -22,7 +22,7 @@ interface AddEditConsumableDialogFormProps {
 
 function matchSupplierId(
   suppliers: { id: string; name: string }[],
-  preferredName?: string
+  preferredName?: string | null
 ): string {
   if (!preferredName?.trim()) return "";
   const name = preferredName.trim().toLowerCase();
