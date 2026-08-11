@@ -28,6 +28,7 @@ function MultiSelectDropdown({
   options,
   selectedIds,
   onToggle,
+  onOpen,
 }: {
   label: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -35,6 +36,7 @@ function MultiSelectDropdown({
   options: { id: string; label: string; renderDot?: () => React.ReactNode }[];
   selectedIds: string[];
   onToggle: (id: string) => void;
+  onOpen?: () => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -53,7 +55,13 @@ function MultiSelectDropdown({
     <div className="relative" ref={dropdownRef}>
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          setIsOpen((prev) => {
+            const next = !prev;
+            if (next) onOpen?.();
+            return next;
+          });
+        }}
         className={cn(
           "inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors",
           selectedIds.length > 0
@@ -109,7 +117,12 @@ export function AssetFilters({
   onFilterChange,
   onResetFilters,
 }: AssetFiltersProps) {
-  const { data: allCategories } = useCategoriesQuery();
+  // Only needed for labels / category multi-select — defer until first dropdown open
+  // so list /api/assets is not competing with another DB round-trip on paint.
+  const [wantCategories, setWantCategories] = useState(false);
+  const { data: allCategories } = useCategoriesQuery({
+    enabled: wantCategories || filters.categories.length > 0,
+  });
   const assetCategories = allCategories?.filter((c) => c.type === "asset") || [];
   const activeCount =
     (filters.searchQuery ? 1 : 0) +
@@ -171,6 +184,7 @@ export function AssetFilters({
               })}
               selectedIds={filters.categories}
               onToggle={(id) => toggleCategory(id)}
+              onOpen={() => setWantCategories(true)}
             />
 
             <MultiSelectDropdown

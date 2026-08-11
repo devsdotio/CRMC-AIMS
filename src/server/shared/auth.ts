@@ -17,6 +17,13 @@ import {
   isUserManagerRole,
 } from "@/server/shared/roles";
 
+/** Short-lived cache — parallel APIs hit requireActor(); avoid N× slow profile selects. */
+const PROFILE_CACHE_TTL_MS = 30_000;
+const profileCache = new Map<
+  string,
+  { row: ProfileRow; expires: number }
+>();
+
 /** Extracts raw JWT from `Authorization: Bearer <token>` when present. */
 async function getBearerToken(): Promise<string | null> {
   const headerStore = await headers();
@@ -54,13 +61,32 @@ export function toActorContext(user: User, profile: ProfileRow): ActorContext {
 }
 
 async function loadProfile(userId: string): Promise<ProfileRow | null> {
+  const now = Date.now();
+  const hit = profileCache.get(userId);
+  if (hit && hit.expires > now) {
+    return hit.row;
+  }
+
   const db = getDb();
   const [row] = await db
     .select()
     .from(profiles)
     .where(eq(profiles.userId, userId))
     .limit(1);
+
+  if (row) {
+    profileCache.set(userId, { row, expires: now + PROFILE_CACHE_TTL_MS });
+  } else {
+    profileCache.delete(userId);
+  }
+
   return row ?? null;
+}
+
+/** Drop cached profile after mutations that change role/status (user admin). */
+export function invalidateProfileCache(userId?: string) {
+  if (userId) profileCache.delete(userId);
+  else profileCache.clear();
 }
 
 /**

@@ -30,7 +30,10 @@ export function AssetDetailPanel({
   onEdit,
 }: AssetDetailPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
-  const { data: suppliers = [] } = useSuppliersQuery();
+  // Suppliers only needed when panel is open with a linked vendor — never on list paint.
+  const { data: suppliers = [] } = useSuppliersQuery({
+    enabled: Boolean(isOpen && asset?.supplierId),
+  });
 
   const supplierName = useMemo(() => {
     if (!asset?.supplierId) return null;

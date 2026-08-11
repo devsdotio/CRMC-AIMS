@@ -38,6 +38,8 @@ export function useAssetsQuery(status?: AssetStatus): UseQueryResult<Asset[], Er
     queryKey: assetQueryKeys.list(status),
     queryFn: () => assetsApi.listAssets(status),
     staleTime: 5 * 60 * 1000, // 5 minutes
+    // Surface timeouts quickly — default multi-retry looked like infinite skeleton
+    retry: 0,
   });
 }
 

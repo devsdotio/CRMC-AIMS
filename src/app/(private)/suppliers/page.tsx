@@ -40,7 +40,7 @@ export default function SuppliersPage() {
 
   const filtered = useMemo(() => {
     return suppliers.filter((s) => {
-      if (filters.searchQuery.trim()) {
+      if (filters.searchQuery?.trim()) {
         const q = filters.searchQuery.toLowerCase();
         const hay = [
           s.name,

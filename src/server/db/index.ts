@@ -28,18 +28,20 @@ export function getDb(): Database {
   }
 
   /**
-   * Shared process pool. Too few connections + heavy parallel queries (old
-   * full-dashboard-from-layout) caused hung API routes and infinite skeletons.
-   * statement_timeout fails slow queries so the pool is not held for minutes.
+   * Shared process pool. Slow remote DB + many parallel APIs exhaust small pools
+   * and leave list pages spinning on skeletons.
+   *
+   * `options` sets Postgres GUCs for every session (statement_timeout aborts
+   * hung statements so pool slots free up).
    */
   const client = postgres(connectionString, {
-    max: process.env.NODE_ENV === "development" ? 5 : 10,
+    max: process.env.NODE_ENV === "development" ? 8 : 12,
     idle_timeout: 20,
-    connect_timeout: 10,
+    connect_timeout: 8,
     prepare: false,
+    // Fail long queries (~8s) instead of holding pool slots for 25s+
     connection: {
-      // ms — abort long statements so waiters can acquire a connection
-      statement_timeout: 12_000,
+      statement_timeout: 8000,
     },
   });
   const db = drizzle(client, { schema });

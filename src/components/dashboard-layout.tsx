@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Sidebar from "@/components/sidebar";
 import GlobalHeader from "@/components/global-header";
 import { cn } from "@/lib/utils";
@@ -24,13 +24,26 @@ export default function DashboardLayout({
   initialProfile,
 }: DashboardLayoutProps) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const { data: me, isLoading: meLoading } = useMeQuery();
-  // Cheap COUNTs only — never pull the full dashboard snapshot from the shell
-  // (that used to starve the DB pool and freeze every page + /api/categories).
-  const { data: summary } = useDashboardSidebarSummaryQuery();
+  // Defer shell metrics until after page data starts — frees the DB pool for
+  // /api/assets, /api/consumables, etc. (sidebar badges are non-critical).
+  const [shellReady, setShellReady] = useState(false);
+  useEffect(() => {
+    const t = window.setTimeout(() => setShellReady(true), 400);
+    return () => window.clearTimeout(t);
+  }, []);
+
+  // Prefer SSR profile labels; soft-refresh /api/me after first paint.
+  const { data: me, isLoading: meLoading } = useMeQuery({
+    enabled: shellReady,
+  });
+  const { data: summary } = useDashboardSidebarSummaryQuery({
+    enabled: shellReady,
+  });
 
   const userName =
-    me?.name ?? initialProfile?.name ?? (meLoading ? "Loading…" : "Unknown user");
+    me?.name ??
+    initialProfile?.name ??
+    (meLoading ? "Loading…" : "Unknown user");
   const userEmail = me?.email ?? initialProfile?.email ?? "";
 
   const currentRole = me?.role ?? initialProfile?.role;
@@ -46,7 +59,6 @@ export default function DashboardLayout({
 
   return (
     <div className="flex h-full w-full overflow-hidden bg-[#F2F3F7] text-[#1B2140]">
-      {/* Desktop Sidebar (hidden on mobile) */}
       <div className="hidden md:block h-full shrink-0">
         <Sidebar
           userName={userName}
@@ -58,7 +70,6 @@ export default function DashboardLayout({
         />
       </div>
 
-      {/* Mobile Sidebar Overlay Drawer */}
       <div
         className={cn(
           "fixed inset-0 z-50 md:hidden transition-opacity duration-300 ease-in-out",

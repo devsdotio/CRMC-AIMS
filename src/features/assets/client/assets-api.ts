@@ -5,6 +5,7 @@ import type {
   ReturnAssetInput,
   UpdateAssetInput,
 } from "@/types/assets";
+import { fetchJson, type ApiResponse } from "@/features/shared/fetch-json";
 
 export type AssetLifecycleEvent = {
   id: string;
@@ -47,45 +48,6 @@ export type FlagMaintenanceInput = {
   notes?: string;
 };
 
-type ApiResponse<T> = { data: T };
-type ApiErrorResponse = { error?: string };
-
-/**
- * Thin fetch wrapper for authenticated same-origin `/api/assets` calls.
- * Cookies from Supabase SSR session are sent automatically (`same-origin`).
- */
-async function fetchJson<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
-  const response = await fetch(input, {
-    ...init,
-    credentials: "same-origin",
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-  });
-
-  if (!response.ok) {
-    let message = `Request failed with status ${response.status}`;
-
-    try {
-      const payload = (await response.json()) as ApiErrorResponse;
-      if (payload.error) {
-        message = payload.error;
-      }
-    } catch {
-      // Ignore JSON parsing errors to preserve generic message.
-    }
-
-    throw new Error(message);
-  }
-
-  if (response.status === 204) {
-    return undefined as T;
-  }
-
-  return (await response.json()) as T;
-}
-
 export const assetsApi = {
   async listAssets(
     status?: AssetStatus,
@@ -107,13 +69,20 @@ export const assetsApi = {
     if (filters?.availableOnly) searchParams.set("availableOnly", "true");
 
     const queryString = searchParams.toString();
-    const path = queryString.length > 0 ? `/api/assets?${queryString}` : "/api/assets";
-    const response = await fetchJson<ApiResponse<Asset[]>>(path, { method: "GET" });
+    const path =
+      queryString.length > 0 ? `/api/assets?${queryString}` : "/api/assets";
+    // Fail fast so the grid leaves skeleton state on hung DB/pool waits.
+    const response = await fetchJson<ApiResponse<Asset[]>>(path, {
+      method: "GET",
+      timeoutMs: 15_000,
+    });
     return response.data;
   },
 
   async getAssetById(id: string): Promise<Asset> {
-    const response = await fetchJson<ApiResponse<Asset>>(`/api/assets/${id}`, { method: "GET" });
+    const response = await fetchJson<ApiResponse<Asset>>(`/api/assets/${id}`, {
+      method: "GET",
+    });
     return response.data;
   },
 
@@ -177,44 +146,57 @@ export const assetsApi = {
   },
 
   async releaseAsset(id: string, payload: ReleaseAssetInput): Promise<Asset> {
-    const response = await fetchJson<ApiResponse<Asset>>(`/api/assets/${id}/release`, {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
-
+    const response = await fetchJson<ApiResponse<Asset>>(
+      `/api/assets/${id}/release`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }
+    );
     return response.data;
   },
 
   async scanRelease(
     payload: ReleaseAssetInput & { code: string }
   ): Promise<Asset> {
-    const response = await fetchJson<ApiResponse<Asset>>("/api/assets/scan/release", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
+    const response = await fetchJson<ApiResponse<Asset>>(
+      "/api/assets/scan/release",
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }
+    );
     return response.data;
   },
 
   async returnAsset(id: string, payload: ReturnAssetInput): Promise<Asset> {
-    const response = await fetchJson<ApiResponse<Asset>>(`/api/assets/${id}/return`, {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
-
+    const response = await fetchJson<ApiResponse<Asset>>(
+      `/api/assets/${id}/return`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }
+    );
     return response.data;
   },
 
   async scanReturn(
     payload: ReturnAssetInput & { code: string }
   ): Promise<Asset> {
-    const response = await fetchJson<ApiResponse<Asset>>("/api/assets/scan/return", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
+    const response = await fetchJson<ApiResponse<Asset>>(
+      "/api/assets/scan/return",
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }
+    );
     return response.data;
   },
 
-  async flagForMaintenance(id: string, payload: FlagMaintenanceInput = {}): Promise<Asset> {
+  async flagForMaintenance(
+    id: string,
+    payload: FlagMaintenanceInput = {}
+  ): Promise<Asset> {
     const response = await fetchJson<ApiResponse<Asset>>(
       `/api/assets/${id}/flag-maintenance`,
       {

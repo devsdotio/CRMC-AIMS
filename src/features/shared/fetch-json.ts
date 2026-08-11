@@ -24,8 +24,9 @@ export async function fetchJson<T>(
   init?: RequestInit & { timeoutMs?: number }
 ): Promise<T> {
   const timeoutMs = init?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const { timeoutMs: _timeoutMs, signal: externalSignal, ...restInit } =
+    init ?? {};
   const controller = new AbortController();
-  const externalSignal = init?.signal;
   const onAbort = () => controller.abort();
   externalSignal?.addEventListener("abort", onAbort);
 
@@ -33,12 +34,12 @@ export async function fetchJson<T>(
 
   try {
     const response = await fetch(input, {
-      ...init,
+      ...restInit,
       credentials: "same-origin",
       signal: controller.signal,
       headers: {
         "Content-Type": "application/json",
-        ...(init?.headers ?? {}),
+        ...(restInit.headers ?? {}),
       },
     });
 

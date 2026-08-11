@@ -47,7 +47,7 @@ export default function ProjectsPage() {
 
   const filtered = useMemo(() => {
     return projects.filter((p) => {
-      if (filters.searchQuery.trim()) {
+      if (filters.searchQuery?.trim()) {
         const q = filters.searchQuery.toLowerCase();
         const hay = [
           p.name,

@@ -25,14 +25,14 @@ export function useDashboardSnapshotQuery(options?: {
   });
 }
 
-/** Nav badge counts — safe to run from the shell on every private page. */
-export function useDashboardSidebarSummaryQuery(): UseQueryResult<
-  DashboardSummary,
-  Error
-> {
+/** Nav badge counts — safe to run from the shell; defer with `enabled` so page lists go first. */
+export function useDashboardSidebarSummaryQuery(options?: {
+  enabled?: boolean;
+}): UseQueryResult<DashboardSummary, Error> {
   return useQuery({
     queryKey: dashboardQueryKeys.sidebarSummary(),
     queryFn: () => dashboardApi.getSidebarSummary(),
     staleTime: 60_000,
+    enabled: options?.enabled ?? true,
   });
 }
