@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useTransition } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { Loader2, ArrowRight } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { AuthCard } from './AuthCard';
@@ -37,11 +37,15 @@ function getRedirectErrorMessage(errorKey: string | null): string | null {
   return REDIRECT_ERROR_MESSAGES[errorKey] ?? 'Unable to access the application.';
 }
 
+type SignInApiData = {
+  profile: {
+    role: string;
+  };
+};
+
 export function SignInForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const emailInputRef = useRef<HTMLInputElement>(null);
-  const [isPending, startTransition] = useTransition();
   const queryClient = useQueryClient();
 
   const [formValues, setFormValues] = useState<SignInFormValues>({
@@ -151,54 +155,51 @@ export function SignInForm() {
     setFormState({ isLoading: true, errorMessage: null, successMessage: null });
 
     try {
-      const supabase = createClient();
-      const { error } = await supabase.auth.signInWithPassword({
-        email: formValues.email.trim(),
-        password: formValues.password,
+      // One server round-trip: Supabase password + profile gate + Set-Cookie.
+      // Avoids client signInWithPassword + separate /api/me (extra ~1–2s).
+      const res = await fetch('/api/auth/sign-in', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+          email: formValues.email.trim(),
+          password: formValues.password,
+        }),
       });
 
-      if (error) {
+      const body = (await res.json().catch(() => null)) as
+        | { data?: SignInApiData; error?: string }
+        | null;
+
+      if (!res.ok || !body?.data?.profile) {
         setFormState({
           isLoading: false,
           errorMessage:
+            body?.error ||
             'Invalid email or password. Please verify your credentials and try again.',
           successMessage: null,
         });
         return;
       }
 
-      // Clear any stale react-query cache from a previous session
       queryClient.clear();
 
-      setFormState({
-        isLoading: true, // Keep loading active while fetching profile and transitioning
-        errorMessage: null,
-        successMessage: 'Sign in successful! Preparing dashboard...',
-      });
-
       let nextPath = safeNextPath(searchParams.get('next'));
-      
-      // If the target is root, resolve the actual dashboard URL here on the client 
-      // to avoid triggering a server-side redirect that flushes the DOM (white screen)
       if (nextPath === '/') {
-        try {
-          const res = await fetch('/api/me');
-          if (res.ok) {
-            const profile = await res.json();
-            if (profile.role === 'borrower') {
-              nextPath = '/borrower-db/dashboard';
-            } else {
-              nextPath = '/dashboard';
-            }
-          }
-        } catch {
-          // fallback to root if API fails
-        }
+        nextPath =
+          body.data.profile.role === 'borrower'
+            ? '/borrower-db/dashboard'
+            : '/dashboard';
       }
 
-      startTransition(() => {
-        router.push(nextPath);
+      setFormState({
+        isLoading: true,
+        errorMessage: null,
+        successMessage: 'Sign in successful! Opening workspace…',
       });
+
+      // Full navigation so the next document reliably picks up Set-Cookie cookies.
+      window.location.assign(nextPath);
     } catch {
       setFormState({
         isLoading: false,

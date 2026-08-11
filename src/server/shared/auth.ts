@@ -1,4 +1,4 @@
-import type { User } from "@supabase/supabase-js";
+import type { JwtPayload, User } from "@supabase/supabase-js";
 import { eq } from "drizzle-orm";
 import { headers } from "next/headers";
 
@@ -64,30 +64,49 @@ async function loadProfile(userId: string): Promise<ProfileRow | null> {
 }
 
 /**
+ * Build a minimal `User` from verified JWT claims (local JWKS verify via getClaims).
+ * Prefer this over getUser() on every request — getUser always hits Auth over the network.
+ */
+function userFromClaims(claims: JwtPayload): User {
+  const email =
+    typeof claims.email === "string" && claims.email.length > 0
+      ? claims.email
+      : undefined;
+
+  return {
+    id: claims.sub,
+    email,
+    app_metadata: {},
+    user_metadata: {},
+    aud: "authenticated",
+    created_at: "",
+  } as User;
+}
+
+/**
  * Verifies the request has a valid Supabase session.
  *
  * Accepts either:
  * - HTTP-only session cookies (browser / SSR), or
  * - `Authorization: Bearer <access_token>` (Swagger, scripts, API clients)
  *
- * Use at the start of protected Route Handlers / controllers.
+ * Uses `getClaims()` (local JWT verify when project uses asymmetric keys)
+ * instead of `getUser()` network RTT on every API call / layout.
  */
 export async function requireUser(): Promise<User> {
   const supabase = await createClient();
   const bearer = await getBearerToken();
 
-  const {
-    data: { user },
-    error,
-  } = bearer
-    ? await supabase.auth.getUser(bearer)
-    : await supabase.auth.getUser();
+  const { data, error } = bearer
+    ? await supabase.auth.getClaims(bearer)
+    : await supabase.auth.getClaims();
 
-  if (error || !user) {
+  const claims = data?.claims;
+  if (error || !claims?.sub) {
     throw new UnauthorizedError();
   }
 
-  return user;
+  return userFromClaims(claims);
 }
 
 /**

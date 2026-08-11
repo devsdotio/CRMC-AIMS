@@ -12,6 +12,10 @@ import { eq } from "drizzle-orm";
 /**
  * Authenticated app shell gate.
  *
+ * Auth verification uses `getClaims()` (local JWT verify when possible) —
+ * not `getUser()` which always round-trips the Auth server (~1s+ on remote
+ * Supabase). Profile gate remains a single local Postgres query.
+ *
  * Do not call supabase.auth.signOut() here and then redirect.
  * Cookie clears from Server Components often never land on the redirect
  * response → proxy still sees a session → bounce loop.
@@ -27,11 +31,11 @@ export default async function PrivateLayout({
   children: React.ReactNode;
 }>) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: claimsData, error: claimsError } =
+    await supabase.auth.getClaims();
+  const userId = claimsData?.claims?.sub;
 
-  if (!user) {
+  if (claimsError || !userId) {
     redirect("/sign-in");
   }
 
@@ -41,7 +45,7 @@ export default async function PrivateLayout({
     const rows = await db
       .select()
       .from(profiles)
-      .where(eq(profiles.userId, user.id))
+      .where(eq(profiles.userId, userId))
       .limit(1);
     profile = rows[0];
   } catch (error) {
@@ -77,7 +81,7 @@ export default async function PrivateLayout({
   }
 
   // Best-effort presence (never block entry)
-  void new UserService().recordActivity(user.id);
+  void new UserService().recordActivity(userId);
 
   return (
     <DashboardLayout
