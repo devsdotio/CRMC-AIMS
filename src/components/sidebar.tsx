@@ -139,17 +139,17 @@ export default function Sidebar({
       items: [
         { name: "Borrow Requests", href: "/borrow-requests", icon: ClipboardList, badge: pendingCount, badgeTone: "accent", roles: ["superadmin", "admin", "staff"] },
         
-        { name: "My Requests", href: "/borrower-db/requests", icon: ClipboardList, badge: pendingCount, badgeTone: "accent", roles: ["borrower"] },
-        { name: "Borrow History", href: "/borrower-db/history", icon: History, roles: ["borrower"] },
         { name: "Assets", href: "/assets", icon: Package, roles: ["superadmin", "admin", "staff"] },
         { name: "Inventory", href: "/consumables", icon: Boxes, badge: lowStockCount, badgeTone: "warning", roles: ["superadmin", "admin", "staff"] },
         { name: "Suppliers", href: "/suppliers", icon: Truck, roles: ["superadmin", "admin", "staff"] },
+        { name: "Projects", href: "/projects", icon: FolderKanban, roles: ["superadmin", "admin"] },
+        { name: "My Requests", href: "/borrower-db/requests", icon: ClipboardList, badge: pendingCount, badgeTone: "accent", roles: ["borrower"] },
+        { name: "Borrow History", href: "/borrower-db/history", icon: History, roles: ["borrower"] },
       ],
     },
     {
       label: "Administration",
       items: [
-        { name: "Projects", href: "/projects", icon: FolderKanban, roles: ["superadmin", "admin"] },
         { name: "Users & Roles", href: "/users", icon: Users, roles: ["superadmin", "admin"] },
         { name: "Settings", href: "/settings", icon: Settings, roles: ["superadmin", "admin"] },
       ],

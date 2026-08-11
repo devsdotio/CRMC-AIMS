@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { Edit3, MapPin, User, Tag, Calendar, Truck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { custodyBadgeLabel } from "@/lib/assets-custody";
@@ -35,12 +35,9 @@ export function AssetDetailPanel({
     enabled: Boolean(isOpen && asset?.supplierId),
   });
 
-  const supplierName = useMemo(() => {
-    if (!asset?.supplierId) return null;
-    return (
-      suppliers.find((s) => s.id === asset.supplierId)?.name ?? null
-    );
-  }, [asset?.supplierId, suppliers]);
+  const supplierName = asset?.supplierId
+    ? (suppliers.find((s) => s.id === asset.supplierId)?.name ?? null)
+    : null;
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
