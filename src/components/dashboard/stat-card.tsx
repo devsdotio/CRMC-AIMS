@@ -80,7 +80,9 @@ export function StatCard({
   href,
   loading = false,
 }: StatCardProps) {
-  const isLoading = loading || value === null;
+  // Only `loading` prop drives skeleton — never treat null value as eternal load.
+  const isLoading = loading;
+  const displayValue = value ?? 0;
 
   // Determine structural urgency tier based on label and variant
   const isOverdue = label.toLowerCase().includes("overdue") || variant === "danger";
@@ -91,7 +93,7 @@ export function StatCard({
     <div
       className={cn(
         "group relative flex flex-col justify-between overflow-hidden rounded-lg border p-5 transition-all duration-300 select-none",
-        "h-full min-h-[160px] bg-card text-text shadow-sm hover:shadow-md",
+        "h-full min-h-40 bg-card text-text shadow-sm hover:shadow-md",
         // Uniform white card background with distinct operational borders & accents
         isOverdue
           ? "border-status-outofservice-bg/60 hover:border-status-outofservice-bg"
@@ -101,7 +103,7 @@ export function StatCard({
           ? "border-category-computing-text/30 hover:border-category-computing-text/60"
           : "border-border hover:border-text-secondary/40"
       )}
-      aria-label={`${label}: ${isLoading ? "loading" : value}`}
+      aria-label={`${label}: ${isLoading ? "loading" : displayValue}`}
     >
       {/* Background Operational Grid / Diagonal Pattern */}
       <div
@@ -165,7 +167,7 @@ export function StatCard({
                   : "text-text"
               )}
             >
-              {(value as number).toLocaleString()}
+              {(displayValue as number).toLocaleString()}
             </span>
             <span className="font-mono text-xs text-text-secondary uppercase">
               {isOverdue ? "units" : isLowStock ? "items" : isPending ? "reqs" : "active"}
@@ -251,7 +253,7 @@ export interface StatCardsGridProps {
 export function StatCardsGrid({ stats }: StatCardsGridProps) {
   return (
     <section aria-label="Key operational telemetry metrics">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map((s, i) => (
           <StatCard key={i} {...s} />
         ))}

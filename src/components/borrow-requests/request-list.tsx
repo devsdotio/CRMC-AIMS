@@ -11,6 +11,9 @@ export interface RequestListProps {
   onSelect: (request: BorrowRequest) => void;
   onApprove: (request: BorrowRequest) => void;
   onReject: (request: BorrowRequest) => void;
+  onRelease?: (request: BorrowRequest) => void;
+  onReturn?: (request: BorrowRequest) => void;
+  onMarkUnreleased?: (request: BorrowRequest) => void;
 }
 
 // ─── Skeleton Row — Matches RequestListItem dimensions exactly ───────────────
@@ -53,6 +56,14 @@ const EMPTY_MESSAGES: Record<TabFilter, { title: string; subtitle: string }> = {
     title: "No rejected requests",
     subtitle: "No requests have been rejected under this view.",
   },
+  released: {
+    title: "No released requests",
+    subtitle: "There are currently no released requests matching your filters.",
+  },
+  returned: {
+    title: "No returned requests",
+    subtitle: "There are currently no returned requests matching your filters.",
+  },
   all: {
     title: "No requests found",
     subtitle: "No borrow requests match your search criteria or date filter.",
@@ -66,6 +77,9 @@ export function RequestList({
   onSelect,
   onApprove,
   onReject,
+  onRelease,
+  onReturn,
+  onMarkUnreleased,
 }: RequestListProps) {
   if (loading) {
     return (
@@ -112,6 +126,9 @@ export function RequestList({
           onSelect={onSelect}
           onApprove={onApprove}
           onReject={onReject}
+          onRelease={onRelease}
+          onReturn={onReturn}
+          onMarkUnreleased={onMarkUnreleased}
         />
       ))}
     </div>

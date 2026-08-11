@@ -1,4 +1,4 @@
-import { and, count, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, count, desc, asc, eq, ilike, or, sql } from "drizzle-orm";
 
 import { getDb } from "@/server/db";
 import type { DbSession } from "@/server/db/transaction";
@@ -12,6 +12,31 @@ import type {
   IConsumableRepository,
   ListConsumableFilters,
 } from "./consumable.types";
+
+/**
+ * List projection: skips bulky stock `history` JSONB (loaded on GET by id).
+ */
+const consumableListColumns = {
+  id: consumables.id,
+  itemCode: consumables.itemCode,
+  name: consumables.name,
+  category: consumables.category,
+  unit: consumables.unit,
+  currentQty: consumables.currentQty,
+  minThreshold: consumables.minThreshold,
+  location: consumables.location,
+  supplier: consumables.supplier,
+  lastRestocked: consumables.lastRestocked,
+  notes: consumables.notes,
+  createdAt: consumables.createdAt,
+  updatedAt: consumables.updatedAt,
+} as const;
+
+function withEmptyHistory(
+  row: Omit<ConsumableRow, "history">
+): ConsumableRow {
+  return { ...row, history: [] };
+}
 
 export class ConsumableRepository implements IConsumableRepository {
   private db(session?: DbSession) {
@@ -57,7 +82,7 @@ export class ConsumableRepository implements IConsumableRepository {
   async list(
     filters: ListConsumableFilters = {},
     session?: DbSession
-  ): Promise<ConsumableRow[]> {
+  ): Promise<import("@/types/filters").PaginatedResponse<ConsumableRow>> {
     const db = this.db(session);
     const conditions = [];
 
@@ -81,9 +106,34 @@ export class ConsumableRepository implements IConsumableRepository {
       );
     }
 
-    const base = db.select().from(consumables).orderBy(desc(consumables.updatedAt));
-    if (conditions.length === 0) return base;
-    return base.where(and(...conditions));
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    
+    // Count total rows matching filters
+    const [{ value: totalCount }] = await db
+      .select({ value: count() })
+      .from(consumables)
+      .where(whereClause);
+
+    const total = Number(totalCount ?? 0);
+    const page = filters.page ?? 1;
+    const limit = filters.limit ?? 50;
+    const offset = (page - 1) * limit;
+
+    const rows = await db
+      .select(consumableListColumns)
+      .from(consumables)
+      .where(whereClause)
+      .orderBy(desc(consumables.updatedAt))
+      .limit(limit)
+      .offset(offset);
+
+    return {
+      data: rows.map(withEmptyHistory),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   async countYear(session?: DbSession): Promise<number> {
@@ -106,6 +156,19 @@ export class ConsumableRepository implements IConsumableRepository {
         sql`${consumables.currentQty} <= ceil(${consumables.minThreshold} * 1.2)`
       );
     return Number(row?.value ?? 0);
+  }
+
+  async getLowStockItems(limit: number, session?: DbSession): Promise<ConsumableRow[]> {
+    const db = this.db(session);
+    const rows = await db
+      .select(consumableListColumns)
+      .from(consumables)
+      .where(
+        sql`${consumables.currentQty} <= ceil(${consumables.minThreshold} * 1.2)`
+      )
+      .orderBy(asc(consumables.currentQty))
+      .limit(limit);
+    return rows.map(withEmptyHistory);
   }
 
   async create(

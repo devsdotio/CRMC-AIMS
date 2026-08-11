@@ -1,10 +1,5 @@
 "use client";
 
-/**
- * React Query hooks for consumables stock.
- * Ready for page integration — UI still uses mocks until wired.
- */
-
 import {
   useMutation,
   useQuery,
@@ -17,34 +12,44 @@ import {
   consumablesApi,
   type CreateConsumablePayload,
   type ConsumableItem,
+  type RestockPayload,
   type StockAdjustPayload,
   type StockMovementPayload,
   type UpdateConsumablePayload,
 } from "./consumables-api";
 import { consumableQueryKeys } from "./query-keys";
+import { purchaseLotQueryKeys } from "@/features/purchase-lots/client/query-keys";
 
 function invalidate(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: consumableQueryKeys.all });
+  qc.invalidateQueries({ queryKey: purchaseLotQueryKeys.all });
 }
 
 export function useConsumablesQuery(filters?: {
   category?: ConsumableItem["category"];
   stockLevel?: "all" | "healthy" | "low" | "critical";
   search?: string;
-}): UseQueryResult<ConsumableItem[], Error> {
+  page?: number;
+  limit?: number;
+}): UseQueryResult<
+  import("@/types/filters").PaginatedResponse<ConsumableItem>,
+  Error
+> {
   return useQuery({
     queryKey: consumableQueryKeys.list(filters),
     queryFn: () => consumablesApi.list(filters),
+    staleTime: 5 * 60 * 1000,
   });
 }
 
 export function useConsumableQuery(
-  id: string
+  id: string,
+  options?: { enabled?: boolean }
 ): UseQueryResult<ConsumableItem, Error> {
   return useQuery({
     queryKey: consumableQueryKeys.detail(id),
     queryFn: () => consumablesApi.getById(id),
-    enabled: Boolean(id),
+    enabled: Boolean(id) && (options?.enabled ?? true),
   });
 }
 
@@ -75,7 +80,7 @@ export function useUpdateConsumableMutation(): UseMutationResult<
 export function useRestockConsumableMutation(): UseMutationResult<
   ConsumableItem,
   Error,
-  { id: string; payload: StockMovementPayload }
+  { id: string; payload: RestockPayload }
 > {
   const qc = useQueryClient();
   return useMutation({

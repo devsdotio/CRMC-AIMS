@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { UserPlus, AlertCircle } from "lucide-react";
 import type { UserAccount, UserFilterState, UserRole } from "@/types/users";
-import { INITIAL_MOCK_USERS, CURRENT_USER_ID } from "@/components/users/mock-data";
+
 import { UserFilters } from "@/components/users/user-filters";
 import { UserTable } from "@/components/users/user-table";
 import { UserDetailPanel } from "@/components/users/user-detail-panel";
@@ -23,7 +23,7 @@ import {
 } from "@/features/users/client";
 
 export default function UsersPage() {
-  const { data: me, isLoading: meLoading, error: meError } = useMeQuery();
+  const { data: me, error: meError } = useMeQuery();
   const {
     data: users = [],
     isLoading: usersLoading,
@@ -38,7 +38,8 @@ export default function UsersPage() {
 
   const currentUserId = me?.id ?? "";
   const canInviteAdmin = me?.role === "superadmin";
-  const isLoading = meLoading || usersLoading;
+  // Table only waits on users list; me gates invite only.
+  const isLoading = usersLoading;
 
   const [filters, setFilters] = useState<UserFilterState>({
     searchQuery: "",
@@ -55,7 +56,7 @@ export default function UsersPage() {
 
   const filteredUsers = useMemo(() => {
     return users.filter((u) => {
-      if (filters.searchQuery.trim()) {
+      if (filters.searchQuery?.trim()) {
         const query = filters.searchQuery.toLowerCase();
         const matchName = u.name.toLowerCase().includes(query);
         const matchEmail = u.email.toLowerCase().includes(query);
@@ -212,7 +213,7 @@ export default function UsersPage() {
         <UserTable
           users={filteredUsers}
           currentUserId={currentUserId}
-          loading={isLoading}
+          loading={isLoading && !usersError}
           onSelect={setSelectedUser}
           onEdit={setEditDialogUser}
           onDeactivate={setDeactivateDialogUser}

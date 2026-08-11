@@ -21,7 +21,7 @@ export interface QuickActionsBarProps {
 
 const DEFAULT_ACTIONS: QuickAction[] = [
   { label: "Add Asset",            href: "/assets/new",        icon: PackagePlus, primary: true },
-  { label: "Log Return",           href: "/borrow-log/return",  icon: RotateCcw },
+  // { label: "Log Return",           href: "/borrow-log/return",  icon: RotateCcw },
   { label: "Add Consumable Stock", href: "/consumables/restock", icon: Boxes },
 ];
 

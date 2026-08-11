@@ -13,12 +13,6 @@ export interface AddEditCategoryDialogProps {
   onSave: (categoryData: Partial<CategoryItem>) => void;
 }
 
-const PRESET_COLOR_TOKENS = [
-  { id: "computing", label: "Computing", bg: "bg-category-computing-bg", text: "text-category-computing-text" },
-  { id: "av", label: "AV Equipment", bg: "bg-category-av-bg", text: "text-category-av-text" },
-  { id: "transport", label: "Transport", bg: "bg-category-transport-bg", text: "text-category-transport-text" },
-  { id: "furniture", label: "Furniture", bg: "bg-category-furniture-bg", text: "text-category-furniture-text" },
-];
 
 export function AddEditCategoryDialog({
   isOpen,
@@ -29,7 +23,6 @@ export function AddEditCategoryDialog({
 }: AddEditCategoryDialogProps) {
   const isEditing = Boolean(initialCategory);
   const [name, setName] = useState("");
-  const [colorToken, setColorToken] = useState("computing");
   const [error, setError] = useState("");
 
   const [prevOpenKey, setPrevOpenKey] = useState({ isOpen: false, id: initialCategory?.id });
@@ -38,10 +31,8 @@ export function AddEditCategoryDialog({
     if (isOpen) {
       if (initialCategory) {
         setName(initialCategory.name);
-        setColorToken(initialCategory.colorToken || "computing");
       } else {
         setName("");
-        setColorToken("computing");
       }
       setError("");
     }
@@ -70,7 +61,6 @@ export function AddEditCategoryDialog({
       id: initialCategory ? initialCategory.id : `cat-${Date.now()}`,
       name: name.trim(),
       type,
-      colorToken: type === "asset" ? colorToken : undefined,
       itemCount: initialCategory ? initialCategory.itemCount : 0,
     });
     onClose();
@@ -134,36 +124,6 @@ export function AddEditCategoryDialog({
             />
           </div>
 
-          {/* Color Token Swatch Selector (Only for Asset categories per design rules) */}
-          {type === "asset" && (
-            <div className="space-y-2">
-              <label className="block text-xs font-bold uppercase tracking-wider text-text-secondary">
-                Preset Category Design Token Swatch
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {PRESET_COLOR_TOKENS.map((token) => {
-                  const isSelected = colorToken === token.id;
-                  return (
-                    <button
-                      key={token.id}
-                      type="button"
-                      onClick={() => setColorToken(token.id)}
-                      className={cn(
-                        "flex items-center gap-2 p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer",
-                        token.bg,
-                        token.text,
-                        isSelected ? "border-current ring-2 ring-accent shadow-2xs" : "opacity-80 border-transparent hover:opacity-100"
-                      )}
-                    >
-                      <Tag className="h-3.5 w-3.5" />
-                      <span>{token.label}</span>
-                      {isSelected && <Check className="h-3.5 w-3.5 ml-auto" />}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
 
           {error && <p className="text-xs font-bold text-status-outofservice-text">{error}</p>}
 

@@ -8,7 +8,11 @@ interface RequisitionItemRowProps {
   item: RequisitionItem;
   index: number;
   isRemovable: boolean;
-  onChange: (id: string, field: keyof RequisitionItem, value: any) => void;
+  onChange: (
+    id: string,
+    field: keyof RequisitionItem,
+    value: RequisitionItem[keyof RequisitionItem]
+  ) => void;
   onRemove: (id: string) => void;
 }
 

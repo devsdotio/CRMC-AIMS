@@ -10,6 +10,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
+/** Legacy enum type; column storage is text after 0013. */
 export const consumableCategoryEnum = pgEnum("consumable_category", [
   "paper",
   "ink_toner",
@@ -32,6 +33,25 @@ export type StockHistoryEntry = {
   actor: string;
   reason?: string;
   notes?: string;
+  /** Present on cost-tracked restocks and lot-aware checkouts. */
+  unitCost?: string;
+  supplierId?: string;
+  supplierName?: string;
+  lotCode?: string;
+  /** Frozen total for this release line (qty × unitCost at scan time). */
+  totalCost?: string;
+  /** Multi-lot FIFO allocations when checkout spans lots. */
+  lotAllocations?: Array<{
+    lotId: string | null;
+    lotCode: string | null;
+    quantity: number;
+    unitCost: string;
+    total: string;
+    supplierId?: string | null;
+    supplierName?: string | null;
+    uncosted?: boolean;
+  }>;
+  recipientName?: string;
 };
 
 export const consumables = pgTable(
@@ -41,7 +61,7 @@ export const consumables = pgTable(
 
     itemCode: text("item_code").notNull().unique(),
     name: text("name").notNull(),
-    category: consumableCategoryEnum("category").notNull(),
+    category: text("category").notNull(),
     unit: text("unit").notNull(),
     currentQty: integer("current_qty").notNull().default(0),
     minThreshold: integer("min_threshold").notNull().default(0),

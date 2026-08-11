@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-const assetCategorySchema = z.enum(["transport", "computing", "av", "furniture"]);
+const assetCategorySchema = z
+  .string()
+  .trim()
+  .min(1, "Category is required.")
+  .max(120);
 const returnConditionSchema = z.enum(["good", "damaged", "needs_repair"]);
 
 /** DTO/query filter includes computed overdue. */
@@ -10,6 +14,7 @@ export const listBorrowLogQuerySchema = z.object({
   status: logFilterStatusSchema.optional(),
   department: z.string().trim().max(120).optional(),
   search: z.string().trim().max(200).optional(),
+  borrowerUserId: z.string().uuid().optional(),
 });
 
 export const releaseBorrowSchema = z.object({

@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { X, Edit3, Wrench, MapPin, User, Tag, Calendar } from "lucide-react";
+import { useEffect, useMemo, useRef } from "react";
+import { Edit3, MapPin, User, Tag, Calendar, Truck } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Asset,  AssetStatus } from "@/types/assets";
+import { custodyBadgeLabel } from "@/lib/assets-custody";
+import type { Asset, AssetStatus } from "@/types/assets";
+import { useSuppliersQuery } from "@/features/suppliers/client";
 import { QRCodeDisplay } from "./qr-code-display";
 import { getCategoryStyle } from "@/constants/categories";
 
@@ -12,7 +14,6 @@ export interface AssetDetailPanelProps {
   isOpen: boolean;
   onClose: () => void;
   onEdit: (asset: Asset) => void;
-  onMarkMaintenance: (asset: Asset) => void;
 }
 
 const STATUS_STYLES: Record<AssetStatus, { bg: string; text: string; label: string }> = {
@@ -27,9 +28,19 @@ export function AssetDetailPanel({
   isOpen,
   onClose,
   onEdit,
-  onMarkMaintenance,
 }: AssetDetailPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
+  // Suppliers only needed when panel is open with a linked vendor — never on list paint.
+  const { data: suppliers = [] } = useSuppliersQuery({
+    enabled: Boolean(isOpen && asset?.supplierId),
+  });
+
+  const supplierName = useMemo(() => {
+    if (!asset?.supplierId) return null;
+    return (
+      suppliers.find((s) => s.id === asset.supplierId)?.name ?? null
+    );
+  }, [asset?.supplierId, suppliers]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -87,46 +98,18 @@ export function AssetDetailPanel({
 
           <button
             type="button"
-            onClick={onClose}
-            aria-label="Close asset detail panel"
-            className="p-1.5 rounded-lg text-text-secondary hover:text-text hover:bg-border transition-colors cursor-pointer"
+            onClick={() => onEdit(asset)}
+            aria-label="Edit asset details"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-bg text-text-secondary hover:text-text border border-border hover:border-primary transition-colors cursor-pointer shadow-xs"
           >
-            <X className="h-5 w-5" />
+            <Edit3 className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Edit</span>
           </button>
         </div>
 
-        {/* Scrollable Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* Status & Quick Actions Bar */}
-          <div className="flex items-center justify-between p-3.5 rounded-lg border border-border bg-bg-subtle">
-            <div className="space-y-0.5">
-              <span className="text-[11px] font-semibold text-text-secondary block uppercase tracking-wider">
-                Current Condition
-              </span>
-              <span className={cn("inline-flex items-center px-3 py-1 rounded-full text-xs font-bold", statusMeta.bg, statusMeta.text)}>
-                {statusMeta.label}
-              </span>
-            </div>
+        {/* Body */}
+        <div className="flex-1 p-6 flex flex-col gap-6">
 
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => onEdit(asset)}
-                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-md border border-border bg-bg text-text hover:border-primary transition-colors cursor-pointer"
-              >
-                <Edit3 className="h-3.5 w-3.5" />
-                Edit
-              </button>
-              <button
-                type="button"
-                onClick={() => onMarkMaintenance(asset)}
-                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-md bg-status-repair-bg/20 text-status-repair-text hover:bg-status-repair-bg/30 transition-colors cursor-pointer"
-              >
-                <Wrench className="h-3.5 w-3.5" />
-                Flag Repair
-              </button>
-            </div>
-          </div>
 
           {/* QR Code Tag Card */}
           <div className="space-y-2">
@@ -136,91 +119,120 @@ export function AssetDetailPanel({
             <QRCodeDisplay assetCode={asset.assetCode} assetName={asset.name} />
           </div>
 
-          {/* Asset Info Overview */}
+          {/* Asset Record Card */}
           <div className="space-y-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary">
               Asset Record
             </h3>
-            <div className="p-4 rounded-lg border border-border bg-bg space-y-3 text-xs">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <span className="text-text-secondary block">Serial Number:</span>
-                  <span className="font-mono font-bold text-text">{asset.serialNumber || "N/A"}</span>
-                </div>
-                <div>
-                  <span className="text-text-secondary block">Location:</span>
-                  <span className="font-semibold text-text flex items-center gap-1">
-                    <MapPin className="h-3 w-3 text-text-secondary" />
-                    {asset.location}
-                  </span>
-                </div>
-              </div>
-
-              <div className="pt-2 border-t border-border grid grid-cols-2 gap-3">
-                <div>
-                  <span className="text-text-secondary block">Current Custodian:</span>
+            
+            <div className="bg-bg rounded-xl border border-border shadow-xs overflow-hidden">
+              {/* Status Header */}
+              <div className="p-4 border-b border-border bg-bg-subtle flex items-center justify-between">
+                <span className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">
+                  Current Condition
+                </span>
+                <div className="flex gap-2">
                   {asset.currentHolder ? (
-                    <span className="font-semibold text-text flex items-center gap-1">
-                      <User className="h-3 w-3 text-text-secondary" />
-                      {asset.currentHolder} ({asset.department})
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-accent/20 text-accent uppercase tracking-wider">
+                      {custodyBadgeLabel(asset.currentHolder)}
                     </span>
                   ) : (
-                    <span className="font-semibold text-status-active-text">Available in Stock</span>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-status-active-bg/20 text-status-active-text uppercase tracking-wider">
+                      Available
+                    </span>
                   )}
-                </div>
-                <div>
-                  <span className="text-text-secondary block">Acquisition Date:</span>
-                  <span className="font-semibold text-text flex items-center gap-1">
-                    <Calendar className="h-3 w-3 text-text-secondary" />
-                    {asset.purchaseDate || "Unrecorded"}
+                  <span className={cn("px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider", statusMeta.bg, statusMeta.text)}>
+                    {statusMeta.label}
+                  </span>
+                  <span className={cn(
+                    "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border",
+                    asset.assignmentType === "assignable" 
+                      ? "border-status-repair-text text-status-repair-text bg-status-repair-bg/10" 
+                      : "border-accent text-accent bg-accent/10"
+                  )}>
+                    {asset.assignmentType === "assignable" ? "Assignable" : "Borrowable"}
                   </span>
                 </div>
               </div>
 
-              {asset.value && (
-                <div className="pt-2 border-t border-border flex items-center justify-between">
-                  <span className="text-text-secondary">Inventory Value:</span>
-                  <span className="font-mono font-bold text-text">
-                    ₱{asset.value.toLocaleString()}
-                  </span>
+              {/* Grid Properties */}
+              <div className="p-5 grid grid-cols-2 gap-y-6 gap-x-4">
+                <div>
+                  <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1.5">
+                    Serial Number
+                  </p>
+                  <p className="text-sm font-mono font-medium text-text">
+                    {asset.serialNumber || "N/A"}
+                  </p>
                 </div>
-              )}
+                
+                <div>
+                  <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                    <MapPin className="h-3 w-3" /> Location
+                  </p>
+                  <p className="text-sm font-medium text-text truncate" title={asset.location}>
+                    {asset.location}
+                  </p>
+                </div>
 
+                <div>
+                  <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                    <User className="h-3 w-3" /> Custody
+                  </p>
+                  <p className="text-sm font-medium text-text truncate">
+                    {asset.currentHolder ? (
+                      <span title={`${asset.currentHolder} ${asset.department ? `(${asset.department})` : ""}`}>
+                        {asset.currentHolder}
+                      </span>
+                    ) : (
+                      <span className="text-status-active-text">Available In Stock</span>
+                    )}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                    <Calendar className="h-3 w-3" /> Acquisition
+                  </p>
+                  <p className="text-sm font-medium text-text">
+                    {asset.purchaseDate || "Unrecorded"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                    <Truck className="h-3 w-3" /> Supplier
+                  </p>
+                  <p className="text-sm font-medium text-text truncate">
+                    {supplierName ||
+                      (asset.supplierId
+                        ? "Supplier record unavailable"
+                        : "Unspecified")}
+                  </p>
+                </div>
+
+                {asset.value != null && asset.value !== undefined && (
+                  <div>
+                    <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1.5">
+                      Inventory Value (₱)
+                    </p>
+                    <p className="text-sm font-mono font-medium text-text">
+                      ₱{asset.value.toLocaleString()}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Notes Full Width */}
               {asset.notes && (
-                <div className="pt-2 border-t border-border space-y-1">
-                  <span className="text-text-secondary block font-semibold">Notes:</span>
-                  <p className="text-text bg-bg-subtle p-2 rounded border border-border leading-relaxed">
+                <div className="p-5 border-t border-border bg-bg-subtle/30">
+                  <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-2">
+                    Custody Notes / Details
+                  </p>
+                  <p className="text-xs text-text leading-relaxed whitespace-pre-wrap">
                     {asset.notes}
                   </p>
                 </div>
-              )}
-            </div>
-          </div>
-
-          {/* Maintenance & Condition Log Entries */}
-          <div className="space-y-3">
-
-            <div className="p-4 rounded-lg border border-border bg-bg">
-              {asset.maintenanceHistory.length === 0 ? (
-                <p className="text-xs text-text-secondary text-center py-3">
-                  No maintenance records logged for this asset yet.
-                </p>
-              ) : (
-                <ol className="relative border-l border-border ml-2 space-y-4">
-                  {asset.maintenanceHistory.map((m) => (
-                    <li key={m.id} className="ml-4">
-                      <span className="absolute -left-1.5 top-1.5 h-3 w-3 rounded-full border-2 border-bg bg-accent" />
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-bold text-text capitalize">{m.type}</span>
-                        <time className="text-[11px] text-text-secondary">{m.date}</time>
-                      </div>
-                      <p className="text-xs text-text-secondary mt-0.5">{m.description}</p>
-                      <span className="text-[10px] text-text-secondary/70 block mt-0.5">
-                        Tech: {m.technician}
-                      </span>
-                    </li>
-                  ))}
-                </ol>
               )}
             </div>
           </div>

@@ -1,7 +1,4 @@
-import type {
-  BorrowLogHistoryEntry,
-  BorrowTransactionRow,
-} from "@/server/db/schema";
+import type { BorrowTransactionRow } from "@/server/db/schema";
 import {
   dueDatePlusDays,
   generateOperationalCode,
@@ -9,9 +6,11 @@ import {
   todayDateString,
 } from "@/server/shared/codes";
 import type { ActorContext } from "@/server/shared/auth";
+import { isAssetOperatorRole } from "@/server/shared/roles";
 import {
   ConflictError,
   NotFoundError,
+  ForbiddenError,
 } from "@/server/shared/errors";
 import {
   isUniqueViolation,
@@ -24,6 +23,7 @@ import { BorrowRequestRepository } from "@/server/modules/borrow-requests/borrow
 import { MaintenanceRepository } from "@/server/modules/maintenance/maintenance.repository";
 
 import { BorrowLogRepository } from "./borrow-log.repository";
+import { AuditLogRepository } from "@/server/modules/audit-logs/audit-logs.repository";
 import type { BorrowLogDTO } from "./borrow-log.types";
 import {
   borrowLogIdSchema,
@@ -38,9 +38,8 @@ function daysBetween(from: string, to: string): number {
   return Math.floor((b - a) / (24 * 60 * 60 * 1000));
 }
 
-export function toBorrowLogDTO(row: BorrowTransactionRow): BorrowLogDTO {
+export function toBorrowLogDTO(row: BorrowTransactionRow, history: import("@/server/db/schema/audit-logs").AuditLogRow[] = []): BorrowLogDTO {
   const today = todayDateString();
-  const history = Array.isArray(row.history) ? row.history : [];
   let status: BorrowLogDTO["status"] = "active";
   let daysOverdue: number | undefined;
 
@@ -82,20 +81,6 @@ export function toBorrowLogDTO(row: BorrowTransactionRow): BorrowLogDTO {
   };
 }
 
-function historyEntry(
-  action: BorrowLogHistoryEntry["action"],
-  actor: string,
-  notes?: string
-): BorrowLogHistoryEntry {
-  return {
-    id: crypto.randomUUID(),
-    action,
-    actor,
-    timestamp: isoNow(),
-    ...(notes ? { notes } : {}),
-  };
-}
-
 /**
  * Custody authority for coded equipment.
  * Release/return always write: borrow log + asset holder + lifecycle (atomic).
@@ -107,20 +92,33 @@ export class BorrowLogService {
     private readonly assets = new AssetRepository(),
     private readonly lifecycle = new AssetLifecycleService(),
     private readonly requests = new BorrowRequestRepository(),
-    private readonly maintenance = new MaintenanceRepository()
+    private readonly maintenance = new MaintenanceRepository(),
+    private readonly auditLogs = new AuditLogRepository()
   ) {}
 
-  async list(rawQuery: unknown): Promise<BorrowLogDTO[]> {
+  async list(rawQuery: unknown, actor?: ActorContext): Promise<BorrowLogDTO[]> {
     const filters = listBorrowLogQuerySchema.parse(rawQuery ?? {});
+    if (actor && !isAssetOperatorRole(actor.role)) {
+      filters.borrowerUserId = actor.userId;
+    }
     const rows = await this.repo.list(filters);
-    return rows.map(toBorrowLogDTO);
+    return Promise.all(
+      rows.map(async (row) => {
+        const history = await this.auditLogs.list({ entityType: "borrow_transaction", entityId: row.id });
+        return toBorrowLogDTO(row, history);
+      })
+    );
   }
 
-  async getById(rawId: string): Promise<BorrowLogDTO> {
+  async getById(rawId: string, actor?: ActorContext): Promise<BorrowLogDTO> {
     const id = borrowLogIdSchema.parse(rawId);
     const row = await this.repo.findById(id);
     if (!row) throw new NotFoundError("Borrow log", id);
-    return toBorrowLogDTO(row);
+    if (actor && !isAssetOperatorRole(actor.role) && row.borrowerUserId !== actor.userId) {
+      throw new ForbiddenError("You are not allowed to view this log.");
+    }
+    const history = await this.auditLogs.list({ entityType: "borrow_transaction", entityId: row.id });
+    return toBorrowLogDTO(row, history);
   }
 
   /**
@@ -154,6 +152,12 @@ export class BorrowLogService {
       throw new ConflictError("Asset is not available for release.");
     }
 
+    if (asset.assignmentType === "assignable") {
+      throw new ConflictError(
+        "This asset is project-assignable. Release via project assignment is not a borrower checkout."
+      );
+    }
+
     const open = await this.repo.findActiveByAssetId(asset.id, tx);
     if (open) {
       throw new ConflictError("Asset already has an active borrow log.");
@@ -173,7 +177,6 @@ export class BorrowLogService {
     }
 
     const logCode = generateOperationalCode("LOG");
-    const entry = historyEntry("released", actor.displayName, input.notes);
 
     const row = await this.repo.create(
       {
@@ -197,9 +200,19 @@ export class BorrowLogService {
         conditionNotes: null,
         releasedByUserId: actor.userId,
         releasedByName: actor.displayName,
-        receivedByUserId: null,
         receivedByName: null,
-        history: [entry],
+      },
+      tx
+    );
+
+    await this.auditLogs.create(
+      {
+        entityType: "borrow_transaction",
+        entityId: row.id,
+        action: "released",
+        actorName: actor.displayName,
+        actorUserId: actor.userId,
+        notes: input.notes,
       },
       tx
     );
@@ -264,15 +277,6 @@ export class BorrowLogService {
         input.condition === "damaged" ||
         Boolean(input.flagMaintenance);
 
-      const history = [
-        ...(Array.isArray(existing.history) ? existing.history : []),
-        historyEntry(
-          needsMaint ? "flagged_repair" : "returned",
-          actor.displayName,
-          input.conditionNotes ?? `Condition: ${input.condition}`
-        ),
-      ];
-
       const updated = await this.repo.update(
         id,
         {
@@ -280,13 +284,23 @@ export class BorrowLogService {
           returnedAt: new Date(),
           conditionOnReturn: input.condition,
           conditionNotes: input.conditionNotes ?? null,
-          receivedByUserId: actor.userId,
           receivedByName: actor.displayName,
-          history,
         },
         tx
       );
       if (!updated) throw new NotFoundError("Borrow log", id);
+
+      await this.auditLogs.create(
+        {
+          entityType: "borrow_transaction",
+          entityId: updated.id,
+          action: needsMaint ? "flagged_repair" : "returned",
+          actorName: actor.displayName,
+          actorUserId: actor.userId,
+          notes: input.conditionNotes ?? `Condition: ${input.condition}`,
+        },
+        tx
+      );
 
       if (existing.assetId) {
         const asset = await this.assets.findByIdForUpdate(existing.assetId, tx);
@@ -412,7 +426,8 @@ export class BorrowLogService {
         }
       }
 
-      return toBorrowLogDTO(updated);
+      const history = await this.auditLogs.list({ entityType: "borrow_transaction", entityId: updated.id }, tx);
+      return toBorrowLogDTO(updated, history);
     });
   }
 

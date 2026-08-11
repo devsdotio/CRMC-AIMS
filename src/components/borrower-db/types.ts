@@ -61,10 +61,10 @@ export type BrowseItem = BrowseAssetItem | BrowseConsumableItem;
 export type RequestWizardStep = "select" | "details" | "review";
 
 export interface WizardFormValues {
-  selectedItem: BrowseItem | null;
+  selectedItems: BrowseItem[];
   dateFrom: string;
   dateTo: string;
-  quantity: number;
+  quantities: Record<string, number>;
   purpose: string;
   notes: string;
 }

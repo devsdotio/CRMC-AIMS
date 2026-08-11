@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 
-import { requireAssetOperator } from "@/server/shared/auth";
+import { requireAssetOperator, requireActor } from "@/server/shared/auth";
 import { created, handleError, ok } from "@/server/shared/http";
 
 import { BorrowLogService } from "./borrow-log.service";
@@ -10,14 +10,15 @@ export class BorrowLogController {
 
   async list(request: NextRequest | Request) {
     try {
-      await requireAssetOperator();
+      const session = await requireActor();
       const url = new URL(request.url);
       return ok(
         await this.service.list({
-          status: url.searchParams.get("status") ?? undefined,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          status: url.searchParams.get("status") as any ?? undefined,
           department: url.searchParams.get("department") ?? undefined,
           search: url.searchParams.get("search") ?? undefined,
-        })
+        }, session)
       );
     } catch (error) {
       return handleError(error);
@@ -26,8 +27,8 @@ export class BorrowLogController {
 
   async get(id: string) {
     try {
-      await requireAssetOperator();
-      return ok(await this.service.getById(id));
+      const session = await requireActor();
+      return ok(await this.service.getById(id, session));
     } catch (error) {
       return handleError(error);
     }

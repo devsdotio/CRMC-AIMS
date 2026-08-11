@@ -28,18 +28,16 @@ export class BorrowRequestRepository implements IBorrowRequestRepository {
     return row ?? null;
   }
 
-  async list(
-    filters: ListBorrowRequestFilters = {},
-    session?: DbSession
-  ): Promise<BorrowRequestRow[]> {
-    const db = this.db(session);
+  private buildConditions(filters: ListBorrowRequestFilters) {
     const conditions = [];
-
     if (filters.status) {
       conditions.push(eq(borrowRequests.status, filters.status));
     }
     if (filters.department?.trim()) {
       conditions.push(eq(borrowRequests.department, filters.department.trim()));
+    }
+    if (filters.requesterUserId) {
+      conditions.push(eq(borrowRequests.requesterUserId, filters.requesterUserId));
     }
     if (filters.search?.trim()) {
       const q = `%${filters.search.trim()}%`;
@@ -53,13 +51,83 @@ export class BorrowRequestRepository implements IBorrowRequestRepository {
         )!
       );
     }
+    if (filters.startDate) {
+      conditions.push(sql`date(${borrowRequests.requestedAt}) >= ${filters.startDate}`);
+    }
+    if (filters.endDate) {
+      conditions.push(sql`date(${borrowRequests.requestedAt}) <= ${filters.endDate}`);
+    }
+    return conditions;
+  }
 
-    const base = db
+  async list(
+    filters: ListBorrowRequestFilters = {},
+    session?: DbSession
+  ): Promise<BorrowRequestRow[]> {
+    const db = this.db(session);
+    const conditions = this.buildConditions(filters);
+
+    let base = db
       .select()
       .from(borrowRequests)
-      .orderBy(desc(borrowRequests.requestedAt));
-    if (conditions.length === 0) return base;
-    return base.where(and(...conditions));
+      .orderBy(desc(borrowRequests.requestedAt))
+      .$dynamic();
+      
+    if (conditions.length > 0) {
+      base = base.where(and(...conditions));
+    }
+
+    if (filters.page && filters.limit) {
+      const offset = (filters.page - 1) * filters.limit;
+      base = base.limit(filters.limit).offset(offset);
+    } else if (filters.limit) {
+      base = base.limit(filters.limit);
+    }
+
+    return base;
+  }
+
+  async count(
+    filters: Omit<ListBorrowRequestFilters, "page" | "limit"> = {},
+    session?: DbSession
+  ): Promise<number> {
+    const db = this.db(session);
+    const conditions = this.buildConditions(filters);
+    
+    let base = db.select({ value: count() }).from(borrowRequests).$dynamic();
+    
+    if (conditions.length > 0) {
+      base = base.where(and(...conditions));
+    }
+    
+    const [row] = await base;
+    return Number(row?.value ?? 0);
+  }
+
+  async countByStatus(
+    filters: Omit<ListBorrowRequestFilters, "status" | "page" | "limit"> = {},
+    session?: DbSession
+  ): Promise<Record<string, number>> {
+    const db = this.db(session);
+    const conditions = this.buildConditions(filters);
+    
+    let base = db
+      .select({ status: borrowRequests.status, count: count() })
+      .from(borrowRequests)
+      .$dynamic();
+      
+    if (conditions.length > 0) {
+      base = base.where(and(...conditions));
+    }
+    
+    const rows = await base.groupBy(borrowRequests.status);
+    const result: Record<string, number> = {};
+    for (const row of rows) {
+      if (row.status) {
+        result[row.status] = Number(row.count);
+      }
+    }
+    return result;
   }
 
   async countAll(session?: DbSession): Promise<number> {
@@ -68,12 +136,14 @@ export class BorrowRequestRepository implements IBorrowRequestRepository {
     return Number(row?.value ?? 0);
   }
 
-  async countPending(session?: DbSession): Promise<number> {
+  async countPending(session?: DbSession, userId?: string): Promise<number> {
     const db = this.db(session);
+    const conditions = [eq(borrowRequests.status, "pending")];
+    if (userId) conditions.push(eq(borrowRequests.requesterUserId, userId));
     const [row] = await db
       .select({ value: count() })
       .from(borrowRequests)
-      .where(eq(borrowRequests.status, "pending"));
+      .where(and(...conditions));
     return Number(row?.value ?? 0);
   }
 

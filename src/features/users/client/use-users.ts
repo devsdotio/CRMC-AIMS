@@ -18,10 +18,14 @@ import {
 } from "@/features/users/client/users-api";
 import { userQueryKeys } from "@/features/users/client/query-keys";
 
-export function useMeQuery(): UseQueryResult<MeProfile, Error> {
+export function useMeQuery(options?: {
+  enabled?: boolean;
+}): UseQueryResult<MeProfile, Error> {
   return useQuery({
     queryKey: userQueryKeys.me(),
     queryFn: () => usersApi.getMe(),
+    staleTime: 5 * 60 * 1000,
+    enabled: options?.enabled ?? true,
   });
 }
 

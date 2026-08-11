@@ -59,7 +59,11 @@ export function MaintenanceLogListItem({
             {categoryMeta.label}
           </span>
           <span className="text-[11px] text-text-secondary/80 bg-bg-subtle px-2 py-0.5 rounded border border-border">
-            {record.source === "return_checkout" ? "Logged on Return" : "Manually Flagged"}
+            {record.source === "return_checkout"
+              ? "Logged on Return"
+              : record.source === "project_assignment"
+                ? "Project damage"
+                : "Manually Flagged"}
           </span>
         </div>
 

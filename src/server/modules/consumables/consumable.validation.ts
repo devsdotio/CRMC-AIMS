@@ -1,12 +1,11 @@
 import { z } from "zod";
 
-export const consumableCategorySchema = z.enum([
-  "paper",
-  "ink_toner",
-  "cleaning",
-  "office_supplies",
-  "medical",
-]);
+/** Free-text category name (must match Settings → Consumable categories). */
+export const consumableCategorySchema = z
+  .string()
+  .trim()
+  .min(1, "Category is required.")
+  .max(120);
 
 export const stockLevelSchema = z.enum(["all", "healthy", "low", "critical"]);
 
@@ -14,6 +13,8 @@ export const listConsumablesQuerySchema = z.object({
   category: consumableCategorySchema.optional(),
   stockLevel: stockLevelSchema.optional(),
   search: z.string().trim().max(200).optional(),
+  page: z.coerce.number().int().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
 });
 
 export const createConsumableSchema = z.object({
@@ -48,6 +49,34 @@ export const stockMovementSchema = z.object({
   notes: z.string().trim().max(2000).optional(),
 });
 
+/**
+ * Restock with cost tracking (phase 1.5).
+ * `unitCost` is required so project spend can later price inventory use correctly.
+ */
+export const restockSchema = z.object({
+  quantity: z.number().int().positive("quantity must be positive."),
+  unitCost: z
+    .union([z.string(), z.number()])
+    .transform((value, ctx) => {
+      const n = typeof value === "number" ? value : Number(value);
+      if (!Number.isFinite(n) || n < 0) {
+        ctx.addIssue({
+          code: "custom",
+          message: "unitCost must be a non-negative amount.",
+        });
+        return z.NEVER;
+      }
+      return n.toFixed(2);
+    }),
+  supplierId: z.string().uuid().optional().nullable(),
+  reason: z.string().trim().max(500).optional(),
+  notes: z.string().trim().max(2000).optional(),
+  purchasedOn: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+});
+
 /** Adjustment can increase or decrease; quantityChange signed. */
 export const stockAdjustSchema = z.object({
   quantityChange: z
@@ -63,4 +92,5 @@ export const consumableIdSchema = z.string().uuid("Invalid consumable id.");
 export type CreateConsumableBody = z.infer<typeof createConsumableSchema>;
 export type UpdateConsumableBody = z.infer<typeof updateConsumableSchema>;
 export type StockMovementBody = z.infer<typeof stockMovementSchema>;
+export type RestockBody = z.infer<typeof restockSchema>;
 export type StockAdjustBody = z.infer<typeof stockAdjustSchema>;

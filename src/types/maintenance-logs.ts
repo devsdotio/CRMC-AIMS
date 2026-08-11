@@ -6,7 +6,10 @@ import type { BaseFilterState, DateRangeFilter } from "./filters";
 
 export type ConditionState = "good" | "needs_maintenance" | "damaged" | "resolved";
 
-export type LogSource = "return_checkout" | "manual_flag";
+export type LogSource =
+  | "return_checkout"
+  | "manual_flag"
+  | "project_assignment";
 
 export interface MaintenanceLogRecord {
   id: string;

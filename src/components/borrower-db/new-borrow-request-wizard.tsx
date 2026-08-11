@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import {
   X,
   Search,
@@ -16,16 +16,14 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getCategoryStyle } from "@/constants/categories";
-import { BROWSE_ITEMS } from "./mock-data";
 import type { BrowseItem, WizardFormValues, RequestWizardStep, PortalBorrowRequest } from "./types";
+import { useCreateBorrowRequestMutation } from "@/features/borrow-requests/client/use-borrow-requests";
+import { useAssetsQuery } from "@/features/assets/client/use-assets";
+import { useConsumablesQuery } from "@/features/consumables/client/use-consumables";
+import { useMeQuery } from "@/features/users/client/use-users";
+import type { MeProfile } from "@/features/users/client/users-api";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function generateRequestCode() {
-  const now = new Date();
-  const seq = Math.floor(Math.random() * 900) + 100;
-  return `REQ-${now.getFullYear()}-0${seq}`;
-}
 
 function today() {
   return new Date().toISOString().split("T")[0];
@@ -36,8 +34,6 @@ function nextWeek() {
   d.setDate(d.getDate() + 7);
   return d.toISOString().split("T")[0];
 }
-
-const FAILURE_ITEM_NAME = "Portable Wireless PA System";
 
 // ─── Step Indicators ─────────────────────────────────────────────────────────
 
@@ -94,11 +90,40 @@ function StepSelect({
   onChange,
   initialType,
 }: {
-  value: BrowseItem | null;
-  onChange: (item: BrowseItem) => void;
+  value: BrowseItem[];
+  onChange: (items: BrowseItem[]) => void;
   initialType?: "borrow" | "requisition" | null;
 }) {
   const [search, setSearch] = useState("");
+  const { data: assets = [], isLoading: assetsLoading } = useAssetsQuery();
+  const { data: paginatedData, isLoading: consumablesLoading } = useConsumablesQuery();
+  const consumables = useMemo(() => paginatedData?.data ?? [], [paginatedData?.data]);
+
+  const BROWSE_ITEMS = useMemo(() => {
+    return [
+      ...assets.map(a => ({
+        id: a.id,
+        name: a.name,
+        category: a.category,
+        type: "asset" as const,
+        status: a.status,
+        assetCode: a.assetCode,
+        location: a.location,
+      })),
+      ...consumables.map(c => ({
+        id: c.id,
+        name: c.name,
+        category: c.category,
+        type: "consumable" as const,
+        status: c.currentQty <= 0 ? "out_of_stock" : c.currentQty <= c.minThreshold ? "low_stock" : "available",
+        itemCode: c.itemCode,
+        currentQty: c.currentQty,
+        unit: c.unit,
+        location: c.location,
+      }))
+    ] as BrowseItem[];
+  }, [assets, consumables]);
+
   const items = BROWSE_ITEMS.filter((item) => {
     // 1. Filter by requested type
     if (initialType === "borrow" && item.type !== "asset") return false;
@@ -127,18 +152,30 @@ function StepSelect({
         />
       </div>
       <div className="max-h-72 overflow-y-auto rounded-lg border border-border divide-y divide-border">
-        {items.length === 0 ? (
+        {assetsLoading || consumablesLoading ? (
+          <div className="flex items-center justify-center p-8">
+            <Loader2 className="h-6 w-6 animate-spin text-accent" />
+          </div>
+        ) : items.length === 0 ? (
           <p className="p-4 text-xs text-center text-text-secondary">No items match your search.</p>
         ) : (
           items.map((item) => {
-            const categoryMeta = getCategoryStyle(item.category);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const categoryMeta = getCategoryStyle(item.category as any);
             const code = item.type === "asset" ? item.assetCode : item.itemCode;
-            const isSelected = value?.id === item.id;
+            const isSelected = value.some(v => v.id === item.id);
             return (
               <button
                 key={item.id}
                 type="button"
-                onClick={() => onChange(item)}
+                onClick={() => {
+                  if (isSelected) {
+                    onChange(value.filter(v => v.id !== item.id));
+                  } else {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    onChange([...value, item as any]);
+                  }
+                }}
                 className={cn(
                   "w-full flex items-center gap-3 px-4 py-3 text-left transition-colors",
                   "focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset",
@@ -168,43 +205,72 @@ function StepSelect({
 // ─── Step 2: Request Details ──────────────────────────────────────────────────
 
 function StepDetails({
-  item,
+  items,
   values,
   onChange,
   errors,
 }: {
-  item: BrowseItem;
-  values: Omit<WizardFormValues, "selectedItem">;
-  onChange: (patch: Partial<Omit<WizardFormValues, "selectedItem">>) => void;
+  items: BrowseItem[];
+  values: Omit<WizardFormValues, "selectedItems">;
+  onChange: (patch: Partial<Omit<WizardFormValues, "selectedItems">>) => void;
   errors: Record<string, string>;
 }) {
-  const isConsumable = item.type === "consumable";
+  const hasConsumable = items.some(i => i.type === "consumable");
+  const hasAsset = items.some(i => i.type === "asset");
 
   return (
     <div className="space-y-4">
       {/* Selected item reminder */}
-      <div className="flex items-center gap-3 rounded-lg bg-bg-subtle border border-border px-3 py-2">
-        <div
-          className={cn(
-            "h-8 w-8 shrink-0 rounded-lg flex items-center justify-center",
-            getCategoryStyle(item.category).bg
-          )}
-        >
-          <Tag className={cn("h-3.5 w-3.5", getCategoryStyle(item.category).text)} />
-        </div>
-        <div>
-          <p className="text-sm font-semibold text-text">{item.name}</p>
-          <p className="text-xs text-text-secondary font-mono">
-            {item.type === "asset" ? item.assetCode : item.itemCode}
-          </p>
-        </div>
+      <div className="space-y-2 max-h-48 overflow-y-auto">
+        {items.map(item => (
+          <div key={item.id} className="flex items-center gap-3 rounded-lg bg-bg-subtle border border-border px-3 py-2">
+            <div
+              className={cn(
+                "h-8 w-8 shrink-0 rounded-lg flex items-center justify-center",
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                getCategoryStyle(item.category as any).bg
+              )}
+            >
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+              <Tag className={cn("h-3.5 w-3.5", getCategoryStyle(item.category as any).text)} />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-text">{item.name}</p>
+              <p className="text-xs text-text-secondary font-mono">
+                {item.type === "asset" ? item.assetCode : item.itemCode}
+              </p>
+            </div>
+            {item.type === "consumable" && (
+              <div className="space-y-1">
+                <input
+                  type="number"
+                  min={1}
+                  max={item.currentQty}
+                  value={values.quantities[item.id] || 1}
+                  onChange={(e) => {
+                    const newQ = { ...values.quantities, [item.id]: Math.max(1, Number(e.target.value)) };
+                    onChange({ quantities: newQ });
+                  }}
+                  className={cn(
+                    "w-20 h-8 rounded-lg border bg-card px-2 text-xs text-text focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+                    errors[`qty_${item.id}`] ? "border-status-outofservice-bg" : "border-border"
+                  )}
+                  aria-label="Quantity"
+                />
+                {errors[`qty_${item.id}`] && (
+                  <p className="text-[10px] text-status-outofservice-bg">{errors[`qty_${item.id}`]}</p>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
       </div>
 
       {/* Date range */}
-      <div className={cn("grid gap-3", isConsumable ? "grid-cols-1" : "grid-cols-2")}>
+      <div className={cn("grid gap-3", hasAsset ? "grid-cols-2" : "grid-cols-1")}>
         <div className="space-y-1">
           <label className="block text-xs font-semibold text-text uppercase tracking-wider">
-            {isConsumable ? "Date Needed" : "Date From"} <span className="text-status-outofservice-bg">*</span>
+            {!hasAsset ? "Date Needed" : "Date From"} <span className="text-status-outofservice-bg">*</span>
           </label>
           <input
             type="date"
@@ -221,7 +287,7 @@ function StepDetails({
             <p id="date-from-err" className="text-xs text-status-outofservice-bg">{errors.dateFrom}</p>
           )}
         </div>
-        {!isConsumable && (
+        {hasAsset && (
           <div className="space-y-1">
             <label className="block text-xs font-semibold text-text uppercase tracking-wider">
               Date To <span className="text-status-outofservice-bg">*</span>
@@ -243,34 +309,6 @@ function StepDetails({
           </div>
         )}
       </div>
-
-      {/* Quantity (consumables only) */}
-      {isConsumable && (
-        <div className="space-y-1">
-          <label className="block text-xs font-semibold text-text uppercase tracking-wider">
-            Quantity <span className="text-status-outofservice-bg">*</span>
-          </label>
-          <input
-            type="number"
-            min={1}
-            max={item.type === "consumable" ? item.currentQty : undefined}
-            value={values.quantity}
-            onChange={(e) => onChange({ quantity: Math.max(1, Number(e.target.value)) })}
-            className={cn(
-              "w-32 h-9 rounded-lg border bg-card px-3 text-sm text-text focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
-              errors.quantity ? "border-status-outofservice-bg" : "border-border"
-            )}
-          />
-          {item.type === "consumable" && (
-            <p className="text-xs text-text-secondary">
-              Available: {item.currentQty} {item.unit}(s)
-            </p>
-          )}
-          {errors.quantity && (
-            <p className="text-xs text-status-outofservice-bg">{errors.quantity}</p>
-          )}
-        </div>
-      )}
 
       {/* Purpose */}
       <div className="space-y-1">
@@ -312,60 +350,114 @@ function StepDetails({
 
 // ─── Step 3: Review ───────────────────────────────────────────────────────────
 
-function StepReview({ values }: { values: WizardFormValues }) {
-  const { selectedItem } = values;
-  if (!selectedItem) return null;
-  const categoryMeta = getCategoryStyle(selectedItem.category);
+function StepReview({ values, me }: { values: WizardFormValues, me?: MeProfile }) {
+  const { selectedItems } = values;
+  if (!selectedItems || selectedItems.length === 0) return null;
+
+  // Use the actual logged-in user or fallback to mock
+  const requester = {
+    name: me?.name || "Maria Santos",
+    email: me?.email || "m.santos@aims.org",
+    department: me?.department || "IT",
+  };
+  
+  const hasAsset = selectedItems.some(i => i.type === "asset");
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-lg border border-border divide-y divide-border overflow-hidden">
-        <div className="px-4 py-3 bg-bg-subtle">
-          <p className="text-xs font-bold uppercase tracking-widest text-text-secondary">Request Summary</p>
-        </div>
-        <div className="px-4 py-3 flex items-center gap-3">
-          <div className={cn("h-9 w-9 shrink-0 rounded-lg flex items-center justify-center", categoryMeta.bg)}>
-            <Tag className={cn("h-4 w-4", categoryMeta.text)} />
+    <div className="space-y-6">
+      {/* ── Requester Details ────────────────────────────────────────────── */}
+      <section aria-labelledby="requester-details-heading" className="space-y-3">
+        <h3 id="requester-details-heading" className="text-xs font-bold uppercase tracking-widest text-text-secondary px-1">
+          Requester Details
+        </h3>
+        <div className="rounded-xl border border-border bg-card p-4 grid grid-cols-2 gap-y-4 gap-x-6 text-sm">
+          <div>
+            <p className="text-xs text-text-secondary font-medium">Name</p>
+            <p className="font-semibold text-text mt-0.5">{requester.name}</p>
           </div>
           <div>
-            <p className="text-sm font-bold text-text">{selectedItem.name}</p>
-            <p className="text-xs text-text-secondary font-mono">
-              {selectedItem.type === "asset" ? selectedItem.assetCode : selectedItem.itemCode}
-              {" · "}
-              {getCategoryStyle(selectedItem.category).label}
-            </p>
+            <p className="text-xs text-text-secondary font-medium">Department</p>
+            <p className="font-semibold text-text mt-0.5">{requester.department}</p>
+          </div>
+          <div className="col-span-2">
+            <p className="text-xs text-text-secondary font-medium">Email Address</p>
+            <p className="font-semibold text-text mt-0.5">{requester.email}</p>
           </div>
         </div>
-        <div className="px-4 py-3 grid grid-cols-2 gap-y-2 gap-x-6 text-sm">
-          <div>
-            <p className="text-xs text-text-secondary font-medium">{selectedItem.type === "consumable" ? "Date Needed" : "From"}</p>
-            <p className="font-semibold text-text">{values.dateFrom}</p>
+      </section>
+
+      {/* ── Request Details ──────────────────────────────────────────────── */}
+      <section aria-labelledby="request-details-heading" className="space-y-3">
+        <h3 id="request-details-heading" className="text-xs font-bold uppercase tracking-widest text-text-secondary px-1">
+          Request Details
+        </h3>
+        <div className="rounded-xl border border-border bg-card divide-y divide-border overflow-hidden">
+          {selectedItems.map((item, idx) => {
+             // eslint-disable-next-line @typescript-eslint/no-explicit-any
+             const categoryMeta = getCategoryStyle(item.category as any);
+             return (
+               <div key={item.id} className="px-4 py-3 flex items-center gap-3 bg-bg-subtle/30">
+                 <div className={cn("h-10 w-10 shrink-0 rounded-xl flex items-center justify-center border", categoryMeta.bg, "border-transparent")}>
+                   <Tag className={cn("h-5 w-5", categoryMeta.text)} />
+                 </div>
+                 <div className="flex-1">
+                   <p className="text-sm font-bold text-text">{item.name}</p>
+                   <p className="text-xs text-text-secondary font-mono mt-0.5">
+                     {item.type === "asset" ? item.assetCode : item.itemCode}
+                     {" · "}
+                     {categoryMeta.label}
+                   </p>
+                 </div>
+                 {item.type === "consumable" && (
+                   <div className="text-right">
+                     <p className="text-xs text-text-secondary font-medium">Qty</p>
+                     <p className="font-semibold text-text">{values.quantities[item.id] || 1}</p>
+                   </div>
+                 )}
+               </div>
+             )
+          })}
+
+          {/* Dates & Qty */}
+          <div className="px-4 py-3 grid grid-cols-2 gap-y-3 gap-x-6 text-sm">
+            <div>
+              <p className="text-xs text-text-secondary font-medium">{!hasAsset ? "Date Needed" : "Checkout Date"}</p>
+              <p className="font-semibold text-text mt-0.5">{values.dateFrom}</p>
+            </div>
+            {hasAsset && (
+              <div>
+                <p className="text-xs text-text-secondary font-medium">Expected Return Date</p>
+                <div className="flex items-center gap-1 mt-0.5">
+                  <Calendar className="h-3.5 w-3.5 text-status-outofservice-bg" />
+                  <p className="font-bold text-status-outofservice-bg">{values.dateTo}</p>
+                </div>
+              </div>
+            )}
           </div>
-          {selectedItem.type === "asset" && (
-            <div>
-              <p className="text-xs text-text-secondary font-medium">To</p>
-              <p className="font-semibold text-text">{values.dateTo}</p>
-            </div>
-          )}
-          {selectedItem.type === "consumable" && (
-            <div>
-              <p className="text-xs text-text-secondary font-medium">Quantity</p>
-              <p className="font-semibold text-text">{values.quantity}</p>
-            </div>
-          )}
         </div>
-        <div className="px-4 py-3">
-          <p className="text-xs text-text-secondary font-medium mb-1">Purpose</p>
-          <p className="text-sm text-text">{values.purpose}</p>
+      </section>
+
+      {/* ── Additional Details ─────────────────────────────────────────── */}
+      <section aria-label="Request purpose">
+        <div className="rounded-xl border border-accent/20 bg-accent/5 p-4">
+          <p className="text-xs text-accent font-medium mb-1">Purpose</p>
+          <p className="text-sm font-semibold text-text mt-0.5">
+            {values.purpose}
+          </p>
         </div>
-        {values.notes && (
-          <div className="px-4 py-3">
-            <p className="text-xs text-text-secondary font-medium mb-1">Notes</p>
+      </section>
+
+      {/* ── Notes ──────────────────────────────────────────────────────── */}
+      {values.notes && (
+        <section aria-label="Additional notes">
+          <div className="rounded-xl border border-border bg-card p-4">
+            <p className="text-xs font-bold uppercase tracking-widest text-text-secondary mb-1.5">Notes</p>
             <p className="text-sm text-text">{values.notes}</p>
           </div>
-        )}
-      </div>
-      <p className="text-xs text-text-secondary text-center">
+        </section>
+      )}
+
+      <p className="text-xs text-text-secondary text-center max-w-sm mx-auto">
         By submitting, your request will be sent to the Property Custodian for review.
       </p>
     </div>
@@ -377,7 +469,7 @@ function StepReview({ values }: { values: WizardFormValues }) {
 interface NewBorrowRequestWizardProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  prefilledItem?: BrowseItem | null;
+  prefilledItems?: BrowseItem[];
   initialType?: "borrow" | "requisition" | null;
   onSuccess: (newRequest: PortalBorrowRequest) => void;
 }
@@ -385,42 +477,66 @@ interface NewBorrowRequestWizardProps {
 export function NewBorrowRequestWizard({
   open,
   onOpenChange,
-  prefilledItem,
+  prefilledItems,
   initialType,
   onSuccess,
 }: NewBorrowRequestWizardProps) {
   const [step, setStep] = useState<RequestWizardStep>(
-    prefilledItem ? "details" : "select"
+    prefilledItems && prefilledItems.length > 0 ? "details" : "select"
   );
   const [values, setValues] = useState<WizardFormValues>({
-    selectedItem: prefilledItem ?? null,
+    selectedItems: prefilledItems ?? [],
     dateFrom: today(),
     dateTo: nextWeek(),
-    quantity: 1,
+    quantities: {},
     purpose: "",
     notes: "",
   });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [submitState, setSubmitState] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
+
+  const { mutateAsync: createRequest, isPending: isSubmitting, isSuccess: isSubmitted, reset: resetMutation } = useCreateBorrowRequestMutation();
+  const { data: me } = useMeQuery();
+
+  useEffect(() => {
+    if (open) {
+      setStep(prefilledItems && prefilledItems.length > 0 ? "details" : "select");
+      setValues({
+        selectedItems: prefilledItems ?? [],
+        dateFrom: today(),
+        dateTo: nextWeek(),
+        quantities: {},
+        purpose: "",
+        notes: "",
+      });
+      setFieldErrors({});
+      setErrorMessage("");
+      resetMutation();
+    }
+  }, [open, prefilledItems, resetMutation]);
 
   const patchValues = useCallback(
     (patch: Partial<WizardFormValues>) => setValues((p) => ({ ...p, ...patch })),
     []
   );
 
-  const canAdvanceSelect = !!values.selectedItem;
+  const canAdvanceSelect = values.selectedItems.length > 0;
 
   function validateDetails(): Record<string, string> {
     const errs: Record<string, string> = {};
     if (!values.dateFrom) errs.dateFrom = "Start date is required.";
-    if (values.selectedItem?.type === "asset") {
+    const hasAsset = values.selectedItems.some(i => i.type === "asset");
+    if (hasAsset) {
       if (!values.dateTo) errs.dateTo = "End date is required.";
       else if (values.dateTo < values.dateFrom) errs.dateTo = "End date must be on or after start date.";
     }
     if (!values.purpose.trim()) errs.purpose = "Purpose is required.";
-    if (values.selectedItem?.type === "consumable" && values.quantity < 1)
-      errs.quantity = "Quantity must be at least 1.";
+    values.selectedItems.forEach((item) => {
+      if (item.type === "consumable") {
+        const q = values.quantities[item.id] || 0;
+        if (q < 1) errs[`qty_${item.id}`] = "Quantity must be at least 1.";
+      }
+    });
     return errs;
   }
 
@@ -438,76 +554,40 @@ export function NewBorrowRequestWizard({
   function handleBack() {
     if (step === "details") setStep("select");
     if (step === "review") setStep("details");
-    setSubmitState("idle");
     setErrorMessage("");
   }
 
   async function handleSubmit() {
-    setSubmitState("loading");
     setErrorMessage("");
 
-    // Simulate async call
-    await new Promise((r) => setTimeout(r, 1500));
-
-    // Hardcoded failure demo path
-    if (values.selectedItem?.name === FAILURE_ITEM_NAME) {
-      setSubmitState("error");
-      setErrorMessage(
-        "Unfortunately, this item has just become unavailable — another request was approved while you were filling out the form. Please choose a different item."
+    try {
+      const createdRequests = await Promise.all(
+        values.selectedItems.map(item => 
+          createRequest({
+            requesterUserId: me?.id,
+            requesterName: me?.name || "Maria Santos",
+            requesterEmail: me?.email || "m.santos@aims.org",
+            department: me?.department || "IT",
+            itemDescription: item.name,
+            assetId: item.type === "asset" ? item.id : undefined,
+            assetCode: item.type === "asset" ? item.assetCode : undefined,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            category: item.category as any,
+            quantity: item.type === "consumable" ? (values.quantities[item.id] || 1) : 1,
+            purpose: values.purpose,
+            expectedReturnDate: values.dateTo,
+            notes: values.notes || undefined,
+          })
+        )
       );
-      return;
-    }
 
-    const newRequest: PortalBorrowRequest = {
-      id: `pr-new-${Date.now()}`,
-      requestCode: generateRequestCode(),
-      requesterName: "Maria Santos",
-      requesterEmail: "m.santos@aims.org",
-      requesterPhone: "+63 917 555 0192",
-      department: "IT",
-      itemDescription: values.selectedItem!.name,
-      assetCode:
-        values.selectedItem?.type === "asset"
-          ? values.selectedItem.assetCode
-          : undefined,
-      category: values.selectedItem!.category,
-      quantity: values.quantity,
-      purpose: values.purpose,
-      requestedAt: new Date().toISOString(),
-      expectedReturnDate: values.dateTo,
-      status: "pending",
-      notes: values.notes || undefined,
-      requestedDateFrom: values.dateFrom,
-      requestedDateTo: values.dateTo,
-      itemType: values.selectedItem!.type,
-      requestedQuantity: values.quantity,
-      history: [
-        {
-          id: `h-new-${Date.now()}`,
-          action: "submitted",
-          actor: "Maria Santos",
-          timestamp: new Date().toLocaleString("en-PH"),
-          note: "Request submitted via Borrower Portal",
-        },
-      ],
-    };
-
-    setSubmitState("success");
-    setTimeout(() => {
-      onSuccess(newRequest);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      onSuccess(createdRequests[0] as any);
       onOpenChange(false);
-      // Reset
-      setStep(prefilledItem ? "details" : "select");
-      setValues({
-        selectedItem: prefilledItem ?? null,
-        dateFrom: today(),
-        dateTo: nextWeek(),
-        quantity: 1,
-        purpose: "",
-        notes: "",
-      });
-      setSubmitState("idle");
-    }, 800);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (e: any) {
+      setErrorMessage(e.message || "Failed to submit request.");
+    }
   }
 
   if (!open) return null;
@@ -522,17 +602,17 @@ export function NewBorrowRequestWizard({
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={() => submitState !== "loading" && onOpenChange(false)}
+        onClick={() => !isSubmitting && onOpenChange(false)}
         aria-hidden="true"
       />
 
       {/* Panel */}
-      <div className="relative z-10 w-full max-w-xl rounded-2xl bg-card border border-border shadow-2xl flex flex-col max-h-[90vh]">
+      <div className="relative z-10 w-full max-w-xl h-187.5 max-h-[90vh] rounded-2xl bg-card border border-border shadow-2xl flex flex-col">
         {/* Header */}
         <div className="flex items-start justify-between gap-4 p-5 border-b border-border">
           <div>
             <h2 id="wizard-title" className="text-base font-bold text-text">
-              {initialType === "requisition" || values.selectedItem?.type === "consumable" ? "New Requisition Request" : "New Borrow Request"}
+              {initialType === "requisition" || values.selectedItems.some(i => i.type === "consumable") ? "New Requisition Request" : "New Borrow Request"}
             </h2>
             <div className="mt-2">
               <StepIndicator current={step} />
@@ -541,7 +621,7 @@ export function NewBorrowRequestWizard({
           <button
             type="button"
             onClick={() => onOpenChange(false)}
-            disabled={submitState === "loading"}
+            disabled={isSubmitting}
             aria-label="Close wizard"
             className="p-1 rounded-lg text-text-secondary hover:text-text hover:bg-bg-subtle transition-colors disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
@@ -553,34 +633,26 @@ export function NewBorrowRequestWizard({
         <div className="flex-1 overflow-y-auto p-5">
           {step === "select" && (
             <StepSelect
-              value={values.selectedItem}
-              onChange={(item) => patchValues({ selectedItem: item })}
+              value={values.selectedItems}
+              onChange={(items) => patchValues({ selectedItems: items })}
               initialType={initialType}
             />
           )}
-          {step === "details" && values.selectedItem && (
+          {step === "details" && values.selectedItems.length > 0 && (
             <StepDetails
-              item={values.selectedItem}
-              values={{ dateFrom: values.dateFrom, dateTo: values.dateTo, quantity: values.quantity, purpose: values.purpose, notes: values.notes }}
+              items={values.selectedItems}
+              values={{ dateFrom: values.dateFrom, dateTo: values.dateTo, quantities: values.quantities, purpose: values.purpose, notes: values.notes }}
               onChange={patchValues}
               errors={fieldErrors}
             />
           )}
           {step === "review" && (
             <>
-              <StepReview values={values} />
-              {submitState === "error" && (
+              <StepReview values={values} me={me} />
+              {errorMessage && (
                 <div className="mt-4 flex items-start gap-2 rounded-lg bg-status-outofservice-bg/10 border border-status-outofservice-bg/30 p-3">
                   <AlertCircle className="h-4 w-4 shrink-0 text-status-outofservice-bg mt-0.5" />
                   <p className="text-xs text-status-outofservice-bg dark:text-status-outofservice-text">{errorMessage}</p>
-                </div>
-              )}
-              {submitState === "success" && (
-                <div className="mt-4 flex items-center gap-2 rounded-lg bg-status-active-bg/10 border border-status-active-bg/30 p-3">
-                  <CheckCircle2 className="h-4 w-4 text-status-active-bg" />
-                  <p className="text-xs text-status-active-bg dark:text-status-active-text font-semibold">
-                    Request submitted successfully!
-                  </p>
                 </div>
               )}
             </>
@@ -592,7 +664,7 @@ export function NewBorrowRequestWizard({
           <button
             type="button"
             onClick={handleBack}
-            disabled={step === "select" || submitState === "loading" || submitState === "success"}
+            disabled={step === "select" || isSubmitting || isSubmitted}
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border border-border text-text-secondary hover:text-text hover:bg-bg-subtle transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -613,15 +685,15 @@ export function NewBorrowRequestWizard({
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={submitState === "loading" || submitState === "success"}
+              disabled={isSubmitting || isSubmitted}
               className="inline-flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold bg-accent text-accent-foreground hover:opacity-90 transition-opacity disabled:opacity-70 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
-              {submitState === "loading" ? (
+              {isSubmitting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Submitting…
                 </>
-              ) : submitState === "success" ? (
+              ) : isSubmitted ? (
                 <>
                   <CheckCircle2 className="h-4 w-4" />
                   Submitted!

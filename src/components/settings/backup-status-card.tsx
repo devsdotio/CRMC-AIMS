@@ -43,14 +43,14 @@ export function BackupStatusCard({ backupStatus }: BackupStatusCardProps) {
           Automated Backup Status
         </h3>
         <p className="text-xs text-text-secondary mt-0.5">
-          CRMC-AIMS runs automated institutional data backups on a daily schedule
+          Automated institutional data backups are currently disabled in this demo environment.
         </p>
       </div>
 
       {/* Status Banner */}
       <div
         className={cn(
-          "flex items-center gap-3 p-3.5 rounded-xl border",
+          "flex items-center gap-3 p-3.5 rounded-xl border opacity-60",
           statusConfig.bg,
           statusConfig.border
         )}
@@ -58,21 +58,21 @@ export function BackupStatusCard({ backupStatus }: BackupStatusCardProps) {
         <StatusIcon className={cn("h-5 w-5 shrink-0", statusConfig.text)} />
         <div>
           <p className={cn("text-xs font-bold", statusConfig.text)}>
-            {statusConfig.label}
+            {statusConfig.label} (Disabled)
           </p>
           <p className="text-[11px] text-text-secondary mt-0.5">
-            Last attempted: <strong className="text-text">{backupStatus.lastBackupDate}</strong>
+            Automated backups are turned off by the system administrator.
           </p>
         </div>
       </div>
 
       {/* Backup Details Grid */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="p-3 rounded-xl border border-border bg-bg-subtle text-xs space-y-0.5">
+        <div className="p-3 rounded-xl border border-border bg-bg-subtle text-xs space-y-0.5 opacity-60">
           <span className="text-text-secondary block text-[11px] font-semibold uppercase tracking-wider">
             Schedule
           </span>
-          <span className="text-text font-bold">Daily Automated</span>
+          <span className="text-text font-bold">Disabled</span>
         </div>
         <div className="p-3 rounded-xl border border-border bg-bg-subtle text-xs space-y-0.5">
           <span className="text-text-secondary block text-[11px] font-semibold uppercase tracking-wider">

@@ -10,6 +10,8 @@ export interface BorrowRequestTabsProps {
   pendingCount: number;
   approvedCount: number;
   rejectedCount: number;
+  releasedCount: number;
+  returnedCount: number;
   totalCount: number;
 }
 
@@ -26,12 +28,16 @@ export function BorrowRequestTabs({
   pendingCount,
   approvedCount,
   rejectedCount,
+  releasedCount,
+  returnedCount,
   totalCount,
 }: BorrowRequestTabsProps) {
   const tabRefs = useRef<Record<TabFilter, HTMLButtonElement | null>>({
     pending: null,
     approved: null,
     rejected: null,
+    released: null,
+    returned: null,
     all: null,
   });
 
@@ -39,11 +45,13 @@ export function BorrowRequestTabs({
     { id: "pending", label: "Pending", count: pendingCount, showBadge: true },
     { id: "approved", label: "Approved", count: approvedCount },
     { id: "rejected", label: "Rejected", count: rejectedCount },
+    { id: "released", label: "Released", count: releasedCount },
+    { id: "returned", label: "Returned", count: returnedCount },
     { id: "all", label: "All Requests", count: totalCount },
   ];
 
   const handleKeyDown = (e: KeyboardEvent<HTMLButtonElement>, currentId: TabFilter) => {
-    const tabOrder: TabFilter[] = ["pending", "approved", "rejected", "all"];
+    const tabOrder: TabFilter[] = ["pending", "approved", "rejected", "released", "returned", "all"];
     const currentIndex = tabOrder.indexOf(currentId);
     let nextIndex = -1;
 

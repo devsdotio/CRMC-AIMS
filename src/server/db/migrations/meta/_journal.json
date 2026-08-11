@@ -43,6 +43,69 @@
       "when": 1786121000000,
       "tag": "0005_accountability_guards",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786122000000,
+      "tag": "0006_borrow_transactions_history",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786341780628,
+      "tag": "0007_icy_bill_hollister",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786343000000,
+      "tag": "0008_suppliers_purchase_lots",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1786344000000,
+      "tag": "0009_project_expense_lines",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786345000000,
+      "tag": "0010_expense_lot_metadata",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1786346000000,
+      "tag": "0011_project_asset_assignments",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1786347000000,
+      "tag": "0012_project_writeoff_maintenance",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1786348000000,
+      "tag": "0013_categories_as_text",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1786350000000,
+      "tag": "0014_asset_models",
+      "breakpoints": true
     }
   ]
 }

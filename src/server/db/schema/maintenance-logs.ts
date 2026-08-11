@@ -9,7 +9,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
-import { assets, assetCategoryEnum } from "./assets";
+import { assets } from "./assets";
 
 export const maintenanceConditionEnum = pgEnum("maintenance_condition", [
   "good",
@@ -21,6 +21,7 @@ export const maintenanceConditionEnum = pgEnum("maintenance_condition", [
 export const maintenanceSourceEnum = pgEnum("maintenance_source", [
   "return_checkout",
   "manual_flag",
+  "project_assignment",
 ]);
 
 /**
@@ -39,7 +40,7 @@ export const maintenanceLogs = pgTable(
     }),
     assetCode: text("asset_code").notNull(),
     assetName: text("asset_name").notNull(),
-    category: assetCategoryEnum("category").notNull(),
+    category: text("category").notNull(),
 
     condition: maintenanceConditionEnum("condition").notNull(),
     source: maintenanceSourceEnum("source").notNull().default("manual_flag"),

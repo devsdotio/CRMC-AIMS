@@ -52,7 +52,11 @@ export function RequisitionSlip({
     }
   };
 
-  const updateItem = (id: string, field: keyof RequisitionItem, value: any) => {
+  const updateItem = (
+    id: string,
+    field: keyof RequisitionItem,
+    value: RequisitionItem[keyof RequisitionItem]
+  ) => {
     setItems((prev) =>
       prev.map((item) => (item.id === id ? { ...item, [field]: value } : item))
     );
@@ -189,7 +193,7 @@ export function RequisitionSlip({
       {/* Signature section */}
       <div className="px-8 pt-8 pb-10 flex flex-col gap-10">
         <p className="text-xs italic text-text-secondary text-center">
-          "Above items are very much needed in the performance of our functions."
+          &ldquo;Above items are very much needed in the performance of our functions.&rdquo;
         </p>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-10">

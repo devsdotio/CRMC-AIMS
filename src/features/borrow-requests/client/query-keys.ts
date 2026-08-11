@@ -7,6 +7,10 @@ export const borrowRequestQueryKeys = {
     status?: BorrowRequest["status"];
     department?: string;
     search?: string;
+    page?: number;
+    limit?: number;
+    startDate?: string;
+    endDate?: string;
   }) => [...borrowRequestQueryKeys.lists(), filters ?? {}] as const,
   detail: (id: string) => [...borrowRequestQueryKeys.all, "detail", id] as const,
 };

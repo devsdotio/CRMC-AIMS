@@ -1,7 +1,7 @@
 /**
  * Single source of truth for asset enums on the app side.
- * Must match `src/server/db/schema/assets.ts` and
- * `src/components/assets/types.ts`.
+ * Must match `src/server/db/schema/assets.ts`.
+ * Category UI/admin free text can be mapped via `src/lib/asset-category.ts`.
  */
 
 export const ASSET_CATEGORIES = [
@@ -16,6 +16,11 @@ export const ASSET_STATUSES = [
   "needs_repair",
   "out_of_service",
   "retired",
+] as const;
+
+export const ASSET_ASSIGNMENT_TYPES = [
+  "borrowable",
+  "assignable",
 ] as const;
 
 export const MAINTENANCE_TYPES = [

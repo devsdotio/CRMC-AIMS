@@ -1,8 +1,14 @@
 /**
- * Dashboard client data layer — prepared for UI integration, not wired yet.
+ * Dashboard client data layer.
  */
 
 export { dashboardApi } from "./dashboard-api";
-export type { DashboardSnapshot } from "./dashboard-api";
+export type {
+  DashboardSnapshot,
+  DashboardSummary,
+} from "./dashboard-api";
 export { dashboardQueryKeys } from "./query-keys";
-export { useDashboardSnapshotQuery } from "./use-dashboard";
+export {
+  useDashboardSidebarSummaryQuery,
+  useDashboardSnapshotQuery,
+} from "./use-dashboard";

@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import type { SettingsSection, CategoryItem, UserProfile, SystemBackupStatus } from "@/types/settings";
+import type { SettingsSection, CategoryItem, UserProfile } from "@/types/settings";
 import { SettingsNav } from "@/components/settings/settings-nav";
 import { AccountSection } from "@/components/settings/account-section";
 import { CategoriesSection } from "@/components/settings/categories-section";
-import { SystemSection } from "@/components/settings/system-section";
+
+import { useCategoriesQuery, useCreateCategoryMutation, useUpdateCategoryMutation, useDeleteCategoryMutation } from "@/features/categories/client/use-categories";
+import { QueryErrorBanner } from "@/components/shared/query-error-banner";
 
 // ── Mock Current User (Admin) ───────────────────────────────────────────
 const MOCK_PROFILE: UserProfile = {
@@ -31,18 +33,28 @@ const INITIAL_CONSUMABLE_CATEGORIES: CategoryItem[] = [
   { id: "cat-c4", name: "Office Stationery", type: "consumable", itemCount: 7 },
 ];
 
-const MOCK_BACKUP_STATUS: SystemBackupStatus = {
-  lastBackupDate: "Jul 28, 2026 at 2:00 AM",
-  status: "success",
-  autoBackupEnabled: true,
-  totalRecordsCount: 4821,
-};
 
 export default function SettingsPage() {
   const [activeSection, setActiveSection] = useState<SettingsSection>("account");
   const [profile, setProfile] = useState<UserProfile>(MOCK_PROFILE);
-  const [assetCategories, setAssetCategories] = useState<CategoryItem[]>(INITIAL_ASSET_CATEGORIES);
-  const [consumableCategories, setConsumableCategories] = useState<CategoryItem[]>(INITIAL_CONSUMABLE_CATEGORIES);
+
+  // Don't hit /api/categories until the Categories section opens.
+  const {
+    data: allCategories,
+    isLoading: categoriesLoading,
+    isError: categoriesError,
+    error: categoriesErr,
+    refetch: refetchCategories,
+  } = useCategoriesQuery({
+    enabled: activeSection === "categories",
+  });
+  const createCategoryMutation = useCreateCategoryMutation();
+  const updateCategoryMutation = useUpdateCategoryMutation();
+  const deleteCategoryMutation = useDeleteCategoryMutation();
+
+  const assetCategories = allCategories?.filter((c) => c.type === "asset") || [];
+  const consumableCategories =
+    allCategories?.filter((c) => c.type === "consumable") || [];
 
   // ── Section-level Page Title Map ───────────────────────────────────────
   const sectionMeta: Record<SettingsSection, { title: string; description: string }> = {
@@ -54,10 +66,6 @@ export default function SettingsPage() {
       title: "Category Management",
       description: "Configure asset and supply categories used throughout the system",
     },
-    system: {
-      title: "System & Backups",
-      description: "Institutional data export and automated backup status",
-    },
   };
 
   const currentMeta = sectionMeta[activeSection];
@@ -67,36 +75,25 @@ export default function SettingsPage() {
     setProfile((prev) => ({ ...prev, ...updated }));
   };
 
-  const handleSaveCategory = (categoryData: Partial<CategoryItem>) => {
-    const isEdit = assetCategories.some((c) => c.id === categoryData.id) ||
-                   consumableCategories.some((c) => c.id === categoryData.id);
-
-    if (categoryData.type === "asset") {
-      if (isEdit) {
-        setAssetCategories((prev) =>
-          prev.map((c) => c.id === categoryData.id ? { ...c, ...categoryData } as CategoryItem : c)
-        );
+  const handleSaveCategory = async (categoryData: Partial<CategoryItem>) => {
+    try {
+      if (categoryData.id && !categoryData.id.startsWith("cat-")) {
+        // If ID does not start with cat- (temporary ID from dialog), it's an existing category from backend
+        await updateCategoryMutation.mutateAsync(categoryData);
       } else {
-        setAssetCategories((prev) => [...prev, categoryData as CategoryItem]);
+        await createCategoryMutation.mutateAsync(categoryData);
       }
-    } else {
-      if (isEdit) {
-        setConsumableCategories((prev) =>
-          prev.map((c) => c.id === categoryData.id ? { ...c, ...categoryData } as CategoryItem : c)
-        );
-      } else {
-        setConsumableCategories((prev) => [...prev, categoryData as CategoryItem]);
-      }
+    } catch (error) {
+      console.error("Failed to save category", error);
     }
   };
 
-  const handleDeleteCategory = (category: CategoryItem) => {
+  const handleDeleteCategory = async (category: CategoryItem) => {
     if (category.itemCount > 0) return; // Safety guard — UI prevents this but double-checked here
-
-    if (category.type === "asset") {
-      setAssetCategories((prev) => prev.filter((c) => c.id !== category.id));
-    } else {
-      setConsumableCategories((prev) => prev.filter((c) => c.id !== category.id));
+    try {
+      await deleteCategoryMutation.mutateAsync(category.id);
+    } catch (error) {
+      console.error("Failed to delete category", error);
     }
   };
 
@@ -134,19 +131,29 @@ export default function SettingsPage() {
           )}
 
           {activeSection === "categories" && profile.role === "admin" && (
-            <CategoriesSection
-              assetCategories={assetCategories}
-              consumableCategories={consumableCategories}
-              onSaveCategory={handleSaveCategory}
-              onDeleteCategory={handleDeleteCategory}
-            />
+            <>
+              {categoriesError && (
+                <QueryErrorBanner
+                  message={
+                    categoriesErr?.message || "Failed to load categories."
+                  }
+                  onRetry={() => void refetchCategories()}
+                />
+              )}
+              {categoriesLoading && !allCategories ? (
+                <p className="text-xs text-text-secondary">Loading categories…</p>
+              ) : (
+                <CategoriesSection
+                  assetCategories={assetCategories}
+                  consumableCategories={consumableCategories}
+                  onSaveCategory={handleSaveCategory}
+                  onDeleteCategory={handleDeleteCategory}
+                />
+              )}
+            </>
           )}
 
-          {activeSection === "system" && profile.role === "admin" && (
-            <SystemSection
-              backupStatus={MOCK_BACKUP_STATUS}
-            />
-          )}
+
         </main>
       </div>
     </div>

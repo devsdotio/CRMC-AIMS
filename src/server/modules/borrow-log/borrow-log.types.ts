@@ -1,7 +1,7 @@
 import type {
-  BorrowLogHistoryEntry,
   BorrowTransactionRow,
 } from "@/server/db/schema";
+import type { AuditLogRow } from "@/server/db/schema/audit-logs";
 
 export type BorrowLogDTO = {
   id: string;
@@ -13,7 +13,7 @@ export type BorrowLogDTO = {
   department: string;
   assetCode: string;
   assetName: string;
-  category: "transport" | "computing" | "av" | "furniture";
+  category: string;
   releasedAt: string;
   dueDate: string;
   returnedAt?: string;
@@ -23,21 +23,24 @@ export type BorrowLogDTO = {
   conditionNotes?: string;
   releasedBy: string;
   receivedBy?: string;
-  history: BorrowLogHistoryEntry[];
+  history: AuditLogRow[];
 };
 
 export type ListBorrowLogFilters = {
   status?: "active" | "overdue" | "returned";
   department?: string;
   search?: string;
+  borrowerUserId?: string;
 };
 
 export interface IBorrowLogRepository {
   findById(id: string): Promise<BorrowTransactionRow | null>;
   findActiveByAssetId(assetId: string): Promise<BorrowTransactionRow | null>;
   list(filters?: ListBorrowLogFilters): Promise<BorrowTransactionRow[]>;
-  countActive(): Promise<number>;
-  countOverdue(): Promise<number>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  countActive(session?: any, userId?: string): Promise<number>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  countOverdue(session?: any, userId?: string): Promise<number>;
   countYear(): Promise<number>;
   create(
     data: Omit<

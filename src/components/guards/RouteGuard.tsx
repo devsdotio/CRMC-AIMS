@@ -1,25 +1,34 @@
-import { redirect } from 'next/navigation';
-import { ReactNode } from 'react';
+import { redirect } from "next/navigation";
+import { ReactNode } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { getDb } from "@/server/db";
 import { profiles } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
-import { type AppRole } from "@/server/shared/roles";
+import { isStaffShellRole, type AppRole } from "@/server/shared/roles";
 
 interface RouteGuardProps {
   children: ReactNode;
   config: {
     allowedRoles: AppRole[];
+    /** Override role-mismatch target (default is role home). */
     fallbackRoute?: string;
   };
 }
 
+function homeForRole(role: AppRole): string {
+  if (role === "borrower") return "/borrower-db/dashboard";
+  if (isStaffShellRole(role)) return "/dashboard";
+  return "/sign-in";
+}
+
 export async function RouteGuard({ children, config }: RouteGuardProps) {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect(config.fallbackRoute ?? '/sign-in');
+    redirect("/sign-in");
   }
 
   const db = getDb();
@@ -30,21 +39,15 @@ export async function RouteGuard({ children, config }: RouteGuardProps) {
     .limit(1);
 
   if (!profile || profile.status !== "active") {
-    redirect(config.fallbackRoute ?? '/sign-in');
+    redirect("/sign-in");
   }
 
   const role = profile.role as AppRole;
 
-  // Role mismatch: redirect silently to their own default/home route
   if (!config.allowedRoles.includes(role)) {
-    if (role === 'admin' || role === 'superadmin') {
-      redirect('/dashboard');
-    } else if (role === 'borrower') {
-      redirect('/borrower-db/dashboard');
-    } else {
-      // Unknown role safely falls back
-      redirect(config.fallbackRoute ?? '/sign-in');
-    }
+    // Send mismatched roles to *their* home — never bounce admin→/dashboard
+    // when /dashboard is the page that already denied them (self-loop).
+    redirect(config.fallbackRoute ?? homeForRole(role));
   }
 
   return <>{children}</>;

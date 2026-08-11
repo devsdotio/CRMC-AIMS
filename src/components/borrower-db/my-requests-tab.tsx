@@ -7,11 +7,7 @@ import { CancelRequestDialog } from "./cancel-request-dialog";
 import type { PortalBorrowRequest, RequestStatusFilter } from "./types";
 import { useState } from "react";
 
-interface MyRequestsTabProps {
-  requests: PortalBorrowRequest[];
-  onCancelConfirmed: (requestId: string) => void;
-  loading?: boolean;
-}
+import { useBorrowRequests, useRejectBorrowRequestMutation } from "@/features/borrow-requests/client/use-borrow-requests";
 
 const STATUS_FILTERS: { key: RequestStatusFilter; label: string }[] = [
   { key: "all", label: "All" },
@@ -21,13 +17,17 @@ const STATUS_FILTERS: { key: RequestStatusFilter; label: string }[] = [
   { key: "returned", label: "Completed" },
 ];
 
-export function MyRequestsTab({
-  requests,
-  onCancelConfirmed,
-  loading = false,
-}: MyRequestsTabProps) {
+export function MyRequestsTab() {
   const [statusFilter, setStatusFilter] = useState<RequestStatusFilter>("all");
   const [cancelTarget, setCancelTarget] = useState<PortalBorrowRequest | null>(null);
+
+  const { data: response, isLoading: loading } = useBorrowRequests();
+  const requests = response?.data ?? [];
+  const { mutate: cancelRequest } = useRejectBorrowRequestMutation();
+
+  const handleCancelConfirmed = (requestId: string) => {
+    cancelRequest({ id: requestId, reason: "Cancelled by borrower" });
+  };
 
   const filtered =
     statusFilter === "all"
@@ -104,27 +104,29 @@ export function MyRequestsTab({
             <MyRequestItemSkeleton key={i} />
           ))
         ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="h-12 w-12 rounded-full bg-bg-subtle flex items-center justify-center mb-4">
-              <ClipboardList className="h-5 w-5 text-text-secondary" aria-hidden />
-            </div>
-            <h3 className="text-sm font-semibold text-text">
-              {statusFilter === "all"
-                ? "No requests yet"
-                : `No ${STATUS_FILTERS.find((f) => f.key === statusFilter)?.label.toLowerCase()} requests`}
-            </h3>
-            <p className="text-xs text-text-secondary mt-1 max-w-xs">
-              {statusFilter === "all"
-                ? "Browse the available assets and consumables to submit your first borrow request."
-                : "No requests match this filter. Try selecting a different status."}
-            </p>
-          </div>
+           <div className="flex flex-col items-center justify-center py-16 text-center">
+             <div className="h-12 w-12 rounded-full bg-bg-subtle flex items-center justify-center mb-4">
+               <ClipboardList className="h-5 w-5 text-text-secondary" aria-hidden />
+             </div>
+             <h3 className="text-sm font-semibold text-text">
+               {statusFilter === "all"
+                 ? "No requests yet"
+                 : `No ${STATUS_FILTERS.find((f) => f.key === statusFilter)?.label.toLowerCase()} requests`}
+             </h3>
+             <p className="text-xs text-text-secondary mt-1 max-w-xs">
+               {statusFilter === "all"
+                 ? "Browse the available assets and consumables to submit your first borrow request."
+                 : "No requests match this filter. Try selecting a different status."}
+             </p>
+           </div>
         ) : (
           filtered.map((request) => (
             <MyRequestItem
               key={request.id}
-              request={request}
-              onCancel={(r) => setCancelTarget(r)}
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              request={request as any}
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              onCancel={(r) => setCancelTarget(r as any)}
             />
           ))
         )}
@@ -139,7 +141,7 @@ export function MyRequestsTab({
             if (!open) setCancelTarget(null);
           }}
           onConfirm={() => {
-            onCancelConfirmed(cancelTarget.id);
+            handleCancelConfirmed(cancelTarget.id);
             setCancelTarget(null);
           }}
         />

@@ -1,13 +1,21 @@
 import { z } from "zod";
 
-const assetCategorySchema = z.enum(["transport", "computing", "av", "furniture"]);
+const assetCategorySchema = z
+  .string()
+  .trim()
+  .min(1, "Category is required.")
+  .max(120);
 const conditionSchema = z.enum([
   "good",
   "needs_maintenance",
   "damaged",
   "resolved",
 ]);
-const sourceSchema = z.enum(["return_checkout", "manual_flag"]);
+const sourceSchema = z.enum([
+  "return_checkout",
+  "manual_flag",
+  "project_assignment",
+]);
 
 export const listMaintenanceQuerySchema = z.object({
   openOnly: z

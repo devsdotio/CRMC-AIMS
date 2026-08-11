@@ -11,7 +11,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
-import { assets, assetCategoryEnum } from "./assets";
+import { assets } from "./assets";
 
 /**
  * Staff-facing borrow request queue (approve / reject).
@@ -21,12 +21,14 @@ export const borrowRequestStatusEnum = pgEnum("borrow_request_status", [
   "pending",
   "approved",
   "rejected",
+  "released",
+  "unreleased",
   "returned",
 ]);
 
 export type BorrowRequestHistoryEntry = {
   id: string;
-  action: "submitted" | "approved" | "rejected" | "returned";
+  action: "submitted" | "approved" | "rejected" | "released" | "unreleased" | "returned";
   actor: string;
   timestamp: string;
   note?: string;
@@ -52,7 +54,7 @@ export const borrowRequests = pgTable(
       onDelete: "set null",
     }),
     assetCode: text("asset_code"),
-    category: assetCategoryEnum("category").notNull(),
+    category: text("category").notNull(),
     quantity: integer("quantity").notNull().default(1),
     purpose: text("purpose").notNull(),
 
@@ -61,6 +63,7 @@ export const borrowRequests = pgTable(
 
     notes: text("notes"),
     rejectionReason: text("rejection_reason"),
+    pickedUpBy: text("picked_up_by"),
 
     history: jsonb("history")
       .$type<BorrowRequestHistoryEntry[]>()

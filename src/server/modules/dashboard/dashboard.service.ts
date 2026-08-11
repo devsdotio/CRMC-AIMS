@@ -79,6 +79,92 @@ export class DashboardService {
     private readonly assets = new AssetRepository()
   ) {}
 
+  /**
+   * Sidebar badges only — cheap COUNT queries, no full list payload.
+   * Layout used to call getSnapshot() on every private page and exhaust the DB pool.
+   */
+  async getSidebarSummary(userId?: string): Promise<DashboardSummaryDTO> {
+    if (userId) {
+      const [activeBorrows, pendingApprovals, overdueAssets] = await Promise.all([
+        this.borrowLog.countActive(undefined, userId),
+        this.requests.countPending(undefined, userId),
+        this.borrowLog.countOverdue(undefined, userId),
+      ]);
+      return {
+        activeBorrows,
+        pendingApprovals,
+        lowStockItems: 0,
+        overdueAssets,
+      };
+    }
+
+    const [activeBorrows, pendingApprovals, lowStockItems, overdueAssets] =
+      await Promise.all([
+        this.borrowLog.countActive(),
+        this.requests.countPending(),
+        this.consumables.countLowStock(),
+        this.borrowLog.countOverdue(),
+      ]);
+
+    return {
+      activeBorrows,
+      pendingApprovals,
+      lowStockItems,
+      overdueAssets,
+    };
+  }
+
+  async getBorrowerSnapshot(userId: string, limit = 5): Promise<DashboardSnapshotDTO> {
+    const [
+      activeBorrows,
+      pendingApprovals,
+      overdueAssets,
+      pendingRows,
+      overdueRows,
+    ] = await Promise.all([
+      this.borrowLog.countActive(undefined, userId),
+      this.requests.countPending(undefined, userId),
+      this.borrowLog.countOverdue(undefined, userId),
+      this.requests.list({ status: "pending", requesterUserId: userId }),
+      this.borrowLog.list({ status: "overdue", borrowerUserId: userId }),
+    ]);
+
+    return {
+      summary: {
+        activeBorrows,
+        pendingApprovals,
+        lowStockItems: 0,
+        overdueAssets,
+      },
+      pendingRequests: pendingRows.slice(0, limit).map((r) => ({
+        id: r.id,
+        requesterName: r.requesterName,
+        department: r.department,
+        itemDescription: r.itemDescription,
+        requestedAt:
+          r.requestedAt instanceof Date
+            ? r.requestedAt.toISOString()
+            : String(r.requestedAt),
+        relativeTime: formatRelativeTime(r.requestedAt),
+      })),
+      overdueAssets: overdueRows.slice(0, limit).map((row) => {
+        const dto = toBorrowLogDTO(row);
+        return {
+          id: dto.id,
+          assetName: dto.assetName,
+          assetCode: dto.assetCode,
+          borrowerName: dto.borrowerName,
+          department: dto.department,
+          daysOverdue: dto.daysOverdue ?? 0,
+          dueSince: `${dto.dueDate}T00:00:00Z`,
+        };
+      }),
+      lowStockItems: [],
+      categoryDistribution: [],
+      recentActivity: [],
+    };
+  }
+
   async getSnapshot(limit = 5): Promise<DashboardSnapshotDTO> {
     const [
       activeBorrows,
@@ -97,33 +183,23 @@ export class DashboardService {
       this.borrowLog.countOverdue(),
       this.requests.list({ status: "pending" }),
       this.borrowLog.list({ status: "overdue" }),
-      this.consumables.list({}),
-      this.assets.findMany({}),
+      this.consumables.getLowStockItems(limit),
+      this.assets.getCategoryDistribution(),
       this.listRecentLifecycle(limit),
     ]);
 
-    const lowStock = allConsumables
-      .filter((c) => c.currentQty <= Math.ceil(c.minThreshold * 1.2))
-      .sort((a, b) => a.currentQty - b.currentQty)
-      .slice(0, limit)
-      .map((c) => ({
-        id: c.id,
-        itemName: c.name,
-        currentQty: c.currentQty,
-        minThreshold: c.minThreshold,
-        unit: c.unit,
-      }));
+    const lowStock = allConsumables.map((c) => ({
+      id: c.id,
+      itemName: c.name,
+      currentQty: c.currentQty,
+      minThreshold: c.minThreshold,
+      unit: c.unit,
+    }));
 
-    const categoryMap = new Map<string, number>();
-    for (const a of allAssets) {
-      categoryMap.set(a.category, (categoryMap.get(a.category) ?? 0) + 1);
-    }
-    const categoryDistribution: DashboardCategoryCount[] = [
-      ...categoryMap.entries(),
-    ].map(([category, count]) => ({
-      category,
-      label: CATEGORY_LABELS[category] ?? category,
-      count,
+    const categoryDistribution: DashboardCategoryCount[] = allAssets.map((c) => ({
+      category: c.category,
+      label: CATEGORY_LABELS[c.category] ?? c.category,
+      count: c.count,
     }));
 
     return {

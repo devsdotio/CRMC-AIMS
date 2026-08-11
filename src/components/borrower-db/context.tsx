@@ -5,7 +5,10 @@ import type { BrowseItem } from "./types";
 import { NewBorrowRequestWizard } from "./new-borrow-request-wizard";
 
 interface BorrowerPortalContextValue {
-  openWizard: (item?: BrowseItem | null, type?: "borrow" | "requisition") => void;
+  cart: BrowseItem[];
+  toggleCartItem: (item: BrowseItem) => void;
+  clearCart: () => void;
+  openWizard: (items?: BrowseItem[] | null, type?: "borrow" | "requisition") => void;
   closeWizard: () => void;
 }
 
@@ -13,15 +16,26 @@ const BorrowerPortalContext = createContext<BorrowerPortalContextValue | undefin
 
 export function BorrowerPortalProvider({ children }: { children: ReactNode }) {
   const [wizardOpen, setWizardOpen] = useState(false);
-  const [wizardItem, setWizardItem] = useState<BrowseItem | null>(null);
+  const [wizardItems, setWizardItems] = useState<BrowseItem[]>([]);
   const [wizardType, setWizardType] = useState<"borrow" | "requisition" | null>(null);
+  const [cart, setCart] = useState<BrowseItem[]>([]);
 
-  const openWizard = (item?: BrowseItem | null, type?: "borrow" | "requisition") => {
-    setWizardItem(item || null);
+  const toggleCartItem = (item: BrowseItem) => {
+    setCart((prev) => {
+      const exists = prev.find((i) => i.id === item.id);
+      if (exists) return prev.filter((i) => i.id !== item.id);
+      return [...prev, item];
+    });
+  };
+
+  const clearCart = () => setCart([]);
+
+  const openWizard = (items?: BrowseItem[] | null, type?: "borrow" | "requisition") => {
+    setWizardItems(items || []);
     if (type) {
       setWizardType(type);
-    } else if (item) {
-      setWizardType(item.type === "asset" ? "borrow" : "requisition");
+    } else if (items && items.length > 0) {
+      setWizardType(items[0].type === "asset" ? "borrow" : "requisition");
     } else {
       setWizardType(null);
     }
@@ -31,21 +45,21 @@ export function BorrowerPortalProvider({ children }: { children: ReactNode }) {
   const closeWizard = () => {
     setWizardOpen(false);
     setTimeout(() => {
-      setWizardItem(null);
+      setWizardItems([]);
       setWizardType(null);
     }, 200); // clear after animation
   };
 
   return (
-    <BorrowerPortalContext.Provider value={{ openWizard, closeWizard }}>
+    <BorrowerPortalContext.Provider value={{ cart, toggleCartItem, clearCart, openWizard, closeWizard }}>
       {children}
       <NewBorrowRequestWizard
         open={wizardOpen}
         onOpenChange={setWizardOpen}
-        prefilledItem={wizardItem}
+        prefilledItems={wizardItems}
         initialType={wizardType}
         onSuccess={(req) => {
-          // You could add this to a global state or trigger a re-fetch
+          clearCart();
           console.log("Request created", req);
         }}
       />

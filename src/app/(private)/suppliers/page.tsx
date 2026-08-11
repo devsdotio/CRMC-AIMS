@@ -1,0 +1,173 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { Truck, AlertCircle } from "lucide-react";
+import type { Supplier, SupplierFilterState } from "@/types/suppliers";
+import { SupplierFilters } from "@/components/suppliers/supplier-filters";
+import { SupplierTable } from "@/components/suppliers/supplier-table";
+import { SupplierDetailPanel } from "@/components/suppliers/supplier-detail-panel";
+import {
+  AddEditSupplierDialog,
+  type SupplierFormInput,
+} from "@/components/suppliers/add-edit-supplier-dialog";
+import {
+  useCreateSupplierMutation,
+  useDeactivateSupplierMutation,
+  useSuppliersQuery,
+  useUpdateSupplierMutation,
+} from "@/features/suppliers/client";
+
+export default function SuppliersPage() {
+  const {
+    data: suppliers = [],
+    isLoading,
+    error,
+    isFetching,
+  } = useSuppliersQuery();
+  const createSupplier = useCreateSupplierMutation();
+  const updateSupplier = useUpdateSupplierMutation();
+  const deactivateSupplier = useDeactivateSupplierMutation();
+
+  const [filters, setFilters] = useState<SupplierFilterState>({
+    searchQuery: "",
+    status: "all",
+  });
+  const [selected, setSelected] = useState<Supplier | null>(null);
+  const [editTarget, setEditTarget] = useState<Supplier | null | undefined>(
+    undefined
+  );
+  const [pageError, setPageError] = useState<string | null>(null);
+
+  const filtered = useMemo(() => {
+    return suppliers.filter((s) => {
+      if (filters.searchQuery?.trim()) {
+        const q = filters.searchQuery.toLowerCase();
+        const hay = [
+          s.name,
+          s.supplierCode,
+          s.contactName ?? "",
+          s.contactEmail ?? "",
+        ]
+          .join(" ")
+          .toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      if (filters.status !== "all" && s.status !== filters.status) return false;
+      return true;
+    });
+  }, [suppliers, filters]);
+
+  const selectedSynced = useMemo(() => {
+    if (!selected) return null;
+    return suppliers.find((s) => s.id === selected.id) ?? selected;
+  }, [suppliers, selected]);
+
+  const handleSubmit = async (input: SupplierFormInput) => {
+    setPageError(null);
+    const payload = {
+      name: input.name,
+      contactName: input.contactName || null,
+      contactEmail: input.contactEmail || null,
+      contactPhone: input.contactPhone || null,
+      address: input.address || null,
+      notes: input.notes || null,
+      status: input.status,
+    };
+    if (editTarget) {
+      const saved = await updateSupplier.mutateAsync({
+        id: editTarget.id,
+        payload,
+      });
+      setSelected((prev) => (prev?.id === saved.id ? saved : prev));
+    } else {
+      await createSupplier.mutateAsync(payload);
+    }
+  };
+
+  const handleDeactivate = async (s: Supplier) => {
+    if (!window.confirm(`Deactivate “${s.name}”? History is kept.`)) return;
+    setPageError(null);
+    try {
+      const saved = await deactivateSupplier.mutateAsync(s.id);
+      setSelected((prev) => (prev?.id === saved.id ? saved : prev));
+    } catch (err) {
+      setPageError(
+        err instanceof Error ? err.message : "Failed to deactivate supplier."
+      );
+    }
+  };
+
+  const loadError = error?.message || pageError;
+
+  return (
+    <div className="h-full flex flex-col min-h-0 overflow-hidden bg-bg-subtle rounded-md">
+      <div className="px-4 md:px-6 pt-5 pb-3 bg-bg shrink-0 flex flex-wrap items-center justify-between gap-4 border-b border-border">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold tracking-tight text-text">
+              Suppliers
+            </h1>
+            <span className="px-2 py-0.5 text-xs font-bold bg-bg-subtle text-text-secondary rounded-full border border-border">
+              {filtered.length} of {suppliers.length}
+              {isFetching && !isLoading ? " · updating…" : ""}
+            </span>
+          </div>
+          <p className="text-xs text-text-secondary mt-0.5">
+            Vendor registry for multi-price restocks and asset acquisition cost
+            history.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setEditTarget(null)}
+          className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg bg-accent text-accent-foreground hover:opacity-90 cursor-pointer shadow-xs"
+        >
+          <Truck className="h-4 w-4" strokeWidth={2.5} />
+          Add Supplier
+        </button>
+      </div>
+
+      {loadError && (
+        <div className="mx-4 md:mx-6 mt-3 flex items-start gap-2 rounded-lg border border-status-outofservice-bg/40 bg-status-outofservice-bg/10 px-3 py-2 text-xs text-status-outofservice-text">
+          <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+          <span>{loadError}</span>
+        </div>
+      )}
+
+      <SupplierFilters
+        filters={filters}
+        onFilterChange={(u) => setFilters((p) => ({ ...p, ...u }))}
+        onResetFilters={() => setFilters({ searchQuery: "", status: "all" })}
+      />
+
+      <main className="flex-1 overflow-y-auto min-h-0 bg-bg">
+        <SupplierTable
+          suppliers={filtered}
+          loading={isLoading && !error}
+          onSelect={setSelected}
+          onEdit={(s) => setEditTarget(s)}
+          onDeactivate={(s) => {
+            void handleDeactivate(s);
+          }}
+        />
+      </main>
+
+      <SupplierDetailPanel
+        supplier={selectedSynced}
+        isOpen={Boolean(selectedSynced)}
+        onClose={() => setSelected(null)}
+        onEdit={(s) => {
+          setSelected(null);
+          setEditTarget(s);
+        }}
+      />
+
+      <AddEditSupplierDialog
+        isOpen={editTarget !== undefined}
+        supplier={editTarget ?? null}
+        onClose={() => setEditTarget(undefined)}
+        onSubmit={handleSubmit}
+      />
+    </div>
+  );
+}

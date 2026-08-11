@@ -1,5 +1,6 @@
-import type { User } from "@supabase/supabase-js";
+import type { JwtPayload, User } from "@supabase/supabase-js";
 import { eq } from "drizzle-orm";
+import { headers } from "next/headers";
 
 import { createClient } from "@/lib/supabase/server";
 import { getDb } from "@/server/db";
@@ -15,6 +16,23 @@ import {
   isStaffShellRole,
   isUserManagerRole,
 } from "@/server/shared/roles";
+
+/** Short-lived cache — parallel APIs hit requireActor(); avoid N× slow profile selects. */
+const PROFILE_CACHE_TTL_MS = 30_000;
+const profileCache = new Map<
+  string,
+  { row: ProfileRow; expires: number }
+>();
+
+/** Extracts raw JWT from `Authorization: Bearer <token>` when present. */
+async function getBearerToken(): Promise<string | null> {
+  const headerStore = await headers();
+  const authorization = headerStore.get("authorization");
+  if (!authorization) return null;
+  const match = authorization.match(/^Bearer\s+(.+)$/i);
+  const token = match?.[1]?.trim();
+  return token || null;
+}
 
 /**
  * Accountability actor derived ONLY from a verified Supabase session + profile.
@@ -43,31 +61,78 @@ export function toActorContext(user: User, profile: ProfileRow): ActorContext {
 }
 
 async function loadProfile(userId: string): Promise<ProfileRow | null> {
+  const now = Date.now();
+  const hit = profileCache.get(userId);
+  if (hit && hit.expires > now) {
+    return hit.row;
+  }
+
   const db = getDb();
   const [row] = await db
     .select()
     .from(profiles)
     .where(eq(profiles.userId, userId))
     .limit(1);
+
+  if (row) {
+    profileCache.set(userId, { row, expires: now + PROFILE_CACHE_TTL_MS });
+  } else {
+    profileCache.delete(userId);
+  }
+
   return row ?? null;
+}
+
+/** Drop cached profile after mutations that change role/status (user admin). */
+export function invalidateProfileCache(userId?: string) {
+  if (userId) profileCache.delete(userId);
+  else profileCache.clear();
+}
+
+/**
+ * Build a minimal `User` from verified JWT claims (local JWKS verify via getClaims).
+ * Prefer this over getUser() on every request — getUser always hits Auth over the network.
+ */
+function userFromClaims(claims: JwtPayload): User {
+  const email =
+    typeof claims.email === "string" && claims.email.length > 0
+      ? claims.email
+      : undefined;
+
+  return {
+    id: claims.sub,
+    email,
+    app_metadata: {},
+    user_metadata: {},
+    aud: "authenticated",
+    created_at: "",
+  } as User;
 }
 
 /**
  * Verifies the request has a valid Supabase session.
- * Use at the start of protected Route Handlers / controllers.
+ *
+ * Accepts either:
+ * - HTTP-only session cookies (browser / SSR), or
+ * - `Authorization: Bearer <access_token>` (Swagger, scripts, API clients)
+ *
+ * Uses `getClaims()` (local JWT verify when project uses asymmetric keys)
+ * instead of `getUser()` network RTT on every API call / layout.
  */
 export async function requireUser(): Promise<User> {
   const supabase = await createClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
+  const bearer = await getBearerToken();
 
-  if (error || !user) {
+  const { data, error } = bearer
+    ? await supabase.auth.getClaims(bearer)
+    : await supabase.auth.getClaims();
+
+  const claims = data?.claims;
+  if (error || !claims?.sub) {
     throw new UnauthorizedError();
   }
 
-  return user;
+  return userFromClaims(claims);
 }
 
 /**

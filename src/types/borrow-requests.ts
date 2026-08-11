@@ -4,13 +4,13 @@ import type { AssetCategory } from './shared';
 export type { AssetCategory };
 import type { BaseFilterState, DateRangeFilter } from "./filters";
 
-export type RequestStatus = "pending" | "approved" | "rejected" | "returned";
+export type RequestStatus = "pending" | "approved" | "rejected" | "released" | "unreleased" | "returned";
 
-export type TabFilter = "pending" | "approved" | "rejected" | "all";
+export type TabFilter = "pending" | "approved" | "rejected" | "released" | "returned" | "all";
 
 export interface ActionHistoryLog {
   id: string;
-  action: "submitted" | "approved" | "rejected" | "returned";
+  action: "submitted" | "approved" | "rejected" | "released" | "unreleased" | "returned";
   actor: string;
   timestamp: string;
   note?: string;
@@ -33,6 +33,7 @@ export interface BorrowRequest {
   status: RequestStatus;
   notes?: string;
   rejectionReason?: string;
+  pickedUpBy?: string;
   history: ActionHistoryLog[];
 }
 

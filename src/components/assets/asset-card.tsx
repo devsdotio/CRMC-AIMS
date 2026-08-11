@@ -2,6 +2,10 @@
 import { getCategoryStyle } from "@/constants/categories";
 import { User, MapPin, Tag } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  custodyBadgeLabel,
+  custodyDetailLabel,
+} from "@/lib/assets-custody";
 import type { Asset, AssetStatus } from "@/types/assets";
 
 export interface AssetCardProps {
@@ -60,15 +64,22 @@ export function AssetCard({ asset, onSelect }: AssetCardProps) {
         <span className="font-mono text-xs font-bold text-text bg-bg px-2 py-0.5 rounded border border-border">
           {asset.assetCode}
         </span>
-        <span
-          className={cn(
-            "px-2.5 py-0.5 rounded-full text-[11px] font-bold",
-            statusMeta.bg,
-            statusMeta.text,
+        <div className="flex items-center gap-2">
+          {asset.currentHolder && (
+            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-accent/20 text-accent">
+              {custodyBadgeLabel(asset.currentHolder)}
+            </span>
           )}
-        >
-          {statusMeta.label}
-        </span>
+          <span
+            className={cn(
+              "px-2.5 py-0.5 rounded-full text-[11px] font-bold",
+              statusMeta.bg,
+              statusMeta.text,
+            )}
+          >
+            {statusMeta.label}
+          </span>
+        </div>
       </div>
 
       {/* Card Content Body */}
@@ -101,15 +112,15 @@ export function AssetCard({ asset, onSelect }: AssetCardProps) {
 
           <div className="flex items-center gap-1.5">
             <User className="h-3.5 w-3.5 shrink-0 text-text-secondary/70" />
-            {asset.currentHolder ? (
-              <span className="font-semibold text-text truncate">
-                Holder: {asset.currentHolder}
-              </span>
-            ) : (
-              <span className="font-semibold text-status-active-text">
-                Available in Stock
-              </span>
-            )}
+            <span
+              className={cn(
+                "font-semibold truncate",
+                asset.currentHolder ? "text-text" : "text-status-active-text"
+              )}
+              title={asset.currentHolder || undefined}
+            >
+              {custodyDetailLabel(asset.currentHolder)}
+            </span>
           </div>
         </div>
       </div>

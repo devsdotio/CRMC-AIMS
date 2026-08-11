@@ -1,36 +1,81 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Sidebar from "@/components/sidebar";
 import GlobalHeader from "@/components/global-header";
 import { cn } from "@/lib/utils";
 import { useMeQuery } from "@/features/users/client";
+import { useDashboardSidebarSummaryQuery } from "@/features/dashboard/client/use-dashboard";
 import { ROLE_DEFINITIONS } from "@/constants/roles";
+
+import type { UserRole } from "@/types/users";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
+  initialProfile?: {
+    name: string;
+    email: string;
+    role: UserRole;
+  };
 }
 
-export default function DashboardLayout({ children }: DashboardLayoutProps) {
+export default function DashboardLayout({
+  children,
+  initialProfile,
+}: DashboardLayoutProps) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const { data: me, isLoading: meLoading } = useMeQuery();
+  // Defer shell metrics until after page data starts — frees the DB pool for
+  // /api/assets, /api/consumables, etc. (sidebar badges are non-critical).
+  const [shellReady, setShellReady] = useState(false);
+  useEffect(() => {
+    const t = window.setTimeout(() => setShellReady(true), 400);
+    return () => window.clearTimeout(t);
+  }, []);
 
-  const userName = me?.name ?? (meLoading ? "Loading…" : "Unknown user");
-  const userEmail = me?.email ?? "";
-  const userRoleLabel = me ? ROLE_DEFINITIONS[me.role].title : meLoading ? "…" : "—";
+  // Prefer SSR profile labels; soft-refresh /api/me after first paint.
+  const { data: me, isLoading: meLoading } = useMeQuery({
+    enabled: shellReady,
+  });
+  const { data: summary } = useDashboardSidebarSummaryQuery({
+    enabled: shellReady,
+  });
+
+  const userName =
+    me?.name ??
+    initialProfile?.name ??
+    (meLoading ? "Loading…" : "Unknown user");
+  const userEmail = me?.email ?? initialProfile?.email ?? "";
+
+  const currentRole = me?.role ?? initialProfile?.role;
+  const userRoleLabel = currentRole
+    ? ROLE_DEFINITIONS[currentRole].title
+    : meLoading
+      ? "…"
+      : "—";
+
+  const pendingCount = summary?.pendingApprovals ?? 0;
+  const overdueCount = summary?.overdueAssets ?? 0;
+  const lowStockCount = summary?.lowStockItems ?? 0;
 
   return (
     <div className="flex h-full w-full overflow-hidden bg-[#F2F3F7] text-[#1B2140]">
-      {/* Desktop Sidebar (hidden on mobile) */}
       <div className="hidden md:block h-full shrink-0">
-        <Sidebar userName={userName} userEmail={userEmail} userRole={me?.role} />
+        <Sidebar
+          userName={userName}
+          userEmail={userEmail}
+          userRole={currentRole}
+          pendingCount={pendingCount}
+          overdueCount={overdueCount}
+          lowStockCount={lowStockCount}
+        />
       </div>
 
-      {/* Mobile Sidebar Overlay Drawer */}
       <div
         className={cn(
           "fixed inset-0 z-50 md:hidden transition-opacity duration-300 ease-in-out",
-          isMobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+          isMobileOpen
+            ? "opacity-100 pointer-events-auto"
+            : "opacity-0 pointer-events-none"
         )}
       >
         <div
@@ -48,7 +93,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             className="border-r-0 w-full h-full"
             userName={userName}
             userEmail={userEmail}
-            userRole={me?.role}
+            userRole={currentRole}
+            pendingCount={pendingCount}
+            overdueCount={overdueCount}
+            lowStockCount={lowStockCount}
           />
         </div>
       </div>
@@ -63,7 +111,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           userRoleLabel={userRoleLabel}
         />
 
-        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 bg-[#F2F3F7] focus:outline-hidden">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden p-3 bg-[#F2F3F7] focus:outline-hidden">
           {children}
         </main>
       </div>

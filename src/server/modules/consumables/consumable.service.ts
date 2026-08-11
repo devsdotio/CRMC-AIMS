@@ -10,6 +10,14 @@ import {
   NotFoundError,
 } from "@/server/shared/errors";
 import { withTransaction } from "@/server/db/transaction";
+import { parseScanPayload } from "@/server/shared/qr";
+import {
+  PurchaseLotService,
+  type LotCostAllocation,
+} from "@/server/modules/purchase-lots/purchase-lot.service";
+import type { PurchaseLotDTO } from "@/server/modules/purchase-lots/purchase-lot.types";
+import { scanReleaseLotSchema } from "@/server/modules/purchase-lots/purchase-lot.validation";
+import { CategoryRepository } from "@/server/modules/categories/category.repository";
 
 import { ConsumableRepository } from "./consumable.repository";
 import type { ConsumableDTO } from "./consumable.types";
@@ -17,6 +25,7 @@ import {
   consumableIdSchema,
   createConsumableSchema,
   listConsumablesQuerySchema,
+  restockSchema,
   stockAdjustSchema,
   stockMovementSchema,
   updateConsumableSchema,
@@ -58,7 +67,19 @@ function historyEntry(
   quantityChange: number,
   actor: string,
   reason?: string,
-  notes?: string
+  notes?: string,
+  extra?: Partial<
+    Pick<
+      StockHistoryEntry,
+      | "unitCost"
+      | "supplierId"
+      | "supplierName"
+      | "lotCode"
+      | "totalCost"
+      | "lotAllocations"
+      | "recipientName"
+    >
+  >
 ): StockHistoryEntry {
   return {
     id: crypto.randomUUID(),
@@ -68,22 +89,41 @@ function historyEntry(
     actor,
     ...(reason ? { reason } : {}),
     ...(notes ? { notes } : {}),
+    ...extra,
   };
 }
 
 export class ConsumableService {
-  constructor(private readonly repo = new ConsumableRepository()) {}
+  constructor(
+    private readonly repo = new ConsumableRepository(),
+    private readonly purchaseLots = new PurchaseLotService(),
+    private readonly taxonomy = new CategoryRepository()
+  ) {}
 
-  async list(rawQuery: unknown): Promise<ConsumableDTO[]> {
+  private async resolveConsumableCategoryName(rawName: string): Promise<string> {
+    const found = await this.taxonomy.findByTypeAndName("consumable", rawName);
+    if (!found) {
+      throw new BadRequestError(
+        `Unknown consumable category “${rawName}”. Add it under Settings → Categories first.`
+      );
+    }
+    return found.name;
+  }
+
+  async list(rawQuery: unknown): Promise<import("@/types/filters").PaginatedResponse<ConsumableDTO>> {
     const filters = listConsumablesQuerySchema.parse(rawQuery ?? {});
-    let rows = await this.repo.list({
+    const result = await this.repo.list({
       category: filters.category,
       search: filters.search,
       stockLevel: filters.stockLevel === "critical" ? "critical" : undefined,
+      page: filters.page,
+      limit: filters.limit,
     });
 
+    let dtos = result.data.map(toDTO);
+
     if (filters.stockLevel && filters.stockLevel !== "all") {
-      rows = rows.filter((row) => {
+      dtos = dtos.filter((row) => {
         const severity = getStockSeverity(row.currentQty, row.minThreshold);
         if (filters.stockLevel === "healthy") return severity === "healthy";
         if (filters.stockLevel === "low") return severity === "low";
@@ -92,7 +132,10 @@ export class ConsumableService {
       });
     }
 
-    return rows.map(toDTO);
+    return {
+      ...result,
+      data: dtos,
+    };
   }
 
   async getById(rawId: string): Promise<ConsumableDTO> {
@@ -105,6 +148,7 @@ export class ConsumableService {
   async create(rawInput: unknown, actor: ActorContext): Promise<ConsumableDTO> {
     const input = createConsumableSchema.parse(rawInput);
     const itemCode = input.itemCode?.trim() || generateOperationalCode("CON");
+    const categoryName = await this.resolveConsumableCategoryName(input.category);
 
     const exists = await this.repo.findByCode(itemCode);
     if (exists) {
@@ -126,7 +170,7 @@ export class ConsumableService {
     const row = await this.repo.create({
       itemCode,
       name: input.name,
-      category: input.category,
+      category: categoryName,
       unit: input.unit,
       currentQty: input.currentQty,
       minThreshold: input.minThreshold,
@@ -146,9 +190,14 @@ export class ConsumableService {
     const existing = await this.repo.findById(id);
     if (!existing) throw new NotFoundError("Consumable", id);
 
+    let categoryName: string | undefined;
+    if (input.category !== undefined) {
+      categoryName = await this.resolveConsumableCategoryName(input.category);
+    }
+
     const updated = await this.repo.update(id, {
       ...(input.name !== undefined ? { name: input.name } : {}),
-      ...(input.category !== undefined ? { category: input.category } : {}),
+      ...(categoryName !== undefined ? { category: categoryName } : {}),
       ...(input.unit !== undefined ? { unit: input.unit } : {}),
       ...(input.minThreshold !== undefined
         ? { minThreshold: input.minThreshold }
@@ -167,11 +216,30 @@ export class ConsumableService {
     actor: ActorContext
   ): Promise<ConsumableDTO> {
     const id = consumableIdSchema.parse(rawId);
-    const input = stockMovementSchema.parse(rawInput);
+    const input = restockSchema.parse(rawInput);
 
     return withTransaction(async (tx) => {
       const existing = await this.repo.findByIdForUpdate(id, tx);
       if (!existing) throw new NotFoundError("Consumable", id);
+
+      const purchasedOn = input.purchasedOn ?? todayDateString();
+      const lot = await this.purchaseLots.recordLot(
+        {
+          itemType: "consumable",
+          consumableId: existing.id,
+          itemCode: existing.itemCode,
+          itemName: existing.name,
+          supplierId: input.supplierId ?? null,
+          quantity: input.quantity,
+          unitCost: input.unitCost,
+          purchasedOn,
+          reference: input.reason ?? null,
+          notes: input.notes ?? null,
+          recordedByUserId: actor.userId,
+          recordedByName: actor.displayName,
+        },
+        tx
+      );
 
       const history = [
         ...(Array.isArray(existing.history) ? existing.history : []),
@@ -180,7 +248,13 @@ export class ConsumableService {
           input.quantity,
           actor.displayName,
           input.reason,
-          input.notes
+          input.notes,
+          {
+            unitCost: lot.unitCost,
+            supplierId: lot.supplierId ?? undefined,
+            supplierName: lot.supplierName ?? undefined,
+            lotCode: lot.lotCode,
+          }
         ),
       ];
 
@@ -190,6 +264,7 @@ export class ConsumableService {
           currentQty: existing.currentQty + input.quantity,
           lastRestocked: new Date(),
           history,
+          ...(lot.supplierName ? { supplier: lot.supplierName } : {}),
         },
         tx
       );
@@ -216,6 +291,20 @@ export class ConsumableService {
         );
       }
 
+      // FIFO cost snapshot — preserves supplier pricing for reports even if
+      // unit costs change on later restocks.
+      const allocations = await this.purchaseLots.consumeFifo(
+        existing.id,
+        input.quantity,
+        tx
+      );
+
+      const totalCost = allocations.reduce(
+        (sum, a) => sum + Number(a.total),
+        0
+      );
+      const primary = allocations.find((a) => !a.uncosted) ?? allocations[0];
+
       const history = [
         ...(Array.isArray(existing.history) ? existing.history : []),
         historyEntry(
@@ -223,7 +312,15 @@ export class ConsumableService {
           -input.quantity,
           actor.displayName,
           input.reason,
-          input.notes
+          input.notes,
+          {
+            unitCost: primary?.unitCost,
+            supplierId: primary?.supplierId ?? undefined,
+            supplierName: primary?.supplierName ?? undefined,
+            lotCode: primary?.lotCode ?? undefined,
+            totalCost: totalCost.toFixed(2),
+            lotAllocations: allocations,
+          }
         ),
       ];
 
@@ -237,6 +334,102 @@ export class ConsumableService {
       );
       if (!updated) throw new NotFoundError("Consumable", id);
       return toDTO(updated);
+    });
+  }
+
+  /**
+   * QR scan release against a *specific* supplier purchase lot.
+   * Quantity is entered after scan; cost/supplier are frozen from the lot row.
+   */
+  async releaseFromLot(
+    rawInput: unknown,
+    actor: ActorContext
+  ): Promise<{
+    consumable: ConsumableDTO;
+    lot: PurchaseLotDTO;
+    allocation: LotCostAllocation;
+  }> {
+    const input = scanReleaseLotSchema.parse(rawInput);
+    const parsed = parseScanPayload(input.code);
+    if (!parsed.code) {
+      throw new BadRequestError("Lot code is required.");
+    }
+
+    return withTransaction(async (tx) => {
+      // Resolve lot without consuming yet — then lock consumable stock first
+      // so we never drain a lot when the stock item is short.
+      const preview = await this.purchaseLots.getByCode(parsed.code);
+      if (preview.itemType !== "consumable") {
+        throw new BadRequestError(
+          "Only consumable purchase lots support quantity release via scan."
+        );
+      }
+      if (!preview.consumableId) {
+        throw new BadRequestError(
+          "This purchase lot is not linked to a consumable item."
+        );
+      }
+      if (preview.quantityRemaining < input.quantity) {
+        throw new BadRequestError(
+          `Insufficient remaining in lot ${preview.lotCode}. Available: ${preview.quantityRemaining}.`
+        );
+      }
+
+      const existing = await this.repo.findByIdForUpdate(
+        preview.consumableId,
+        tx
+      );
+      if (!existing) {
+        throw new NotFoundError("Consumable", preview.consumableId);
+      }
+
+      if (existing.currentQty < input.quantity) {
+        throw new BadRequestError(
+          `Insufficient stock on ${existing.itemCode}. Available: ${existing.currentQty} ${existing.unit}.`
+        );
+      }
+
+      const { lot, allocation } = await this.purchaseLots.consumeFromLot(
+        preview.lotCode,
+        input.quantity,
+        tx
+      );
+
+      const history = [
+        ...(Array.isArray(existing.history) ? existing.history : []),
+        historyEntry(
+          "checkout",
+          -input.quantity,
+          actor.displayName,
+          input.reason,
+          input.notes,
+          {
+            unitCost: allocation.unitCost,
+            supplierId: allocation.supplierId ?? undefined,
+            supplierName: allocation.supplierName ?? undefined,
+            lotCode: allocation.lotCode ?? undefined,
+            totalCost: allocation.total,
+            lotAllocations: [allocation],
+            recipientName: input.recipientName,
+          }
+        ),
+      ];
+
+      const updated = await this.repo.update(
+        existing.id,
+        {
+          currentQty: existing.currentQty - input.quantity,
+          history,
+        },
+        tx
+      );
+      if (!updated) throw new NotFoundError("Consumable", existing.id);
+
+      return {
+        consumable: toDTO(updated),
+        lot,
+        allocation,
+      };
     });
   }
 

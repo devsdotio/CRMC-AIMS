@@ -1,11 +1,12 @@
 /**
- * Consumables client data layer — prepared for UI integration, not wired yet.
+ * Consumables client data layer.
  */
 
 export { consumablesApi } from "./consumables-api";
 export type {
   ConsumableItem,
   CreateConsumablePayload,
+  RestockPayload,
   StockAdjustPayload,
   StockMovementPayload,
   UpdateConsumablePayload,

@@ -99,8 +99,16 @@ export function RecentActivityFeed({
             {Array.from({ length: 6 }).map((_, i) => <SkeletonRow key={i} />)}
           </div>
         ) : entries.length === 0 ? (
-          <div className="flex items-center justify-center py-10">
-            <p className="text-sm text-text-secondary">No activity has been recorded yet.</p>
+          <div className="flex flex-col items-center justify-center gap-3 py-12 px-5 text-center">
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-bg-subtle border border-border">
+              <ClipboardList className="h-5 w-5 text-text-secondary" strokeWidth={2} />
+            </span>
+            <div>
+              <p className="text-sm font-medium text-text">No recent activity</p>
+              <p className="text-xs text-text-secondary mt-0.5">
+                No events or changes have been recorded yet.
+              </p>
+            </div>
           </div>
         ) : (
           <ol className="divide-y divide-border" aria-label="Recent activity log">

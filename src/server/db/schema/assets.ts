@@ -14,15 +14,19 @@ import {
 import type { MaintenanceLogEntry } from "@/types/assets";
 
 /**
- * Enums mirror the frontend Asset contract
- * (`src/components/assets/types.ts`). Keep these in sync with
- * `src/server/modules/assets/asset.constants.ts`.
+ * Legacy enum retained for drizzle history only.
+ * Runtime category values live in `categories` (type=asset) and store as text on assets.
  */
 export const assetCategoryEnum = pgEnum("asset_category", [
   "transport",
   "computing",
   "av",
   "furniture",
+]);
+
+export const assetAssignmentTypeEnum = pgEnum("asset_assignment_type", [
+  "borrowable",
+  "assignable",
 ]);
 
 export const assetStatusEnum = pgEnum("asset_status", [
@@ -36,15 +40,12 @@ export const assetStatusEnum = pgEnum("asset_status", [
  * Coded capital equipment registry — one row per physical asset
  * (the QR-tagged unit the custodian manages).
  *
- * Borrow lifecycle (who has it) is tracked via `currentHolder` for now.
- * A dedicated borrow_transactions table will own that later; release/
- * return mutations will then write there instead of mutating holder alone.
+ * Multiple units of the same product share an optional `modelId`
+ * (e.g. 30 × Epson 310 Printer). Each unit still has a unique asset_code / QR.
  *
- * Every accountable mutation also appends an immutable row to
- * `asset_lifecycle_events` (status changes, holder transitions, staff actor).
- *
- * Maintenance history is stored as jsonb matching MaintenanceLogEntry[]
- * until a first-class maintenance_logs table is introduced.
+ * Custody: `currentHolder` + `borrow_transactions` (borrowable) or
+ * project assignments (assignable). Lifecycle audit → `asset_lifecycle_events`.
+ * Acquisition cost history → `purchase_lots`.
  */
 export const assets = pgTable(
   "assets",
@@ -53,8 +54,15 @@ export const assets = pgTable(
 
     assetCode: text("asset_code").notNull().unique(),
     name: text("name").notNull(),
-    category: assetCategoryEnum("category").notNull(),
+    category: text("category").notNull(),
     status: assetStatusEnum("status").notNull().default("active"),
+    assignmentType: assetAssignmentTypeEnum("assignment_type").notNull().default("borrowable"),
+
+    /**
+     * Optional catalog parent (`asset_models`). Null for one-off units
+     * that were registered without a bulk model.
+     */
+    modelId: uuid("model_id"),
 
     serialNumber: text("serial_number"),
     location: text("location").notNull(),
@@ -62,6 +70,7 @@ export const assets = pgTable(
     department: text("department"),
     purchaseDate: date("purchase_date", { mode: "string" }),
     value: numeric("value", { precision: 14, scale: 2 }),
+    supplierId: uuid("supplier_id"),
     imageUrl: text("image_url"),
     notes: text("notes"),
 
@@ -85,6 +94,8 @@ export const assets = pgTable(
     index("assets_status_idx").on(table.status),
     index("assets_category_idx").on(table.category),
     index("assets_location_idx").on(table.location),
+    index("assets_supplier_id_idx").on(table.supplierId),
+    index("assets_model_id_idx").on(table.modelId),
   ]
 );
 

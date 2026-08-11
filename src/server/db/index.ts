@@ -28,14 +28,21 @@ export function getDb(): Database {
   }
 
   /**
-   * Small pool: Next route handlers share the process; transactions need headroom.
-   * keepAlive + connect_timeout avoid hung statements on flaky network to Supabase.
+   * Shared process pool. Slow remote DB + many parallel APIs exhaust small pools
+   * and leave list pages spinning on skeletons.
+   *
+   * `options` sets Postgres GUCs for every session (statement_timeout aborts
+   * hung statements so pool slots free up).
    */
   const client = postgres(connectionString, {
-    max: 10,
+    max: process.env.NODE_ENV === "development" ? 8 : 12,
     idle_timeout: 20,
-    connect_timeout: 15,
+    connect_timeout: 8,
     prepare: false,
+    // Fail long queries (~8s) instead of holding pool slots for 25s+
+    connection: {
+      statement_timeout: 8000,
+    },
   });
   const db = drizzle(client, { schema });
 

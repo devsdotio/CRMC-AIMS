@@ -12,7 +12,9 @@ export { borrowRequestQueryKeys } from "./query-keys";
 export {
   useApproveBorrowRequestMutation,
   useBorrowRequestQuery,
-  useBorrowRequestsQuery,
+  useBorrowRequests,
   useCreateBorrowRequestMutation,
   useRejectBorrowRequestMutation,
+  useReleaseBorrowRequestMutation,
+  useMarkUnreleasedBorrowRequestMutation,
 } from "./use-borrow-requests";

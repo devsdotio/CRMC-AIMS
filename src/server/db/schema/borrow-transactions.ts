@@ -10,7 +10,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
-import { assets, assetCategoryEnum } from "./assets";
+import { assets } from "./assets";
 import { borrowRequests } from "./borrow-requests";
 
 /**
@@ -27,14 +27,6 @@ export const returnConditionEnum = pgEnum("return_condition", [
   "damaged",
   "needs_repair",
 ]);
-
-export type BorrowLogHistoryEntry = {
-  id: string;
-  action: "released" | "returned" | "flagged_repair" | "reminder_sent";
-  actor: string;
-  timestamp: string;
-  notes?: string;
-};
 
 export const borrowTransactions = pgTable(
   "borrow_transactions",
@@ -53,7 +45,7 @@ export const borrowTransactions = pgTable(
     }),
     assetCode: text("asset_code").notNull(),
     assetName: text("asset_name").notNull(),
-    category: assetCategoryEnum("category").notNull(),
+    category: text("category").notNull(),
 
     borrowerUserId: uuid("borrower_user_id"),
     borrowerName: text("borrower_name").notNull(),
@@ -76,11 +68,6 @@ export const borrowTransactions = pgTable(
     releasedByName: text("released_by_name").notNull(),
     receivedByUserId: uuid("received_by_user_id"),
     receivedByName: text("received_by_name"),
-
-    history: jsonb("history")
-      .$type<BorrowLogHistoryEntry[]>()
-      .notNull()
-      .default(sql`'[]'::jsonb`),
 
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

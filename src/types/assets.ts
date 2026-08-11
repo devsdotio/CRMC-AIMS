@@ -3,6 +3,7 @@ export type { AssetCategory };
 import type { BaseFilterState } from "./filters";
 
 export type AssetStatus = "active" | "needs_repair" | "out_of_service" | "retired";
+export type AssetAssignmentType = "borrowable" | "assignable";
 
 export interface MaintenanceLogEntry {
   id: string;
@@ -19,16 +20,23 @@ export interface Asset {
   name: string;
   category: AssetCategory;
   status: AssetStatus;
+  assignmentType: AssetAssignmentType;
+  /** Parent product model when unit belongs to a multi-copy catalog entry. */
+  modelId?: string;
   serialNumber?: string;
   location: string;
   currentHolder?: string;
   department?: string;
   purchaseDate?: string;
   value?: number;
+  /** Linked suppliers registry id; null clears on update payloads. */
+  supplierId?: string | null;
   imageUrl?: string;
   notes?: string;
   lastUpdated: string;
   maintenanceHistory: MaintenanceLogEntry[];
+  /** Canonical QR payload (`CRMC-AIMS:{assetCode}`) for printers / scanners. */
+  qrPayload?: string;
 }
 
 export interface AssetFilterState extends BaseFilterState {
@@ -42,16 +50,17 @@ export type ViewMode = "grid" | "table";
 
 export type CreateAssetInput = Pick<
   Asset,
-  "assetCode" | "name" | "category" | "status" | "location"
+  "assetCode" | "name" | "category" | "status" | "location" | "assignmentType"
 > &
   Partial<
     Pick<
       Asset,
+      | "modelId"
       | "serialNumber"
-      | "currentHolder"
       | "department"
       | "purchaseDate"
       | "value"
+      | "supplierId"
       | "imageUrl"
       | "notes"
       | "lastUpdated"
@@ -59,9 +68,15 @@ export type CreateAssetInput = Pick<
     >
   >;
 
-export type UpdateAssetInput = Partial<CreateAssetInput>;
+export type UpdateAssetInput = Partial<
+  Omit<CreateAssetInput, "supplierId">
+> & {
+  /** Explicit null clears the linked supplier. */
+  supplierId?: string | null;
+};
 
 export type ReturnAssetInput = {
   condition: string;
   status?: AssetStatus;
+  flagMaintenance?: boolean;
 };

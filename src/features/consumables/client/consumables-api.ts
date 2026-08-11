@@ -31,6 +31,15 @@ export type StockMovementPayload = {
   notes?: string;
 };
 
+export type RestockPayload = {
+  quantity: number;
+  unitCost: string | number;
+  supplierId?: string | null;
+  reason?: string;
+  notes?: string;
+  purchasedOn?: string;
+};
+
 export type StockAdjustPayload = {
   quantityChange: number;
   reason: string;
@@ -42,13 +51,17 @@ export const consumablesApi = {
     category?: ConsumableItem["category"];
     stockLevel?: "all" | "healthy" | "low" | "critical";
     search?: string;
-  }): Promise<ConsumableItem[]> {
+    page?: number;
+    limit?: number;
+  }): Promise<import("@/types/filters").PaginatedResponse<ConsumableItem>> {
     const sp = new URLSearchParams();
     if (params?.category) sp.set("category", params.category);
     if (params?.stockLevel) sp.set("stockLevel", params.stockLevel);
     if (params?.search) sp.set("search", params.search);
+    if (params?.page) sp.set("page", params.page.toString());
+    if (params?.limit) sp.set("limit", params.limit.toString());
     const qs = sp.toString();
-    const res = await fetchJson<ApiResponse<ConsumableItem[]>>(
+    const res = await fetchJson<ApiResponse<import("@/types/filters").PaginatedResponse<ConsumableItem>>>(
       qs ? `/api/consumables?${qs}` : "/api/consumables"
     );
     return res.data;
@@ -82,7 +95,7 @@ export const consumablesApi = {
 
   async restock(
     id: string,
-    payload: StockMovementPayload
+    payload: RestockPayload
   ): Promise<ConsumableItem> {
     const res = await fetchJson<ApiResponse<ConsumableItem>>(
       `/api/consumables/${id}/restock`,

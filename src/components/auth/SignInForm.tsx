@@ -1,14 +1,15 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useTransition } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { Loader2, ArrowRight } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { AuthCard } from './AuthCard';
 import { PasswordInput } from './PasswordInput';
 import { FormAlert } from './FormAlert';
 import { SignInFormValues, AuthFormState } from "@/types/auth";
+import { useQueryClient } from "@tanstack/react-query";
 
 function safeNextPath(raw: string | null): string {
   if (!raw || !raw.startsWith('/') || raw.startsWith('//')) {
@@ -25,16 +26,27 @@ const REDIRECT_ERROR_MESSAGES: Record<string, string> = {
     'Borrower accounts cannot access the staff workspace yet. Contact Property Custodian for updates.',
 };
 
+const STAY_ON_SIGN_IN_ERRORS = new Set([
+  'no_profile',
+  'deactivated',
+  'borrower_portal',
+]);
+
 function getRedirectErrorMessage(errorKey: string | null): string | null {
   if (!errorKey) return null;
   return REDIRECT_ERROR_MESSAGES[errorKey] ?? 'Unable to access the application.';
 }
 
+type SignInApiData = {
+  profile: {
+    role: string;
+  };
+};
+
 export function SignInForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const emailInputRef = useRef<HTMLInputElement>(null);
-  const [isPending, startTransition] = useTransition();
+  const queryClient = useQueryClient();
 
   const [formValues, setFormValues] = useState<SignInFormValues>({
     email: '',
@@ -63,6 +75,33 @@ export function SignInForm() {
   useEffect(() => {
     emailInputRef.current?.focus();
   }, []);
+
+  /**
+   * Clear residual Supabase session when the private shell rejected entry.
+   * Server Components cannot reliably attach signOut cookies to redirects.
+   */
+  useEffect(() => {
+    if (!paramErrorKey || !STAY_ON_SIGN_IN_ERRORS.has(paramErrorKey)) {
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const supabase = createClient();
+        await supabase.auth.signOut();
+      } catch {
+        // Best-effort
+      }
+      if (!cancelled) {
+        // Drop auth cookies from a stuck bounce loop even if signOut is partial
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [paramErrorKey]);
 
   const validateEmail = (email: string) => {
     if (!email.trim()) return 'Email address is required.';
@@ -116,51 +155,51 @@ export function SignInForm() {
     setFormState({ isLoading: true, errorMessage: null, successMessage: null });
 
     try {
-      const supabase = createClient();
-      const { error } = await supabase.auth.signInWithPassword({
-        email: formValues.email.trim(),
-        password: formValues.password,
+      // One server round-trip: Supabase password + profile gate + Set-Cookie.
+      // Avoids client signInWithPassword + separate /api/me (extra ~1–2s).
+      const res = await fetch('/api/auth/sign-in', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+          email: formValues.email.trim(),
+          password: formValues.password,
+        }),
       });
 
-      if (error) {
+      const body = (await res.json().catch(() => null)) as
+        | { data?: SignInApiData; error?: string }
+        | null;
+
+      if (!res.ok || !body?.data?.profile) {
         setFormState({
           isLoading: false,
           errorMessage:
+            body?.error ||
             'Invalid email or password. Please verify your credentials and try again.',
           successMessage: null,
         });
         return;
       }
 
-      setFormState({
-        isLoading: true, // Keep loading active while fetching profile and transitioning
-        errorMessage: null,
-        successMessage: 'Sign in successful! Preparing dashboard...',
-      });
+      queryClient.clear();
 
       let nextPath = safeNextPath(searchParams.get('next'));
-      
-      // If the target is root, resolve the actual dashboard URL here on the client 
-      // to avoid triggering a server-side redirect that flushes the DOM (white screen)
       if (nextPath === '/') {
-        try {
-          const res = await fetch('/api/me');
-          if (res.ok) {
-            const profile = await res.json();
-            if (profile.role === 'borrower') {
-              nextPath = '/borrower-db/dashboard';
-            } else {
-              nextPath = '/dashboard';
-            }
-          }
-        } catch {
-          // fallback to root if API fails
-        }
+        nextPath =
+          body.data.profile.role === 'borrower'
+            ? '/borrower-db/dashboard'
+            : '/dashboard';
       }
 
-      startTransition(() => {
-        router.push(nextPath);
+      setFormState({
+        isLoading: true,
+        errorMessage: null,
+        successMessage: 'Sign in successful! Opening workspace…',
       });
+
+      // Full navigation so the next document reliably picks up Set-Cookie cookies.
+      window.location.assign(nextPath);
     } catch {
       setFormState({
         isLoading: false,

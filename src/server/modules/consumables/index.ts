@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 
-import { requireAssetOperator } from "@/server/shared/auth";
+import { requireAssetOperator, requireActor } from "@/server/shared/auth";
 import { created, handleError, ok } from "@/server/shared/http";
 
 import { ConsumableService } from "./consumable.service";
@@ -12,13 +12,19 @@ export class ConsumableController {
 
   async list(request: NextRequest | Request) {
     try {
-      await requireAssetOperator();
+      await requireActor();
       const url = new URL(request.url);
+      
+      const pageParam = url.searchParams.get("page");
+      const limitParam = url.searchParams.get("limit");
+
       return ok(
         await this.service.list({
           category: url.searchParams.get("category") ?? undefined,
           stockLevel: url.searchParams.get("stockLevel") ?? undefined,
           search: url.searchParams.get("search") ?? undefined,
+          page: pageParam ? parseInt(pageParam, 10) : undefined,
+          limit: limitParam ? parseInt(limitParam, 10) : undefined,
         })
       );
     } catch (error) {
@@ -28,7 +34,7 @@ export class ConsumableController {
 
   async get(id: string) {
     try {
-      await requireAssetOperator();
+      await requireActor();
       return ok(await this.service.getById(id));
     } catch (error) {
       return handleError(error);
@@ -80,6 +86,17 @@ export class ConsumableController {
       const session = await requireAssetOperator();
       const body = await request.json();
       return ok(await this.service.adjust(id, body, session.actor));
+    } catch (error) {
+      return handleError(error);
+    }
+  }
+
+  /** QR scan release from a supplier purchase lot (consumable batch). */
+  async releaseFromLot(request: NextRequest | Request) {
+    try {
+      const session = await requireAssetOperator();
+      const body = await request.json();
+      return ok(await this.service.releaseFromLot(body, session.actor));
     } catch (error) {
       return handleError(error);
     }
