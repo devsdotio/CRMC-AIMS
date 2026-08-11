@@ -18,6 +18,8 @@ import { supplierQueryKeys } from "./query-keys";
 
 export function useSuppliersQuery(options?: {
   activeOnly?: boolean;
+  /** When false, skip the request (e.g. until a dialog that needs suppliers opens). */
+  enabled?: boolean;
 }): UseQueryResult<Supplier[], Error> {
   return useQuery({
     queryKey: supplierQueryKeys.list({
@@ -27,6 +29,8 @@ export function useSuppliersQuery(options?: {
       suppliersApi.list({
         activeOnly: options?.activeOnly,
       }),
+    enabled: options?.enabled ?? true,
+    staleTime: 5 * 60 * 1000,
   });
 }
 

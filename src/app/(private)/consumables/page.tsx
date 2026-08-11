@@ -45,10 +45,9 @@ export default function ConsumablesPage() {
   const releaseMutation = useReleaseFromLotMutation();
 
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
-  const { data: suppliers = [], isLoading: isSuppliersLoading } =
-    useSuppliersQuery({ activeOnly: true });
 
-  const isLoading = isConsumablesLoading || isSuppliersLoading;
+  // Grid/table only need the consumables list; suppliers load when restock opens.
+  const isLoading = isConsumablesLoading;
 
   const [filters, setFilters] = useState<ConsumableFilterState>({
     searchQuery: "",
@@ -80,6 +79,12 @@ export default function ConsumablesPage() {
     item: ConsumableItem | null;
     lot: PurchaseLot | null;
   }>({ isOpen: false, item: null, lot: null });
+
+  // Suppliers only matter for Restock dialog (add/edit loads its own registry list).
+  const { data: suppliers = [] } = useSuppliersQuery({
+    activeOnly: true,
+    enabled: restockState.isOpen,
+  });
 
   const releaseItemId = releaseState.item?.id;
   const { data: releaseLots = [] } = usePurchaseLotsQuery({

@@ -13,6 +13,31 @@ import type {
   ListConsumableFilters,
 } from "./consumable.types";
 
+/**
+ * List projection: skips bulky stock `history` JSONB (loaded on GET by id).
+ */
+const consumableListColumns = {
+  id: consumables.id,
+  itemCode: consumables.itemCode,
+  name: consumables.name,
+  category: consumables.category,
+  unit: consumables.unit,
+  currentQty: consumables.currentQty,
+  minThreshold: consumables.minThreshold,
+  location: consumables.location,
+  supplier: consumables.supplier,
+  lastRestocked: consumables.lastRestocked,
+  notes: consumables.notes,
+  createdAt: consumables.createdAt,
+  updatedAt: consumables.updatedAt,
+} as const;
+
+function withEmptyHistory(
+  row: Omit<ConsumableRow, "history">
+): ConsumableRow {
+  return { ...row, history: [] };
+}
+
 export class ConsumableRepository implements IConsumableRepository {
   private db(session?: DbSession) {
     return session ?? getDb();
@@ -95,7 +120,7 @@ export class ConsumableRepository implements IConsumableRepository {
     const offset = (page - 1) * limit;
 
     const rows = await db
-      .select()
+      .select(consumableListColumns)
       .from(consumables)
       .where(whereClause)
       .orderBy(desc(consumables.updatedAt))
@@ -103,7 +128,7 @@ export class ConsumableRepository implements IConsumableRepository {
       .offset(offset);
 
     return {
-      data: rows,
+      data: rows.map(withEmptyHistory),
       total,
       page,
       limit,
@@ -135,14 +160,15 @@ export class ConsumableRepository implements IConsumableRepository {
 
   async getLowStockItems(limit: number, session?: DbSession): Promise<ConsumableRow[]> {
     const db = this.db(session);
-    return db
-      .select()
+    const rows = await db
+      .select(consumableListColumns)
       .from(consumables)
       .where(
         sql`${consumables.currentQty} <= ceil(${consumables.minThreshold} * 1.2)`
       )
       .orderBy(asc(consumables.currentQty))
       .limit(limit);
+    return rows.map(withEmptyHistory);
   }
 
   async create(

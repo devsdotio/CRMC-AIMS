@@ -43,12 +43,13 @@ export function useConsumablesQuery(filters?: {
 }
 
 export function useConsumableQuery(
-  id: string
+  id: string,
+  options?: { enabled?: boolean }
 ): UseQueryResult<ConsumableItem, Error> {
   return useQuery({
     queryKey: consumableQueryKeys.detail(id),
     queryFn: () => consumablesApi.getById(id),
-    enabled: Boolean(id),
+    enabled: Boolean(id) && (options?.enabled ?? true),
   });
 }
 

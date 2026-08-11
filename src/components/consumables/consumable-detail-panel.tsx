@@ -18,6 +18,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { ConsumableItem, StockHistoryEntry } from "@/types/inventory";
 import type { PurchaseLot } from "@/types/purchase-lots";
+import { useConsumableQuery } from "@/features/consumables/client/use-consumables";
 import { usePurchaseLotsQuery } from "@/features/purchase-lots/client";
 import { formatPhp } from "@/components/projects/format-money";
 import { StockLevelBar } from "./stock-level-bar";
@@ -57,6 +58,13 @@ export function ConsumableDetailPanel({
   const panelRef = useRef<HTMLDivElement>(null);
   const [expandedLotId, setExpandedLotId] = useState<string | null>(null);
 
+  // List payload omits history for speed — load full record when the panel opens.
+  const { data: detailItem, isLoading: detailLoading } = useConsumableQuery(
+    item?.id ?? "",
+    { enabled: Boolean(isOpen && item?.id) }
+  );
+  const displayItem = detailItem ?? item;
+
   const { data: lots = [], isLoading: lotsLoading } = usePurchaseLotsQuery({
     consumableId: item?.id,
     itemType: "consumable",
@@ -69,9 +77,9 @@ export function ConsumableDetailPanel({
   );
 
   const historyNewestFirst = useMemo(() => {
-    if (!item?.history) return [];
-    return [...item.history].reverse();
-  }, [item?.history]);
+    if (!detailItem?.history?.length) return [];
+    return [...detailItem.history].reverse();
+  }, [detailItem?.history]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -85,7 +93,7 @@ export function ConsumableDetailPanel({
     setExpandedLotId(null);
   }, [item?.id]);
 
-  if (!isOpen || !item) return null;
+  if (!isOpen || !item || !displayItem) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs transition-opacity duration-200">
@@ -105,18 +113,18 @@ export function ConsumableDetailPanel({
           <div className="min-w-0 pr-2">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-mono text-xs font-bold text-text bg-bg px-2 py-0.5 rounded border border-border">
-                {item.itemCode}
+                {displayItem.itemCode}
               </span>
               <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-bg-subtle text-text-secondary border border-border">
                 <Tag className="h-2.5 w-2.5" />
-                {item.category.replace(/_/g, " ")}
+                {displayItem.category.replace(/_/g, " ")}
               </span>
             </div>
             <h2
               id="consumable-detail-heading"
               className="text-base font-bold text-text mt-0.5 leading-tight truncate"
             >
-              {item.name}
+              {displayItem.name}
             </h2>
           </div>
 
@@ -136,16 +144,16 @@ export function ConsumableDetailPanel({
               Stock status
             </span>
             <StockLevelBar
-              currentQty={item.currentQty}
-              minThreshold={item.minThreshold}
-              unit={item.unit}
+              currentQty={displayItem.currentQty}
+              minThreshold={displayItem.minThreshold}
+              unit={displayItem.unit}
             />
           </div>
 
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
-              onClick={() => onRestock(item)}
+              onClick={() => onRestock(displayItem)}
               className="inline-flex items-center justify-center gap-1.5 p-2.5 rounded-lg text-xs font-bold bg-accent text-accent-foreground hover:opacity-90 cursor-pointer shadow-xs"
             >
               <PlusCircle className="h-4 w-4" />
@@ -153,7 +161,7 @@ export function ConsumableDetailPanel({
             </button>
             <button
               type="button"
-              onClick={() => onRelease(item)}
+              onClick={() => onRelease(displayItem)}
               className="inline-flex items-center justify-center gap-1.5 p-2.5 rounded-lg text-xs font-bold border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 cursor-pointer"
             >
               <PackageMinus className="h-4 w-4" />
@@ -161,7 +169,7 @@ export function ConsumableDetailPanel({
             </button>
             <button
               type="button"
-              onClick={() => onAdjust(item)}
+              onClick={() => onAdjust(displayItem)}
               className="inline-flex items-center justify-center gap-1.5 p-2.5 rounded-lg text-xs font-semibold border border-border bg-bg text-text hover:border-primary cursor-pointer"
             >
               <SlidersHorizontal className="h-4 w-4" />
@@ -170,7 +178,7 @@ export function ConsumableDetailPanel({
             {onEdit && (
               <button
                 type="button"
-                onClick={() => onEdit(item)}
+                onClick={() => onEdit(displayItem)}
                 className="inline-flex items-center justify-center gap-1.5 p-2.5 rounded-lg text-xs font-semibold border border-border bg-bg text-text hover:border-primary cursor-pointer"
               >
                 Edit details
@@ -187,13 +195,13 @@ export function ConsumableDetailPanel({
                 <div>
                   <span className="text-text-secondary block">Unit</span>
                   <span className="font-bold text-text capitalize">
-                    {item.unit}
+                    {displayItem.unit}
                   </span>
                 </div>
                 <div>
                   <span className="text-text-secondary block">Min threshold</span>
                   <span className="font-bold text-text">
-                    {item.minThreshold} {item.unit}
+                    {displayItem.minThreshold} {displayItem.unit}
                   </span>
                 </div>
               </div>
@@ -202,7 +210,7 @@ export function ConsumableDetailPanel({
                   <span className="text-text-secondary block">Location</span>
                   <span className="font-semibold text-text flex items-center gap-1">
                     <MapPin className="h-3 w-3 text-text-secondary shrink-0" />
-                    {item.location}
+                    {displayItem.location}
                   </span>
                 </div>
                 <div>
@@ -211,17 +219,17 @@ export function ConsumableDetailPanel({
                   </span>
                   <span className="font-semibold text-text flex items-center gap-1">
                     <Truck className="h-3 w-3 text-text-secondary shrink-0" />
-                    {item.supplier || "Unspecified"}
+                    {displayItem.supplier || "Unspecified"}
                   </span>
                 </div>
               </div>
-              {item.notes && (
+              {displayItem.notes && (
                 <div className="pt-2 border-t border-border space-y-1">
                   <span className="text-text-secondary block font-semibold">
                     Notes
                   </span>
                   <p className="text-text bg-bg-subtle p-2.5 rounded border border-border leading-relaxed">
-                    {item.notes}
+                    {displayItem.notes}
                   </p>
                 </div>
               )}
@@ -291,7 +299,7 @@ export function ConsumableDetailPanel({
                           </div>
                           <p className="text-[11px] text-text-secondary truncate">
                             {lot.supplierName || "No supplier"} ·{" "}
-                            {formatPhp(Number(lot.unitCost))}/{item.unit}
+                            {formatPhp(Number(lot.unitCost))}/{displayItem.unit}
                           </p>
                           <p className="text-[11px] text-text">
                             <span className="font-semibold">
@@ -322,7 +330,7 @@ export function ConsumableDetailPanel({
                           {!depleted && (
                             <button
                               type="button"
-                              onClick={() => onRelease(item, lot)}
+                              onClick={() => onRelease(displayItem, lot)}
                               className="w-full inline-flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 cursor-pointer"
                             >
                               <PackageMinus className="h-3.5 w-3.5" />
@@ -345,7 +353,11 @@ export function ConsumableDetailPanel({
               Accountability log
             </h3>
             <div className="p-4 rounded-lg border border-border bg-bg">
-              {historyNewestFirst.length === 0 ? (
+              {detailLoading && historyNewestFirst.length === 0 ? (
+                <p className="text-xs text-text-secondary text-center py-3">
+                  Loading accountability log…
+                </p>
+              ) : historyNewestFirst.length === 0 ? (
                 <p className="text-xs text-text-secondary text-center py-3">
                   No stock movements logged yet.
                 </p>
@@ -365,7 +377,7 @@ export function ConsumableDetailPanel({
                           >
                             {historyTypeLabel(h.type)} (
                             {isPositive ? "+" : ""}
-                            {h.quantityChange} {item.unit})
+                            {h.quantityChange} {displayItem.unit})
                           </span>
                           <time className="text-[11px] text-text-secondary shrink-0">
                             {h.date}

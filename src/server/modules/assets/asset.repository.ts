@@ -7,6 +7,37 @@ import { assets, type AssetRow, type NewAssetRow } from "@/server/db/schema";
 import type { IAssetRepository, ListAssetsFilters } from "./asset.types";
 
 /**
+ * List projection: skips bulky `maintenance_history` JSONB (detail/mutations only).
+ */
+const assetListColumns = {
+  id: assets.id,
+  assetCode: assets.assetCode,
+  name: assets.name,
+  category: assets.category,
+  status: assets.status,
+  assignmentType: assets.assignmentType,
+  modelId: assets.modelId,
+  serialNumber: assets.serialNumber,
+  location: assets.location,
+  currentHolder: assets.currentHolder,
+  department: assets.department,
+  purchaseDate: assets.purchaseDate,
+  value: assets.value,
+  supplierId: assets.supplierId,
+  imageUrl: assets.imageUrl,
+  notes: assets.notes,
+  lastUpdated: assets.lastUpdated,
+  createdAt: assets.createdAt,
+  updatedAt: assets.updatedAt,
+} as const;
+
+function withEmptyMaintenanceHistory(
+  row: Omit<AssetRow, "maintenanceHistory">
+): AssetRow {
+  return { ...row, maintenanceHistory: [] };
+}
+
+/**
  * Data-access only. No validation, no DTO mapping, no domain rules.
  * Methods accept optional `db` so multi-step ops can share a transaction.
  */
@@ -66,9 +97,13 @@ export class AssetRepository implements IAssetRepository {
       );
     }
 
-    const base = db.select().from(assets).orderBy(asc(assets.createdAt));
-    if (conditions.length === 0) return base;
-    return base.where(and(...conditions));
+    const base = db
+      .select(assetListColumns)
+      .from(assets)
+      .orderBy(asc(assets.createdAt));
+    const rows =
+      conditions.length === 0 ? await base : await base.where(and(...conditions));
+    return rows.map(withEmptyMaintenanceHistory);
   }
 
   async findById(id: string, session?: DbSession): Promise<AssetRow | null> {
@@ -113,11 +148,12 @@ export class AssetRepository implements IAssetRepository {
     session?: DbSession
   ): Promise<AssetRow[]> {
     const db = this.db(session);
-    return db
-      .select()
+    const rows = await db
+      .select(assetListColumns)
       .from(assets)
       .where(eq(assets.modelId, modelId))
       .orderBy(asc(assets.assetCode));
+    return rows.map(withEmptyMaintenanceHistory);
   }
 
   async create(
