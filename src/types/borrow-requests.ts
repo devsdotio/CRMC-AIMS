@@ -4,7 +4,7 @@ import type { AssetCategory } from './shared';
 export type { AssetCategory };
 import type { BaseFilterState, DateRangeFilter } from "./filters";
 
-export type RequestStatus = "pending" | "approved" | "rejected" | "released" | "unreleased" | "returned";
+export type RequestStatus = "pending" | "approved" | "rejected" | "released" | "unreleased" | "returned" | "cancelled";
 
 export type TabFilter = "pending" | "approved" | "rejected" | "released" | "returned" | "all";
 

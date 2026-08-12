@@ -333,9 +333,43 @@ When we implement the consumable module “fully” under this design, the backe
 
 Migration: `0015_consumable_requests.sql`
 
-*(Borrowable/assignable modules already have substantial paths; endpoint audit comes next after consumable request design is fixed.)*
+---
+
+## 12. Borrowable & assignable asset APIs (implemented)
+
+### Borrowable (short-term borrow queue)
+
+| Method | Path | Who |
+|--------|------|-----|
+| GET/POST | `/api/borrow-requests` | Actor |
+| GET | `/api/borrow-requests/:id` | Actor (own or operator) |
+| POST | `/api/borrow-requests/:id/approve` | Asset operator |
+| POST | `/api/borrow-requests/:id/reject` | Asset operator |
+| POST | `/api/borrow-requests/:id/cancel` | Requester or operator (pending only) |
+| POST | `/api/borrow-requests/:id/release` | Asset operator — **due date = request `expectedReturnDate`** |
+| POST | `/api/borrow-requests/:id/unrelease` | Asset operator (approved, pickup failed) |
+| POST | `/api/borrow-requests/:id/return` | Asset operator |
+| GET/POST | `/api/borrow-log` | Operator — direct release / list (incl. `?status=overdue`) |
+| GET | `/api/borrow-log/:id` | Operator |
+| POST | `/api/borrow-log/:id/return` | Operator |
+| GET/POST/PATCH/DELETE | `/api/assets`, `/api/assets/:id` | Registry CRUD |
+| POST | `/api/assets/:id/release`, `/api/assets/:id/return` | Operator — ad-hoc custody |
+| POST | `/api/assets/scan/resolve`, `…/release`, `…/return` | QR scan paths |
+
+Migration: `0016_borrow_request_cancelled.sql` (adds `cancelled` status)
+
+### Assignable (project custody)
+
+| Method | Path | Who |
+|--------|------|-----|
+| GET/POST | `/api/projects/:id/assets` | Operator — list / assign |
+| POST | `/api/projects/:id/assets/:assignmentId/return` | Operator |
+| POST | `/api/projects/:id/assets/:assignmentId/damage` | Operator — maintenance or write-off |
+
+Assign/return writes **lifecycle events + audit_logs** (`entityType: project_asset_assignment`).
 
 ---
+
 
 ## 7. Mapping example: “40 sheets of A4 from two suppliers”
 

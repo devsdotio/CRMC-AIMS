@@ -8,6 +8,20 @@ type Params = { params: Promise<{ id: string }> };
  *   post:
  *     summary: Reject a pending borrow request
  *     tags: [BorrowRequests]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [reason]
+ *             properties:
+ *               reason: { type: string }
  */
 export async function POST(request: Request, { params }: Params) {
   const { id } = await params;

@@ -45,7 +45,15 @@ export function getApiDocs() {
           description:
             "Multi-product consumable issue queue (request → approve → lot-aware release)",
         },
-        { name: "Requests", description: "Borrow and release requests" },
+        {
+          name: "BorrowRequests",
+          description: "Short-term borrow request queue (borrowable assets)",
+        },
+        {
+          name: "BorrowLog",
+          description: "Active borrow custody transactions (release / return / overdue)",
+        },
+        { name: "Requests", description: "Borrow and release requests (legacy tag)" },
         { name: "Dashboard", description: "Admin dashboard data" },
         { name: "Users", description: "User account administration" },
         { name: "Projects", description: "Projects, expenses, and assignments" },

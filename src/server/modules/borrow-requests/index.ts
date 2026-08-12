@@ -72,6 +72,22 @@ export class BorrowRequestController {
       return handleError(error);
     }
   }
+
+  async cancel(request: NextRequest | Request, id: string) {
+    try {
+      const session = await requireActor();
+      let body: unknown = {};
+      try {
+        body = await request.json();
+      } catch {
+        body = {};
+      }
+      return ok(await this.service.cancel(id, body, session));
+    } catch (error) {
+      return handleError(error);
+    }
+  }
+
   async release(request: NextRequest | Request, id: string) {
     try {
       const session = await requireAssetOperator();

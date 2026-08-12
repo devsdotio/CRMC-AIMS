@@ -26,6 +26,7 @@ import { withTransaction } from "@/server/db/transaction";
 import {
   approveBorrowRequestSchema,
   borrowRequestIdSchema,
+  cancelBorrowRequestSchema,
   createBorrowRequestSchema,
   listBorrowRequestsQuerySchema,
   rejectBorrowRequestSchema,
@@ -135,12 +136,16 @@ export class BorrowRequestService {
     const input = createBorrowRequestSchema.parse(rawInput);
     const requestCode = generateOperationalCode("REQ");
 
+    const requesterUserId = isAssetOperatorRole(actor.role)
+      ? (input.requesterUserId ?? actor.userId)
+      : actor.userId;
+
     const submitted = historyEntry("submitted", actor.displayName, "Request recorded");
 
     const row = await withTransaction(async (tx) => {
       const created = await this.repo.create({
         requestCode,
-        requesterUserId: input.requesterUserId ?? null,
+        requesterUserId,
         requesterName: input.requesterName,
         requesterEmail: input.requesterEmail.toLowerCase(),
         requesterPhone: input.requesterPhone ?? "",
@@ -302,7 +307,7 @@ export class BorrowRequestService {
           borrowerEmail: existing.requesterEmail,
           borrowerPhone: existing.requesterPhone || "",
           department: existing.department,
-          dueDate: this.borrowLogs.defaultDueDate(),
+          dueDate: existing.expectedReturnDate,
           notes: noteWithPicker,
           borrowerUserId: existing.requesterUserId ?? undefined,
         },
@@ -341,6 +346,57 @@ export class BorrowRequestService {
 
       return up;
     });
+    return toDTO(updated);
+  }
+
+  async cancel(
+    rawId: string,
+    rawInput: unknown,
+    actor: ActorContext
+  ): Promise<BorrowRequestDTO> {
+    const id = borrowRequestIdSchema.parse(rawId);
+    const input = cancelBorrowRequestSchema.parse(rawInput ?? {});
+    const existing = await this.repo.findById(id);
+    if (!existing) throw new NotFoundError("Borrow request", id);
+    if (existing.status !== "pending") {
+      throw new ConflictError("Only pending requests can be cancelled.");
+    }
+
+    if (
+      !isAssetOperatorRole(actor.role) &&
+      existing.requesterUserId !== actor.userId
+    ) {
+      throw new ForbiddenError("You can only cancel your own requests.");
+    }
+
+    const history = [
+      ...(Array.isArray(existing.history) ? existing.history : []),
+      historyEntry("cancelled", actor.displayName, input.note),
+    ];
+
+    const updated = await withTransaction(async (tx) => {
+      const up = await this.repo.update(
+        id,
+        { status: "cancelled", history },
+        tx
+      );
+      if (!up) throw new NotFoundError("Borrow request", id);
+
+      await this.auditLogs.create(
+        {
+          entityType: "borrow_request",
+          entityId: up.id,
+          action: "cancelled",
+          actorName: actor.displayName,
+          actorUserId: actor.userId,
+          notes: input.note,
+        },
+        tx
+      );
+
+      return up;
+    });
+
     return toDTO(updated);
   }
 

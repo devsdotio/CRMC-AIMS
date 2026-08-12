@@ -18,7 +18,7 @@ export type BorrowRequestDTO = {
   requestedAt: string;
   relativeTime: string;
   expectedReturnDate: string;
-  status: "pending" | "approved" | "rejected" | "released" | "unreleased" | "returned";
+  status: "pending" | "approved" | "rejected" | "released" | "unreleased" | "returned" | "cancelled";
   notes?: string;
   rejectionReason?: string;
   pickedUpBy?: string;
