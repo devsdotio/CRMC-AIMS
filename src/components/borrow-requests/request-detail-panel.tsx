@@ -25,6 +25,7 @@ const STATUS_STYLES: Record<RequestStatus, { bg: string; text: string; label: st
   released:   { bg: "bg-status-active-bg/20",       text: "text-status-active-text font-bold",      label: "Released" },
   unreleased: { bg: "bg-bg-subtle",                 text: "text-text-secondary font-bold",          label: "Unreleased" },
   returned:   { bg: "bg-status-active-bg/20",       text: "text-status-active-text font-bold",      label: "Returned" },
+  cancelled:  { bg: "bg-bg-subtle",                 text: "text-text-secondary font-bold",          label: "Cancelled" },
 };
 
 function getActionIcon(action: string) {
@@ -35,6 +36,7 @@ function getActionIcon(action: string) {
     case "released": return <PackageCheck className="h-4 w-4" />;
     case "unreleased": return <PackageMinus className="h-4 w-4" />;
     case "returned": return <RotateCcw className="h-4 w-4" />;
+    case "cancelled": return <XCircle className="h-4 w-4" />;
     default: return <History className="h-4 w-4" />;
   }
 }

@@ -10,7 +10,14 @@ export type TabFilter = "pending" | "approved" | "rejected" | "released" | "retu
 
 export interface ActionHistoryLog {
   id: string;
-  action: "submitted" | "approved" | "rejected" | "released" | "unreleased" | "returned";
+  action:
+    | "submitted"
+    | "approved"
+    | "rejected"
+    | "released"
+    | "unreleased"
+    | "returned"
+    | "cancelled";
   actor: string;
   timestamp: string;
   note?: string;
