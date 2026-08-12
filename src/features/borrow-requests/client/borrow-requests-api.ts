@@ -8,11 +8,14 @@ export type CreateBorrowRequestPayload = {
   requesterEmail: string;
   requesterPhone?: string;
   department: string;
-  itemDescription: string;
-  assetId?: string;
-  assetCode?: string;
-  category: BorrowRequest["category"];
-  quantity?: number;
+  items: {
+    itemDescription: string;
+    assetId?: string;
+    assetCode?: string;
+    category: BorrowRequest["items"][number]["category"];
+    quantity: number;
+    itemType: "asset" | "consumable";
+  }[];
   purpose: string;
   expectedReturnDate: string;
   notes?: string;

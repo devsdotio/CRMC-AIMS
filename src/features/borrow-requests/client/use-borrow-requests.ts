@@ -1,14 +1,10 @@
 "use client";
 
-/**
- * React Query hooks for borrow requests.
- * Ready for page integration — UI still uses mocks until wired.
- */
-
 import {
   useMutation,
   useQuery,
   useQueryClient,
+  keepPreviousData,
   type UseMutationResult,
   type UseQueryResult,
 } from "@tanstack/react-query";
@@ -36,6 +32,7 @@ export function useBorrowRequests(filters?: {
   return useQuery({
     queryKey: borrowRequestQueryKeys.list(filters),
     queryFn: () => borrowRequestsApi.list(filters),
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -61,11 +58,23 @@ export function useCreateBorrowRequestMutation(): UseMutationResult<
     mutationFn: (payload) => borrowRequestsApi.create(payload),
     onSuccess: (newRequest) => {
       // 1. Optimistically add to lists
-      qc.setQueriesData<BorrowRequest[]>(
+      qc.setQueriesData<PaginatedResponse<BorrowRequest[]>>(
         { queryKey: borrowRequestQueryKeys.list() },
         (old) => {
-          if (!old) return [newRequest];
-          return [newRequest, ...old];
+          if (!old) {
+            return {
+              data: [newRequest],
+              meta: { total: 1, page: 1, limit: 10, totalPages: 1 },
+            };
+          }
+          return {
+            ...old,
+            data: [newRequest, ...old.data],
+            meta: {
+              ...old.meta,
+              total: old.meta.total + 1,
+            },
+          };
         }
       );
 
@@ -87,7 +96,7 @@ export function useCreateBorrowRequestMutation(): UseMutationResult<
                 id: newRequest.id,
                 requesterName: newRequest.requesterName,
                 department: newRequest.department,
-                itemDescription: newRequest.itemDescription,
+                items: newRequest.items,
                 requestedAt: newRequest.requestedAt,
                 relativeTime: newRequest.relativeTime,
               },
@@ -172,9 +181,12 @@ export function useReleaseBorrowRequestMutation(): UseMutationResult<
     mutationFn: ({ id, payload }) => borrowRequestsApi.release(id, payload),
     onMutate: async ({ id }) => {
       await qc.cancelQueries({ queryKey: borrowRequestQueryKeys.all });
-      qc.setQueriesData<BorrowRequest[]>({ queryKey: borrowRequestQueryKeys.list() }, (old) => {
-        if (!old || !Array.isArray(old)) return old;
-        return old.map(req => req.id === id ? { ...req, status: "released" } : req);
+      qc.setQueriesData<PaginatedResponse<BorrowRequest[]>>({ queryKey: borrowRequestQueryKeys.list() }, (old) => {
+        if (!old || !Array.isArray(old.data)) return old;
+        return {
+          ...old,
+          data: old.data.map(req => req.id === id ? { ...req, status: "released" as const } : req),
+        };
       });
       qc.setQueriesData<BorrowRequest>({ queryKey: borrowRequestQueryKeys.detail(id) }, (old) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -212,9 +224,12 @@ export function useMarkReturnedBorrowRequestMutation(): UseMutationResult<
     mutationFn: ({ id, payload }) => borrowRequestsApi.markReturned(id, payload),
     onMutate: async ({ id }) => {
       await qc.cancelQueries({ queryKey: borrowRequestQueryKeys.all });
-      qc.setQueriesData<BorrowRequest[]>({ queryKey: borrowRequestQueryKeys.list() }, (old) => {
-        if (!old || !Array.isArray(old)) return old;
-        return old.map(req => req.id === id ? { ...req, status: "returned" } : req);
+      qc.setQueriesData<PaginatedResponse<BorrowRequest[]>>({ queryKey: borrowRequestQueryKeys.list() }, (old) => {
+        if (!old || !Array.isArray(old.data)) return old;
+        return {
+          ...old,
+          data: old.data.map(req => req.id === id ? { ...req, status: "returned" as const } : req),
+        };
       });
       qc.setQueriesData<BorrowRequest>({ queryKey: borrowRequestQueryKeys.detail(id) }, (old) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

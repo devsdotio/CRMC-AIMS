@@ -52,13 +52,21 @@ export function CancelRequestDialog({
           </p>
         </div>
 
-        <div className="rounded-lg bg-bg-subtle border border-border px-3 py-2 text-sm">
-          <p className="font-mono text-xs text-text-secondary">
+        <div className="rounded-lg bg-bg-subtle border border-border px-3 py-2 text-sm max-h-40 overflow-y-auto">
+          <p className="font-mono text-xs text-text-secondary mb-1">
             {request.requestCode}
           </p>
-          <p className="font-semibold text-text mt-0.5">
-            {request.itemDescription}
-          </p>
+          <div className="space-y-1">
+            {request.items?.map((item, idx) => (
+              <p key={idx} className="font-semibold text-text">
+                {item.itemDescription}
+                <span className="ml-2 text-xs font-normal text-text-secondary">
+                  × {item.quantity}{" "}
+                  {item.itemType === "consumable" ? "unit(s)" : "item(s)"}
+                </span>
+              </p>
+            ))}
+          </div>
         </div>
 
         <div className="flex items-center justify-end gap-3 pt-1">

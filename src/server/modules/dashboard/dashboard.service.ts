@@ -140,7 +140,7 @@ export class DashboardService {
         id: r.id,
         requesterName: r.requesterName,
         department: r.department,
-        itemDescription: r.itemDescription,
+        itemDescription: r.items[0]?.itemDescription || "Multiple items",
         requestedAt:
           r.requestedAt instanceof Date
             ? r.requestedAt.toISOString()
@@ -213,7 +213,7 @@ export class DashboardService {
         id: r.id,
         requesterName: r.requesterName,
         department: r.department,
-        itemDescription: r.itemDescription,
+        itemDescription: r.items[0]?.itemDescription || "Multiple items",
         requestedAt:
           r.requestedAt instanceof Date
             ? r.requestedAt.toISOString()

@@ -10,10 +10,14 @@ export type BorrowRequestDTO = {
   requesterEmail: string;
   requesterPhone: string;
   department: string;
-  itemDescription: string;
-  assetCode?: string;
-  category: string;
-  quantity: number;
+  items: {
+    itemDescription: string;
+    assetId?: string;
+    assetCode?: string;
+    category: string;
+    quantity: number;
+    itemType: "asset" | "consumable";
+  }[];
   purpose: string;
   requestedAt: string;
   relativeTime: string;

@@ -31,11 +31,16 @@ export const createBorrowRequestSchema = z.object({
   requesterEmail: z.string().trim().email().max(320),
   requesterPhone: z.string().trim().max(40).optional().default(""),
   department: z.string().trim().min(1).max(120),
-  itemDescription: z.string().trim().min(1).max(500),
-  assetId: z.string().uuid().optional(),
-  assetCode: z.string().trim().max(64).optional(),
-  category: assetCategorySchema,
-  quantity: z.number().int().min(1).max(999).optional().default(1),
+  items: z.array(
+    z.object({
+      itemDescription: z.string().trim().min(1).max(500),
+      assetId: z.string().uuid().optional(),
+      assetCode: z.string().trim().max(64).optional(),
+      category: assetCategorySchema,
+      quantity: z.number().int().min(1).max(999).optional().default(1),
+      itemType: z.enum(["asset", "consumable"]),
+    })
+  ).min(1, "At least one item is required."),
   purpose: z.string().trim().min(1).max(1000),
   expectedReturnDate: z
     .string()

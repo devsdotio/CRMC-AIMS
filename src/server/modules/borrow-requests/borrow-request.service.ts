@@ -43,10 +43,7 @@ function toDTO(row: BorrowRequestRow): BorrowRequestDTO {
     requesterEmail: row.requesterEmail,
     requesterPhone: row.requesterPhone,
     department: row.department,
-    itemDescription: row.itemDescription,
-    assetCode: row.assetCode ?? undefined,
-    category: row.category,
-    quantity: row.quantity,
+    items: row.items,
     purpose: row.purpose,
     requestedAt:
       row.requestedAt instanceof Date
@@ -102,7 +99,7 @@ export class BorrowRequestService {
       filters.requesterUserId = actor.userId;
     }
     
-    const { page, limit, ...countFilters } = filters;
+    const { page, limit, status, ...countFilters } = filters;
     const [rows, total, counts] = await Promise.all([
       this.repo.list(filters),
       this.repo.count(filters),
@@ -145,11 +142,7 @@ export class BorrowRequestService {
         requesterEmail: input.requesterEmail.toLowerCase(),
         requesterPhone: input.requesterPhone ?? "",
         department: input.department,
-        itemDescription: input.itemDescription,
-        assetId: input.assetId ?? null,
-        assetCode: input.assetCode ?? null,
-        category: input.category,
-        quantity: input.quantity,
+        items: input.items,
         purpose: input.purpose,
         expectedReturnDate: input.expectedReturnDate,
         status: "pending",
@@ -192,24 +185,25 @@ export class BorrowRequestService {
       historyEntry("approved", actor.displayName, input.note),
     ];
 
-    const assetToAssignId = input.assetId ?? existing.assetId;
-    if (assetToAssignId) {
-      const asset = await this.assetRepo.findById(assetToAssignId);
-      if (asset && asset.currentHolder) {
-        throw new ConflictError(`Cannot approve: Asset is currently borrowed by ${asset.currentHolder}. It will remain in pending status until available.`);
-      }
-      if (asset && asset.assignmentType === "assignable") {
-        throw new BadRequestError(
-          "This asset is project-assignable and cannot be approved for borrow checkout."
-        );
+    // Note: Since a single request can now contain multiple items, we shouldn't necessarily block the whole request
+    // if ONE item is already checked out, or we should block it all. For simplicity, we just check all requested assets.
+    for (const item of existing.items) {
+      if (item.assetId) {
+        const asset = await this.assetRepo.findById(item.assetId);
+        if (asset && asset.currentHolder) {
+          throw new ConflictError(`Cannot approve: Asset ${item.assetCode} is currently borrowed by ${asset.currentHolder}. It will remain in pending status until available.`);
+        }
+        if (asset && asset.assignmentType === "assignable") {
+          throw new BadRequestError(
+            `Asset ${item.assetCode} is project-assignable and cannot be approved for borrow checkout.`
+          );
+        }
       }
     }
 
     const updated = await withTransaction(async (tx) => {
       const up = await this.repo.update(id, {
         status: "approved",
-        assetId: input.assetId ?? existing.assetId,
-        assetCode: input.assetCode ?? existing.assetCode,
         history,
       }, tx);
       if (!up) throw new NotFoundError("Borrow request", id);
@@ -286,28 +280,30 @@ export class BorrowRequestService {
       : `Released to: ${input.pickedUpBy}`;
 
     // Open accountable borrow log first while request is still approved.
-    if (existing.assetId) {
-      const asset = await this.assetRepo.findById(existing.assetId);
-      if (!asset) throw new NotFoundError("Asset", existing.assetId);
-      if (asset.assignmentType === "assignable") {
-        throw new BadRequestError(
-          "This asset is project-assignable and cannot be released as a borrow checkout."
+    for (const item of existing.items) {
+      if (item.assetId) {
+        const asset = await this.assetRepo.findById(item.assetId);
+        if (!asset) throw new NotFoundError("Asset", item.assetId);
+        if (asset.assignmentType === "assignable") {
+          throw new BadRequestError(
+            `Asset ${item.assetCode} is project-assignable and cannot be released as a borrow checkout.`
+          );
+        }
+        await this.borrowLogs.release(
+          {
+            assetId: item.assetId,
+            requestId: existing.id,
+            borrowerName: input.pickedUpBy,
+            borrowerEmail: existing.requesterEmail,
+            borrowerPhone: existing.requesterPhone || "",
+            department: existing.department,
+            dueDate: this.borrowLogs.defaultDueDate(),
+            notes: noteWithPicker,
+            borrowerUserId: existing.requesterUserId ?? undefined,
+          },
+          actor
         );
       }
-      await this.borrowLogs.release(
-        {
-          assetId: existing.assetId,
-          requestId: existing.id,
-          borrowerName: input.pickedUpBy,
-          borrowerEmail: existing.requesterEmail,
-          borrowerPhone: existing.requesterPhone || "",
-          department: existing.department,
-          dueDate: this.borrowLogs.defaultDueDate(),
-          notes: noteWithPicker,
-          borrowerUserId: existing.requesterUserId ?? undefined,
-        },
-        actor
-      );
     }
 
     const history = [
@@ -369,8 +365,10 @@ export class BorrowRequestService {
       }, tx);
       if (!up) throw new NotFoundError("Borrow request", id);
 
-      if (up.assetId) {
-        await this.assetRepo.update(up.assetId, { currentHolder: null }, tx);
+      for (const item of up.items) {
+        if (item.assetId) {
+          await this.assetRepo.update(item.assetId, { currentHolder: null }, tx);
+        }
       }
 
       await this.auditLogs.create({
@@ -401,26 +399,28 @@ export class BorrowRequestService {
       : `Returned by: ${input.returnedBy}`;
 
     // Close active borrow log (clears holder + lifecycle) when this request released an asset.
-    if (existing.assetId) {
-      const open = await this.borrowLogRepo.findActiveByAssetId(existing.assetId);
-      if (open) {
-        await this.borrowLogs.returnLog(
-          open.id,
-          {
-            condition: "good",
-            conditionNotes: noteWithReturner,
-            flagMaintenance: false,
-          },
-          actor
-        );
-      } else {
-        // Legacy release without log — clear holder so registry is usable again.
-        const asset = await this.assetRepo.findById(existing.assetId);
-        if (asset?.currentHolder) {
-          await this.assetRepo.update(existing.assetId, {
-            currentHolder: null,
-            lastUpdated: new Date(),
-          });
+    for (const item of existing.items) {
+      if (item.assetId) {
+        const open = await this.borrowLogRepo.findActiveByAssetId(item.assetId);
+        if (open) {
+          await this.borrowLogs.returnLog(
+            open.id,
+            {
+              condition: "good",
+              conditionNotes: noteWithReturner,
+              flagMaintenance: false,
+            },
+            actor
+          );
+        } else {
+          // Legacy release without log — clear holder so registry is usable again.
+          const asset = await this.assetRepo.findById(item.assetId);
+          if (asset?.currentHolder) {
+            await this.assetRepo.update(item.assetId, {
+              currentHolder: null,
+              lastUpdated: new Date(),
+            });
+          }
         }
       }
     }

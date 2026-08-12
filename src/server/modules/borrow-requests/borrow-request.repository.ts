@@ -46,8 +46,7 @@ export class BorrowRequestRepository implements IBorrowRequestRepository {
           ilike(borrowRequests.requesterName, q),
           ilike(borrowRequests.requesterEmail, q),
           ilike(borrowRequests.requestCode, q),
-          ilike(borrowRequests.itemDescription, q),
-          ilike(borrowRequests.assetCode, q)
+          sql`${borrowRequests.items}::text ILIKE ${q}`
         )!
       );
     }

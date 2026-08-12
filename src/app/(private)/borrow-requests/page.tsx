@@ -34,7 +34,7 @@ export default function BorrowRequestsPage() {
     page: 1,
   });
 
-  const { data: response, isLoading, isError, error, refetch } = useBorrowRequests({
+  const { data: response, isLoading, isError, error, refetch, isPlaceholderData } = useBorrowRequests({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
     status: activeTab === "all" ? undefined : (activeTab as any),
     department: filters.department === "All Departments" ? undefined : filters.department,
@@ -82,7 +82,7 @@ export default function BorrowRequestsPage() {
   const rejectedCount = meta?.counts?.rejected || 0;
   const releasedCount = meta?.counts?.released || 0;
   const returnedCount = meta?.counts?.returned || 0;
-  const totalCount = meta?.counts?.undefined || 0; // undefined status means all
+  const totalCount = meta?.counts ? Object.values(meta.counts).reduce((a, b) => a + (b || 0), 0) : 0;
 
   // Handlers for state updates
   const handleFilterChange = (updated: Partial<BorrowRequestFilterState>) => {
@@ -202,6 +202,7 @@ export default function BorrowRequestsPage() {
           requests={requests}
           activeTab={activeTab}
           loading={isLoading && !isError}
+          transitioning={isPlaceholderData}
           onSelect={setSelectedRequest}
           onApprove={handleOpenApproveModal}
           onReject={handleOpenRejectModal}

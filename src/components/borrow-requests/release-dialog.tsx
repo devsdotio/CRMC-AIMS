@@ -82,7 +82,7 @@ export function ReleaseDialog({
         <div className="px-6 py-5 border-b border-border bg-bg-subtle/50">
           <h2 className="text-lg font-bold text-text">Release Item</h2>
           <p className="mt-1 text-sm text-text-secondary">
-            Releasing {request.requestCode} - {request.itemDescription}
+            Releasing {request.requestCode} - {request.items.map(i => i.itemDescription).join(", ")}
           </p>
         </div>
 

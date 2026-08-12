@@ -54,7 +54,7 @@ export function MyRequestsTab() {
             all: "bg-text text-card border-text",
             pending: "bg-status-repair-bg/15 text-status-repair-text border-status-repair-bg/40",
             approved: "bg-status-active-bg/15 text-status-active-text border-status-active-bg/40",
-            rejected: "bg-status-outofservice-bg/10 text-status-outofservice-bg dark:text-status-outofservice-text border-status-outofservice-bg/40",
+            rejected: "bg-destructive text-white border-destructive",
             returned: "bg-bg-subtle text-text border-border",
           };
 
@@ -62,7 +62,7 @@ export function MyRequestsTab() {
             all: "bg-card/20 text-card",
             pending: "bg-status-repair-bg/20 text-status-repair-text",
             approved: "bg-status-active-bg/20 text-status-active-text",
-            rejected: "bg-status-outofservice-bg/20 text-status-outofservice-bg dark:text-status-outofservice-text",
+            rejected: "bg-destructive text-white",
             returned: "bg-border text-text",
           };
 

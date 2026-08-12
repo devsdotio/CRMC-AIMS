@@ -1,6 +1,6 @@
 import type { BorrowRequest } from "@/types/borrow-requests";
 import type { BorrowLogRecord } from "@/types/borrow-log";
-import type { Asset, AssetStatus } from "@/types/assets";
+import type { Asset, AssetStatus, AssetAssignmentType } from "@/types/assets";
 import type { ConsumableItem } from "@/types/inventory";
 
 // ─── Re-exports ───────────────────────────────────────────────────────────────
@@ -14,11 +14,8 @@ export type PortalRequestReleasedStatus = "waiting_pickup" | "released";
 export interface PortalBorrowRequest extends BorrowRequest {
   /** Present only when status === "approved" */
   releasedStatus?: PortalRequestReleasedStatus;
-  /** For consumables — number of units requested */
-  requestedQuantity?: number;
   requestedDateFrom: string;
   requestedDateTo: string;
-  itemType: "asset" | "consumable";
 }
 
 export type PortalBorrowLogRecord = BorrowLogRecord;
@@ -33,6 +30,7 @@ export interface BrowseAssetItem {
   name: string;
   category: string;
   status: AssetStatus;
+  assignmentType: AssetAssignmentType;
   assetCode: string;
   location: string;
   notes?: string;
@@ -58,9 +56,10 @@ export type BrowseItem = BrowseAssetItem | BrowseConsumableItem;
 
 // ─── Wizard ───────────────────────────────────────────────────────────────────
 
-export type RequestWizardStep = "select" | "details" | "review";
+export type RequestWizardStep = "type" | "select" | "details" | "review";
 
 export interface WizardFormValues {
+  requestType: "borrowable" | "assignable" | "consumable" | null;
   selectedItems: BrowseItem[];
   dateFrom: string;
   dateTo: string;

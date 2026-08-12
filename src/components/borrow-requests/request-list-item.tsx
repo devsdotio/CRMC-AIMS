@@ -20,7 +20,7 @@ export interface RequestListItemProps {
 const STATUS_STYLES: Record<RequestStatus, { bg: string; text: string; label: string }> = {
   pending:    { bg: "bg-status-repair-bg/20",       text: "text-status-repair-text font-bold",      label: "Pending Review" },
   approved:   { bg: "bg-status-active-bg/20",       text: "text-status-active-text font-bold",      label: "Approved" },
-  rejected:   { bg: "bg-status-outofservice-bg/20", text: "text-status-outofservice-text font-bold", label: "Rejected" },
+  rejected:   { bg: "bg-destructive", text: "text-white font-bold", label: "Rejected" },
   released:   { bg: "bg-status-active-bg/20",       text: "text-status-active-text font-bold",      label: "Released" },
   unreleased: { bg: "bg-bg-subtle",                 text: "text-text-secondary font-bold",          label: "Unreleased" },
   returned:   { bg: "bg-status-active-bg/20",       text: "text-status-active-text font-bold",      label: "Returned" },
@@ -36,8 +36,8 @@ export function RequestListItem({
   onMarkUnreleased,
 }: RequestListItemProps) {
   const [isMarkingUnreleased, setIsMarkingUnreleased] = useState(false);
-  
-  const categoryMeta = getCategoryStyle(request.category);
+  const firstItem = request.items?.[0];
+  const categoryMeta = getCategoryStyle(firstItem?.category || "office");
   const statusMeta = STATUS_STYLES[request.status];
 
   const handleMarkUnreleased = async (e: React.MouseEvent) => {
@@ -89,10 +89,10 @@ export function RequestListItem({
 
         {/* Row 2: Item Description */}
         <h3 className="text-sm font-bold text-text truncate group-hover:text-accent transition-colors">
-          {request.itemDescription}
-          {request.quantity > 1 && (
+          {firstItem?.itemDescription} {request.items.length > 1 ? `(+${request.items.length - 1} more)` : ""}
+          {request.items.length === 1 && firstItem && firstItem.quantity > 1 && (
             <span className="ml-2 text-xs font-semibold text-text-secondary">
-              (Qty: {request.quantity})
+              (Qty: {firstItem.quantity})
             </span>
           )}
         </h3>
@@ -159,8 +159,8 @@ export function RequestListItem({
               aria-label={`Reject request ${request.requestCode} from ${request.requesterName}`}
               className={cn(
                 "inline-flex items-center gap-1 rounded-md border border-border bg-bg px-3 py-1.5 text-xs font-semibold text-text-secondary",
-                "transition-colors duration-150 hover:border-status-outofservice-bg hover:text-status-outofservice-text",
-                "focus:outline-none focus-visible:ring-2 focus-visible:ring-status-outofservice-bg focus-visible:ring-offset-1"
+                "transition-colors duration-150 hover:border-destructive hover:text-destructive hover:bg-destructive/10",
+                "focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-1"
               )}
             >
               <X className="h-3.5 w-3.5" />

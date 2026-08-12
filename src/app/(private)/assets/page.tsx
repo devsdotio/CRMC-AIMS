@@ -171,7 +171,7 @@ export default function AssetsPage() {
           <button
             type="button"
             onClick={() => setAddEditState({ isOpen: true, asset: null })}
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-accent text-accent-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
           >
             <Plus className="h-4 w-4" strokeWidth={2.5} />
             Add Asset

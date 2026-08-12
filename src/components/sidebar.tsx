@@ -137,13 +137,13 @@ export default function Sidebar({
     {
       label: "Operations",
       items: [
-        { name: "Borrow Requests", href: "/borrow-requests", icon: ClipboardList, badge: pendingCount, badgeTone: "accent", roles: ["superadmin", "admin", "staff"] },
-        
-        { name: "My Requests", href: "/borrower-db/requests", icon: ClipboardList, badge: pendingCount, badgeTone: "accent", roles: ["borrower"] },
-        { name: "Borrow History", href: "/borrower-db/history", icon: History, roles: ["borrower"] },
         { name: "Assets", href: "/assets", icon: Package, roles: ["superadmin", "admin", "staff"] },
         { name: "Inventory", href: "/consumables", icon: Boxes, badge: lowStockCount, badgeTone: "warning", roles: ["superadmin", "admin", "staff"] },
+        { name: "Requests", href: "/borrow-requests", icon: ClipboardList, badge: pendingCount, badgeTone: "accent", roles: ["superadmin", "admin", "staff"] },
+        { name: "My Requests", href: "/borrower-db/requests", icon: ClipboardList, badge: pendingCount, badgeTone: "accent", roles: ["borrower"] },
+        { name: "Borrow History", href: "/borrower-db/history", icon: History, roles: ["borrower"] },
         { name: "Suppliers", href: "/suppliers", icon: Truck, roles: ["superadmin", "admin", "staff"] },
+        { name: "Audit Logs", href: "/audit-logs", icon: FileText, roles: ["superadmin", "admin"] },
       ],
     },
     {

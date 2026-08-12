@@ -39,8 +39,7 @@ const WORKFLOW_STATUS_STYLES: Record<
   },
   rejected: {
     label: "Rejected",
-    badgeClass:
-      "bg-status-outofservice-bg/10 text-status-outofservice-bg dark:text-status-outofservice-text border-status-outofservice-bg/30",
+    badgeClass: "bg-destructive text-white border border-destructive/30",
     Icon: XCircle,
   },
   returned: {
@@ -77,7 +76,6 @@ export function MyRequestItemSkeleton() {
 }
 
 export function MyRequestItem({ request, onCancel }: MyRequestItemProps) {
-  const categoryMeta = getCategoryStyle(request.category);
   const statusStyle =
     WORKFLOW_STATUS_STYLES[request.status] ?? WORKFLOW_STATUS_STYLES.pending;
   const StatusIcon = statusStyle.Icon;
@@ -96,26 +94,14 @@ export function MyRequestItem({ request, onCancel }: MyRequestItemProps) {
         request.status === "returned" && "border-l-transparent"
       )}
     >
-      {/* Row 1: Code, Category, Status */}
+      {/* Row 1: Code, Status */}
       <div className="flex items-center flex-wrap gap-2">
         <span className="font-mono text-xs font-semibold text-text-secondary">
           {request.requestCode}
         </span>
         <span className="text-text-secondary/30 text-xs">·</span>
-        <span
-          className={cn(
-            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide border",
-            categoryMeta.bg,
-            categoryMeta.text,
-            "border-transparent"
-          )}
-        >
-          <Tag className="h-2.5 w-2.5" />
-          {categoryMeta.label}
-        </span>
-        <span className="text-text-secondary/30 text-xs">·</span>
         <span className="text-[10px] font-bold uppercase tracking-wide text-text-secondary border border-border px-2 py-0.5 rounded-full bg-bg-subtle">
-          {request.itemType === "asset" ? "Borrow" : "Requisition"}
+          {request.items?.length ?? 0} Item(s)
         </span>
 
         {/* Status badge */}
@@ -130,16 +116,18 @@ export function MyRequestItem({ request, onCancel }: MyRequestItemProps) {
         </span>
       </div>
 
-      {/* Row 2: Item description */}
-      <h3 className="text-sm font-bold text-text leading-snug">
-        {request.itemDescription}
-        {(request.requestedQuantity ?? request.quantity) > 1 && (
-          <span className="ml-2 text-xs font-normal text-text-secondary">
-            × {request.requestedQuantity ?? request.quantity}{" "}
-            {request.itemType === "consumable" ? "units" : "item(s)"}
-          </span>
-        )}
-      </h3>
+      {/* Row 2: Items list */}
+      <div className="space-y-1.5 mt-1">
+        {request.items?.map((item, idx) => (
+          <h3 key={idx} className="text-sm font-bold text-text leading-snug">
+            {item.itemDescription}
+            <span className="ml-2 text-xs font-normal text-text-secondary">
+              × {item.quantity}{" "}
+              {item.itemType === "consumable" ? "unit(s)" : "item(s)"}
+            </span>
+          </h3>
+        ))}
+      </div>
 
       {/* Row 3: Meta */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-text-secondary">
@@ -159,12 +147,6 @@ export function MyRequestItem({ request, onCancel }: MyRequestItemProps) {
             day: "numeric",
           })}
         </span>
-        {request.itemType === "asset" && request.assetCode && (
-          <span className="flex items-center gap-1">
-            <Package className="h-3.5 w-3.5 shrink-0" aria-hidden />
-            <span className="font-mono">{request.assetCode}</span>
-          </span>
-        )}
       </div>
 
       {/* Waiting for pickup indicator */}

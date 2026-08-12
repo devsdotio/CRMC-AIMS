@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+
 
 import {
   Package,
@@ -19,13 +19,13 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { getCategoryStyle } from "@/constants/categories";
 import { useBorrowerPortal } from "./context";
-import { RequisitionSlip } from "@/components/requisition-slip/RequisitionSlip";
 import {
   PortalSummaryStats,
   PortalBorrowRequest,
   PortalBorrowLogRecord,
 } from "./types";
 import { useDashboardSnapshotQuery } from "@/features/dashboard/client/use-dashboard";
+import type { DashboardPendingRequest } from "@/server/modules/dashboard/dashboard.service";
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
 
@@ -62,7 +62,7 @@ function DashStatCard({ label, value, subtext, icon: Icon, tone = "default", isL
   const showBadge = !isLoading && value !== undefined && value > 0;
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-5 flex flex-col gap-3 hover:border-text-secondary/30 transition-colors duration-200">
+    <div className="rounded-xl border border-border bg-card p-5 flex flex-col gap-3 hover:border-text-secondary/30 transition-colors duration-200">
       <div className="flex items-start justify-between">
         <div className={cn("h-10 w-10 rounded-xl flex items-center justify-center", styles.icon)}>
           <Icon className="h-5 w-5" aria-hidden />
@@ -172,32 +172,26 @@ function ActiveBorrowCardSkeleton() {
 
 // ─── Pending Request Card ─────────────────────────────────────────────────────
 
-function PendingRequestCard({ request }: { request: PortalBorrowRequest }) {
-  const categoryMeta = getCategoryStyle(request.category);
-  const isApproved = request.status === "approved";
-  const isRejected = request.status === "rejected";
+function PendingRequestCard({ request }: { request: DashboardPendingRequest }) {
+  const isApproved = false; // Snapshot pending requests are always pending
+  const isRejected = false;
 
-  const statusBadge = isApproved
-    ? { label: "Approved", className: "bg-status-active-bg/15 text-status-active-text border-status-active-bg/30" }
-    : isRejected
-    ? { label: "Rejected", className: "bg-status-outofservice-bg/10 text-status-outofservice-bg dark:text-status-outofservice-text border-status-outofservice-bg/30" }
-    : { label: "Pending", className: "bg-status-repair-bg/15 text-status-repair-text border-status-repair-bg/30" };
+  const statusBadge = { label: "Pending", className: "bg-status-repair-bg/15 text-status-repair-text border-status-repair-bg/30" };
 
   return (
     <div className={cn(
       "flex items-center gap-3 px-4 py-3 border-b border-border last:border-b-0 hover:bg-bg-subtle/50 transition-colors duration-150 border-l-4",
-      isApproved ? "border-l-status-active-bg/60" : isRejected ? "border-l-status-outofservice-bg/60" : "border-l-status-repair-bg/60"
+      "border-l-status-repair-bg/60"
     )}>
-      <div className={cn("h-8 w-8 shrink-0 rounded-lg flex items-center justify-center", categoryMeta.bg)}>
-        <Tag className={cn("h-3.5 w-3.5", categoryMeta.text)} aria-hidden />
+      <div className={cn("h-8 w-8 shrink-0 rounded-lg flex items-center justify-center", "bg-office-bg text-office-text")}>
+        <Tag className={cn("h-3.5 w-3.5", "text-office-text")} aria-hidden />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-text truncate">{request.itemDescription}</p>
+        <p className="text-sm font-semibold text-text truncate">
+          {request.itemDescription}
+        </p>
         <div className="flex items-center gap-1.5 mt-0.5">
-          <p className="text-xs text-text-secondary font-mono">{request.requestCode}</p>
-          <span className="text-[10px] font-bold uppercase tracking-wide text-text-secondary border border-border px-1.5 py-0.5 rounded-md bg-bg-subtle leading-none">
-            {request.itemType === "asset" ? "Borrow" : "Req"}
-          </span>
+          <p className="text-xs text-text-secondary font-mono">{request.id.substring(0, 8).toUpperCase()}</p>
         </div>
       </div>
       <span
@@ -280,7 +274,6 @@ function QuickActionBtn({
 
 export function BorrowerDashboard() {
   const { openWizard } = useBorrowerPortal();
-  const [isReqOpen, setIsReqOpen] = useState(false);
   const { data: snapshot, isLoading } = useDashboardSnapshotQuery();
   const loading = isLoading || !snapshot;
 
@@ -298,15 +291,7 @@ export function BorrowerDashboard() {
     daysOverdue: asset.daysOverdue,
   }));
 
-  const pendingRequestsMapped = rawPending.map((req) => ({
-    id: req.id,
-    requestCode: `REQ-${req.id.substring(0,6).toUpperCase()}`,
-    itemDescription: req.itemDescription,
-    itemType: "asset" as const,
-    category: "computing" as const,
-    status: "pending" as const,
-    requestedAt: req.requestedAt,
-  }));
+  const pendingRequestsMapped = rawPending;
 
   const statCards: StatCardProps[] = [
     {
@@ -344,11 +329,11 @@ export function BorrowerDashboard() {
   ];
 
   return (
-    <div className="flex flex-col gap-4 bg-bg-subtle max-w-full overflow-x-hidden" data-theme="light">
+    <div className="flex flex-col gap-3 bg-bg-subtle max-w-full overflow-x-hidden" data-theme="light">
 
       {/* ── Greeting Banner ─────────────────────────────────────────── */}
-      <div className="rounded-2xl border border-border bg-card p-6 flex flex-col sm:flex-row sm:items-center gap-4">
-        <div className="h-12 w-12 rounded-2xl bg-accent/10 flex items-center justify-center shrink-0">
+      <div className="rounded-xl border border-border bg-card p-6 flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="h-12 w-12 rounded-xl bg-accent/10 flex items-center justify-center shrink-0">
           <TrendingUp className="h-6 w-6 text-accent" aria-hidden />
         </div>
         <div className="flex-1">
@@ -372,22 +357,14 @@ export function BorrowerDashboard() {
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-accent text-accent-foreground text-sm font-semibold hover:opacity-90 active:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
             <Package className="h-4 w-4" aria-hidden />
-            Borrow Equipment
-          </button>
-          <button
-            type="button"
-            onClick={() => setIsReqOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-bg-subtle border border-border text-text text-sm font-semibold hover:bg-border/50 active:bg-border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-          >
-            <Zap className="h-4 w-4 text-accent" aria-hidden />
-            Requisition Supplies
+            Request
           </button>
         </div>
       </div>
 
       {/* ── Stat Cards ──────────────────────────────────────────────── */}
       <section aria-label="Borrowing overview">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {statCards.map((card) => (
             <DashStatCard key={card.label} {...card} />
           ))}
@@ -395,11 +372,11 @@ export function BorrowerDashboard() {
       </section>
 
       {/* ── Row 2: Active Items + Recent Requests ──────────────────────── */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
 
         {/* Active Borrowings (Showing Overdue from Snapshot for now) */}
         <section aria-labelledby="active-borrowings-heading">
-          <div className="rounded-2xl border border-border bg-card overflow-hidden h-full flex flex-col">
+          <div className="rounded-xl border border-border bg-card overflow-hidden h-full flex flex-col">
             <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
               <h2 id="active-borrowings-heading" className="text-sm font-bold text-text">
                 Attention Required (Overdue)
@@ -441,7 +418,7 @@ export function BorrowerDashboard() {
 
         {/* Recent Requests */}
         <section aria-labelledby="recent-requests-heading">
-          <div className="rounded-2xl border border-border bg-card overflow-hidden h-full flex flex-col">
+          <div className="rounded-xl border border-border bg-card overflow-hidden h-full flex flex-col">
             <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
               <h2 id="recent-requests-heading" className="text-sm font-bold text-text">
                 Recent Pending Requests
@@ -481,8 +458,6 @@ export function BorrowerDashboard() {
           </div>
         </section>
       </div>
-
-      <RequisitionSlip open={isReqOpen} onOpenChange={setIsReqOpen} />
     </div>
   );
 }

@@ -23,10 +23,14 @@ export interface BorrowRequest {
   requesterEmail: string;
   requesterPhone: string;
   department: string;
-  itemDescription: string;
-  assetCode?: string;
-  category: AssetCategory;
-  quantity: number;
+  items: {
+    itemDescription: string;
+    assetId?: string;
+    assetCode?: string;
+    category: AssetCategory;
+    quantity: number;
+    itemType: "asset" | "consumable";
+  }[];
   purpose: string;
   requestedAt: string;
   expectedReturnDate: string;

@@ -49,13 +49,17 @@ export const borrowRequests = pgTable(
     requesterPhone: text("requester_phone").notNull().default(""),
     department: text("department").notNull(),
 
-    itemDescription: text("item_description").notNull(),
-    assetId: uuid("asset_id").references(() => assets.id, {
-      onDelete: "set null",
-    }),
-    assetCode: text("asset_code"),
-    category: text("category").notNull(),
-    quantity: integer("quantity").notNull().default(1),
+    items: jsonb("items")
+      .$type<{
+        itemDescription: string;
+        assetId?: string;
+        assetCode?: string;
+        category: string;
+        quantity: number;
+        itemType: "asset" | "consumable";
+      }[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
     purpose: text("purpose").notNull(),
 
     expectedReturnDate: date("expected_return_date", { mode: "string" }).notNull(),
@@ -84,7 +88,6 @@ export const borrowRequests = pgTable(
     index("borrow_requests_status_idx").on(table.status),
     index("borrow_requests_department_idx").on(table.department),
     index("borrow_requests_requested_at_idx").on(table.requestedAt),
-    index("borrow_requests_asset_id_idx").on(table.assetId),
   ]
 );
 

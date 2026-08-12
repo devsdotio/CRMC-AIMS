@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { X, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+import { X, AlertCircle, CheckCircle2, Loader2, User, Building2, FileText, CalendarClock } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getCategoryStyle } from "@/constants/categories";
 import type { BorrowRequest } from "@/types/borrow-requests";
 
 export interface ApproveRejectDialogProps {
@@ -114,13 +115,53 @@ function ApproveRejectDialogForm({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="p-3 rounded-lg border border-border bg-bg-subtle text-xs space-y-1">
-            <p className="text-text">
-              <span className="font-bold">Requester:</span> {request.requesterName} ({request.department})
-            </p>
-            <p className="text-text">
-              <span className="font-bold">Item:</span> {request.itemDescription}
-            </p>
+          {/* Request summary */}
+          <div className="rounded-lg border border-border bg-bg-subtle/50 overflow-hidden text-xs">
+            {/* Requester row */}
+            <div className="flex items-center gap-4 px-3.5 py-2.5 border-b border-border">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <User className="h-3.5 w-3.5 text-text-secondary shrink-0" />
+                <span className="text-[10px] font-semibold uppercase text-text-secondary">Requester:</span>
+                <span className="font-bold text-text truncate">{request.requesterName}</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-text-secondary shrink-0 ml-auto">
+                <Building2 className="h-3.5 w-3.5" />
+                <span className="text-[10px] font-semibold uppercase">Dept:</span>
+                <span className="font-medium text-text">{request.department}</span>
+              </div>
+            </div>
+            {/* Items */}
+            <div className="divide-y divide-border">
+              {request.items.map((item, idx) => {
+                const catStyle = getCategoryStyle(item.category);
+                return (
+                  <div key={idx} className={cn("flex items-center gap-2.5 px-3.5 py-2", idx % 2 === 1 && "bg-bg-subtle/60")}>
+                    <span className="flex items-center justify-center h-5 min-w-5 px-1 rounded bg-bg border border-border text-[10px] font-bold text-text shrink-0">
+                      &times;{item.quantity}
+                    </span>
+                    <span className="text-text font-medium truncate flex-1 min-w-0">{item.itemDescription}</span>
+                    <span className={cn("rounded px-1.5 py-px text-[9px] font-bold uppercase shrink-0", catStyle.bg, catStyle.text)}>
+                      {catStyle.label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            {/* Purpose + return date row */}
+            <div className="px-3.5 py-2.5 border-t border-border bg-primary/5 space-y-1.5">
+              <div className="flex items-start gap-2">
+                <FileText className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <span className="text-[10px] font-semibold uppercase text-text-secondary block mb-0.5">Purpose</span>
+                  <p className="text-text font-medium leading-snug line-clamp-2">{request.purpose}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 justify-end">
+                <CalendarClock className="h-3.5 w-3.5 text-primary" />
+                <span className="text-[10px] font-semibold uppercase text-text-secondary">Return:</span>
+                <span className="text-primary font-bold">{request.expectedReturnDate}</span>
+              </div>
+            </div>
           </div>
 
           {!isApprove ? (
