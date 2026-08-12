@@ -309,23 +309,6 @@ export class BorrowRequestService {
           actor
         );
       }
-<<<<<<< HEAD
-=======
-      await this.borrowLogs.release(
-        {
-          assetId: existing.assetId,
-          requestId: existing.id,
-          borrowerName: input.pickedUpBy,
-          borrowerEmail: existing.requesterEmail,
-          borrowerPhone: existing.requesterPhone || "",
-          department: existing.department,
-          dueDate: existing.expectedReturnDate,
-          notes: noteWithPicker,
-          borrowerUserId: existing.requesterUserId ?? undefined,
-        },
-        actor
-      );
->>>>>>> 0d9abb1b8b8e552f5ae405e35b37790b49794818
     }
 
     const history = [
