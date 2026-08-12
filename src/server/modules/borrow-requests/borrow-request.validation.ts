@@ -13,6 +13,7 @@ export const borrowRequestStatusSchema = z.enum([
   "released",
   "unreleased",
   "returned",
+  "cancelled",
 ]);
 
 export const listBorrowRequestsQuerySchema = z.object({
@@ -73,6 +74,10 @@ export const returnBorrowRequestSchema = z.object({
   returnedBy: z.string().trim().min(1, "Name of person who returned the item is required.").max(255),
 });
 
+export const cancelBorrowRequestSchema = z.object({
+  note: z.string().trim().max(1000).optional(),
+});
+
 export const borrowRequestIdSchema = z.string().uuid("Invalid request id.");
 
 export type CreateBorrowRequestBody = z.infer<typeof createBorrowRequestSchema>;
@@ -81,4 +86,5 @@ export type RejectBorrowRequestBody = z.infer<typeof rejectBorrowRequestSchema>;
 export type ReleaseBorrowRequestBody = z.infer<typeof releaseBorrowRequestSchema>;
 export type MarkUnreleasedBorrowRequestBody = z.infer<typeof markUnreleasedBorrowRequestSchema>;
 export type ReturnBorrowRequestBody = z.infer<typeof returnBorrowRequestSchema>;
+export type CancelBorrowRequestBody = z.infer<typeof cancelBorrowRequestSchema>;
 export type ListBorrowRequestsQuery = z.infer<typeof listBorrowRequestsQuerySchema>;

@@ -1,29 +1,37 @@
 import type { NextRequest } from "next/server";
 
-import { requireAssetOperator, requireActor } from "@/server/shared/auth";
+import { requireActor, requireAssetOperator } from "@/server/shared/auth";
 import { created, handleError, ok } from "@/server/shared/http";
 
-import { BorrowRequestService } from "./borrow-request.service";
+import { ConsumableRequestService } from "./consumable-request.service";
 
-export class BorrowRequestController {
+export class ConsumableRequestController {
   constructor(
-    private readonly service: BorrowRequestService = new BorrowRequestService()
+    private readonly service: ConsumableRequestService = new ConsumableRequestService()
   ) {}
 
   async list(request: NextRequest | Request) {
     try {
       const session = await requireActor();
       const url = new URL(request.url);
-      const data = await this.service.list({
-        status: url.searchParams.get("status") ?? undefined,
-        department: url.searchParams.get("department") ?? undefined,
-        search: url.searchParams.get("search") ?? undefined,
-        startDate: url.searchParams.get("startDate") ?? undefined,
-        endDate: url.searchParams.get("endDate") ?? undefined,
-        page: url.searchParams.has("page") ? Number(url.searchParams.get("page")) : undefined,
-        limit: url.searchParams.has("limit") ? Number(url.searchParams.get("limit")) : undefined,
-      }, session);
-      return ok(data);
+      return ok(
+        await this.service.list(
+          {
+            status: url.searchParams.get("status") ?? undefined,
+            department: url.searchParams.get("department") ?? undefined,
+            search: url.searchParams.get("search") ?? undefined,
+            startDate: url.searchParams.get("startDate") ?? undefined,
+            endDate: url.searchParams.get("endDate") ?? undefined,
+            page: url.searchParams.has("page")
+              ? Number(url.searchParams.get("page"))
+              : undefined,
+            limit: url.searchParams.has("limit")
+              ? Number(url.searchParams.get("limit"))
+              : undefined,
+          },
+          session
+        )
+      );
     } catch (error) {
       return handleError(error);
     }
@@ -91,46 +99,13 @@ export class BorrowRequestController {
   async release(request: NextRequest | Request, id: string) {
     try {
       const session = await requireAssetOperator();
-      let body: unknown = {};
-      try {
-        body = await request.json();
-      } catch {
-        body = {};
-      }
+      const body = await request.json();
       return ok(await this.service.release(id, body, session.actor));
     } catch (error) {
       return handleError(error);
     }
   }
-
-  async markUnreleased(request: NextRequest | Request, id: string) {
-    try {
-      const session = await requireAssetOperator();
-      let body: unknown = {};
-      try {
-        body = await request.json();
-      } catch {
-        body = {};
-      }
-      return ok(await this.service.markUnreleased(id, body, session.actor));
-    } catch (error) {
-      return handleError(error);
-    }
-  }
-
-  async markReturned(request: NextRequest | Request, id: string) {
-    try {
-      const session = await requireAssetOperator();
-      let body: unknown = {};
-      try {
-        body = await request.json();
-      } catch {
-        body = {};
-      }
-      return ok(await this.service.markReturned(id, body, session.actor));
-    } catch (error) {
-      return handleError(error);
-    }
-  }
 }
-export const borrowRequestController = new BorrowRequestController();
+
+export const consumableRequestController = new ConsumableRequestController();
+export { ConsumableRequestService } from "./consumable-request.service";

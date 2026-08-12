@@ -4,12 +4,9 @@ type Params = { params: Promise<{ id: string }> };
 
 /**
  * @swagger
- * /api/borrow-requests/{id}/release:
+ * /api/borrow-requests/{id}/cancel:
  *   post:
- *     summary: Release an approved borrow request (opens borrow log + sets holder)
- *     description: |
- *       Creates an active borrow transaction when assetId is bound.
- *       Due date is taken from the request's expectedReturnDate.
+ *     summary: Cancel a pending borrow request (requester or operator)
  *     tags: [BorrowRequests]
  *     parameters:
  *       - in: path
@@ -17,17 +14,17 @@ type Params = { params: Promise<{ id: string }> };
  *         required: true
  *         schema: { type: string, format: uuid }
  *     requestBody:
- *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required: [pickedUpBy]
  *             properties:
- *               pickedUpBy: { type: string, description: Person who physically picked up the item }
  *               note: { type: string }
+ *     responses:
+ *       200:
+ *         description: Request cancelled
  */
 export async function POST(request: Request, { params }: Params) {
   const { id } = await params;
-  return borrowRequestController.release(request, id);
+  return borrowRequestController.cancel(request, id);
 }

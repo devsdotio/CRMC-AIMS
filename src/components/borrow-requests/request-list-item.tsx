@@ -24,6 +24,7 @@ const STATUS_STYLES: Record<RequestStatus, { bg: string; text: string; label: st
   released:   { bg: "bg-status-active-bg/20",       text: "text-status-active-text font-bold",      label: "Released" },
   unreleased: { bg: "bg-bg-subtle",                 text: "text-text-secondary font-bold",          label: "Unreleased" },
   returned:   { bg: "bg-status-active-bg/20",       text: "text-status-active-text font-bold",      label: "Returned" },
+  cancelled:  { bg: "bg-bg-subtle",                 text: "text-text-secondary font-bold",          label: "Cancelled" },
 };
 
 export function RequestListItem({

@@ -24,11 +24,19 @@ export const borrowRequestStatusEnum = pgEnum("borrow_request_status", [
   "released",
   "unreleased",
   "returned",
+  "cancelled",
 ]);
 
 export type BorrowRequestHistoryEntry = {
   id: string;
-  action: "submitted" | "approved" | "rejected" | "released" | "unreleased" | "returned";
+  action:
+    | "submitted"
+    | "approved"
+    | "rejected"
+    | "released"
+    | "unreleased"
+    | "returned"
+    | "cancelled";
   actor: string;
   timestamp: string;
   note?: string;

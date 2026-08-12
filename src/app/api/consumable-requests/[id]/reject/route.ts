@@ -1,13 +1,11 @@
-import { borrowRequestController } from "@/server/modules/borrow-requests";
-
-type Params = { params: Promise<{ id: string }> };
+import { consumableRequestController } from "@/server/modules/consumable-requests";
 
 /**
  * @swagger
- * /api/borrow-requests/{id}/reject:
+ * /api/consumable-requests/{id}/reject:
  *   post:
- *     summary: Reject a pending borrow request
- *     tags: [BorrowRequests]
+ *     summary: Reject a pending consumable request
+ *     tags: [ConsumableRequests]
  *     parameters:
  *       - in: path
  *         name: id
@@ -23,7 +21,10 @@ type Params = { params: Promise<{ id: string }> };
  *             properties:
  *               reason: { type: string }
  */
-export async function POST(request: Request, { params }: Params) {
-  const { id } = await params;
-  return borrowRequestController.reject(request, id);
+export async function POST(
+  request: Request,
+  context: { params: Promise<{ id: string }> }
+) {
+  const { id } = await context.params;
+  return consumableRequestController.reject(request, id);
 }
