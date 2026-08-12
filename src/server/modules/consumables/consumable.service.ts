@@ -450,11 +450,7 @@ export class ConsumableService {
         throw new BadRequestError("Adjustment would result in negative stock.");
       }
 
-      let lotAllocations: LotCostAllocation[] = [];
-      let primaryLotCode: string | undefined;
-      let primaryUnitCost: string | undefined;
-      let primarySupplierId: string | undefined;
-      let primarySupplierName: string | undefined;
+      const lotAllocations: LotCostAllocation[] = [];
 
       if (input.quantityChange < 0) {
         for (const alloc of input.allocations ?? []) {
@@ -512,10 +508,6 @@ export class ConsumableService {
       }
 
       const primary = lotAllocations[0];
-      primaryLotCode = primary?.lotCode ?? undefined;
-      primaryUnitCost = primary?.unitCost;
-      primarySupplierId = primary?.supplierId ?? undefined;
-      primarySupplierName = primary?.supplierName ?? undefined;
 
       const totalCost = lotAllocations.reduce(
         (sum, a) => sum + Number(a.total),
@@ -531,10 +523,10 @@ export class ConsumableService {
           input.reason,
           input.notes,
           {
-            unitCost: primaryUnitCost,
-            supplierId: primarySupplierId,
-            supplierName: primarySupplierName,
-            lotCode: primaryLotCode,
+            unitCost: primary?.unitCost,
+            supplierId: primary?.supplierId ?? undefined,
+            supplierName: primary?.supplierName ?? undefined,
+            lotCode: primary?.lotCode ?? undefined,
             totalCost: totalCost.toFixed(2),
             lotAllocations,
           }
