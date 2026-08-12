@@ -77,15 +77,97 @@ export const restockSchema = z.object({
     .optional(),
 });
 
-/** Adjustment can increase or decrease; quantityChange signed. */
-export const stockAdjustSchema = z.object({
-  quantityChange: z
-    .number()
-    .int()
-    .refine((n) => n !== 0, "quantityChange cannot be zero."),
-  reason: z.string().trim().min(1).max(500),
-  notes: z.string().trim().max(2000).optional(),
-});
+/** Adjustment can increase or decrease; quantityChange signed. Must stay lot-synced. */
+export const stockAdjustSchema = z
+  .object({
+    quantityChange: z
+      .number()
+      .int()
+      .refine((n) => n !== 0, "quantityChange cannot be zero."),
+    reason: z.string().trim().min(1).max(500),
+    notes: z.string().trim().max(2000).optional(),
+    /**
+     * Required when decreasing: which lot(s) lose quantity.
+     * Sum of allocation quantities must equal abs(quantityChange).
+     */
+    allocations: z
+      .array(
+        z
+          .object({
+            lotId: z.string().uuid().optional(),
+            lotCode: z.string().trim().min(1).max(64).optional(),
+            quantity: z.number().int().positive(),
+          })
+          .refine((a) => Boolean(a.lotId || a.lotCode), {
+            message: "Each allocation needs lotId or lotCode.",
+          })
+      )
+      .optional(),
+    /** Increase: attach found stock onto an existing lot. */
+    attachLotId: z.string().uuid().optional(),
+    attachLotCode: z.string().trim().min(1).max(64).optional(),
+    /**
+     * Increase: create a correction lot (default path when not attaching).
+     * unitCost defaults to 0.00 when omitted.
+     */
+    createCorrectionLot: z.boolean().optional(),
+    unitCost: z
+      .union([z.string(), z.number()])
+      .transform((value, ctx) => {
+        const n = typeof value === "number" ? value : Number(value);
+        if (!Number.isFinite(n) || n < 0) {
+          ctx.addIssue({
+            code: "custom",
+            message: "unitCost must be a non-negative amount.",
+          });
+          return z.NEVER;
+        }
+        return n.toFixed(2);
+      })
+      .optional(),
+    supplierId: z.string().uuid().optional().nullable(),
+  })
+  .superRefine((body, ctx) => {
+    if (body.quantityChange < 0) {
+      const need = Math.abs(body.quantityChange);
+      if (!body.allocations || body.allocations.length === 0) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["allocations"],
+          message:
+            "Decreasing stock requires lot allocations so lot remainders stay in sync.",
+        });
+        return;
+      }
+      const sum = body.allocations.reduce((s, a) => s + a.quantity, 0);
+      if (sum !== need) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["allocations"],
+          message: `Allocation quantities must total ${need} (got ${sum}).`,
+        });
+      }
+      return;
+    }
+
+    // Increase
+    const attaching = Boolean(body.attachLotId || body.attachLotCode);
+    if (!attaching && body.createCorrectionLot !== true) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["createCorrectionLot"],
+        message:
+          "Increasing stock requires attachLotId/attachLotCode or createCorrectionLot=true.",
+      });
+    }
+    if (attaching && body.createCorrectionLot === true) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["createCorrectionLot"],
+        message: "Choose either attach-to-lot or createCorrectionLot, not both.",
+      });
+    }
+  });
 
 export const consumableIdSchema = z.string().uuid("Invalid consumable id.");
 

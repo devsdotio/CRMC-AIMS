@@ -450,6 +450,78 @@ export class ConsumableService {
         throw new BadRequestError("Adjustment would result in negative stock.");
       }
 
+      let lotAllocations: LotCostAllocation[] = [];
+      let primaryLotCode: string | undefined;
+      let primaryUnitCost: string | undefined;
+      let primarySupplierId: string | undefined;
+      let primarySupplierName: string | undefined;
+
+      if (input.quantityChange < 0) {
+        for (const alloc of input.allocations ?? []) {
+          const result = alloc.lotId
+            ? await this.purchaseLots.consumeFromLotId(
+                alloc.lotId,
+                alloc.quantity,
+                tx,
+                existing.id
+              )
+            : await this.purchaseLots.consumeFromLot(
+                alloc.lotCode!,
+                alloc.quantity,
+                tx,
+                existing.id
+              );
+          lotAllocations.push(result.allocation);
+        }
+      } else if (input.attachLotId || input.attachLotCode) {
+        const result = await this.purchaseLots.addToLot(
+          { lotId: input.attachLotId, lotCode: input.attachLotCode },
+          input.quantityChange,
+          tx,
+          existing.id
+        );
+        lotAllocations.push(result.allocation);
+      } else {
+        // Correction lot (found stock / uncosted correction)
+        const lot = await this.purchaseLots.recordLot(
+          {
+            itemType: "consumable",
+            consumableId: existing.id,
+            itemCode: existing.itemCode,
+            itemName: existing.name,
+            supplierId: input.supplierId ?? null,
+            quantity: input.quantityChange,
+            unitCost: input.unitCost ?? "0.00",
+            purchasedOn: todayDateString(),
+            reference: input.reason,
+            notes: input.notes ?? "Stock correction lot",
+            recordedByUserId: actor.userId,
+            recordedByName: actor.displayName,
+          },
+          tx
+        );
+        lotAllocations.push({
+          lotId: lot.id,
+          lotCode: lot.lotCode,
+          quantity: input.quantityChange,
+          unitCost: lot.unitCost,
+          total: lot.totalCost,
+          supplierId: lot.supplierId,
+          supplierName: lot.supplierName,
+        });
+      }
+
+      const primary = lotAllocations[0];
+      primaryLotCode = primary?.lotCode ?? undefined;
+      primaryUnitCost = primary?.unitCost;
+      primarySupplierId = primary?.supplierId ?? undefined;
+      primarySupplierName = primary?.supplierName ?? undefined;
+
+      const totalCost = lotAllocations.reduce(
+        (sum, a) => sum + Number(a.total),
+        0
+      );
+
       const history = [
         ...(Array.isArray(existing.history) ? existing.history : []),
         historyEntry(
@@ -457,7 +529,15 @@ export class ConsumableService {
           input.quantityChange,
           actor.displayName,
           input.reason,
-          input.notes
+          input.notes,
+          {
+            unitCost: primaryUnitCost,
+            supplierId: primarySupplierId,
+            supplierName: primarySupplierName,
+            lotCode: primaryLotCode,
+            totalCost: totalCost.toFixed(2),
+            lotAllocations,
+          }
         ),
       ];
 

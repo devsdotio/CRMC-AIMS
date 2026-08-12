@@ -117,7 +117,8 @@ export class PurchaseLotService {
   async consumeFromLot(
     lotCode: string,
     quantity: number,
-    session: DbSession
+    session: DbSession,
+    expectedConsumableId?: string
   ): Promise<{ lot: PurchaseLotDTO; allocation: LotCostAllocation }> {
     if (quantity <= 0) {
       throw new BadRequestError("quantity must be positive.");
@@ -128,9 +129,47 @@ export class PurchaseLotService {
       throw new NotFoundError("Purchase lot", lotCode);
     }
 
+    return this.drawFromLockedLot(lot, quantity, session, expectedConsumableId);
+  }
+
+  /** Same as consumeFromLot but keyed by lot id. */
+  async consumeFromLotId(
+    lotId: string,
+    quantity: number,
+    session: DbSession,
+    expectedConsumableId?: string
+  ): Promise<{ lot: PurchaseLotDTO; allocation: LotCostAllocation }> {
+    if (quantity <= 0) {
+      throw new BadRequestError("quantity must be positive.");
+    }
+
+    const lot = await this.repo.findByIdForUpdate(lotId, session);
+    if (!lot) {
+      throw new NotFoundError("Purchase lot", lotId);
+    }
+
+    return this.drawFromLockedLot(lot, quantity, session, expectedConsumableId);
+  }
+
+  private async drawFromLockedLot(
+    lot: PurchaseLotRow,
+    quantity: number,
+    session: DbSession,
+    expectedConsumableId?: string
+  ): Promise<{ lot: PurchaseLotDTO; allocation: LotCostAllocation }> {
     if (lot.itemType !== "consumable") {
       throw new BadRequestError(
         "Only consumable purchase lots support quantity release via scan."
+      );
+    }
+
+    if (
+      expectedConsumableId &&
+      lot.consumableId &&
+      lot.consumableId !== expectedConsumableId
+    ) {
+      throw new BadRequestError(
+        `Lot ${lot.lotCode} does not belong to this consumable item.`
       );
     }
 
@@ -154,6 +193,73 @@ export class PurchaseLotService {
       quantity,
       unitCost: formatMoney(unit),
       total: formatMoney(total),
+      supplierId: lot.supplierId,
+      supplierName: lot.supplierName,
+    };
+
+    const refreshed = await this.repo.findById(lot.id, session);
+    return {
+      lot: toPurchaseLotDTO(refreshed ?? lot),
+      allocation,
+    };
+  }
+
+  /**
+   * Attach found / correction stock onto an existing lot (increase remaining).
+   */
+  async addToLot(
+    opts: { lotId?: string; lotCode?: string },
+    quantity: number,
+    session: DbSession,
+    expectedConsumableId?: string
+  ): Promise<{ lot: PurchaseLotDTO; allocation: LotCostAllocation }> {
+    if (quantity <= 0) {
+      throw new BadRequestError("quantity must be positive.");
+    }
+
+    let lot: PurchaseLotRow | null = null;
+    if (opts.lotId) {
+      lot = await this.repo.findByIdForUpdate(opts.lotId, session);
+    } else if (opts.lotCode) {
+      lot = await this.repo.findByLotCodeForUpdate(opts.lotCode, session);
+    } else {
+      throw new BadRequestError("lotId or lotCode is required.");
+    }
+
+    if (!lot) {
+      throw new NotFoundError(
+        "Purchase lot",
+        opts.lotId ?? opts.lotCode ?? ""
+      );
+    }
+
+    if (lot.itemType !== "consumable") {
+      throw new BadRequestError(
+        "Only consumable purchase lots support quantity adjustments."
+      );
+    }
+
+    if (
+      expectedConsumableId &&
+      lot.consumableId &&
+      lot.consumableId !== expectedConsumableId
+    ) {
+      throw new BadRequestError(
+        `Lot ${lot.lotCode} does not belong to this consumable item.`
+      );
+    }
+
+    const nextQty = lot.quantity + quantity;
+    const nextRemaining = lot.quantityRemaining + quantity;
+    await this.repo.updateQuantities(lot.id, nextQty, nextRemaining, session);
+
+    const unit = Number(lot.unitCost);
+    const allocation: LotCostAllocation = {
+      lotId: lot.id,
+      lotCode: lot.lotCode,
+      quantity,
+      unitCost: formatMoney(unit),
+      total: formatMoney(unit * quantity),
       supplierId: lot.supplierId,
       supplierName: lot.supplierName,
     };

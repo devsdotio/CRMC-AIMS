@@ -40,6 +40,11 @@ export function getApiDocs() {
         { name: "System", description: "System and health endpoints" },
         { name: "Assets", description: "Coded assets, bulk models, QR scan custody" },
         { name: "Consumables", description: "Consumable stock + supplier lot QR release" },
+        {
+          name: "ConsumableRequests",
+          description:
+            "Multi-product consumable issue queue (request → approve → lot-aware release)",
+        },
         { name: "Requests", description: "Borrow and release requests" },
         { name: "Dashboard", description: "Admin dashboard data" },
         { name: "Users", description: "User account administration" },
