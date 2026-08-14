@@ -43,7 +43,7 @@ export type BorrowRequestHistoryEntry = {
 };
 
 export const borrowRequests = pgTable(
-  "borrow_requests",
+  "requests",
   {
     id: uuid("id").primaryKey().defaultRandom(),
 
@@ -93,9 +93,9 @@ export const borrowRequests = pgTable(
       .defaultNow(),
   },
   (table) => [
-    index("borrow_requests_status_idx").on(table.status),
-    index("borrow_requests_department_idx").on(table.department),
-    index("borrow_requests_requested_at_idx").on(table.requestedAt),
+    index("requests_status_idx").on(table.status),
+    index("requests_department_idx").on(table.department),
+    index("requests_requested_at_idx").on(table.requestedAt),
   ]
 );
 

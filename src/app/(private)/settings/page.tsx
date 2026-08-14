@@ -8,6 +8,7 @@ import { CategoriesSection } from "@/components/settings/categories-section";
 
 import { useCategoriesQuery, useCreateCategoryMutation, useUpdateCategoryMutation, useDeleteCategoryMutation } from "@/features/categories/client/use-categories";
 import { QueryErrorBanner } from "@/components/shared/query-error-banner";
+import { useToast } from "@/components/providers/toast-context";
 
 // ── Mock Current User (Admin) ───────────────────────────────────────────
 const MOCK_PROFILE: UserProfile = {
@@ -51,6 +52,7 @@ export default function SettingsPage() {
   const createCategoryMutation = useCreateCategoryMutation();
   const updateCategoryMutation = useUpdateCategoryMutation();
   const deleteCategoryMutation = useDeleteCategoryMutation();
+  const toast = useToast();
 
   const assetCategories = allCategories?.filter((c) => c.type === "asset") || [];
   const consumableCategories =
@@ -80,11 +82,13 @@ export default function SettingsPage() {
       if (categoryData.id && !categoryData.id.startsWith("cat-")) {
         // If ID does not start with cat- (temporary ID from dialog), it's an existing category from backend
         await updateCategoryMutation.mutateAsync(categoryData);
+        toast.success("Category updated.");
       } else {
         await createCategoryMutation.mutateAsync(categoryData);
+        toast.success("Category created.");
       }
     } catch (error) {
-      console.error("Failed to save category", error);
+      toast.error(error instanceof Error ? error.message : "Failed to save category.");
     }
   };
 
@@ -92,8 +96,9 @@ export default function SettingsPage() {
     if (category.itemCount > 0) return; // Safety guard — UI prevents this but double-checked here
     try {
       await deleteCategoryMutation.mutateAsync(category.id);
+      toast.success("Category deleted.");
     } catch (error) {
-      console.error("Failed to delete category", error);
+      toast.error(error instanceof Error ? error.message : "Failed to delete category.");
     }
   };
 

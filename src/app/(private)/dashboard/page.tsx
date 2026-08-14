@@ -15,6 +15,7 @@ import {
   useApproveBorrowRequestMutation,
   useRejectBorrowRequestMutation,
 } from "@/features/borrow-requests/client/use-borrow-requests";
+import { useToast } from "@/components/providers/toast-context";
 
 export default function DashboardPage() {
   const {
@@ -26,6 +27,7 @@ export default function DashboardPage() {
   } = useDashboardSnapshotQuery();
   const approveMutation = useApproveBorrowRequestMutation();
   const rejectMutation = useRejectBorrowRequestMutation();
+  const toast = useToast();
 
   // Only true while the first fetch is in flight — never `!snapshot` after error.
   const loading = isLoading && !snapshot;
@@ -86,9 +88,17 @@ export default function DashboardPage() {
         <PendingApprovalsWidget
           requests={snapshot?.pendingRequests || []}
           loading={loading}
-          onApprove={(id) => approveMutation.mutate({ id })}
+          onApprove={(id) =>
+            approveMutation.mutate({ id }, {
+              onSuccess: () => toast.success("Request approved."),
+              onError: (err) => toast.error(err.message || "Approve failed."),
+            })
+          }
           onReject={(id) =>
-            rejectMutation.mutate({ id, reason: "Rejected from dashboard" })
+            rejectMutation.mutate({ id, reason: "Rejected from dashboard" }, {
+              onSuccess: () => toast.success("Request rejected."),
+              onError: (err) => toast.error(err.message || "Reject failed."),
+            })
           }
         />
         <LowStockWidget

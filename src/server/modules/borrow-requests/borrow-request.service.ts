@@ -7,7 +7,6 @@ import { generateOperationalCode, isoNow } from "@/server/shared/codes";
 import type { ActorContext } from "@/server/shared/auth";
 import { isAssetOperatorRole } from "@/server/shared/roles";
 import {
-  BadRequestError,
   ConflictError,
   NotFoundError,
   ForbiddenError,
@@ -198,11 +197,6 @@ export class BorrowRequestService {
         if (asset && asset.currentHolder) {
           throw new ConflictError(`Cannot approve: Asset ${item.assetCode} is currently borrowed by ${asset.currentHolder}. It will remain in pending status until available.`);
         }
-        if (asset && asset.assignmentType === "assignable") {
-          throw new BadRequestError(
-            `Asset ${item.assetCode} is project-assignable and cannot be approved for borrow checkout.`
-          );
-        }
       }
     }
 
@@ -289,11 +283,6 @@ export class BorrowRequestService {
       if (item.assetId) {
         const asset = await this.assetRepo.findById(item.assetId);
         if (!asset) throw new NotFoundError("Asset", item.assetId);
-        if (asset.assignmentType === "assignable") {
-          throw new BadRequestError(
-            `Asset ${item.assetCode} is project-assignable and cannot be released as a borrow checkout.`
-          );
-        }
         await this.borrowLogs.release(
           {
             assetId: item.assetId,
@@ -447,7 +436,7 @@ export class BorrowRequestService {
     const existing = await this.repo.findById(id);
     if (!existing) throw new NotFoundError("Borrow request", id);
     if (existing.status !== "released") {
-      throw new BadRequestError("Only released requests can be marked returned.");
+      throw new ConflictError("Only released requests can be marked returned.");
     }
 
     const noteWithReturner = input.note

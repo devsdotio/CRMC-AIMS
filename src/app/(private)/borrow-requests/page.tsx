@@ -16,12 +16,14 @@ import { ApproveRejectDialog } from "@/components/borrow-requests/approve-reject
 import { ReleaseDialog } from "@/components/borrow-requests/release-dialog";
 import { ReturnDialog } from "@/components/borrow-requests/return-dialog";
 import { QueryErrorBanner } from "@/components/shared/query-error-banner";
+import { useToast } from "@/components/providers/toast-context";
 export default function BorrowRequestsPage() {
   const approveMutation = useApproveBorrowRequestMutation();
   const rejectMutation = useRejectBorrowRequestMutation();
   const releaseMutation = useReleaseBorrowRequestMutation();
   const markUnreleasedMutation = useMarkUnreleasedBorrowRequestMutation();
   const returnMutation = useMarkReturnedBorrowRequestMutation();
+  const toast = useToast();
 
   const [activeTab, setActiveTab] = useState<TabFilter>("pending");
 
@@ -117,10 +119,17 @@ export default function BorrowRequestsPage() {
     mode: "approve" | "reject",
     reason?: string
   ) => {
-    if (mode === "approve") {
-      await approveMutation.mutateAsync({ id: req.id });
-    } else {
-      await rejectMutation.mutateAsync({ id: req.id, reason: reason || "Rejected by Custodian" });
+    try {
+      if (mode === "approve") {
+        await approveMutation.mutateAsync({ id: req.id });
+        toast.success("Request approved successfully.");
+      } else {
+        await rejectMutation.mutateAsync({ id: req.id, reason: reason || "Rejected by Custodian" });
+        toast.success("Request rejected.");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Action failed.");
+      throw err;
     }
 
     // Keep drawer in sync if open
@@ -134,14 +143,26 @@ export default function BorrowRequestsPage() {
   };
 
   const handleReleaseConfirm = async (req: BorrowRequest, payload: { pickedUpBy: string; note?: string }) => {
-    await releaseMutation.mutateAsync({ id: req.id, payload });
+    try {
+      await releaseMutation.mutateAsync({ id: req.id, payload });
+      toast.success("Request released for pickup.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Release failed.");
+      throw err;
+    }
     if (selectedRequest && selectedRequest.id === req.id) {
       setSelectedRequest(null);
     }
   };
 
   const handleMarkUnreleased = async (req: BorrowRequest) => {
-    await markUnreleasedMutation.mutateAsync({ id: req.id });
+    try {
+      await markUnreleasedMutation.mutateAsync({ id: req.id });
+      toast.success("Request marked as unreleased.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to mark as unreleased.");
+      throw err;
+    }
     if (selectedRequest && selectedRequest.id === req.id) {
       setSelectedRequest(null);
     }
@@ -152,7 +173,13 @@ export default function BorrowRequestsPage() {
   };
 
   const handleReturnConfirm = async (req: BorrowRequest, payload: { returnedBy: string; note?: string }) => {
-    await returnMutation.mutateAsync({ id: req.id, payload });
+    try {
+      await returnMutation.mutateAsync({ id: req.id, payload });
+      toast.success("Item marked as returned.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Return failed.");
+      throw err;
+    }
     if (selectedRequest && selectedRequest.id === req.id) {
       setSelectedRequest(null);
     }

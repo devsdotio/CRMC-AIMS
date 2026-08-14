@@ -15,12 +15,14 @@ import { MaintenanceLogList } from "@/components/maintenance-logs/maintenance-lo
 import { MaintenanceLogDetailPanel } from "@/components/maintenance-logs/maintenance-log-detail-panel";
 import { FlagForMaintenanceDialog } from "@/components/maintenance-logs/flag-for-maintenance-dialog";
 import { ResolveMaintenanceDialog } from "@/components/maintenance-logs/resolve-maintenance-dialog";
+import { useToast } from "@/components/providers/toast-context";
 
 export default function MaintenanceLogsPage() {
   const { data: records = [], isLoading } = useMaintenanceLogsQuery();
   const { data: assets = [], isLoading: assetsLoading } = useAssetsQuery();
   const flagMutation = useCreateMaintenanceLogMutation();
   const resolveMutation = useResolveMaintenanceLogMutation();
+  const toast = useToast();
 
   // Filter & Sort State
   const [filters, setFilters] = useState<MaintenanceLogFilterState>({
@@ -122,19 +124,25 @@ export default function MaintenanceLogsPage() {
     notes: string;
     scheduledDate?: string;
   }) => {
-    await flagMutation.mutateAsync({
-      assetId: flagData.assetId,
-      assetCode: flagData.assetCode,
-      assetName: flagData.assetName,
-      category: flagData.category as
-        | "computing"
-        | "transport"
-        | "av"
-        | "furniture",
-      condition: flagData.condition,
-      notes: flagData.notes,
-      scheduledDate: flagData.scheduledDate,
-    });
+    try {
+      await flagMutation.mutateAsync({
+        assetId: flagData.assetId,
+        assetCode: flagData.assetCode,
+        assetName: flagData.assetName,
+        category: flagData.category as
+          | "computing"
+          | "transport"
+          | "av"
+          | "furniture",
+        condition: flagData.condition,
+        notes: flagData.notes,
+        scheduledDate: flagData.scheduledDate,
+      });
+      toast.success("Asset flagged for maintenance.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to flag asset.");
+      throw err;
+    }
   };
 
   const handleConfirmResolve = async (
@@ -143,10 +151,16 @@ export default function MaintenanceLogsPage() {
     technician: string,
     date: string
   ) => {
-    await resolveMutation.mutateAsync({
-      id: rec.id,
-      resolutionNotes,
-    });
+    try {
+      await resolveMutation.mutateAsync({
+        id: rec.id,
+        resolutionNotes,
+      });
+      toast.success("Maintenance log resolved.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to resolve log.");
+      throw err;
+    }
 
     if (selectedRecord?.id === rec.id) {
       setSelectedRecord(null);

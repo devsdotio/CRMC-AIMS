@@ -21,6 +21,7 @@ import {
   useUpdateUserMutation,
   useUsersQuery,
 } from "@/features/users/client";
+import { useToast } from "@/components/providers/toast-context";
 
 export default function UsersPage() {
   const { data: me, error: meError } = useMeQuery();
@@ -35,6 +36,7 @@ export default function UsersPage() {
   const updateUser = useUpdateUserMutation();
   const deactivateUser = useDeactivateUserMutation();
   const reactivateUser = useReactivateUserMutation();
+  const toast = useToast();
 
   const currentUserId = me?.id ?? "";
   const canInviteAdmin = me?.role === "superadmin";
@@ -103,14 +105,19 @@ export default function UsersPage() {
     if (input.role === "superadmin") {
       throw new Error("Superadmin accounts can only be created via seed script.");
     }
-
-    await createUser.mutateAsync({
-      name: input.name,
-      email: input.email,
-      role: input.role,
-      department: input.department || undefined,
-      password: input.password,
-    });
+    try {
+      await createUser.mutateAsync({
+        name: input.name,
+        email: input.email,
+        role: input.role,
+        department: input.department || undefined,
+        password: input.password,
+      });
+      toast.success("User account created.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create user.");
+      throw err;
+    }
   };
 
   const handleSaveUser = async (input: EditUserSaveInput) => {
@@ -118,19 +125,23 @@ export default function UsersPage() {
     if (input.role === "superadmin") {
       throw new Error("Cannot assign superadmin via this form.");
     }
-
-    const saved = await updateUser.mutateAsync({
-      id: input.id,
-      payload: {
-        name: input.name,
-        role: input.role,
-        department: input.department || null,
-        status: input.status,
-        ...(input.password ? { password: input.password } : {}),
-      },
-    });
-
-    setSelectedUser((prev) => (prev?.id === saved.id ? saved : prev));
+    try {
+      const saved = await updateUser.mutateAsync({
+        id: input.id,
+        payload: {
+          name: input.name,
+          role: input.role,
+          department: input.department || null,
+          status: input.status,
+          ...(input.password ? { password: input.password } : {}),
+        },
+      });
+      setSelectedUser((prev) => (prev?.id === saved.id ? saved : prev));
+      toast.success("User account updated.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update user.");
+      throw err;
+    }
   };
 
   const handleConfirmDeactivate = async (userToDeactivate: UserAccount) => {
@@ -138,9 +149,14 @@ export default function UsersPage() {
     if (userToDeactivate.id === currentUserId) {
       throw new Error("You cannot deactivate your own account.");
     }
-
-    const saved = await deactivateUser.mutateAsync(userToDeactivate.id);
-    setSelectedUser((prev) => (prev?.id === saved.id ? saved : prev));
+    try {
+      const saved = await deactivateUser.mutateAsync(userToDeactivate.id);
+      setSelectedUser((prev) => (prev?.id === saved.id ? saved : prev));
+      toast.success("Account deactivated.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to deactivate account.");
+      throw err;
+    }
   };
 
   const handleReactivate = async (userToReactivate: UserAccount) => {
@@ -148,10 +164,9 @@ export default function UsersPage() {
     try {
       const saved = await reactivateUser.mutateAsync(userToReactivate.id);
       setSelectedUser((prev) => (prev?.id === saved.id ? saved : prev));
+      toast.success("Account reactivated.");
     } catch (err) {
-      setPageError(
-        err instanceof Error ? err.message : "Failed to reactivate account."
-      );
+      toast.error(err instanceof Error ? err.message : "Failed to reactivate account.");
     }
   };
 

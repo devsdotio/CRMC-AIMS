@@ -30,6 +30,7 @@ import {
 } from "@/components/consumables/release-from-lot-dialog";
 import { useSuppliersQuery } from "@/features/suppliers/client";
 import { QueryErrorBanner } from "@/components/shared/query-error-banner";
+import { useToast } from "@/components/providers/toast-context";
 
 export default function ConsumablesPage() {
   const { data: paginatedData, isLoading: isConsumablesLoading, isError, error, refetch } =
@@ -44,6 +45,7 @@ export default function ConsumablesPage() {
   const restockMutation = useRestockConsumableMutation();
   const adjustMutation = useAdjustConsumableMutation();
   const releaseMutation = useReleaseFromLotMutation();
+  const toast = useToast();
 
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
 
@@ -169,7 +171,6 @@ export default function ConsumablesPage() {
   };
 
   const handleSaveConsumable = async (itemData: Partial<ConsumableItem>) => {
-    setActionError(null);
     try {
       if (addEditState.item) {
         await updateMutation.mutateAsync({
@@ -187,6 +188,7 @@ export default function ConsumablesPage() {
             notes: itemData.notes,
           },
         });
+        toast.success("Item updated successfully.");
       } else {
         const created = await createMutation.mutateAsync({
           itemCode: itemData.itemCode,
@@ -200,11 +202,10 @@ export default function ConsumablesPage() {
           notes: itemData.notes,
         });
         setSelectedId(created.id);
+        toast.success("Item created successfully.");
       }
     } catch (err) {
-      setActionError(
-        err instanceof Error ? err.message : "Failed to save consumable."
-      );
+      toast.error(err instanceof Error ? err.message : "Failed to save item.");
       throw err;
     }
   };
@@ -216,7 +217,6 @@ export default function ConsumablesPage() {
     supplierId?: string | null;
     notes?: string;
   }) => {
-    setActionError(null);
     try {
       await restockMutation.mutateAsync({
         id: input.itemId,
@@ -228,10 +228,9 @@ export default function ConsumablesPage() {
         },
       });
       setSelectedId(input.itemId);
+      toast.success("Stock restocked successfully.");
     } catch (err) {
-      setActionError(
-        err instanceof Error ? err.message : "Restock failed."
-      );
+      toast.error(err instanceof Error ? err.message : "Restock failed.");
       throw err;
     }
   };
@@ -242,7 +241,6 @@ export default function ConsumablesPage() {
     reason: string,
     notes?: string
   ) => {
-    setActionError(null);
     try {
       await adjustMutation.mutateAsync({
         id: itemId,
@@ -253,19 +251,23 @@ export default function ConsumablesPage() {
         },
       });
       setSelectedId(itemId);
+      toast.success("Stock adjusted successfully.");
     } catch (err) {
-      setActionError(
-        err instanceof Error ? err.message : "Adjustment failed."
-      );
+      toast.error(err instanceof Error ? err.message : "Adjustment failed.");
       throw err;
     }
   };
 
   const handleConfirmRelease = async (input: ReleaseFromLotInput) => {
-    setActionError(null);
-    await releaseMutation.mutateAsync(input);
-    if (releaseState.item) {
-      setSelectedId(releaseState.item.id);
+    try {
+      await releaseMutation.mutateAsync(input);
+      if (releaseState.item) {
+        setSelectedId(releaseState.item.id);
+      }
+      toast.success("Items released successfully.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Release failed.");
+      throw err;
     }
   };
 

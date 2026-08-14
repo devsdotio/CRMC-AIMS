@@ -15,6 +15,7 @@ import { AssetTable } from "@/components/assets/asset-table";
 import { AssetDetailPanel } from "@/components/assets/asset-detail-panel";
 import { AddEditAssetDialog } from "@/components/assets/add-edit-asset-dialog";
 import { QueryErrorBanner } from "@/components/shared/query-error-banner";
+import { useToast } from "@/components/providers/toast-context";
 
 export default function AssetsPage() {
   const {
@@ -26,6 +27,7 @@ export default function AssetsPage() {
   } = useAssetsQuery();
   const createMutation = useCreateAssetMutation();
   const updateMutation = useUpdateAssetMutation();
+  const toast = useToast();
 
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
 
@@ -100,51 +102,58 @@ export default function AssetsPage() {
   };
 
   const handleSaveAsset = async (assetData: Partial<Asset>) => {
-    if (addEditState.asset) {
-      // Edit
-      await updateMutation.mutateAsync({
-        id: addEditState.asset.id,
-        payload: {
-          name: assetData.name,
-          category: assetData.category,
-          status: assetData.status,
-          assignmentType: assetData.assignmentType as
-            | "borrowable"
-            | "assignable"
-            | undefined,
+    try {
+      if (addEditState.asset) {
+        // Edit
+        await updateMutation.mutateAsync({
+          id: addEditState.asset.id,
+          payload: {
+            name: assetData.name,
+            category: assetData.category,
+            status: assetData.status,
+            assignmentType: assetData.assignmentType as
+              | "borrowable"
+              | "assignable"
+              | undefined,
+            serialNumber: assetData.serialNumber,
+            location: assetData.location,
+            department: assetData.department,
+            purchaseDate: assetData.purchaseDate,
+            value: assetData.value,
+            supplierId:
+              assetData.supplierId === undefined
+                ? undefined
+                : assetData.supplierId || null,
+            notes: assetData.notes,
+          },
+        });
+        if (selectedAsset?.id === addEditState.asset.id) {
+          setSelectedAsset(null);
+        }
+        toast.success("Asset updated successfully.");
+      } else {
+        // Create
+        await createMutation.mutateAsync({
+          assetCode: assetData.assetCode || `ASSET-${Date.now()}`,
+          name: assetData.name || "New Asset",
+          category: (assetData.category as string) || "",
+          status: (assetData.status as AssetStatus) || "active",
+          assignmentType:
+            (assetData.assignmentType as "borrowable" | "assignable") ||
+            "borrowable",
           serialNumber: assetData.serialNumber,
-          location: assetData.location,
+          location: assetData.location || "Central Storage",
           department: assetData.department,
           purchaseDate: assetData.purchaseDate,
           value: assetData.value,
-          supplierId:
-            assetData.supplierId === undefined
-              ? undefined
-              : assetData.supplierId || null,
+          supplierId: assetData.supplierId || undefined,
           notes: assetData.notes,
-        },
-      });
-      if (selectedAsset?.id === addEditState.asset.id) {
-        setSelectedAsset(null);
+        });
+        toast.success("Asset created successfully.");
       }
-    } else {
-      // Create
-      await createMutation.mutateAsync({
-        assetCode: assetData.assetCode || `ASSET-${Date.now()}`,
-        name: assetData.name || "New Asset",
-        category: (assetData.category as string) || "",
-        status: (assetData.status as AssetStatus) || "active",
-        assignmentType:
-          (assetData.assignmentType as "borrowable" | "assignable") ||
-          "borrowable",
-        serialNumber: assetData.serialNumber,
-        location: assetData.location || "Central Storage",
-        department: assetData.department,
-        purchaseDate: assetData.purchaseDate,
-        value: assetData.value,
-        supplierId: assetData.supplierId || undefined,
-        notes: assetData.notes,
-      });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save asset.");
+      throw err;
     }
   };
 

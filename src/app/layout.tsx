@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { QueryProvider } from "@/components/providers/query-provider";
+import { ToastProvider } from "@/components/providers/toast-context";
 import "./globals.css";
 
 const quicksand = localFont({
@@ -28,7 +29,9 @@ export default function RootLayout({
       className={`${quicksand.variable} h-full antialiased`}
     >
       <body className="h-full flex flex-col bg-[#F2F3F7] text-[#1B2140] overflow-hidden">
-        <QueryProvider>{children}</QueryProvider>
+        <ToastProvider>
+          <QueryProvider>{children}</QueryProvider>
+        </ToastProvider>
       </body>
     </html>
   );

@@ -57,6 +57,7 @@ import {
   ReportDamageDialog,
   type ReportDamageFormInput,
 } from "./report-damage-dialog";
+import { useToast } from "@/components/providers/toast-context";
 
 export interface ProjectDetailPanelProps {
   project: Project | null;
@@ -126,6 +127,7 @@ export function ProjectDetailPanel({
   const [damageTarget, setDamageTarget] =
     useState<ProjectAssetAssignment | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const toast = useToast();
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -168,45 +170,64 @@ export function ProjectDetailPanel({
       incurredOn: input.incurredOn || undefined,
       notes: input.notes || null,
     };
-    if (editExpense) {
-      await updateExpense.mutateAsync({
-        projectId: project.id,
-        expenseId: editExpense.id,
-        payload,
-      });
-    } else {
-      await createExpense.mutateAsync({
-        projectId: project.id,
-        payload,
-      });
+    try {
+      if (editExpense) {
+        await updateExpense.mutateAsync({
+          projectId: project.id,
+          expenseId: editExpense.id,
+          payload,
+        });
+        toast.success("Expense updated.");
+      } else {
+        await createExpense.mutateAsync({
+          projectId: project.id,
+          payload,
+        });
+        toast.success("Expense added.");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save expense.");
+      throw err;
     }
   };
 
   const handleMaterialSubmit = async (input: MaterialFormInput) => {
     setActionError(null);
-    await useMaterial.mutateAsync({
-      projectId: project.id,
-      payload: {
-        consumableId: input.consumableId,
-        quantity: input.quantity,
-        notes: input.notes || null,
-      },
-    });
+    try {
+      await useMaterial.mutateAsync({
+        projectId: project.id,
+        payload: {
+          consumableId: input.consumableId,
+          quantity: input.quantity,
+          notes: input.notes || null,
+        },
+      });
+      toast.success("Material usage recorded.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to record material.");
+      throw err;
+    }
   };
 
   const handleAssignAsset = async (input: AssignAssetFormInput) => {
     setActionError(null);
-    await assignAsset.mutateAsync({
-      projectId: project.id,
-      assetId: input.assetId,
-      notes: input.notes || null,
-    });
+    try {
+      await assignAsset.mutateAsync({
+        projectId: project.id,
+        assetId: input.assetId,
+        notes: input.notes || null,
+      });
+      toast.success("Asset assigned to project.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to assign asset.");
+      throw err;
+    }
   };
 
   const handleReturnAsset = async (row: ProjectAssetAssignment) => {
     if (
       !window.confirm(
-        `Return “${row.assetName}” (${row.assetCode}) from this project?`
+        `Return "${row.assetName}" (${row.assetCode}) from this project?`
       )
     )
       return;
@@ -216,28 +237,33 @@ export function ProjectDetailPanel({
         projectId: project.id,
         assignmentId: row.id,
       });
+      toast.success(`${row.assetName} returned from project.`);
     } catch (err) {
-      setActionError(
-        err instanceof Error ? err.message : "Failed to return asset."
-      );
+      toast.error(err instanceof Error ? err.message : "Failed to return asset.");
     }
   };
 
   const handleDamageSubmit = async (input: ReportDamageFormInput) => {
     if (!damageTarget) return;
     setActionError(null);
-    await reportDamage.mutateAsync({
-      projectId: project.id,
-      assignmentId: damageTarget.id,
-      mode: input.mode,
-      amount:
-        input.mode === "write_off" && input.amount
-          ? input.amount
-          : undefined,
-      assetStatus:
-        input.mode === "write_off" ? input.assetStatus : undefined,
-      notes: input.notes,
-    });
+    try {
+      await reportDamage.mutateAsync({
+        projectId: project.id,
+        assignmentId: damageTarget.id,
+        mode: input.mode,
+        amount:
+          input.mode === "write_off" && input.amount
+            ? input.amount
+            : undefined,
+        assetStatus:
+          input.mode === "write_off" ? input.assetStatus : undefined,
+        notes: input.notes,
+      });
+      toast.success("Damage report submitted.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to report damage.");
+      throw err;
+    }
   };
 
   const damageDefaultValue = (() => {
@@ -249,8 +275,8 @@ export function ProjectDetailPanel({
   const handleDeleteExpense = async (line: ProjectExpenseLine) => {
     const msg =
       line.lineType === "consumable"
-        ? `Remove material charge “${line.description}”? Stock and purchase lots will be restored.`
-        : `Delete expense “${line.description}”?`;
+        ? `Remove material charge "${line.description}"? Stock and purchase lots will be restored.`
+        : `Delete expense "${line.description}"?`;
     if (!window.confirm(msg)) return;
     setActionError(null);
     try {
@@ -258,10 +284,9 @@ export function ProjectDetailPanel({
         projectId: project.id,
         expenseId: line.id,
       });
+      toast.success("Expense deleted.");
     } catch (err) {
-      setActionError(
-        err instanceof Error ? err.message : "Failed to delete expense."
-      );
+      toast.error(err instanceof Error ? err.message : "Failed to delete expense.");
     }
   };
 

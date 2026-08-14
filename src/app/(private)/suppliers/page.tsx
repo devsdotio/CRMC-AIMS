@@ -16,6 +16,7 @@ import {
   useSuppliersQuery,
   useUpdateSupplierMutation,
 } from "@/features/suppliers/client";
+import { useToast } from "@/components/providers/toast-context";
 
 export default function SuppliersPage() {
   const {
@@ -27,6 +28,7 @@ export default function SuppliersPage() {
   const createSupplier = useCreateSupplierMutation();
   const updateSupplier = useUpdateSupplierMutation();
   const deactivateSupplier = useDeactivateSupplierMutation();
+  const toast = useToast();
 
   const [filters, setFilters] = useState<SupplierFilterState>({
     searchQuery: "",
@@ -73,27 +75,33 @@ export default function SuppliersPage() {
       notes: input.notes || null,
       status: input.status,
     };
-    if (editTarget) {
-      const saved = await updateSupplier.mutateAsync({
-        id: editTarget.id,
-        payload,
-      });
-      setSelected((prev) => (prev?.id === saved.id ? saved : prev));
-    } else {
-      await createSupplier.mutateAsync(payload);
+    try {
+      if (editTarget) {
+        const saved = await updateSupplier.mutateAsync({
+          id: editTarget.id,
+          payload,
+        });
+        setSelected((prev) => (prev?.id === saved.id ? saved : prev));
+        toast.success("Supplier updated.");
+      } else {
+        await createSupplier.mutateAsync(payload);
+        toast.success("Supplier created.");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save supplier.");
+      throw err;
     }
   };
 
   const handleDeactivate = async (s: Supplier) => {
-    if (!window.confirm(`Deactivate “${s.name}”? History is kept.`)) return;
+    if (!window.confirm(`Deactivate "${s.name}"? History is kept.`)) return;
     setPageError(null);
     try {
       const saved = await deactivateSupplier.mutateAsync(s.id);
       setSelected((prev) => (prev?.id === saved.id ? saved : prev));
+      toast.success(`${s.name} deactivated.`);
     } catch (err) {
-      setPageError(
-        err instanceof Error ? err.message : "Failed to deactivate supplier."
-      );
+      toast.error(err instanceof Error ? err.message : "Failed to deactivate supplier.");
     }
   };
 
