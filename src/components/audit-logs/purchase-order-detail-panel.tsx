@@ -59,26 +59,26 @@ export function PurchaseOrderDetailPanel({
       >
         {/* Panel Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-bg-subtle/50 shrink-0">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-xs font-bold text-text bg-bg px-2 py-0.5 rounded border border-border">
+          <div className="min-w-0 flex-1 pr-3">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h2 id="po-detail-heading" className="font-mono text-lg font-bold tracking-tight text-text">
                 {lot.lotCode}
-              </span>
-              <span className="inline-flex items-center gap-1 px-3 py-0.5 rounded-full text-xs font-bold bg-category-av-bg/20 text-category-av-bg border border-category-av-bg/30">
+              </h2>
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-category-av-bg/20 text-category-av-bg border border-category-av-bg/30">
                 <ShoppingCart className="h-3 w-3" />
                 Purchased Intake
               </span>
             </div>
-            <h2 id="po-detail-heading" className="text-base font-bold text-text mt-1">
-              Purchase Order & Batch Record
-            </h2>
+            <p className="text-xs text-text-secondary font-medium mt-0.5 truncate">
+              Purchase Lot Intake • Vendor: <strong className="text-text font-semibold">{lot.supplierName || "Direct Procurement"}</strong>
+            </p>
           </div>
 
           <button
             type="button"
             onClick={onClose}
             aria-label="Close detail panel"
-            className="p-1.5 rounded-lg text-text-secondary hover:text-text hover:bg-border transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg text-text-secondary hover:text-text hover:bg-border transition-colors cursor-pointer shrink-0"
           >
             <X className="h-5 w-5" />
           </button>

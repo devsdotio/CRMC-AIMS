@@ -57,32 +57,23 @@ export function MaintenanceLogDetailPanel({
       >
         {/* Panel Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-bg-subtle/50 shrink-0">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-xs font-bold text-text bg-bg px-2 py-0.5 rounded border border-border">
+          <div className="min-w-0 flex-1 pr-3">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h2 id="mnt-detail-heading" className="font-mono text-lg font-bold tracking-tight text-text">
                 {record.logCode}
-              </span>
-              <span
-                className={cn(
-                  "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider",
-                  categoryMeta.bg,
-                  categoryMeta.text
-                )}
-              >
-                <Tag className="h-2.5 w-2.5 mr-1" />
-                {categoryMeta.label}
-              </span>
+              </h2>
+              <ConditionTag condition={record.isResolved ? "resolved" : record.condition} />
             </div>
-            <h2 id="mnt-detail-heading" className="text-base font-bold text-text mt-0.5">
-              Condition & Maintenance Entry Record
-            </h2>
+            <p className="text-xs text-text-secondary font-medium mt-0.5 truncate">
+              Maintenance Record • Asset: <strong className="text-text font-semibold">{record.assetCode}</strong> ({record.assetName})
+            </p>
           </div>
 
           <button
             type="button"
             onClick={onClose}
             aria-label="Close maintenance detail panel"
-            className="p-1.5 rounded-lg text-text-secondary hover:text-text hover:bg-border transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg text-text-secondary hover:text-text hover:bg-border transition-colors cursor-pointer shrink-0"
           >
             <X className="h-5 w-5" />
           </button>

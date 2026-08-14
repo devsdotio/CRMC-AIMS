@@ -165,11 +165,11 @@ export function AuditLogDetailPanel({
       >
         {/* Panel Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-bg-subtle/50 shrink-0">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-xs font-bold text-text bg-bg px-2 py-0.5 rounded border border-border">
+          <div className="min-w-0 flex-1 pr-3">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h2 id="audit-detail-heading" className="font-mono text-lg font-bold tracking-tight text-text">
                 {codeOrId}
-              </span>
+              </h2>
               <span
                 className={cn(
                   "inline-flex items-center px-3 py-0.5 rounded-full text-xs font-bold border",
@@ -180,16 +180,16 @@ export function AuditLogDetailPanel({
                 {style.label}
               </span>
             </div>
-            <h2 id="audit-detail-heading" className="text-base font-bold text-text mt-1">
-              Audit Event Record
-            </h2>
+            <p className="text-xs text-text-secondary font-medium mt-0.5 truncate">
+              System Audit Trail • <span className="text-text font-semibold capitalize">{departmentOrEntity || "General"}</span>
+            </p>
           </div>
 
           <button
             type="button"
             onClick={onClose}
             aria-label="Close audit detail panel"
-            className="p-1.5 rounded-lg text-text-secondary hover:text-text hover:bg-border transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg text-text-secondary hover:text-text hover:bg-border transition-colors cursor-pointer shrink-0"
           >
             <X className="h-5 w-5" />
           </button>

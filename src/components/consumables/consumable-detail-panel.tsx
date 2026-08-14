@@ -173,22 +173,34 @@ export function ConsumableDetailPanel({
         )}
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-bg-subtle/50 shrink-0">
-          <div className="min-w-0 pr-2">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-mono text-xs font-bold text-text bg-bg px-2 py-0.5 rounded border border-border">
+          <div className="min-w-0 flex-1 pr-3">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h2
+                id="consumable-detail-heading"
+                className="font-mono text-lg font-bold tracking-tight text-text"
+              >
                 {displayItem.itemCode}
-              </span>
-              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-bg-subtle text-text-secondary border border-border">
-                <Tag className="h-2.5 w-2.5" />
-                {displayItem.category.replace(/_/g, " ")}
+              </h2>
+              <span
+                className={cn(
+                  "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border",
+                  displayItem.currentQty === 0
+                    ? "bg-status-outofservice-bg/20 text-status-outofservice-text border-status-outofservice-bg/30"
+                    : displayItem.currentQty <= displayItem.minThreshold
+                    ? "bg-status-repair-bg/20 text-status-repair-text border-status-repair-bg/30"
+                    : "bg-status-active-bg/20 text-status-active-text border-status-active-bg/30"
+                )}
+              >
+                {displayItem.currentQty === 0
+                  ? "Out of Stock"
+                  : displayItem.currentQty <= displayItem.minThreshold
+                  ? "Low Stock"
+                  : "In Stock"}
               </span>
             </div>
-            <h2
-              id="consumable-detail-heading"
-              className="text-base font-bold text-text mt-0.5 leading-tight truncate"
-            >
-              {displayItem.name}
-            </h2>
+            <p className="text-xs text-text-secondary font-medium mt-0.5 truncate">
+              {displayItem.category.replace(/_/g, " ")} • <strong className="text-text font-semibold">{displayItem.name}</strong>
+            </p>
           </div>
 
           <button

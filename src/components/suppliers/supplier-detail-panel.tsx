@@ -48,17 +48,21 @@ export function SupplierDetailPanel({
         )}
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-bg-subtle/50 shrink-0">
-          <div>
-            <SupplierStatusBadge status={supplier.status} />
-            <h2 className="text-base font-bold text-text mt-0.5">{supplier.name}</h2>
-            <p className="text-[11px] font-mono text-text-secondary">
-              {supplier.supplierCode}
+          <div className="min-w-0 flex-1 pr-3">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h2 className="font-mono text-lg font-bold tracking-tight text-text">
+                {supplier.supplierCode}
+              </h2>
+              <SupplierStatusBadge status={supplier.status} />
+            </div>
+            <p className="text-xs text-text-secondary font-medium mt-0.5 truncate">
+              Supplier Record • <strong className="text-text font-semibold">{supplier.name}</strong>
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-text-secondary hover:text-text hover:bg-border cursor-pointer"
+            className="p-1.5 rounded-lg text-text-secondary hover:text-text hover:bg-border cursor-pointer shrink-0"
             aria-label="Close"
           >
             <X className="h-5 w-5" />

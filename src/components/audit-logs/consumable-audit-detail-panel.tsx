@@ -280,11 +280,11 @@ export function ConsumableAuditDetailPanel({
       >
         {/* Panel Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-bg-subtle/50 shrink-0">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-xs font-bold text-text bg-bg px-2 py-0.5 rounded border border-border">
+          <div className="min-w-0 flex-1 pr-3">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h2 id="con-audit-heading" className="font-mono text-lg font-bold tracking-tight text-text">
                 {currentItem.itemCode}
-              </span>
+              </h2>
               <span
                 className={cn(
                   "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border",
@@ -298,16 +298,16 @@ export function ConsumableAuditDetailPanel({
                 {isOutOfStock ? "Out of Stock" : isLowStock ? "Low Stock" : "In Stock"}
               </span>
             </div>
-            <h2 id="con-audit-heading" className="text-base font-bold text-text mt-1">
-              Consumable Accountability & Audit Trail
-            </h2>
+            <p className="text-xs text-text-secondary font-medium mt-0.5 truncate">
+              Consumable Accountability Log • <strong className="text-text font-semibold">{currentItem.name}</strong>
+            </p>
           </div>
 
           <button
             type="button"
             onClick={onClose}
             aria-label="Close detail panel"
-            className="p-1.5 rounded-lg text-text-secondary hover:text-text hover:bg-border transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg text-text-secondary hover:text-text hover:bg-border transition-colors cursor-pointer shrink-0"
           >
             <X className="h-5 w-5" />
           </button>
@@ -368,25 +368,37 @@ export function ConsumableAuditDetailPanel({
               <span className="text-[10px] font-semibold text-text-secondary uppercase block">
                 Total Restocked
               </span>
-              <span className="text-sm font-bold text-status-active-text mt-0.5 block">
-                +{totalInflow} {currentItem.unit}
-              </span>
+              {detailLoading ? (
+                <div className="h-5 w-16 bg-bg-subtle rounded-md mx-auto mt-1 animate-pulse" />
+              ) : (
+                <span className="text-sm font-bold text-status-active-text mt-0.5 block">
+                  +{totalInflow} {currentItem.unit}
+                </span>
+              )}
             </div>
             <div className="p-3 rounded-lg border border-border bg-bg-subtle/60">
               <span className="text-[10px] font-semibold text-text-secondary uppercase block">
                 Total Issued
               </span>
-              <span className="text-sm font-bold text-status-repair-text mt-0.5 block">
-                -{totalOutflow} {currentItem.unit}
-              </span>
+              {detailLoading ? (
+                <div className="h-5 w-16 bg-bg-subtle rounded-md mx-auto mt-1 animate-pulse" />
+              ) : (
+                <span className="text-sm font-bold text-status-repair-text mt-0.5 block">
+                  -{totalOutflow} {currentItem.unit}
+                </span>
+              )}
             </div>
             <div className="p-3 rounded-lg border border-border bg-bg-subtle/60">
               <span className="text-[10px] font-semibold text-text-secondary uppercase block">
                 Active Batches
               </span>
-              <span className="text-sm font-bold text-text mt-0.5 block">
-                {purchaseLots.length} {purchaseLots.length === 1 ? "Lot" : "Lots"}
-              </span>
+              {detailLoading ? (
+                <div className="h-5 w-12 bg-bg-subtle rounded-md mx-auto mt-1 animate-pulse" />
+              ) : (
+                <span className="text-sm font-bold text-text mt-0.5 block">
+                  {purchaseLots.length} {purchaseLots.length === 1 ? "Lot" : "Lots"}
+                </span>
+              )}
             </div>
           </div>
 
@@ -395,35 +407,31 @@ export function ConsumableAuditDetailPanel({
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
                 <History className="h-3.5 w-3.5" />
-                Accountability Log ({combinedLogs.length})
+                Accountability Log {!detailLoading && `(${combinedLogs.length})`}
               </h3>
-              {detailLoading && (
-                <span className="text-[11px] font-semibold text-accent bg-accent/10 px-2 py-0.5 rounded-full border border-accent/20 flex items-center gap-1">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  Syncing logs...
+              {detailLoading ? (
+                <span className="text-[11px] font-semibold text-accent bg-accent/10 px-2.5 py-0.5 rounded-full border border-accent/20 flex items-center gap-1.5">
+                  <Loader2 className="h-3 w-3 animate-spin text-accent" />
+                  <span>Preparing full history…</span>
+                </span>
+              ) : (
+                <span className="text-[11px] font-semibold text-text-secondary bg-bg-subtle px-2 py-0.5 rounded-full border border-border">
+                  Full Audit Trail
                 </span>
               )}
             </div>
 
-            {detailLoading && combinedLogs.length === 0 ? (
-              <div className="p-4 rounded-xl border border-border bg-bg shadow-xs animate-pulse">
-                <div className="flex items-center gap-2 mb-4 text-xs text-accent font-semibold">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  <span>Loading accountability and stock movements…</span>
+            {detailLoading ? (
+              <div className="p-8 rounded-xl border border-border bg-bg shadow-xs flex flex-col items-center justify-center text-center">
+                <div className="flex flex-col items-center gap-3 text-text-secondary animate-pulse py-4">
+                  <Layers className="h-8 w-8 text-accent animate-bounce" />
+                  <span className="text-xs font-semibold text-text">
+                    Loading complete accountability history…
+                  </span>
+                  <span className="text-[11px] text-text-secondary">
+                    Retrieving stock movements, restocks, lot allocations, and releases
+                  </span>
                 </div>
-                <ol className="relative border-l-2 border-border/60 ml-3 space-y-6">
-                  {[1, 2, 3].map((i) => (
-                    <li key={i} className="pl-6 relative space-y-2">
-                      <span className="absolute -left-3.25 top-1.5 h-6 w-6 rounded-full border-2 border-border bg-bg-subtle" />
-                      <div className="flex items-center justify-between pt-1">
-                        <div className="h-4 w-36 bg-bg-subtle rounded-md" />
-                        <div className="h-3 w-16 bg-bg-subtle rounded-md" />
-                      </div>
-                      <div className="h-3 w-28 bg-bg-subtle rounded-md" />
-                      <div className="h-10 w-full bg-bg-subtle/80 rounded-lg border border-border/40" />
-                    </li>
-                  ))}
-                </ol>
               </div>
             ) : combinedLogs.length === 0 ? (
               <div className="p-4 rounded-lg border border-border bg-bg text-center text-xs text-text-secondary">

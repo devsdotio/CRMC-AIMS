@@ -137,37 +137,39 @@ export function RequestDetailPanel({
       >
         {/* Panel Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-bg-subtle/50 shrink-0">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-xs font-bold text-text-secondary">
+          <div className="min-w-0 flex-1 pr-3">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h2 id="detail-panel-heading" className="font-mono text-lg font-bold tracking-tight text-text">
                 {request.requestCode}
-              </span>
-              <span
-                className={cn(
-                  "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase",
-                  categoryMeta.bg,
-                  categoryMeta.text
-                )}
-              >
-                <Tag className="h-2.5 w-2.5 mr-1" />
-                {categoryMeta.label}
-              </span>
+              </h2>
+              {statusMeta && (
+                <span
+                  className={cn(
+                    "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold capitalize border",
+                    statusMeta.badge
+                  )}
+                >
+                  {statusMeta.icon}
+                  {statusMeta.label}
+                </span>
+              )}
             </div>
-            <h2 id="detail-panel-heading" className="text-base font-bold text-text mt-0.5">
-              Borrow Request Details
-            </h2>
+            <p className="text-xs text-text-secondary font-medium mt-0.5 truncate">
+              Borrow Request • Borrower: <strong className="text-text font-semibold">{request.borrowerName}</strong>
+            </p>
           </div>
 
-          {request.status === "released" && onReturn ? (
-            <button
-              type="button"
-              onClick={() => onReturn(request)}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
-            >
-              <RotateCcw className="h-3.5 w-3.5" strokeWidth={2.5} />
-              Mark Returned
-            </button>
-          ) : (
+          <div className="flex items-center gap-2 shrink-0">
+            {request.status === "released" && onReturn && (
+              <button
+                type="button"
+                onClick={() => onReturn(request)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+              >
+                <RotateCcw className="h-3.5 w-3.5" strokeWidth={2.5} />
+                Mark Returned
+              </button>
+            )}
             <button
               type="button"
               onClick={onClose}
@@ -176,7 +178,7 @@ export function RequestDetailPanel({
             >
               <X className="h-5 w-5" />
             </button>
-          )}
+          </div>
         </div>
 
         {/* Scrollable Panel Body */}

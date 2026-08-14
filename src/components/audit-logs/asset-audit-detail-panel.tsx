@@ -12,6 +12,7 @@ import {
   History,
   ShieldCheck,
   CheckCircle2,
+  Package,
   PackageCheck,
   PackageMinus,
   RotateCcw,
@@ -126,11 +127,11 @@ export function AssetAuditDetailPanel({
       >
         {/* Panel Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-bg-subtle/50 shrink-0">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-xs font-bold text-text bg-bg px-2 py-0.5 rounded border border-border">
+          <div className="min-w-0 flex-1 pr-3">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h2 id="asset-audit-heading" className="font-mono text-lg font-bold tracking-tight text-text">
                 {asset.assetCode}
-              </span>
+              </h2>
               <span
                 className={cn(
                   "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold capitalize border",
@@ -144,16 +145,16 @@ export function AssetAuditDetailPanel({
                 {asset.currentHolder ? "Borrowed / In-Use" : asset.status.replace(/_/g, " ")}
               </span>
             </div>
-            <h2 id="asset-audit-heading" className="text-base font-bold text-text mt-1">
-              Asset Lifecycle Audit Record
-            </h2>
+            <p className="text-xs text-text-secondary font-medium mt-0.5 truncate">
+              Asset Lifecycle Audit Trail • <strong className="text-text font-semibold">{asset.name}</strong>
+            </p>
           </div>
 
           <button
             type="button"
             onClick={onClose}
             aria-label="Close detail panel"
-            className="p-1.5 rounded-lg text-text-secondary hover:text-text hover:bg-border transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg text-text-secondary hover:text-text hover:bg-border transition-colors cursor-pointer shrink-0"
           >
             <X className="h-5 w-5" />
           </button>
@@ -214,30 +215,29 @@ export function AssetAuditDetailPanel({
                 <History className="h-3.5 w-3.5" />
                 Complete Lifecycle History
               </h3>
-              <span className="text-[11px] font-semibold text-text-secondary bg-bg-subtle px-2 py-0.5 rounded-full border border-border">
-                {lifecycleEvents.length} {lifecycleEvents.length === 1 ? "event" : "events"}
-              </span>
+              {isLifecycleLoading ? (
+                <span className="text-[11px] font-semibold text-accent bg-accent/10 px-2.5 py-0.5 rounded-full border border-accent/20 flex items-center gap-1.5">
+                  <Loader2 className="h-3 w-3 animate-spin text-accent" />
+                  <span>Preparing full history…</span>
+                </span>
+              ) : (
+                <span className="text-[11px] font-semibold text-text-secondary bg-bg-subtle px-2 py-0.5 rounded-full border border-border">
+                  {lifecycleEvents.length} {lifecycleEvents.length === 1 ? "event" : "events"}
+                </span>
+              )}
             </div>
 
             {isLifecycleLoading ? (
-              <div className="p-4 rounded-xl border border-border bg-bg shadow-xs animate-pulse">
-                <div className="flex items-center gap-2 mb-4 text-xs text-accent font-semibold">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  <span>Loading complete asset lifecycle history…</span>
+              <div className="p-8 rounded-xl border border-border bg-bg shadow-xs flex flex-col items-center justify-center text-center">
+                <div className="flex flex-col items-center gap-3 text-text-secondary animate-pulse py-4">
+                  <Package className="h-8 w-8 text-accent animate-bounce" />
+                  <span className="text-xs font-semibold text-text">
+                    Loading complete asset lifecycle history…
+                  </span>
+                  <span className="text-[11px] text-text-secondary">
+                    Retrieving registration, checkout releases, returns, and maintenance logs
+                  </span>
                 </div>
-                <ol className="relative border-l-2 border-border/60 ml-3 space-y-6">
-                  {[1, 2, 3].map((i) => (
-                    <li key={i} className="pl-6 relative space-y-2">
-                      <span className="absolute -left-3.25 top-1.5 h-6 w-6 rounded-full border-2 border-border bg-bg-subtle" />
-                      <div className="flex items-center justify-between pt-1">
-                        <div className="h-4 w-36 bg-bg-subtle rounded-md" />
-                        <div className="h-3 w-16 bg-bg-subtle rounded-md" />
-                      </div>
-                      <div className="h-3 w-28 bg-bg-subtle rounded-md" />
-                      <div className="h-10 w-full bg-bg-subtle/80 rounded-lg border border-border/40" />
-                    </li>
-                  ))}
-                </ol>
               </div>
             ) : lifecycleEvents.length === 0 ? (
               <div className="p-4 rounded-lg border border-border bg-bg text-center text-xs text-text-secondary">

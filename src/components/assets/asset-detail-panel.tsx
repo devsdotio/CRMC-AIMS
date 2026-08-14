@@ -30,6 +30,7 @@ import {
   AlertCircle,
   ShieldCheck,
   Sparkles,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { custodyBadgeLabel } from "@/lib/assets-custody";
@@ -907,39 +908,53 @@ export function AssetDetailPanel({
       >
         {/* Panel Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-bg-subtle/50 shrink-0">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-xs font-bold text-text bg-bg px-2 py-0.5 rounded border border-border">
-                {asset.assetCode}
-              </span>
-              <span
-                className={cn(
-                  "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider",
-                  categoryMeta.bg,
-                  categoryMeta.text,
-                )}
+          <div className="min-w-0 flex-1 pr-3">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h2
+                id="asset-detail-heading"
+                className="font-mono text-lg font-bold tracking-tight text-text"
               >
-                <Tag className="h-2.5 w-2.5 mr-1" />
-                {categoryMeta.label}
-              </span>
+                {asset.assetCode}
+              </h2>
+              {statusMeta && (
+                <span
+                  className={cn(
+                    "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold capitalize border",
+                    asset.status === "active"
+                      ? "bg-status-active-bg/20 text-status-active-text border-status-active-bg/30"
+                      : asset.status === "needs_repair"
+                      ? "bg-status-repair-bg/20 text-status-repair-text border-status-repair-bg/30"
+                      : "bg-status-outofservice-bg/20 text-status-outofservice-text border-status-outofservice-bg/30"
+                  )}
+                >
+                  {asset.currentHolder ? "Borrowed / In-Use" : statusMeta.label}
+                </span>
+              )}
             </div>
-            <h2
-              id="asset-detail-heading"
-              className="text-base font-bold text-text mt-0.5 leading-tight"
-            >
-              {asset.name}
-            </h2>
+            <p className="text-xs text-text-secondary font-medium mt-0.5 truncate">
+              {categoryMeta.label} • <strong className="text-text font-semibold">{asset.name}</strong>
+            </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => onEdit(asset)}
-            aria-label="Edit asset details"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-bg text-text-secondary hover:text-text border border-border hover:border-primary transition-colors cursor-pointer shadow-xs"
-          >
-            <Edit3 className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Edit</span>
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => onEdit(asset)}
+              aria-label="Edit asset details"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-bg text-text-secondary hover:text-text border border-border hover:border-primary transition-colors cursor-pointer shadow-xs"
+            >
+              <Edit3 className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Edit</span>
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close asset detail panel"
+              className="p-1.5 rounded-lg text-text-secondary hover:text-text hover:bg-border transition-colors cursor-pointer"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
         </div>
 
         {/* Body */}
