@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Edit3,
@@ -10,7 +10,9 @@ import {
   Calendar,
   Truck,
   ChevronDown,
+  ChevronUp,
   ChevronRight,
+  ExternalLink,
   FileText,
   Loader2,
   Send,
@@ -20,210 +22,803 @@ import {
   PackageMinus,
   RotateCcw,
   History,
+  Wrench,
+  Clock,
+  ArrowRight,
+  Phone,
+  Mail,
+  AlertCircle,
+  ShieldCheck,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { custodyBadgeLabel } from "@/lib/assets-custody";
-import type { Asset, AssetStatus } from "@/types/assets";
+import type { Asset, AssetStatus, MaintenanceLogEntry } from "@/types/assets";
+import type { BorrowRequest, ActionHistoryLog } from "@/types/borrow-requests";
 import { useSuppliersQuery } from "@/features/suppliers/client";
+import {
+  useAssetLifecycleQuery,
+  type AssetLifecycleEvent,
+  type AssetChangesMap,
+} from "@/features/assets/client";
 import { QRCodeDisplay } from "./qr-code-display";
 import { getCategoryStyle } from "@/constants/categories";
 import { useBorrowRequests } from "@/features/borrow-requests/client";
-import { useState } from "react";
 
-function getRequestIcon(status: string) {
-  switch (status) {
+function getTimelineIcon(status: string) {
+  switch (status.toLowerCase()) {
     case "pending":
-      return <Send className="h-4 w-4" />;
+    case "submitted":
+      return <Send className="h-3.5 w-3.5" />;
     case "approved":
-      return <CheckCircle className="h-4 w-4" />;
+    case "created":
+      return <CheckCircle className="h-3.5 w-3.5" />;
     case "rejected":
-      return <XCircle className="h-4 w-4" />;
-    case "released":
-      return <PackageCheck className="h-4 w-4" />;
-    case "unreleased":
-      return <PackageMinus className="h-4 w-4" />;
-    case "returned":
-      return <RotateCcw className="h-4 w-4" />;
     case "cancelled":
-      return <XCircle className="h-4 w-4" />;
+    case "out_of_service":
+    case "deleted":
+      return <XCircle className="h-3.5 w-3.5" />;
+    case "released":
+      return <PackageCheck className="h-3.5 w-3.5" />;
+    case "unreleased":
+      return <PackageMinus className="h-3.5 w-3.5" />;
+    case "returned":
+      return <RotateCcw className="h-3.5 w-3.5" />;
+    case "maintenance":
+    case "needs_repair":
+    case "flagged_maintenance":
+      return <Wrench className="h-3.5 w-3.5" />;
+    case "updated":
+    case "status_changed":
+      return <FileText className="h-3.5 w-3.5" />;
     default:
-      return <History className="h-4 w-4" />;
+      return <History className="h-3.5 w-3.5" />;
   }
 }
 
-function getRequestStyle(status: string) {
-  switch (status) {
-    case "pending":
-      return { bg: "bg-bg-subtle border-border", text: "text-text-secondary" };
+function getTimelineStyle(status: string) {
+  switch (status.toLowerCase()) {
     case "approved":
+    case "released":
+    case "created":
       return {
-        bg: "bg-status-active-bg/20 border-status-active-bg/30",
+        bg: "bg-status-active-bg text-white border-status-active-bg",
         text: "text-status-active-text",
-      };
-    case "rejected":
-      return {
-        bg: "bg-destructive border-destructive",
-        text: "text-destructive",
+        badge: "bg-status-active-bg text-white border-transparent",
         iconText: "text-white",
       };
-    case "released":
+    case "pending":
+    case "submitted":
+    case "borrow":
       return {
-        bg: "bg-status-active-bg/20 border-status-active-bg/30",
-        text: "text-status-active-text",
+        bg: "bg-primary text-white border-primary",
+        text: "text-primary dark:text-blue-400",
+        badge: "bg-primary text-white border-transparent",
+        iconText: "text-white",
       };
-    case "unreleased":
-      return { bg: "bg-bg-subtle border-border", text: "text-text-secondary" };
     case "returned":
       return {
-        bg: "bg-status-active-bg/20 border-status-active-bg/30",
-        text: "text-status-active-text",
+        bg: "bg-category-computing-bg text-white border-category-computing-bg",
+        text: "text-sky-700 dark:text-sky-400",
+        badge: "bg-category-computing-bg text-white border-transparent",
+        iconText: "text-white",
+      };
+    case "maintenance":
+    case "needs_repair":
+    case "flagged_maintenance":
+    case "unreleased":
+      return {
+        bg: "bg-status-repair-bg text-white border-status-repair-bg",
+        text: "text-status-repair-text",
+        badge: "bg-status-repair-bg text-white border-transparent",
+        iconText: "text-white",
+      };
+    case "rejected":
+    case "cancelled":
+    case "out_of_service":
+    case "deleted":
+      return {
+        bg: "bg-status-outofservice-bg text-white border-status-outofservice-bg",
+        text: "text-status-outofservice-text",
+        badge: "bg-status-outofservice-bg text-white border-transparent",
+        iconText: "text-white",
+      };
+    case "updated":
+    case "status_changed":
+      return {
+        bg: "bg-indigo-600 text-white border-indigo-600",
+        text: "text-indigo-600 dark:text-indigo-400",
+        badge: "bg-indigo-600 text-white border-transparent",
+        iconText: "text-white",
       };
     default:
-      return { bg: "bg-bg-subtle border-border", text: "text-text-secondary" };
+      return {
+        bg: "bg-slate-700 text-white border-slate-700",
+        text: "text-text",
+        badge: "bg-slate-700 text-white border-transparent",
+        iconText: "text-white",
+      };
   }
+}
+
+const FIELD_LABELS: Record<string, string> = {
+  assetCode: "Asset Code",
+  name: "Asset Name",
+  category: "Category",
+  status: "Status",
+  assignmentType: "Assignment Type",
+  modelId: "Product Model",
+  serialNumber: "Serial Number",
+  location: "Location",
+  currentHolder: "Custody / Holder",
+  department: "Department",
+  purchaseDate: "Acquisition Date",
+  value: "Inventory Value",
+  supplierId: "Supplier",
+  imageUrl: "Image URL",
+  notes: "Custody / Item Notes",
+};
+
+function formatFieldValue(key: string, value: unknown): string {
+  if (value === null || value === undefined || value === "") {
+    return "None";
+  }
+  if (key === "value" && (typeof value === "number" || typeof value === "string")) {
+    const num = Number(value);
+    if (!isNaN(num)) {
+      return `₱${num.toLocaleString()}`;
+    }
+  }
+  return String(value);
+}
+
+type UnifiedTimelineItem =
+  | {
+      id: string;
+      kind: "request";
+      date: Date;
+      title: string;
+      subtitle: string;
+      department?: string;
+      status: string;
+      iconType: string;
+      request: BorrowRequest;
+    }
+  | {
+      id: string;
+      kind: "lifecycle";
+      date: Date;
+      title: string;
+      subtitle: string;
+      department?: string;
+      status: string;
+      iconType: string;
+      event: AssetLifecycleEvent;
+      changes?: AssetChangesMap;
+    }
+  | {
+      id: string;
+      kind: "maintenance";
+      date: Date;
+      title: string;
+      subtitle: string;
+      department?: string;
+      status: string;
+      iconType: string;
+      maintenance: MaintenanceLogEntry;
+    };
+
+function RequestDetailsSection({ request }: { request: BorrowRequest }) {
+  const historyLogs = Array.isArray(request.history) ? request.history : [];
+
+  return (
+    <div className="mt-3 space-y-3 rounded-lg border border-border/80 bg-bg-subtle/60 p-3 text-xs">
+      {/* Request Meta Info */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-text">
+        {request.purpose && (
+          <div className="col-span-full">
+            <span className="font-semibold text-text-secondary text-[10px] uppercase tracking-wider block mb-0.5">
+              Purpose
+            </span>
+            <p className="text-text leading-relaxed font-medium bg-bg/70 px-2.5 py-1.5 rounded border border-border/50">
+              {request.purpose}
+            </p>
+          </div>
+        )}
+
+        <div>
+          <span className="font-semibold text-text-secondary text-[10px] uppercase tracking-wider block mb-0.5">
+            Requester Contact
+          </span>
+          <div className="space-y-0.5 text-text-secondary">
+            {request.requesterEmail && (
+              <div className="flex items-center gap-1.5">
+                <Mail className="h-3 w-3 shrink-0" />
+                <span className="truncate">{request.requesterEmail}</span>
+              </div>
+            )}
+            {request.requesterPhone && (
+              <div className="flex items-center gap-1.5">
+                <Phone className="h-3 w-3 shrink-0" />
+                <span>{request.requesterPhone}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <span className="font-semibold text-text-secondary text-[10px] uppercase tracking-wider block mb-0.5">
+            Dates & Handover
+          </span>
+          <div className="space-y-0.5 text-text-secondary">
+            {request.expectedReturnDate && (
+              <div className="flex items-center gap-1.5">
+                <Calendar className="h-3 w-3 shrink-0" />
+                <span>Expected Return: {request.expectedReturnDate}</span>
+              </div>
+            )}
+            {request.pickedUpBy && (
+              <div className="flex items-center gap-1.5">
+                <User className="h-3 w-3 shrink-0" />
+                <span>Picked up by: {request.pickedUpBy}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {request.rejectionReason && (
+          <div className="col-span-full rounded bg-destructive/10 border border-destructive/20 p-2 text-destructive">
+            <div className="flex items-center gap-1.5 font-bold mb-0.5">
+              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+              Rejection Reason:
+            </div>
+            <p className="leading-relaxed">{request.rejectionReason}</p>
+          </div>
+        )}
+
+        {request.notes && !request.rejectionReason && (
+          <div className="col-span-full">
+            <span className="font-semibold text-text-secondary text-[10px] uppercase tracking-wider block mb-0.5">
+              Request Notes
+            </span>
+            <p className="text-text-secondary bg-bg/50 px-2 py-1 rounded border border-border/40">
+              {request.notes}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Step-by-Step History Sub-timeline */}
+      {historyLogs.length > 0 && (
+        <div className="pt-2 border-t border-border/60">
+          <span className="font-bold text-text-secondary text-[10px] uppercase tracking-wider flex items-center gap-1.5 mb-2.5">
+            <Clock className="h-3 w-3" />
+            Request Action History ({historyLogs.length} events)
+          </span>
+          <div className="space-y-2 relative border-l-2 border-border/60 ml-2 pl-3">
+            {historyLogs.map((log, idx) => {
+              const stepStyle = getTimelineStyle(log.action);
+              const logDate = log.timestamp ? new Date(log.timestamp) : null;
+              return (
+                <div key={log.id || `step-${idx}`} className="relative group">
+                  <div
+                    className={cn(
+                      "absolute -left-4.75 top-1 h-3 w-3 rounded-full border-2 bg-bg",
+                      stepStyle.bg.replace("text-white", "")
+                    )}
+                  />
+                  <div className="flex items-center justify-between gap-1 flex-wrap">
+                    <div className="flex items-center gap-1.5">
+                      <span className={cn("font-bold text-[11px] capitalize", stepStyle.text)}>
+                        {log.action}
+                      </span>
+                      <span className="text-[11px] text-text-secondary font-medium">
+                        by {log.actor}
+                      </span>
+                    </div>
+                    {logDate && (
+                      <time className="text-[10px] text-text-secondary font-mono">
+                        {logDate.toLocaleDateString()} {logDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </time>
+                    )}
+                  </div>
+                  {log.note && (
+                    <p className="mt-1 text-[11px] text-text bg-bg/80 border border-border/50 rounded px-2 py-1 leading-snug">
+                      {log.note}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LifecycleDetailsSection({ item }: { item: Extract<UnifiedTimelineItem, { kind: "lifecycle" }> }) {
+  const { event, changes } = item;
+  const changesEntries = changes ? Object.entries(changes) : [];
+
+  return (
+    <div className="mt-3 space-y-2.5 rounded-lg border border-border/80 bg-bg-subtle/60 p-3 text-xs">
+      {/* Performed by */}
+      <div className="flex items-center justify-between text-[11px] text-text-secondary pb-1 border-b border-border/50">
+        <div className="flex items-center gap-1.5 font-medium">
+          <User className="h-3 w-3 text-text-secondary" />
+          <span>Recorded by <strong className="text-text">{event.actor.displayName}</strong></span>
+          {event.actor.email && <span className="opacity-70">({event.actor.email})</span>}
+        </div>
+      </div>
+
+      {/* Field Level Changes Diffs */}
+      {changesEntries.length > 0 && (
+        <div className="space-y-1.5">
+          <span className="font-bold text-text-secondary text-[10px] uppercase tracking-wider block mb-1">
+            Changed Details ({changesEntries.length} {changesEntries.length === 1 ? "field" : "fields"})
+          </span>
+          <div className="space-y-1.5">
+            {changesEntries.map(([fieldKey, diff]) => {
+              const label = FIELD_LABELS[fieldKey] || fieldKey;
+              return (
+                <div
+                  key={fieldKey}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 p-2 rounded bg-bg border border-border/70 text-xs shadow-2xs"
+                >
+                  <span className="font-semibold text-text-secondary text-[11px]">
+                    {label}
+                  </span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span
+                      title="Previous value"
+                      className="px-1.5 py-0.5 rounded text-[11px] font-mono bg-destructive/10 text-destructive line-through border border-destructive/20"
+                    >
+                      {formatFieldValue(fieldKey, diff.from)}
+                    </span>
+                    <ArrowRight className="h-3 w-3 text-text-secondary shrink-0" />
+                    <span
+                      title="New updated value"
+                      className="px-1.5 py-0.5 rounded text-[11px] font-mono font-bold bg-status-active-bg/15 text-status-active-text border border-status-active-bg/30"
+                    >
+                      {formatFieldValue(fieldKey, diff.to)}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Status Transition */}
+      {(event.fromStatus || event.toStatus) && event.eventType !== "updated" && (
+        <div className="flex items-center justify-between gap-2 p-2 rounded bg-bg border border-border/60">
+          <span className="font-semibold text-text-secondary text-[11px]">Status Transition</span>
+          <div className="flex items-center gap-1.5">
+            <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-bg-subtle text-text-secondary border border-border">
+              {event.fromStatus || "—"}
+            </span>
+            <ArrowRight className="h-3 w-3 text-text-secondary" />
+            <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-status-active-bg text-white">
+              {event.toStatus || "—"}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Custody Transition */}
+      {(event.fromHolder || event.toHolder) && (
+        <div className="flex items-center justify-between gap-2 p-2 rounded bg-bg border border-border/60">
+          <span className="font-semibold text-text-secondary text-[11px]">Custody Handover</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-text-secondary font-medium">
+              {event.fromHolder ? event.fromHolder : "In Stock"}
+            </span>
+            <ArrowRight className="h-3 w-3 text-text-secondary" />
+            <span className="font-bold text-text">
+              {event.toHolder ? event.toHolder : "In Stock"}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Event Notes or Conditions */}
+      {Boolean(event.payload.notes || event.payload.condition || event.payload.description) && (
+        <div className="rounded bg-bg/80 p-2 border border-border/50 space-y-1">
+          {event.payload.description && (
+            <p className="text-text leading-relaxed">
+              <strong className="text-text-secondary">Description:</strong> {String(event.payload.description)}
+            </p>
+          )}
+          {event.payload.condition && (
+            <p className="text-text leading-relaxed">
+              <strong className="text-text-secondary">Condition:</strong> {String(event.payload.condition)}
+            </p>
+          )}
+          {event.payload.notes && (
+            <p className="text-text-secondary leading-relaxed italic">
+              &quot;{String(event.payload.notes)}&quot;
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MaintenanceDetailsSection({ maintenance }: { maintenance: MaintenanceLogEntry }) {
+  return (
+    <div className="mt-3 space-y-2 rounded-lg border border-border/80 bg-bg-subtle/60 p-3 text-xs text-text">
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <span className="font-semibold text-text-secondary text-[10px] uppercase tracking-wider block">
+            Technician
+          </span>
+          <p className="font-medium text-text mt-0.5">{maintenance.technician}</p>
+        </div>
+        <div>
+          <span className="font-semibold text-text-secondary text-[10px] uppercase tracking-wider block">
+            Maintenance Type
+          </span>
+          <p className="font-medium text-text capitalize mt-0.5">{maintenance.type}</p>
+        </div>
+        {maintenance.cost !== undefined && maintenance.cost !== null && (
+          <div>
+            <span className="font-semibold text-text-secondary text-[10px] uppercase tracking-wider block">
+              Repair / Service Cost
+            </span>
+            <p className="font-mono font-medium text-text mt-0.5">₱{maintenance.cost.toLocaleString()}</p>
+          </div>
+        )}
+      </div>
+
+      {maintenance.description && (
+        <div className="pt-2 border-t border-border/50">
+          <span className="font-semibold text-text-secondary text-[10px] uppercase tracking-wider block mb-0.5">
+            Work Description
+          </span>
+          <p className="text-text bg-bg/80 p-2 rounded border border-border/50 leading-relaxed font-medium">
+            {maintenance.description}
+          </p>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function AssetHistoryTimeline({ asset }: { asset: Asset }) {
-  const { data, isLoading } = useBorrowRequests({ assetId: asset.id, limit: 50 });
+  const [isListExpanded, setIsListExpanded] = useState(false);
+  const [expandedItemIds, setExpandedItemIds] = useState<Set<string>>(new Set());
+
+  const { data: requestData, isLoading: isRequestsLoading } = useBorrowRequests({
+    assetId: asset.id,
+    limit: 50,
+  });
+
+  const { data: lifecycleData, isLoading: isLifecycleLoading } = useAssetLifecycleQuery(
+    asset.id,
+    100
+  );
+
+  useEffect(() => {
+    setIsListExpanded(false);
+    setExpandedItemIds(new Set());
+  }, [asset.id]);
+
+  const toggleItemExpansion = (id: string) => {
+    setExpandedItemIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const isLoading = isRequestsLoading && isLifecycleLoading;
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center p-4">
+      <div className="flex items-center justify-center p-8 rounded-xl border border-border bg-bg">
         <Loader2 className="h-5 w-5 animate-spin text-text-secondary" />
       </div>
     );
   }
 
-  const requests = data?.data || [];
-  
-  // Prepare unified timeline items
-  type TimelineItem = {
-    id: string;
-    type: "borrow" | "creation" | "update" | "maintenance";
-    date: Date;
-    title: string;
-    subtitle: string;
-    department?: string;
-    status: string;
-    iconType: string;
-  };
-  
-  const timeline: TimelineItem[] = [];
-  
-  // 1. Borrow Requests
+  const requests = requestData?.data || [];
+  const lifecycleEvents = lifecycleData || [];
+  const timeline: UnifiedTimelineItem[] = [];
+
+  // 1. Map Borrow Requests
   for (const req of requests) {
     timeline.push({
-      id: req.id,
-      type: "borrow",
+      id: `req-${req.id}`,
+      kind: "request",
       date: new Date(req.requestedAt),
       title: req.requestCode,
       subtitle: `By ${req.requesterName}`,
       department: req.department,
       status: req.status,
       iconType: req.status,
+      request: req,
     });
   }
-  
-  // 2. Creation Log
-  // If no createdAt exists, we fallback to purchaseDate or a dummy date to show the section is prepared.
-  const creationDate = asset.purchaseDate ? new Date(asset.purchaseDate) : new Date(new Date().setFullYear(new Date().getFullYear() - 1));
-  timeline.push({
-    id: "creation-log",
-    type: "creation",
-    date: creationDate,
-    title: "Asset Created",
-    subtitle: "System initialization",
-    status: "created",
-    iconType: "approved",
-  });
-  
-  // 3. Update Log
-  // We use lastUpdated if available, otherwise just use current date
-  const updateDate = asset.lastUpdated ? new Date(asset.lastUpdated) : new Date();
-  timeline.push({
-    id: "last-update-log",
-    type: "update",
-    date: updateDate,
-    title: "Last Updated",
-    subtitle: "System record updated",
-    status: "updated",
-    iconType: "pending",
-  });
-  
-  // 4. Maintenance Logs
+
+  // 2. Map Real Lifecycle Events
+  if (lifecycleEvents.length > 0) {
+    for (const ev of lifecycleEvents) {
+      let title = "Asset Activity";
+      let statusLabel = ev.toStatus || ev.eventType;
+
+      if (ev.eventType === "updated") {
+        title = "Asset Updated";
+        statusLabel = "updated";
+      } else if (ev.eventType === "created") {
+        title = "Asset Registered";
+        statusLabel = "created";
+      } else if (ev.eventType === "status_changed") {
+        title = `Status Changed: ${ev.fromStatus || "—"} → ${ev.toStatus || "—"}`;
+        statusLabel = ev.toStatus || "status_changed";
+      } else if (ev.eventType === "released") {
+        title = `Released${ev.toHolder ? ` to ${ev.toHolder}` : ""}`;
+        statusLabel = "released";
+      } else if (ev.eventType === "returned") {
+        title = `Returned${ev.fromHolder ? ` from ${ev.fromHolder}` : ""}`;
+        statusLabel = "returned";
+      } else if (ev.eventType === "flagged_maintenance") {
+        title = "Flagged for Maintenance";
+        statusLabel = "needs_repair";
+      } else if (ev.eventType === "deleted") {
+        title = "Asset Record Deleted";
+        statusLabel = "deleted";
+      }
+
+      timeline.push({
+        id: `lifecycle-${ev.id}`,
+        kind: "lifecycle",
+        date: new Date(ev.createdAt),
+        title,
+        subtitle: `By ${ev.actor.displayName}`,
+        status: statusLabel,
+        iconType: ev.eventType === "updated" ? "updated" : ev.eventType,
+        event: ev,
+        changes: ev.payload.changes,
+      });
+    }
+  } else {
+    // Fallback synthesis if lifecycle table has no historical records yet
+    const creationDate = asset.purchaseDate
+      ? new Date(asset.purchaseDate)
+      : new Date(new Date().setFullYear(new Date().getFullYear() - 1));
+
+    timeline.push({
+      id: "fallback-creation",
+      kind: "lifecycle",
+      date: creationDate,
+      title: "Asset Created",
+      subtitle: "System initialization",
+      status: "created",
+      iconType: "created",
+      event: {
+        id: "fallback-creation-ev",
+        assetId: asset.id,
+        assetCode: asset.assetCode,
+        eventType: "created",
+        actor: { userId: "", email: null, displayName: "System" },
+        fromStatus: null,
+        toStatus: asset.status,
+        fromHolder: null,
+        toHolder: asset.currentHolder || null,
+        payload: {},
+        createdAt: creationDate.toISOString(),
+      },
+    });
+
+    if (asset.lastUpdated) {
+      timeline.push({
+        id: "fallback-update",
+        kind: "lifecycle",
+        date: new Date(asset.lastUpdated),
+        title: "Last Updated",
+        subtitle: "System record updated",
+        status: "updated",
+        iconType: "updated",
+        event: {
+          id: "fallback-update-ev",
+          assetId: asset.id,
+          assetCode: asset.assetCode,
+          eventType: "updated",
+          actor: { userId: "", email: null, displayName: "Staff" },
+          fromStatus: null,
+          toStatus: asset.status,
+          fromHolder: null,
+          toHolder: null,
+          payload: {},
+          createdAt: new Date(asset.lastUpdated).toISOString(),
+        },
+      });
+    }
+  }
+
+  // 3. Map Standalone Maintenance Logs
   if (asset.maintenanceHistory) {
     for (const log of asset.maintenanceHistory) {
       timeline.push({
-        id: log.id,
-        type: "maintenance",
+        id: `maint-${log.id}`,
+        kind: "maintenance",
         date: new Date(log.date),
         title: `Maintenance: ${log.type}`,
         subtitle: `By ${log.technician}`,
         status: "maintenance",
-        iconType: "returned",
+        iconType: "maintenance",
+        maintenance: log,
       });
     }
   }
-  
+
   // Sort descending (newest first)
   timeline.sort((a, b) => b.date.getTime() - a.date.getTime());
-  
-  const recentTimeline = timeline.slice(0, 5);
-  const hasMore = timeline.length > 5;
+
+  const displayedTimeline = isListExpanded ? timeline : timeline.slice(0, 4);
 
   if (timeline.length === 0) {
     return (
-      <div className="p-4 text-center text-sm text-text-secondary">
+      <div className="p-4 text-center text-sm text-text-secondary rounded-xl border border-border bg-bg">
         No history found for this asset.
       </div>
     );
   }
 
   return (
-    <div className="p-3 rounded-xl border border-border bg-bg shadow-xs overflow-hidden">
-      <ol className="relative border-l-2 border-border/60 ml-3 space-y-4">
-        {recentTimeline.map((item) => {
-          const style = getRequestStyle(item.iconType);
-          return (
-            <li key={item.id} className="pl-6 relative flex items-center min-h-8">
-              <span className={cn(
-                "absolute -left-4.25 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full border-2 flex items-center justify-center bg-bg shadow-sm z-10",
-                style.bg,
-                (style as Record<string, string>).iconText || style.text
-              )}>
-                {getRequestIcon(item.iconType)}
-              </span>
-              
-              <div className="flex items-center flex-wrap gap-2 w-full text-xs py-1">
-                <span className={cn("font-bold", style.text)}>
-                  {item.title}
+    <div className="p-4 rounded-xl border border-border bg-bg shadow-xs">
+      <div className="relative">
+        <ol className="relative border-l-2 border-border/60 ml-3 space-y-4">
+          {displayedTimeline.map((item) => {
+            const style = getTimelineStyle(item.iconType);
+            const isExpanded = expandedItemIds.has(item.id);
+
+            // Determine if item has rich expandable details
+            const hasExpandableDetails =
+              item.kind === "request" ||
+              (item.kind === "lifecycle" &&
+                (Boolean(item.changes && Object.keys(item.changes).length > 0) ||
+                  Boolean(item.event.fromStatus || item.event.toStatus) ||
+                  Boolean(item.event.fromHolder || item.event.toHolder) ||
+                  Boolean(item.event.payload.notes || item.event.payload.description || item.event.payload.condition))) ||
+              item.kind === "maintenance";
+
+            return (
+              <li key={item.id} className="relative pl-6">
+                <span
+                  className={cn(
+                    "absolute -left-3.25 top-1.5 h-6 w-6 rounded-full border-2 flex items-center justify-center shadow-sm z-10",
+                    style.bg,
+                    style.iconText
+                  )}
+                >
+                  {getTimelineIcon(item.iconType)}
                 </span>
-                <span className="text-text-secondary font-medium truncate max-w-30">
-                  {item.subtitle}
-                </span>
-                
-                {item.department && (
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-bg-subtle text-text-secondary border border-border/50 ml-auto">
-                    {item.department}
-                  </span>
-                )}
-                
-                <span className={cn("px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase border whitespace-nowrap", !item.department && "ml-auto", style.bg, style.text, style.bg.replace('bg-', 'border-'))}>
-                  {item.status}
-                </span>
-                <time className="text-[10px] text-text-secondary font-medium shrink-0">
-                  {item.date.toLocaleDateString()}
-                </time>
-              </div>
-            </li>
-          );
-        })}
-      </ol>
-      {hasMore && (
-        <div className="mt-4 pt-3 border-t border-border flex justify-center">
-          <Link href="/dashboard/audit-logs" className="text-xs font-semibold text-primary hover:underline flex items-center gap-1">
-            View full history in Audit Logs <ChevronRight className="h-3 w-3" />
-          </Link>
+
+                <div
+                  className={cn(
+                    "rounded-lg transition-all duration-150",
+                    hasExpandableDetails && "hover:bg-bg-subtle/40 -mx-1.5 px-1.5 py-1"
+                  )}
+                >
+                  {/* Item Header / Clickable Toggle */}
+                  <div
+                    role={hasExpandableDetails ? "button" : undefined}
+                    tabIndex={hasExpandableDetails ? 0 : undefined}
+                    aria-expanded={hasExpandableDetails ? isExpanded : undefined}
+                    onClick={() => hasExpandableDetails && toggleItemExpansion(item.id)}
+                    onKeyDown={(e) => {
+                      if (hasExpandableDetails && (e.key === "Enter" || e.key === " ")) {
+                        e.preventDefault();
+                        toggleItemExpansion(item.id);
+                      }
+                    }}
+                    className={cn(
+                      "flex items-start justify-between gap-2 text-xs select-none",
+                      hasExpandableDetails && "cursor-pointer group"
+                    )}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span
+                          className={cn(
+                            "font-bold capitalize transition-colors",
+                            style.text,
+                            hasExpandableDetails && "group-hover:underline"
+                          )}
+                        >
+                          {item.title}
+                        </span>
+                        <span
+                          className={cn(
+                            "px-1.5 py-0.5 rounded text-[10px] font-bold font-mono uppercase inline-block shadow-2xs",
+                            style.badge
+                          )}
+                        >
+                          {item.status}
+                        </span>
+
+                        {item.kind === "lifecycle" && item.changes && Object.keys(item.changes).length > 0 && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-text-secondary bg-bg-subtle px-1.5 py-0.5 rounded border border-border/60">
+                            <Sparkles className="h-2.5 w-2.5 text-primary" />
+                            {Object.keys(item.changes).length} {Object.keys(item.changes).length === 1 ? "change" : "changes"}
+                          </span>
+                        )}
+                      </div>
+
+                      <p className="text-xs text-text-secondary mt-0.5 font-medium">
+                        {item.subtitle}
+                        {item.department ? ` · ${item.department}` : ""}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
+                      <time className="text-[11px] text-text-secondary font-medium">
+                        {item.date.toLocaleDateString()}
+                      </time>
+                      {hasExpandableDetails && (
+                        <span className="p-0.5 rounded text-text-secondary hover:text-text group-hover:bg-bg-subtle transition-colors">
+                          {isExpanded ? (
+                            <ChevronUp className="h-3.5 w-3.5" />
+                          ) : (
+                            <ChevronDown className="h-3.5 w-3.5" />
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Expandable Body */}
+                  {isExpanded && (
+                    <div className="animate-in fade-in-50 duration-150">
+                      {item.kind === "request" && <RequestDetailsSection request={item.request} />}
+                      {item.kind === "lifecycle" && <LifecycleDetailsSection item={item} />}
+                      {item.kind === "maintenance" && (
+                        <MaintenanceDetailsSection maintenance={item.maintenance} />
+                      )}
+                    </div>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+
+        {timeline.length > 4 && !isListExpanded && (
+          <div className="absolute inset-x-0 bottom-0 h-16 bg-linear-to-t from-bg via-bg/85 to-transparent pointer-events-none" />
+        )}
+      </div>
+
+      {timeline.length > 4 && (
+        <div
+          className={cn(
+            "relative z-10 flex justify-center",
+            !isListExpanded ? "-mt-4 pt-1" : "mt-4 pt-2"
+          )}
+        >
+          <button
+            type="button"
+            onClick={() => setIsListExpanded(!isListExpanded)}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary bg-bg/90 backdrop-blur-xs hover:bg-primary/10 border border-border shadow-xs cursor-pointer py-1 px-3 rounded-full transition-all duration-150"
+          >
+            {isListExpanded ? (
+              <>
+                Show less <ChevronUp className="h-3.5 w-3.5" />
+              </>
+            ) : (
+              <>
+                See more ({timeline.length - 4} more){" "}
+                <ChevronDown className="h-3.5 w-3.5" />
+              </>
+            )}
+          </button>
         </div>
       )}
     </div>
@@ -242,23 +837,23 @@ const STATUS_STYLES: Record<
   { bg: string; text: string; label: string }
 > = {
   active: {
-    bg: "bg-status-active-bg/20",
-    text: "text-status-active-text font-bold",
+    bg: "bg-status-active-bg",
+    text: "text-white font-bold",
     label: "Active",
   },
   needs_repair: {
-    bg: "bg-status-repair-bg/20",
-    text: "text-status-repair-text font-bold",
+    bg: "bg-status-repair-bg",
+    text: "text-white font-bold",
     label: "Needs Repair",
   },
   out_of_service: {
-    bg: "bg-status-outofservice-bg/20",
-    text: "text-status-outofservice-text font-bold",
+    bg: "bg-status-outofservice-bg",
+    text: "text-white font-bold",
     label: "Out of Service",
   },
   retired: {
-    bg: "bg-status-retired-bg/20",
-    text: "text-status-retired-text font-bold",
+    bg: "bg-status-retired-bg",
+    text: "text-white font-bold",
     label: "Retired",
   },
 };
@@ -371,11 +966,11 @@ export function AssetDetailPanel({
                 </span>
                 <div className="flex gap-2">
                   {asset.currentHolder ? (
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-accent/20 text-accent uppercase tracking-wider">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-primary text-white uppercase tracking-wider">
                       {custodyBadgeLabel(asset.currentHolder)}
                     </span>
                   ) : (
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-status-active-bg/20 text-status-active-text uppercase tracking-wider">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-status-active-bg text-white uppercase tracking-wider">
                       Available
                     </span>
                   )}
@@ -390,15 +985,15 @@ export function AssetDetailPanel({
                   </span>
                   <span
                     className={cn(
-                      "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border",
+                      "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
                       asset.assignmentType === "assignable"
-                        ? "border-status-repair-text text-status-repair-text bg-status-repair-bg/10"
-                        : "border-accent text-accent bg-accent/10",
+                        ? "bg-amber-600 text-white"
+                        : "bg-slate-700 text-white",
                     )}
                   >
                     {asset.assignmentType === "assignable"
                       ? "Assignable"
-                      : "Borrowable"}
+                      : "General"}
                   </span>
                 </div>
               </div>
@@ -494,9 +1089,20 @@ export function AssetDetailPanel({
 
           {/* Asset History Card */}
           <div className="space-y-3 pb-8">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary">
-              Asset History
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
+                <History className="h-3.5 w-3.5" />
+                Asset History
+              </h3>
+              <Link
+                href={`/dashboard/audit-logs?search=${encodeURIComponent(asset.assetCode)}`}
+                title="View full history in Audit Logs"
+                className="p-1 rounded-md text-text-secondary hover:text-primary hover:bg-bg-subtle transition-colors cursor-pointer"
+                aria-label="View full history in Audit Logs"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+              </Link>
+            </div>
             <AssetHistoryTimeline asset={asset} />
           </div>
         </div>

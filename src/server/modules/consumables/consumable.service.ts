@@ -447,27 +447,39 @@ export class ConsumableService {
 
       const next = existing.currentQty + input.quantityChange;
       if (next < 0) {
-        throw new BadRequestError("Adjustment would result in negative stock.");
+        throw new BadRequestError(
+          `Cannot deduct ${Math.abs(input.quantityChange)} ${existing.unit}. Only ${existing.currentQty} ${existing.unit} available in stock.`
+        );
       }
 
       const lotAllocations: LotCostAllocation[] = [];
 
       if (input.quantityChange < 0) {
-        for (const alloc of input.allocations ?? []) {
-          const result = alloc.lotId
-            ? await this.purchaseLots.consumeFromLotId(
-                alloc.lotId,
-                alloc.quantity,
-                tx,
-                existing.id
-              )
-            : await this.purchaseLots.consumeFromLot(
-                alloc.lotCode!,
-                alloc.quantity,
-                tx,
-                existing.id
-              );
-          lotAllocations.push(result.allocation);
+        if (!input.allocations || input.allocations.length === 0 || input.useFifo) {
+          const need = Math.abs(input.quantityChange);
+          const fifoAllocs = await this.purchaseLots.consumeFifo(
+            existing.id,
+            need,
+            tx
+          );
+          lotAllocations.push(...fifoAllocs);
+        } else {
+          for (const alloc of input.allocations ?? []) {
+            const result = alloc.lotId
+              ? await this.purchaseLots.consumeFromLotId(
+                  alloc.lotId,
+                  alloc.quantity,
+                  tx,
+                  existing.id
+                )
+              : await this.purchaseLots.consumeFromLot(
+                  alloc.lotCode!,
+                  alloc.quantity,
+                  tx,
+                  existing.id
+                );
+            lotAllocations.push(result.allocation);
+          }
         }
       } else if (input.attachLotId || input.attachLotCode) {
         const result = await this.purchaseLots.addToLot(

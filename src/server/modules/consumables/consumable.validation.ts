@@ -87,7 +87,11 @@ export const stockAdjustSchema = z
     reason: z.string().trim().min(1).max(500),
     notes: z.string().trim().max(2000).optional(),
     /**
-     * Required when decreasing: which lot(s) lose quantity.
+     * If true, decrease will automatically consume oldest lots in FIFO order.
+     */
+    useFifo: z.boolean().optional(),
+    /**
+     * Required when decreasing (unless useFifo=true): which lot(s) lose quantity.
      * Sum of allocation quantities must equal abs(quantityChange).
      */
     allocations: z
@@ -130,35 +134,33 @@ export const stockAdjustSchema = z
   .superRefine((body, ctx) => {
     if (body.quantityChange < 0) {
       const need = Math.abs(body.quantityChange);
-      if (!body.allocations || body.allocations.length === 0) {
+      const hasAllocations = Boolean(body.allocations && body.allocations.length > 0);
+      if (!body.useFifo && !hasAllocations) {
         ctx.addIssue({
           code: "custom",
           path: ["allocations"],
           message:
-            "Decreasing stock requires lot allocations so lot remainders stay in sync.",
+            "Decreasing stock requires lot allocations or useFifo=true so lot remainders stay in sync.",
         });
         return;
       }
-      const sum = body.allocations.reduce((s, a) => s + a.quantity, 0);
-      if (sum !== need) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["allocations"],
-          message: `Allocation quantities must total ${need} (got ${sum}).`,
-        });
+      if (hasAllocations) {
+        const sum = body.allocations!.reduce((s, a) => s + a.quantity, 0);
+        if (sum !== need) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["allocations"],
+            message: `Allocation quantities must total ${need} (got ${sum}).`,
+          });
+        }
       }
       return;
     }
 
     // Increase
     const attaching = Boolean(body.attachLotId || body.attachLotCode);
-    if (!attaching && body.createCorrectionLot !== true) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["createCorrectionLot"],
-        message:
-          "Increasing stock requires attachLotId/attachLotCode or createCorrectionLot=true.",
-      });
+    if (!attaching && body.createCorrectionLot === undefined) {
+      body.createCorrectionLot = true;
     }
     if (attaching && body.createCorrectionLot === true) {
       ctx.addIssue({

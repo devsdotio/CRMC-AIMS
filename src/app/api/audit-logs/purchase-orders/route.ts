@@ -25,7 +25,7 @@ export async function GET(request: Request) {
       note?: string;
     };
     
-    const logs: FlattenedLog[] = lots.map((lot: any) => ({
+    const logs: FlattenedLog[] = lots.map((lot) => ({
       id: lot.id,
       requestCode: lot.lotCode,
       department: lot.supplierName || "Internal",

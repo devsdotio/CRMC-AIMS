@@ -18,23 +18,23 @@ const STATUS_STYLES: Record<
   { bg: string; text: string; label: string }
 > = {
   active: {
-    bg: "bg-status-active-bg/20",
-    text: "text-status-active-text font-bold",
+    bg: "bg-status-active-bg",
+    text: "text-white font-bold",
     label: "Active",
   },
   needs_repair: {
-    bg: "bg-status-repair-bg/20",
-    text: "text-status-repair-text font-bold",
+    bg: "bg-status-repair-bg",
+    text: "text-white font-bold",
     label: "Needs Repair",
   },
   out_of_service: {
-    bg: "bg-status-outofservice-bg/20",
-    text: "text-status-outofservice-text font-bold",
+    bg: "bg-status-outofservice-bg",
+    text: "text-white font-bold",
     label: "Out of Service",
   },
   retired: {
-    bg: "bg-status-retired-bg/20",
-    text: "text-status-retired-text font-bold",
+    bg: "bg-status-retired-bg",
+    text: "text-white font-bold",
     label: "Retired",
   },
 };
@@ -66,7 +66,7 @@ export function AssetCard({ asset, onSelect }: AssetCardProps) {
         </span>
         <div className="flex items-center gap-2">
           {asset.currentHolder && (
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-accent/20 text-accent">
+            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-primary text-white">
               {custodyBadgeLabel(asset.currentHolder)}
             </span>
           )}
@@ -88,12 +88,12 @@ export function AssetCard({ asset, onSelect }: AssetCardProps) {
         <div>
           <span
             className={cn(
-              "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
+              "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-2xs",
               categoryMeta.bg,
               categoryMeta.text,
             )}
           >
-            <Tag className="h-2.5 w-2.5" />
+            <Tag className="h-2.5 w-2.5 shrink-0" />
             {categoryMeta.label}
           </span>
         </div>

@@ -17,6 +17,8 @@ import {
   type StockMovementPayload,
   type UpdateConsumablePayload,
 } from "./consumables-api";
+
+export type { StockAdjustPayload };
 import { consumableQueryKeys } from "./query-keys";
 import { purchaseLotQueryKeys } from "@/features/purchase-lots/client/query-keys";
 

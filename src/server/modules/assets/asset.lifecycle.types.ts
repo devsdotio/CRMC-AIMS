@@ -8,6 +8,60 @@ import { ASSET_LIFECYCLE_EVENT_TYPES } from "./asset.constants";
 
 export type AssetLifecycleEventType = (typeof ASSET_LIFECYCLE_EVENT_TYPES)[number];
 
+export interface AssetFieldChange<T = unknown> {
+  from: T;
+  to: T;
+}
+
+export type AssetChangesMap = Record<string, AssetFieldChange>;
+
+export interface AssetUpdatePayload {
+  changes?: AssetChangesMap;
+  [key: string]: unknown;
+}
+
+export interface AssetReleasePayload {
+  requestId?: string;
+  expectedReturnDate?: string;
+  borrowerDepartment?: string;
+  borrowerEmail?: string;
+  borrowerPhone?: string;
+  notes?: string;
+  [key: string]: unknown;
+}
+
+export interface AssetReturnPayload {
+  condition?: string;
+  notes?: string;
+  [key: string]: unknown;
+}
+
+export interface AssetFlagMaintenancePayload {
+  description?: string;
+  notes?: string;
+  [key: string]: unknown;
+}
+
+export interface AssetStatusChangePayload {
+  via?: string;
+  reason?: string;
+  [key: string]: unknown;
+}
+
+export interface AssetDeletePayload {
+  snapshot?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+export type AssetLifecycleEventPayloadTyped =
+  | AssetUpdatePayload
+  | AssetReleasePayload
+  | AssetReturnPayload
+  | AssetFlagMaintenancePayload
+  | AssetStatusChangePayload
+  | AssetDeletePayload
+  | Record<string, unknown>;
+
 export interface AssetLifecycleEventDTO {
   id: string;
   assetId: string | null;
@@ -22,7 +76,7 @@ export interface AssetLifecycleEventDTO {
   toStatus: string | null;
   fromHolder: string | null;
   toHolder: string | null;
-  payload: AssetLifecycleEventPayload;
+  payload: AssetLifecycleEventPayloadTyped;
   createdAt: string;
 }
 
@@ -36,7 +90,7 @@ export interface RecordLifecycleEventInput {
   toStatus?: string | null;
   fromHolder?: string | null;
   toHolder?: string | null;
-  payload?: AssetLifecycleEventPayload;
+  payload?: AssetLifecycleEventPayloadTyped;
 }
 
 export interface ListLifecycleEventsFilters {

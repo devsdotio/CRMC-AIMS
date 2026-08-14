@@ -44,6 +44,13 @@ export const auditLogsApi = {
     return res.data;
   },
 
+  async listConsumableRequests(): Promise<import("@/server/modules/consumable-requests/consumable-request.types").ConsumableRequestDTO[]> {
+    const res = await fetchJson<{ data: import("@/server/modules/consumable-requests/consumable-request.types").ConsumableRequestDTO[] }>(
+      "/api/consumable-requests?limit=1000"
+    );
+    return res.data;
+  },
+
   async listPurchaseOrders(): Promise<FlattenedLog[]> {
     const res = await fetchJson<ApiResponse<FlattenedLog[]>>("/api/audit-logs/purchase-orders");
     return res.data;

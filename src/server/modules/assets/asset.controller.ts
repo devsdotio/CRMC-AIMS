@@ -191,7 +191,7 @@ export class AssetController {
 
   async listLifecycle(request: NextRequest | Request, id: string) {
     try {
-      await requireAssetOperator();
+      await requireActor();
       const url = new URL(request.url);
       const limitRaw = url.searchParams.get("limit");
       const limit = limitRaw ? Number(limitRaw) : undefined;

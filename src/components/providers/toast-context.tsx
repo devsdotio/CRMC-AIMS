@@ -148,7 +148,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {/* Portal — fixed bottom-right, above all modals */}
       <div
         aria-label="Notifications"
-        className="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none"
+        className="fixed bottom-4 right-4 z-9999 flex flex-col gap-2 pointer-events-none"
       >
         {toasts.map((t) => (
           <div key={t.id} className="pointer-events-auto">

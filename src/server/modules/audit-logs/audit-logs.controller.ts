@@ -12,10 +12,10 @@ export class AuditLogController {
       const url = new URL(request.url);
       
       const queryParams = {
-        entityType: url.searchParams.get("entityType") ?? undefined,
-        entityId: url.searchParams.get("entityId") ?? undefined,
-        actorUserId: url.searchParams.get("actorUserId") ?? undefined,
-        action: url.searchParams.get("action") ?? undefined,
+        entityType: url.searchParams.get("entityType")?.trim() || undefined,
+        entityId: url.searchParams.get("entityId")?.trim() || undefined,
+        actorUserId: url.searchParams.get("actorUserId")?.trim() || undefined,
+        action: url.searchParams.get("action")?.trim() || undefined,
       };
 
       return ok(await this.service.list(queryParams, session));

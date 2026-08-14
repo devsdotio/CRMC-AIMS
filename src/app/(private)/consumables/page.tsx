@@ -8,6 +8,7 @@ import {
   useUpdateConsumableMutation,
   useRestockConsumableMutation,
   useAdjustConsumableMutation,
+  type StockAdjustPayload,
 } from "@/features/consumables/client/use-consumables";
 import {
   usePurchaseLotsQuery,
@@ -227,7 +228,6 @@ export default function ConsumablesPage() {
           notes: input.notes,
         },
       });
-      setSelectedId(input.itemId);
       toast.success("Stock restocked successfully.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Restock failed.");
@@ -237,20 +237,13 @@ export default function ConsumablesPage() {
 
   const handleConfirmAdjust = async (
     itemId: string,
-    adjustmentDelta: number,
-    reason: string,
-    notes?: string
+    payload: StockAdjustPayload
   ) => {
     try {
       await adjustMutation.mutateAsync({
         id: itemId,
-        payload: {
-          quantityChange: adjustmentDelta,
-          reason,
-          notes,
-        },
+        payload,
       });
-      setSelectedId(itemId);
       toast.success("Stock adjusted successfully.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Adjustment failed.");
@@ -261,9 +254,6 @@ export default function ConsumablesPage() {
   const handleConfirmRelease = async (input: ReleaseFromLotInput) => {
     try {
       await releaseMutation.mutateAsync(input);
-      if (releaseState.item) {
-        setSelectedId(releaseState.item.id);
-      }
       toast.success("Items released successfully.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Release failed.");

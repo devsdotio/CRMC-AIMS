@@ -4,7 +4,10 @@
 
 export {
   assetsApi,
+  type AssetChangesMap,
+  type AssetFieldChange,
   type AssetLifecycleEvent,
+  type AssetLifecycleEventPayload,
   type FlagMaintenanceInput,
   type ReleaseAssetInput,
 } from "./assets-api";

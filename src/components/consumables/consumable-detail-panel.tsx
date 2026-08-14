@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import {
   X,
   PlusCircle,
@@ -10,9 +11,11 @@ import {
   History,
   Tag,
   PackageMinus,
+  PackagePlus,
   QrCode,
   ChevronDown,
   ChevronUp,
+  ExternalLink,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -40,10 +43,65 @@ function historyTypeLabel(type: StockHistoryEntry["type"]) {
   return "Adjustment";
 }
 
-function actionTone(type: StockHistoryEntry["type"]) {
-  if (type === "restock") return "text-status-active-text";
-  if (type === "checkout") return "text-primary";
-  return "text-text-secondary";
+function getHistoryEntryIcon(type: StockHistoryEntry["type"]) {
+  switch (type) {
+    case "restock":
+      return <PackagePlus className="h-3.5 w-3.5" />;
+    case "checkout":
+      return <PackageMinus className="h-3.5 w-3.5" />;
+    case "adjustment":
+      return <SlidersHorizontal className="h-3.5 w-3.5" />;
+    default:
+      return <History className="h-3.5 w-3.5" />;
+  }
+}
+
+function getHistoryEntryStyle(
+  type: StockHistoryEntry["type"],
+  quantityChange: number
+) {
+  switch (type) {
+    case "restock":
+      return {
+        bg: "bg-status-active-bg/20 border-status-active-bg/40",
+        text: "text-status-active-text",
+        badge:
+          "bg-status-active-bg/15 text-status-active-text border-status-active-bg/30",
+        iconText: "text-status-active-text",
+      };
+    case "checkout":
+      return {
+        bg: "bg-primary/15 border-primary/30",
+        text: "text-primary dark:text-primary-foreground",
+        badge:
+          "bg-primary/10 text-primary dark:text-primary-foreground border-primary/25",
+        iconText: "text-primary dark:text-primary-foreground",
+      };
+    case "adjustment":
+      if (quantityChange > 0) {
+        return {
+          bg: "bg-category-computing-bg border-category-computing-text/30",
+          text: "text-category-computing-text",
+          badge:
+            "bg-category-computing-bg text-category-computing-text border-category-computing-text/30",
+          iconText: "text-category-computing-text",
+        };
+      }
+      return {
+        bg: "bg-status-repair-bg/20 border-status-repair-bg/40",
+        text: "text-status-repair-text",
+        badge:
+          "bg-status-repair-bg/15 text-status-repair-text border-status-repair-bg/30",
+        iconText: "text-status-repair-text",
+      };
+    default:
+      return {
+        bg: "bg-bg-subtle border-border",
+        text: "text-text-secondary",
+        badge: "bg-bg-subtle text-text-secondary border-border",
+        iconText: "text-text-secondary",
+      };
+  }
 }
 
 export function ConsumableDetailPanel({
@@ -57,6 +115,7 @@ export function ConsumableDetailPanel({
 }: ConsumableDetailPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [expandedLotId, setExpandedLotId] = useState<string | null>(null);
+  const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
 
   // List payload omits history for speed — load full record when the panel opens.
   const { data: detailItem, isLoading: detailLoading } = useConsumableQuery(
@@ -80,6 +139,10 @@ export function ConsumableDetailPanel({
     ? [...detailItem.history].reverse()
     : [];
 
+  const displayedHistory = isHistoryExpanded
+    ? historyNewestFirst
+    : historyNewestFirst.slice(0, 4);
+
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape" && isOpen) onClose();
@@ -90,6 +153,7 @@ export function ConsumableDetailPanel({
 
   useEffect(() => {
     setExpandedLotId(null);
+    setIsHistoryExpanded(false);
   }, [item?.id]);
 
   if (!isOpen || !item || !displayItem) return null;
@@ -347,11 +411,21 @@ export function ConsumableDetailPanel({
 
           {/* Accountability history */}
           <div className="space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
-              <History className="h-3.5 w-3.5" />
-              Accountability log
-            </h3>
-            <div className="p-4 rounded-lg border border-border bg-bg">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
+                <History className="h-3.5 w-3.5" />
+                Accountability log
+              </h3>
+              <Link
+                href={`/dashboard/audit-logs?search=${encodeURIComponent(displayItem.itemCode)}`}
+                title="View full history in Audit Logs"
+                className="p-1 rounded-md text-text-secondary hover:text-primary hover:bg-bg-subtle transition-colors cursor-pointer"
+                aria-label="View full history in Audit Logs"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+            <div className="p-4 rounded-xl border border-border bg-bg shadow-xs">
               {detailLoading && historyNewestFirst.length === 0 ? (
                 <p className="text-xs text-text-secondary text-center py-3">
                   Loading accountability log…
@@ -361,97 +435,150 @@ export function ConsumableDetailPanel({
                   No stock movements logged yet.
                 </p>
               ) : (
-                <ol className="relative border-l border-border ml-2 space-y-4">
-                  {historyNewestFirst.map((h) => {
-                    const isPositive = h.quantityChange > 0;
-                    return (
-                      <li key={h.id} className="ml-4">
-                        <span className="absolute -left-1.5 top-1.5 h-3 w-3 rounded-full border-2 border-bg bg-accent" />
-                        <div className="flex items-start justify-between gap-2 text-xs">
-                          <span
-                            className={cn(
-                              "font-bold capitalize",
-                              actionTone(h.type)
-                            )}
-                          >
-                            {historyTypeLabel(h.type)} (
-                            {isPositive ? "+" : ""}
-                            {h.quantityChange} {displayItem.unit})
-                          </span>
-                          <time className="text-[11px] text-text-secondary shrink-0">
-                            {h.date}
-                          </time>
-                        </div>
-                        <p className="text-xs text-text-secondary mt-0.5">
-                          By <span className="font-semibold text-text">{h.actor}</span>
-                          {h.recipientName
-                            ? ` · to ${h.recipientName}`
-                            : null}
-                        </p>
-                        {(h.lotCode ||
-                          h.supplierName ||
-                          h.unitCost ||
-                          h.totalCost) && (
-                          <div className="mt-1 text-[11px] space-y-0.5 rounded border border-border bg-bg-subtle px-2 py-1.5">
-                            {h.lotCode && (
-                              <p>
-                                <span className="text-text-secondary">Lot </span>
-                                <span className="font-mono font-semibold">
-                                  {h.lotCode}
+                <>
+                  <div className="relative">
+                    <ol className="relative border-l-2 border-border/60 ml-3 space-y-6">
+                      {displayedHistory.map((h) => {
+                        const isPositive = h.quantityChange > 0;
+                        const style = getHistoryEntryStyle(h.type, h.quantityChange);
+                        return (
+                          <li key={h.id} className="relative pl-6">
+                            <span
+                              className={cn(
+                                "absolute -left-3.25 top-1.5 h-6 w-6 rounded-full border-2 flex items-center justify-center bg-bg shadow-sm z-10",
+                                style.bg,
+                                style.iconText
+                              )}
+                            >
+                              {getHistoryEntryIcon(h.type)}
+                            </span>
+                            <div className="flex items-start justify-between gap-2 text-xs pt-1.5">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span
+                                  className={cn(
+                                    "font-bold capitalize",
+                                    style.text
+                                  )}
+                                >
+                                  {historyTypeLabel(h.type)}
                                 </span>
-                              </p>
-                            )}
-                            {h.supplierName && (
-                              <p>
-                                <span className="text-text-secondary">
-                                  Supplier{" "}
+                                <span
+                                  className={cn(
+                                    "px-1.5 py-0.5 rounded text-[10px] font-bold font-mono border",
+                                    style.badge
+                                  )}
+                                >
+                                  {isPositive ? "+" : ""}
+                                  {h.quantityChange} {displayItem.unit}
                                 </span>
-                                <span className="font-semibold">
-                                  {h.supplierName}
-                                </span>
-                              </p>
-                            )}
-                            {(h.unitCost || h.totalCost) && (
-                              <p>
-                                {h.unitCost && (
-                                  <>
+                              </div>
+                              <time className="text-[11px] text-text-secondary shrink-0 font-medium">
+                                {h.date}
+                              </time>
+                            </div>
+                            <p className="text-xs text-text-secondary mt-0.5 font-medium">
+                              By <span className="font-semibold text-text">{h.actor}</span>
+                              {h.recipientName
+                                ? ` · to ${h.recipientName}`
+                                : null}
+                            </p>
+                            {(h.lotCode ||
+                              h.supplierName ||
+                              h.unitCost ||
+                              h.totalCost) && (
+                              <div className="mt-1.5 text-[11px] space-y-0.5 rounded border border-border bg-bg-subtle px-2 py-1.5">
+                                {h.lotCode && (
+                                  <p>
+                                    <span className="text-text-secondary">Lot </span>
+                                    <span className="font-mono font-semibold">
+                                      {h.lotCode}
+                                    </span>
+                                  </p>
+                                )}
+                                {h.supplierName && (
+                                  <p>
                                     <span className="text-text-secondary">
-                                      Unit{" "}
+                                      Supplier{" "}
                                     </span>
                                     <span className="font-semibold">
-                                      {formatPhp(Number(h.unitCost))}
+                                      {h.supplierName}
                                     </span>
-                                  </>
+                                  </p>
                                 )}
-                                {h.totalCost && (
-                                  <>
-                                    <span className="text-text-secondary">
-                                      {" "}
-                                      · Line{" "}
-                                    </span>
-                                    <span className="font-semibold">
-                                      {formatPhp(Number(h.totalCost))}
-                                    </span>
-                                  </>
+                                {(h.unitCost || h.totalCost) && (
+                                  <p>
+                                    {h.unitCost && (
+                                      <>
+                                        <span className="text-text-secondary">
+                                          Unit{" "}
+                                        </span>
+                                        <span className="font-semibold">
+                                          {formatPhp(Number(h.unitCost))}
+                                        </span>
+                                      </>
+                                    )}
+                                    {h.totalCost && (
+                                      <>
+                                        <span className="text-text-secondary">
+                                          {" "}
+                                          · Line{" "}
+                                        </span>
+                                        <span className="font-semibold">
+                                          {formatPhp(Number(h.totalCost))}
+                                        </span>
+                                      </>
+                                    )}
+                                  </p>
                                 )}
+                              </div>
+                            )}
+                            {h.reason && (
+                              <p className="text-[11px] text-text-secondary font-medium mt-1">
+                                <span className="font-semibold text-text">Reason:</span>{" "}
+                                {h.reason}
                               </p>
                             )}
-                          </div>
+                            {h.notes && (
+                              <p className="text-xs text-text bg-bg-subtle p-2 rounded mt-1.5 border border-border">
+                                {h.notes}
+                              </p>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ol>
+
+                    {historyNewestFirst.length > 4 && !isHistoryExpanded && (
+                      <div className="absolute inset-x-0 bottom-0 h-20 bg-linear-to-t from-bg via-bg/85 to-transparent pointer-events-none" />
+                    )}
+                  </div>
+
+                  {historyNewestFirst.length > 4 && (
+                    <div
+                      className={cn(
+                        "relative z-10 flex justify-center",
+                        !isHistoryExpanded ? "-mt-4 pt-1" : "mt-4 pt-2"
+                      )}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setIsHistoryExpanded(!isHistoryExpanded)}
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary bg-bg/90 backdrop-blur-xs hover:bg-primary/10 border border-border shadow-xs cursor-pointer py-1 px-3 rounded-full transition-all duration-150"
+                      >
+                        {isHistoryExpanded ? (
+                          <>
+                            Show less <ChevronUp className="h-3.5 w-3.5" />
+                          </>
+                        ) : (
+                          <>
+                            See more ({historyNewestFirst.length - 4} more){" "}
+                            <ChevronDown className="h-3.5 w-3.5" />
+                          </>
                         )}
-                        {h.reason && (
-                          <p className="text-[11px] text-accent font-semibold mt-0.5">
-                            Reason: {h.reason}
-                          </p>
-                        )}
-                        {h.notes && (
-                          <p className="text-xs text-text bg-bg-subtle p-2 rounded mt-1 border border-border">
-                            {h.notes}
-                          </p>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ol>
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>

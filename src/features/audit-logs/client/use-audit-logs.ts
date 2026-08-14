@@ -30,6 +30,13 @@ export function useRequisitionsHistoryQuery(): UseQueryResult<FlattenedLog[], Er
   });
 }
 
+export function useConsumableRequestsAuditQuery() {
+  return useQuery({
+    queryKey: ["audit-logs", "consumable-requests"],
+    queryFn: () => auditLogsApi.listConsumableRequests(),
+  });
+}
+
 export function usePurchaseOrdersHistoryQuery(): UseQueryResult<FlattenedLog[], Error> {
   return useQuery({
     queryKey: ["audit-logs", "purchase-orders-history"],

@@ -7,6 +7,29 @@ import type {
 } from "@/types/assets";
 import { fetchJson, type ApiResponse } from "@/features/shared/fetch-json";
 
+export interface AssetFieldChange<T = unknown> {
+  from: T;
+  to: T;
+}
+
+export type AssetChangesMap = Record<string, AssetFieldChange>;
+
+export interface AssetLifecycleEventPayload {
+  changes?: AssetChangesMap;
+  requestId?: string;
+  expectedReturnDate?: string;
+  borrowerDepartment?: string;
+  borrowerEmail?: string;
+  borrowerPhone?: string;
+  condition?: string;
+  description?: string;
+  notes?: string;
+  via?: string;
+  reason?: string;
+  snapshot?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
 export type AssetLifecycleEvent = {
   id: string;
   assetId: string | null;
@@ -28,7 +51,7 @@ export type AssetLifecycleEvent = {
   toStatus: string | null;
   fromHolder: string | null;
   toHolder: string | null;
-  payload: Record<string, unknown>;
+  payload: AssetLifecycleEventPayload;
   createdAt: string;
 };
 
@@ -220,6 +243,7 @@ export const assetsApi = {
         : `/api/assets/${id}/lifecycle`;
     const response = await fetchJson<ApiResponse<AssetLifecycleEvent[]>>(path, {
       method: "GET",
+      timeoutMs: 15_000,
     });
     return response.data;
   },

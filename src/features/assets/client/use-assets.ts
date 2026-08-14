@@ -59,6 +59,8 @@ export function useAssetLifecycleQuery(
     queryKey: assetQueryKeys.lifecycle(id),
     queryFn: () => assetsApi.listLifecycle(id, limit),
     enabled: Boolean(id),
+    staleTime: 5 * 60 * 1000,
+    retry: 0,
   });
 }
 

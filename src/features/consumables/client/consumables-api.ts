@@ -44,6 +44,17 @@ export type StockAdjustPayload = {
   quantityChange: number;
   reason: string;
   notes?: string;
+  useFifo?: boolean;
+  allocations?: Array<{
+    lotId?: string;
+    lotCode?: string;
+    quantity: number;
+  }>;
+  attachLotId?: string;
+  attachLotCode?: string;
+  createCorrectionLot?: boolean;
+  unitCost?: string | number;
+  supplierId?: string | null;
 };
 
 export const consumablesApi = {

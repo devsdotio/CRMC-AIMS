@@ -25,8 +25,8 @@ export interface RequestDetailPanelProps {
   request: BorrowRequest | null;
   isOpen: boolean;
   onClose: () => void;
-  onApprove: (request: BorrowRequest) => void;
-  onReject: (request: BorrowRequest) => void;
+  onApprove?: (request: BorrowRequest) => void;
+  onReject?: (request: BorrowRequest) => void;
   onRelease?: (request: BorrowRequest) => void | Promise<void>;
   onReturn?: (request: BorrowRequest) => void | Promise<void>;
   onMarkUnreleased?: (request: BorrowRequest) => void | Promise<void>;
@@ -43,15 +43,20 @@ const STATUS_STYLES: Record<RequestStatus, { bg: string; text: string; label: st
 };
 
 function getActionIcon(action: string) {
-  switch (action) {
-    case "submitted": return <Send className="h-4 w-4" />;
-    case "approved": return <CheckCircle className="h-4 w-4" />;
-    case "rejected": return <XCircle className="h-4 w-4" />;
-    case "released": return <PackageCheck className="h-4 w-4" />;
-    case "unreleased": return <PackageMinus className="h-4 w-4" />;
-    case "returned": return <RotateCcw className="h-4 w-4" />;
-    case "cancelled": return <XCircle className="h-4 w-4" />;
-    default: return <History className="h-4 w-4" />;
+  switch (action.toLowerCase()) {
+    case "pending":
+    case "created":
+      return <FileText className="h-3.5 w-3.5" />;
+    case "approved":
+      return <Check className="h-3.5 w-3.5" />;
+    case "rejected":
+      return <X className="h-3.5 w-3.5" />;
+    case "released":
+      return <Send className="h-3.5 w-3.5 ml-0.5" />;
+    case "returned":
+      return <RotateCcw className="h-3.5 w-3.5" />;
+    default:
+      return <History className="h-3.5 w-3.5" />;
   }
 }
 
@@ -62,7 +67,7 @@ function getActionStyle(action: string) {
     case "approved":
       return { bg: "bg-status-active-bg/20 border-status-active-bg/30", text: "text-status-active-text" };
     case "rejected":
-      return { bg: "bg-destructive border-destructive", text: "text-destructive", iconText: "text-white" };
+      return { bg: "bg-destructive border-destructive", text: "text-white", iconText: "text-white" };
     case "released":
       return { bg: "bg-status-active-bg/20 border-status-active-bg/30", text: "text-status-active-text" };
     case "unreleased":
@@ -227,11 +232,11 @@ export function RequestDetailPanel({
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold text-text truncate">{item.itemDescription}</p>
                       <div className="flex flex-wrap items-center gap-1 mt-0.5">
-                        <span className={cn("rounded px-1.5 py-px text-[9px] font-bold uppercase", itemCategoryMeta.bg, itemCategoryMeta.text)}>
+                        <span className={cn("rounded-full px-1.5 py-px text-[9px] font-bold uppercase", itemCategoryMeta.bg, itemCategoryMeta.text)}>
                           {itemCategoryMeta.label}
                         </span>
                         <span className={cn(
-                          "rounded px-1.5 py-px text-[9px] font-semibold uppercase",
+                          "rounded-full px-1.5 py-px text-[9px] font-semibold uppercase",
                           item.itemType === "asset" ? "bg-primary/10 text-primary" : "bg-status-repair-bg/10 text-status-repair-text"
                         )}>
                           {item.itemType === "asset" ? "Asset" : "Consumable"}
@@ -240,7 +245,7 @@ export function RequestDetailPanel({
                           const acColor = getAssetCodeColor(item.assetCode);
                           return (
                             <span
-                              className="rounded px-1.5 py-px text-[9px] font-mono font-bold"
+                              className="rounded-full px-1.5 py-px text-[9px] font-mono font-bold"
                               style={{ backgroundColor: acColor.bg, color: acColor.text, border: `1px solid ${acColor.border}` }}
                             >
                               {item.assetCode}
@@ -250,7 +255,7 @@ export function RequestDetailPanel({
                       </div>
                     </div>
                     {/* Quantity badge — right side */}
-                    <span className="flex items-center justify-center h-6 min-w-6 px-1.5 rounded-md bg-bg-subtle border border-border text-[11px] font-bold text-text shrink-0">
+                    <span className="flex items-center justify-center h-6 min-w-6 px-1.5 rounded-full bg-bg-subtle border border-border text-[11px] font-bold text-text shrink-0">
                       &times;{item.quantity}
                     </span>
                   </div>
@@ -345,18 +350,18 @@ export function RequestDetailPanel({
             </h3>
             <div className="p-4 rounded-lg border border-border bg-bg">
               <ol className="relative border-l-2 border-border/60 ml-3 space-y-6">
-                {request.history.map((h, index) => {
+                {[...request.history].reverse().map((h, index) => {
                   const style = getActionStyle(h.action);
                   return (
                     <li key={h.id} className="pl-6 relative">
                       <span className={cn(
-                        "absolute -left-4.25 top-0 h-8 w-8 rounded-full border-2 flex items-center justify-center bg-bg shadow-sm z-10",
+                        "absolute -left-[13px] top-1.5 h-6 w-6 rounded-full border-2 flex items-center justify-center bg-bg shadow-sm z-10",
                         style.bg,
                         (style as Record<string, string>).iconText || style.text
                       )}>
                         {getActionIcon(h.action)}
                       </span>
-                      <div className="flex flex-col gap-0.5 pt-2">
+                      <div className="flex flex-col gap-0.5 pt-1.5">
                         <div className="flex items-center justify-between text-xs">
                           <span className={cn("font-bold capitalize", style.text)}>
                             {h.action}
@@ -414,8 +419,8 @@ export function RequestDetailPanel({
           </div>
         </div>
 
-        {/* Action Footer (Only for pending requests) */}
-        {request.status === "pending" && (
+        {/* Action Footer (Only for pending requests with action handlers) */}
+        {request.status === "pending" && onApprove && onReject && (
           <div className="p-4 border-t border-border bg-bg-subtle flex items-center justify-end gap-3 shrink-0">
             <button
               type="button"

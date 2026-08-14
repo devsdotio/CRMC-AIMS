@@ -2,7 +2,7 @@
 
 import { Edit3, Trash2, Tag } from "lucide-react";
 import { cn } from "@/lib/utils";
-
+import { getCategoryStyle } from "@/constants/categories";
 import type { CategoryItem } from "@/types/settings";
 
 export interface CategoryListItemProps {
@@ -11,22 +11,13 @@ export interface CategoryListItemProps {
   onDelete: (category: CategoryItem) => void;
 }
 
-const SWATCH_COLORS = [
-  { bg: "bg-blue-500/15", text: "text-blue-600 dark:text-blue-400", border: "border-blue-500/20" },
-  { bg: "bg-emerald-500/15", text: "text-emerald-600 dark:text-emerald-400", border: "border-emerald-500/20" },
-  { bg: "bg-violet-500/15", text: "text-violet-600 dark:text-violet-400", border: "border-violet-500/20" },
-  { bg: "bg-amber-500/15", text: "text-amber-600 dark:text-amber-400", border: "border-amber-500/20" },
-  { bg: "bg-rose-500/15", text: "text-rose-600 dark:text-rose-400", border: "border-rose-500/20" },
-  { bg: "bg-cyan-500/15", text: "text-cyan-600 dark:text-cyan-400", border: "border-cyan-500/20" },
-];
-
-export function getSwatchForName(name: string) {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  const index = Math.abs(hash) % SWATCH_COLORS.length;
-  return SWATCH_COLORS[index];
+export function getSwatchForName(name: string, colorToken?: string) {
+  const style = getCategoryStyle(name, name, colorToken);
+  return {
+    bg: style.bg,
+    text: style.text,
+    border: "border-transparent",
+  };
 }
 
 export function CategoryListItem({
@@ -35,21 +26,20 @@ export function CategoryListItem({
   onDelete,
 }: CategoryListItemProps) {
   const isUsed = category.itemCount > 0;
-  const swatch = getSwatchForName(category.name);
+  const categoryStyle = getCategoryStyle(category.name, category.name, category.colorToken);
 
   return (
     <div className="flex items-center justify-between gap-4 p-3.5 bg-bg rounded-xl border border-border transition-colors hover:bg-bg-subtle/60">
       <div className="flex items-center gap-3">
-          <span 
-            className={cn(
-              "inline-flex items-center justify-center h-7 w-7 rounded-full text-xs font-bold shrink-0 border",
-              swatch.bg,
-              swatch.text,
-              swatch.border
-            )}
-          >
-            <Tag className="h-3.5 w-3.5" />
-          </span>
+        <span 
+          className={cn(
+            "inline-flex items-center justify-center h-7 w-7 rounded-full text-xs font-bold shrink-0 shadow-2xs",
+            categoryStyle.bg,
+            categoryStyle.text
+          )}
+        >
+          <Tag className="h-3.5 w-3.5" />
+        </span>
 
         <div>
           <span className="text-xs font-bold text-text block leading-tight">
