@@ -352,7 +352,7 @@ export function RequestDetailPanel({
                       <span className={cn(
                         "absolute -left-4.25 top-0 h-8 w-8 rounded-full border-2 flex items-center justify-center bg-bg shadow-sm z-10",
                         style.bg,
-                        (style as any).iconText || style.text
+                        (style as Record<string, string>).iconText || style.text
                       )}>
                         {getActionIcon(h.action)}
                       </span>

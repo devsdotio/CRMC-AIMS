@@ -25,6 +25,7 @@ export const listBorrowRequestsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional().default(20),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  assetId: z.string().uuid().optional(),
 });
 
 export const createBorrowRequestSchema = z.object({

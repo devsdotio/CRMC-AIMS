@@ -28,6 +28,7 @@ export function useBorrowRequests(filters?: {
   limit?: number;
   startDate?: string;
   endDate?: string;
+  assetId?: string;
 }): UseQueryResult<PaginatedResponse<BorrowRequest[]>, Error> {
   return useQuery({
     queryKey: borrowRequestQueryKeys.list(filters),

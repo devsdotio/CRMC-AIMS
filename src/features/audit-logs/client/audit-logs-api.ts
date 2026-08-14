@@ -3,6 +3,17 @@ import type { AuditLogRow } from "@/server/db/schema/audit-logs";
 
 export type AuditLogRecord = AuditLogRow;
 
+export type FlattenedLog = {
+  id: string;
+  requestId?: string;
+  requestCode: string;
+  department: string;
+  action: string;
+  actor: string;
+  timestamp: string;
+  note?: string;
+};
+
 export const auditLogsApi = {
   async list(params?: {
     entityType?: string;
@@ -20,6 +31,21 @@ export const auditLogsApi = {
     const res = await fetchJson<ApiResponse<AuditLogRecord[]>>(
       qs ? `/api/audit-logs?${qs}` : "/api/audit-logs"
     );
+    return res.data;
+  },
+  
+  async listBorrowRequests(): Promise<FlattenedLog[]> {
+    const res = await fetchJson<ApiResponse<FlattenedLog[]>>("/api/audit-logs/borrow-requests");
+    return res.data;
+  },
+
+  async listRequisitions(): Promise<FlattenedLog[]> {
+    const res = await fetchJson<ApiResponse<FlattenedLog[]>>("/api/audit-logs/requisitions");
+    return res.data;
+  },
+
+  async listPurchaseOrders(): Promise<FlattenedLog[]> {
+    const res = await fetchJson<ApiResponse<FlattenedLog[]>>("/api/audit-logs/purchase-orders");
     return res.data;
   },
 };

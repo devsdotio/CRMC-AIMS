@@ -641,7 +641,7 @@ export function NewBorrowRequestWizard({
       setErrorMessage("");
       resetMutation();
     }
-  }, [open, prefilledItems, resetMutation]);
+  }, [open, prefilledItems, resetMutation, initialType]);
 
   const patchValues = useCallback(
     (patch: Partial<WizardFormValues>) => setValues((p) => ({ ...p, ...patch })),
@@ -739,7 +739,7 @@ export function NewBorrowRequestWizard({
       />
 
       {/* Panel */}
-      <div className="relative z-10 w-full max-w-3xl h-[650px] rounded-xl bg-card border border-border shadow-2xl flex flex-col">
+      <div className="relative z-10 w-full max-w-3xl h-162.5 rounded-xl bg-card border border-border shadow-2xl flex flex-col">
         {/* Header */}
         <div className="flex items-start justify-between gap-4 p-5 border-b border-border shrink-0">
           <div>

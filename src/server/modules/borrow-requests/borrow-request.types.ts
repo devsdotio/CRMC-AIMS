@@ -38,6 +38,7 @@ export type ListBorrowRequestFilters = {
   limit?: number;
   startDate?: string;
   endDate?: string;
+  assetId?: string;
 };
 
 export interface IBorrowRequestRepository {

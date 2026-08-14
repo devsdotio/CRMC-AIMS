@@ -187,9 +187,12 @@ function ApproveRejectDialogForm({
               {error && <p className="text-[11px] font-medium text-status-outofservice-text">{error}</p>}
             </div>
           ) : (
-            <p className="text-xs text-text-secondary">
-              Are you sure you want to approve this request? The requester will be notified to pick up the asset.
-            </p>
+            <div className="space-y-2">
+              <p className="text-xs text-text-secondary">
+                Are you sure you want to approve this request? The requester will be notified to pick up the asset.
+              </p>
+              {error && <p className="text-[11px] font-medium text-status-outofservice-text">{error}</p>}
+            </div>
           )}
 
           <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-border">
