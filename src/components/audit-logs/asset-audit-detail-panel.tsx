@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getCategoryStyle } from "@/constants/categories";
+import { LoadingState } from "@/components/providers/loading-context";
 import { useAssetLifecycleQuery, type AssetLifecycleEvent } from "@/features/assets/client";
 import { formatDateTime, formatRelativeTime } from "./audit-log-utils";
 import type { Asset } from "@/types/assets";
@@ -228,17 +229,12 @@ export function AssetAuditDetailPanel({
             </div>
 
             {isLifecycleLoading ? (
-              <div className="p-8 rounded-xl border border-border bg-bg shadow-xs flex flex-col items-center justify-center text-center">
-                <div className="flex flex-col items-center gap-3 text-text-secondary animate-pulse py-4">
-                  <Package className="h-8 w-8 text-accent animate-bounce" />
-                  <span className="text-xs font-semibold text-text">
-                    Loading complete asset lifecycle history…
-                  </span>
-                  <span className="text-[11px] text-text-secondary">
-                    Retrieving registration, checkout releases, returns, and maintenance logs
-                  </span>
-                </div>
-              </div>
+              <LoadingState
+                variant="card"
+                icon="package"
+                message="Loading complete asset lifecycle history…"
+                subtitle="Retrieving registration, checkout releases, returns, and maintenance logs"
+              />
             ) : lifecycleEvents.length === 0 ? (
               <div className="p-4 rounded-lg border border-border bg-bg text-center text-xs text-text-secondary">
                 No recorded lifecycle actions yet for this asset.

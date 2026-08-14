@@ -13,6 +13,7 @@ import { getCategoryStyle } from "@/constants/categories";
 import type { Asset, AssetCategory, AssetStatus } from "@/types/assets";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/providers/toast-context";
+import { LoadingState } from "@/components/providers/loading-context";
 
 const STATUS_OPTIONS = [
   { value: "active", label: "Active" },
@@ -142,12 +143,11 @@ export function AssetsAuditList() {
 
   if (isLoading) {
     return (
-      <div className="flex h-full items-center justify-center p-8">
-        <div className="flex flex-col items-center gap-3 text-text-secondary animate-pulse">
-          <Package className="h-8 w-8 text-accent animate-bounce" />
-          <span className="text-xs font-semibold">Loading assets audit ledger...</span>
-        </div>
-      </div>
+      <LoadingState
+        icon="package"
+        message="Loading assets audit ledger..."
+        subtitle="Retrieving tracked equipment, hardware registries, and lifecycle logs"
+      />
     );
   }
 

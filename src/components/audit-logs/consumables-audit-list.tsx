@@ -13,6 +13,7 @@ import { getCategoryStyle } from "@/constants/categories";
 import type { ConsumableItem } from "@/features/consumables/client/consumables-api";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/providers/toast-context";
+import { LoadingState } from "@/components/providers/loading-context";
 
 const STOCK_STATUS_OPTIONS = [
   { value: "healthy", label: "In Stock" },
@@ -151,12 +152,11 @@ export function ConsumablesAuditList() {
 
   if (isLoading) {
     return (
-      <div className="flex h-full items-center justify-center p-8">
-        <div className="flex flex-col items-center gap-3 text-text-secondary animate-pulse">
-          <Layers className="h-8 w-8 text-accent animate-bounce" />
-          <span className="text-xs font-semibold">Loading consumables audit ledger...</span>
-        </div>
-      </div>
+      <LoadingState
+        icon="layers"
+        message="Loading consumables audit ledger..."
+        subtitle="Retrieving inventory items, batch balances, and stock movement records"
+      />
     );
   }
 

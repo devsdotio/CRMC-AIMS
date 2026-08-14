@@ -20,6 +20,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { LoadingState } from "@/components/providers/loading-context";
 import type {
   Project,
   ProjectAssetAssignment,
@@ -477,10 +478,12 @@ export function ProjectDetailPanel({
             )}
 
             {expensesLoading ? (
-              <div className="space-y-2 animate-pulse">
-                <div className="h-12 bg-border rounded-lg" />
-                <div className="h-12 bg-border rounded-lg" />
-              </div>
+              <LoadingState
+                variant="card"
+                icon="project"
+                message="Loading project expenses..."
+                subtitle="Retrieving material costs, item write-offs, and expenditures"
+              />
             ) : expenses.length === 0 ? (
               <p className="text-[11px] text-text-secondary border border-dashed border-border rounded-lg p-3">
                 No spend yet. Use <strong>Materials</strong> for inventory (stock
@@ -606,10 +609,12 @@ export function ProjectDetailPanel({
             </p>
 
             {assignmentsLoading ? (
-              <div className="space-y-2 animate-pulse">
-                <div className="h-12 bg-border rounded-lg" />
-                <div className="h-12 bg-border rounded-lg" />
-              </div>
+              <LoadingState
+                variant="card"
+                icon="package"
+                message="Loading assigned assets..."
+                subtitle="Retrieving hardware assignments and custody records"
+              />
             ) : assignments.length === 0 ? (
               <div className="rounded-lg border border-dashed border-border p-3 flex items-start gap-2.5">
                 <Package className="h-4 w-4 text-text-secondary shrink-0 mt-0.5" />

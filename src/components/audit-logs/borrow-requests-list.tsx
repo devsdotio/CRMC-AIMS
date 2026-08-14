@@ -19,6 +19,7 @@ import {
 import type { BorrowRequest } from "@/types/borrow-requests";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/providers/toast-context";
+import { LoadingState } from "@/components/providers/loading-context";
 
 const STATUS_OPTIONS = [
   { value: "pending", label: "Pending Review" },
@@ -145,12 +146,11 @@ export function BorrowRequestsList() {
 
   if (isLoading) {
     return (
-      <div className="flex h-full items-center justify-center p-8">
-        <div className="flex flex-col items-center gap-3 text-text-secondary animate-pulse">
-          <ClipboardList className="h-8 w-8 text-accent animate-bounce" />
-          <span className="text-xs font-semibold">Loading borrow requests audit ledger...</span>
-        </div>
-      </div>
+      <LoadingState
+        icon="clipboard"
+        message="Loading borrow requests audit ledger..."
+        subtitle="Retrieving release handovers, borrower accountability records, and return logs"
+      />
     );
   }
 

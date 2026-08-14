@@ -18,6 +18,7 @@ import { useConsumablesQuery } from "@/features/consumables/client/use-consumabl
 import { AssetAuditDetailPanel } from "./asset-audit-detail-panel";
 import { ConsumableAuditDetailPanel } from "./consumable-audit-detail-panel";
 import { getCategoryStyle } from "@/constants/categories";
+import { LoadingState } from "@/components/providers/loading-context";
 import type { Asset } from "@/types/assets";
 import type { ConsumableItem } from "@/features/consumables/client/consumables-api";
 
@@ -26,8 +27,8 @@ export function AuditQuickCodeLookup() {
   const [isOpenResults, setIsOpenResults] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const { data: assets = [] } = useAssetsQuery();
-  const { data: consumableResponse } = useConsumablesQuery({ limit: 100 });
+  const { data: assets = [], isLoading: isAssetsLoading } = useAssetsQuery();
+  const { data: consumableResponse, isLoading: isConsumablesLoading } = useConsumablesQuery({ limit: 100 });
   const consumables = consumableResponse?.data || [];
 
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
@@ -178,7 +179,16 @@ export function AuditQuickCodeLookup() {
         {/* Live Matching Results Dropdown Popup */}
         {isOpenResults && query.trim().length > 0 && (
           <div className="absolute left-0 right-0 top-full mt-2 bg-bg border border-border rounded-xl shadow-xl z-40 max-h-96 overflow-y-auto divide-y divide-border animate-in fade-in zoom-in-95 duration-150">
-            {totalMatches === 0 ? (
+            {(isAssetsLoading || isConsumablesLoading) && totalMatches === 0 ? (
+              <div className="p-4">
+                <LoadingState
+                  variant="inline"
+                  icon="spinner"
+                  message="Searching inventory codes..."
+                  subtitle="Filtering active assets and stock consumables"
+                />
+              </div>
+            ) : totalMatches === 0 ? (
               <div className="p-5 text-center text-xs text-text-secondary">
                 <Search className="h-8 w-8 mx-auto text-text-secondary/30 mb-2" />
                 <p className="font-semibold text-text">No matching code found for &ldquo;{query}&rdquo;</p>

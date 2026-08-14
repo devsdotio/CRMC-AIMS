@@ -145,17 +145,17 @@ export function RequestDetailPanel({
               {statusMeta && (
                 <span
                   className={cn(
-                    "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold capitalize border",
-                    statusMeta.badge
+                    "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold capitalize border border-border/50",
+                    statusMeta.bg,
+                    statusMeta.text
                   )}
                 >
-                  {statusMeta.icon}
                   {statusMeta.label}
                 </span>
               )}
             </div>
             <p className="text-xs text-text-secondary font-medium mt-0.5 truncate">
-              Borrow Request • Borrower: <strong className="text-text font-semibold">{request.borrowerName}</strong>
+              Borrow Request • Requester: <strong className="text-text font-semibold">{request.requesterName}</strong>
             </p>
           </div>
 

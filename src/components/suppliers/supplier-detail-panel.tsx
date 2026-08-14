@@ -7,6 +7,7 @@ import type { Supplier } from "@/types/suppliers";
 import { SupplierStatusBadge } from "./supplier-status-badge";
 import { usePurchaseLotsQuery } from "@/features/purchase-lots/client";
 import { formatPhp } from "@/components/projects/format-money";
+import { LoadingState } from "@/components/providers/loading-context";
 
 export function SupplierDetailPanel({
   supplier,
@@ -20,7 +21,7 @@ export function SupplierDetailPanel({
   onEdit: (s: Supplier) => void;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
-  const { data: lots = [] } = usePurchaseLotsQuery({
+  const { data: lots = [], isLoading: lotsLoading } = usePurchaseLotsQuery({
     supplierId: supplier?.id,
     enabled: isOpen && Boolean(supplier),
   });
@@ -100,7 +101,14 @@ export function SupplierDetailPanel({
               <Truck className="h-3.5 w-3.5" />
               Purchase cost history
             </h3>
-            {lots.length === 0 ? (
+            {lotsLoading ? (
+              <LoadingState
+                variant="card"
+                icon="truck"
+                message="Loading purchase cost history…"
+                subtitle="Retrieving vendor intake records"
+              />
+            ) : lots.length === 0 ? (
               <p className="text-[11px] text-text-secondary border border-dashed border-border rounded-lg p-3">
                 No purchase lots yet. Restocks with unit cost will appear here.
               </p>

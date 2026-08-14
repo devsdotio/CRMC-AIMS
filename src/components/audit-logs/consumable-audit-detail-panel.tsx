@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getCategoryStyle } from "@/constants/categories";
+import { LoadingState } from "@/components/providers/loading-context";
 import { useConsumableQuery } from "@/features/consumables/client/use-consumables";
 import { useAuditLogsQuery } from "@/features/audit-logs/client/use-audit-logs";
 import { usePurchaseLotsQuery } from "@/features/purchase-lots/client";
@@ -422,17 +423,12 @@ export function ConsumableAuditDetailPanel({
             </div>
 
             {detailLoading ? (
-              <div className="p-8 rounded-xl border border-border bg-bg shadow-xs flex flex-col items-center justify-center text-center">
-                <div className="flex flex-col items-center gap-3 text-text-secondary animate-pulse py-4">
-                  <Layers className="h-8 w-8 text-accent animate-bounce" />
-                  <span className="text-xs font-semibold text-text">
-                    Loading complete accountability history…
-                  </span>
-                  <span className="text-[11px] text-text-secondary">
-                    Retrieving stock movements, restocks, lot allocations, and releases
-                  </span>
-                </div>
-              </div>
+              <LoadingState
+                variant="card"
+                icon="layers"
+                message="Loading complete accountability history…"
+                subtitle="Retrieving stock movements, restocks, lot allocations, and releases"
+              />
             ) : combinedLogs.length === 0 ? (
               <div className="p-4 rounded-lg border border-border bg-bg text-center text-xs text-text-secondary">
                 No stock movements or accountability logs recorded yet.

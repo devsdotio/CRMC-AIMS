@@ -16,6 +16,7 @@ import {
 import type { PurchaseLot } from "@/types/purchase-lots";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/providers/toast-context";
+import { LoadingState } from "@/components/providers/loading-context";
 
 export function PurchaseOrdersList() {
   const { data: lots = [], isLoading, error } = usePurchaseLotsQuery();
@@ -127,12 +128,11 @@ export function PurchaseOrdersList() {
 
   if (isLoading) {
     return (
-      <div className="flex h-full items-center justify-center p-8">
-        <div className="flex flex-col items-center gap-3 text-text-secondary animate-pulse">
-          <ShoppingCart className="h-8 w-8 text-accent animate-bounce" />
-          <span className="text-xs font-semibold">Loading purchase orders audit ledger...</span>
-        </div>
-      </div>
+      <LoadingState
+        icon="truck"
+        message="Loading purchase orders audit ledger..."
+        subtitle="Retrieving intake batches, lot codes, supplier records, and costing data"
+      />
     );
   }
 

@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { LoadingState } from "@/components/providers/loading-context";
 import type { ConsumableItem, StockHistoryEntry } from "@/types/inventory";
 import type { PurchaseLot } from "@/types/purchase-lots";
 import { useConsumableQuery } from "@/features/consumables/client/use-consumables";
@@ -329,7 +330,12 @@ export function ConsumableDetailPanel({
             </p>
 
             {lotsLoading ? (
-              <p className="text-xs text-text-secondary py-3">Loading lots…</p>
+              <LoadingState
+                variant="card"
+                icon="truck"
+                message="Loading active purchase lots…"
+                subtitle="Retrieving intake batches and lot allocations"
+              />
             ) : lots.length === 0 ? (
               <div className="rounded-lg border border-dashed border-border p-4 text-center">
                 <p className="text-xs text-text-secondary">
@@ -437,16 +443,22 @@ export function ConsumableDetailPanel({
                 <ExternalLink className="h-3.5 w-3.5" />
               </Link>
             </div>
-            <div className="p-4 rounded-xl border border-border bg-bg shadow-xs">
-              {detailLoading && historyNewestFirst.length === 0 ? (
-                <p className="text-xs text-text-secondary text-center py-3">
-                  Loading accountability log…
-                </p>
-              ) : historyNewestFirst.length === 0 ? (
+
+            {detailLoading && historyNewestFirst.length === 0 ? (
+              <LoadingState
+                variant="card"
+                icon="layers"
+                message="Loading accountability log…"
+                subtitle="Retrieving stock movement history"
+              />
+            ) : historyNewestFirst.length === 0 ? (
+              <div className="p-4 rounded-xl border border-border bg-bg shadow-xs">
                 <p className="text-xs text-text-secondary text-center py-3">
                   No stock movements logged yet.
                 </p>
-              ) : (
+              </div>
+            ) : (
+              <div className="p-4 rounded-xl border border-border bg-bg shadow-xs">
                 <>
                   <div className="relative">
                     <ol className="relative border-l-2 border-border/60 ml-3 space-y-6">
@@ -591,8 +603,8 @@ export function ConsumableDetailPanel({
                     </div>
                   )}
                 </>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
       </aside>

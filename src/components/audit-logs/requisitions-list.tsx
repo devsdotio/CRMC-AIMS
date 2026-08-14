@@ -19,6 +19,7 @@ import {
 import type { ConsumableRequestDTO } from "@/server/modules/consumable-requests/consumable-request.types";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/providers/toast-context";
+import { LoadingState } from "@/components/providers/loading-context";
 
 const STATUS_OPTIONS = [
   { value: "pending", label: "Pending Review" },
@@ -144,12 +145,11 @@ export function RequisitionsList() {
 
   if (isLoading) {
     return (
-      <div className="flex h-full items-center justify-center p-8">
-        <div className="flex flex-col items-center gap-3 text-text-secondary animate-pulse">
-          <FileSpreadsheet className="h-8 w-8 text-accent animate-bounce" />
-          <span className="text-xs font-semibold">Loading requisitions audit ledger...</span>
-        </div>
-      </div>
+      <LoadingState
+        icon="clipboard"
+        message="Loading requisitions audit ledger..."
+        subtitle="Retrieving staff requisition slips, item allocations, and status histories"
+      />
     );
   }
 

@@ -23,6 +23,7 @@ import {
 import type { AuditLogRecord } from "@/features/audit-logs/client/audit-logs-api";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/providers/toast-context";
+import { LoadingState } from "@/components/providers/loading-context";
 
 export function GeneralAuditList() {
   const { data: logs = [], isLoading, error } = useAuditLogsQuery();
@@ -184,12 +185,11 @@ export function GeneralAuditList() {
 
   if (isLoading) {
     return (
-      <div className="flex h-full items-center justify-center p-8">
-        <div className="flex flex-col items-center gap-3 text-text-secondary animate-pulse">
-          <History className="h-8 w-8 text-accent animate-spin" />
-          <span className="text-xs font-semibold">Loading system audit ledger...</span>
-        </div>
-      </div>
+      <LoadingState
+        icon="history"
+        message="Loading system audit ledger..."
+        subtitle="Compiling immutable system-wide activity logs and user operations"
+      />
     );
   }
 
