@@ -9,7 +9,8 @@ import { RequestDetailSheet } from "./request-detail-sheet";
 import type { PortalBorrowRequest, RequestStatusFilter } from "./types";
 import { LoadingState } from "@/components/providers/loading-context";
 
-import { useBorrowRequests, useRejectBorrowRequestMutation } from "@/features/borrow-requests/client/use-borrow-requests";
+import { useBorrowRequests, useCancelBorrowRequestMutation } from "@/features/borrow-requests/client/use-borrow-requests";
+import { useToast } from "@/components/providers/toast-context";
 
 const STATUS_FILTERS: { key: RequestStatusFilter; label: string }[] = [
   { key: "all", label: "All" },
@@ -29,14 +30,22 @@ export function MyRequestsTab() {
 
   const { data: response, isLoading: loading } = useBorrowRequests();
   const requests = useMemo(() => response?.data ?? [], [response?.data]);
-  const { mutate: cancelRequest } = useRejectBorrowRequestMutation();
+  const { mutate: cancelRequest } = useCancelBorrowRequestMutation();
+  const toast = useToast();
 
   useEffect(() => {
     setPage(1);
   }, [statusFilter]);
 
   const handleCancelConfirmed = (requestId: string) => {
-    cancelRequest({ id: requestId, reason: "Cancelled by borrower" });
+    cancelRequest(
+      { id: requestId, note: "Cancelled by borrower" },
+      {
+        onSuccess: () => toast.success("Request cancelled."),
+        onError: (err) =>
+          toast.error(err instanceof Error ? err.message : "Failed to cancel request."),
+      }
+    );
   };
 
   const filtered = useMemo(() => {

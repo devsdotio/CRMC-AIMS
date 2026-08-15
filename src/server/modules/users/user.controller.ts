@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 
 import {
+  requireActor,
   requireSession,
   requireUserManager,
 } from "@/server/shared/auth";
@@ -83,6 +84,28 @@ export class UserController {
         displayName: session.actor.displayName,
         role: session.actor.role,
       });
+    } catch (error) {
+      return handleError(error);
+    }
+  }
+
+  async updateMe(request: NextRequest | Request) {
+    try {
+      const actor = await requireActor();
+      const body = await request.json();
+      const data = await this.userService.updateMe(body, actor);
+      return ok(data);
+    } catch (error) {
+      return handleError(error);
+    }
+  }
+
+  async changePassword(request: NextRequest | Request) {
+    try {
+      const actor = await requireActor();
+      const body = await request.json();
+      const data = await this.userService.changePassword(body, actor);
+      return ok(data);
     } catch (error) {
       return handleError(error);
     }

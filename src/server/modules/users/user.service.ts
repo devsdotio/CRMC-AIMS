@@ -1,5 +1,8 @@
 import type { ProfileRow } from "@/server/db/schema";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { formatRelativeTime } from "@/lib/format-relative-time";
 import {
   BadRequestError,
@@ -22,8 +25,10 @@ import type {
   UpdateUserInput,
 } from "./user.types";
 import {
+  changePasswordSchema,
   createUserSchema,
   listUsersQuerySchema,
+  updateMeSchema,
   updateUserSchema,
   userIdSchema,
 } from "./user.validation";
@@ -116,6 +121,79 @@ export class UserService {
     } catch {
       // ignore
     }
+  }
+
+  async updateMe(rawInput: unknown, actor: ActorContext): Promise<ProfileDTO> {
+    const input = updateMeSchema.parse(rawInput);
+    const existing = await this.profileRepository.findByUserId(actor.userId);
+    if (!existing) {
+      throw new NotFoundError("Profile", actor.userId);
+    }
+
+    const updated = await this.profileRepository.update(actor.userId, {
+      ...(input.name !== undefined ? { fullName: input.name } : {}),
+      ...(input.department !== undefined ? { department: input.department } : {}),
+    });
+
+    if (!updated) {
+      throw new NotFoundError("Profile", actor.userId);
+    }
+
+    if (input.name !== undefined) {
+      try {
+        const admin = createAdminClient();
+        await admin.auth.admin.updateUserById(actor.userId, {
+          user_metadata: { full_name: input.name },
+        });
+      } catch {
+        // Profile update already succeeded; auth metadata is optional.
+      }
+    }
+
+    return toProfileDTO(updated);
+  }
+
+  async changePassword(
+    rawInput: unknown,
+    actor: ActorContext
+  ): Promise<{ updated: true }> {
+    const input = changePasswordSchema.parse(rawInput);
+    const email =
+      actor.email ??
+      (await this.profileRepository.findByUserId(actor.userId))?.email;
+
+    if (!email) {
+      throw new BadRequestError("Your account has no email to verify against.");
+    }
+
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    if (!url || !anonKey) {
+      throw new Error(
+        "NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY must be configured."
+      );
+    }
+
+    const verifier = createSupabaseClient(url, anonKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { error: verifyError } = await verifier.auth.signInWithPassword({
+      email,
+      password: input.currentPassword,
+    });
+    if (verifyError) {
+      throw new BadRequestError("Current password is incorrect.");
+    }
+
+    const supabase = await createClient();
+    const { error } = await supabase.auth.updateUser({
+      password: input.newPassword,
+    });
+    if (error) {
+      throw new BadRequestError(error.message || "Failed to update password.");
+    }
+
+    return { updated: true };
   }
 
   async listUsersForActor(

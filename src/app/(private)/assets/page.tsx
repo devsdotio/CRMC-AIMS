@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { Plus } from "lucide-react";
+import { Plus, QrCode } from "lucide-react";
 import { 
   useAssetsQuery, 
   useCreateAssetMutation, 
@@ -14,6 +14,7 @@ import { AssetGrid } from "@/components/assets/asset-grid";
 import { AssetTable } from "@/components/assets/asset-table";
 import { AssetDetailPanel } from "@/components/assets/asset-detail-panel";
 import { AddEditAssetDialog } from "@/components/assets/add-edit-asset-dialog";
+import { ScanAssetDialog } from "@/components/assets/scan-asset-dialog";
 import { QueryErrorBanner } from "@/components/shared/query-error-banner";
 import { useToast } from "@/components/providers/toast-context";
 
@@ -46,6 +47,7 @@ export default function AssetsPage() {
     isOpen: false,
     asset: null,
   });
+  const [scanOpen, setScanOpen] = useState(false);
 
   // Filter & Sort Assets
   const filteredAssets = useMemo(() => {
@@ -179,6 +181,14 @@ export default function AssetsPage() {
         <div className="flex items-center gap-2.5">
           <button
             type="button"
+            onClick={() => setScanOpen(true)}
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg border border-border bg-bg text-text hover:bg-bg-subtle transition-colors cursor-pointer shadow-xs"
+          >
+            <QrCode className="h-4 w-4" strokeWidth={2.5} />
+            Scan Code
+          </button>
+          <button
+            type="button"
             onClick={() => setAddEditState({ isOpen: true, asset: null })}
             className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
           >
@@ -240,6 +250,12 @@ export default function AssetsPage() {
         initialAsset={addEditState.asset}
         onClose={() => setAddEditState({ isOpen: false, asset: null })}
         onSave={handleSaveAsset}
+      />
+
+      <ScanAssetDialog
+        isOpen={scanOpen}
+        onClose={() => setScanOpen(false)}
+        onSuccess={(message) => toast.success(message)}
       />
     </div>
   );

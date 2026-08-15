@@ -69,12 +69,12 @@ export function OverdueAssetsWidget({
             </p>
           )}
         </div>
-        {/* <Link
+        <Link
           href="/borrow-log?filter=overdue"
           className="flex items-center gap-0.5 text-xs font-medium text-accent hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
         >
           View all <ChevronRight className="h-3.5 w-3.5" />
-        </Link> */}
+        </Link>
       </div>
 
       {/* Body */}
@@ -134,20 +134,34 @@ export function OverdueAssetsWidget({
                       </span>
                     </td>
                     <td className="px-5 py-3.5 text-right">
-                      <button
-                        type="button"
-                        onClick={() => onSendReminder?.(asset.id)}
-                        aria-label={`Send reminder for ${asset.assetName} to ${asset.borrowerName}`}
-                        className={cn(
-                          "inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium",
-                          "text-text-secondary transition-colors duration-150",
-                          "hover:border-primary hover:text-text",
-                          "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                        )}
-                      >
-                        <BellRing className="h-3.5 w-3.5" />
-                        Remind
-                      </button>
+                      {onSendReminder ? (
+                        <button
+                          type="button"
+                          onClick={() => onSendReminder(asset.id)}
+                          aria-label={`Send reminder for ${asset.assetName} to ${asset.borrowerName}`}
+                          className={cn(
+                            "inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium",
+                            "text-text-secondary transition-colors duration-150",
+                            "hover:border-primary hover:text-text",
+                            "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                          )}
+                        >
+                          <BellRing className="h-3.5 w-3.5" />
+                          Remind
+                        </button>
+                      ) : (
+                        <Link
+                          href="/borrow-log?filter=overdue"
+                          className={cn(
+                            "inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium",
+                            "text-text-secondary transition-colors duration-150",
+                            "hover:border-primary hover:text-text",
+                            "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                          )}
+                        >
+                          Open log
+                        </Link>
+                      )}
                     </td>
                   </tr>
                 );

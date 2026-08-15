@@ -48,6 +48,11 @@ const ROUTE_MAP: Record<string, RouteMeta> = {
     subtitle: "Track active borrowings, returns, and overdue items",
     category: "Operations",
   },
+  "/maintenance-logs": {
+    title: "Maintenance Logs",
+    subtitle: "Condition flags, inspections, and repair resolutions",
+    category: "Operations",
+  },
   "/consumables": {
     title: "Inventory",
     subtitle: "Monitor stock quantities and minimum threshold alerts",

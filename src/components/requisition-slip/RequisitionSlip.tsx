@@ -1,11 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus, Send, Loader2, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { RequisitionItemRow } from "./RequisitionItemRow";
 import { SignatureBlock } from "./SignatureBlock";
-import type { RequisitionItem, RequisitionSlipData } from "./types";
+import type { RequisitionItem } from "./types";
+import { useCreateBorrowRequestMutation } from "@/features/borrow-requests/client/use-borrow-requests";
+import { useMeQuery } from "@/features/users/client/use-users";
+import { useToast } from "@/components/providers/toast-context";
 
 function generateEmptyRow(): RequisitionItem {
   return {
@@ -35,11 +38,19 @@ export function RequisitionSlip({
   const [recommendingPerson, setRecommendingPerson] = useState("");
   const [budgetOfficer, setBudgetOfficer] = useState("");
   
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const { data: me } = useMeQuery();
+  const { mutateAsync: createRequest, isPending: isSubmitting } =
+    useCreateBorrowRequestMutation();
+  const toast = useToast();
 
-  // Pre-filled from system config (mocked here per prompt)
+  useEffect(() => {
+    if (me?.name && !requisitionedBy) {
+      setRequisitionedBy(me.name);
+    }
+  }, [me?.name, requisitionedBy]);
+
   const approvedBy = { name: "Mr. Victor Elliot S. Lepiten, III", title: "President" };
 
   const addRow = () => {
@@ -80,28 +91,66 @@ export function RequisitionSlip({
       return;
     }
 
-    setIsSubmitting(true);
-    
-    // Fake async delay
-    await new Promise((r) => setTimeout(r, 1500));
+    if (!me?.id || !me.email) {
+      setError("Your profile could not be loaded. Sign in again and retry.");
+      return;
+    }
 
-    const payload: RequisitionSlipData = {
-      date,
-      items: items.filter((item) => item.description.trim() || item.qty),
-      requisitionedBy,
-      recommendingOfficePerson: recommendingPerson,
-      budgetOfficer,
-      approvedBy,
-    };
+    const validItems = items.filter(
+      (item) => item.qty && item.qty > 0 && item.description.trim()
+    );
+    const purpose =
+      validItems.find((item) => item.purpose.trim())?.purpose.trim() ||
+      "Supplies requisition";
+    const notesParts = [
+      `Slip date: ${date}`,
+      recommendingPerson.trim()
+        ? `Recommending: ${recommendingPerson.trim()}`
+        : null,
+      budgetOfficer.trim() ? `Budget officer: ${budgetOfficer.trim()}` : null,
+      ...validItems
+        .filter((item) => item.costCenterCode.trim() || item.suggestedDealer.trim())
+        .map((item) => {
+          const bits = [
+            item.costCenterCode.trim()
+              ? `cost center ${item.costCenterCode.trim()}`
+              : null,
+            item.suggestedDealer.trim()
+              ? `dealer ${item.suggestedDealer.trim()}`
+              : null,
+            item.estimatedCost != null
+              ? `est. ${item.estimatedCost}`
+              : null,
+          ].filter(Boolean);
+          return bits.length ? `${item.description}: ${bits.join(", ")}` : null;
+        }),
+    ].filter(Boolean);
 
-    console.log("Requisition Slip Submitted:", payload);
-    setIsSubmitting(false);
-    setSuccess(true);
-    setTimeout(() => {
-      onOpenChange(false);
-      setSuccess(false);
-      setItems(Array.from({ length: 4 }).map(() => generateEmptyRow()));
-    }, 1500);
+    try {
+      await createRequest({
+        requesterUserId: me.id,
+        requesterName: requisitionedBy.trim(),
+        requesterEmail: me.email,
+        department: me.department || "Unspecified",
+        items: validItems.map((item) => ({
+          itemDescription: item.description.trim(),
+          category: "Supplies",
+          quantity: item.qty ?? 1,
+          itemType: "consumable" as const,
+        })),
+        purpose,
+        notes: notesParts.join(" · ") || undefined,
+      });
+      toast.success("Requisition submitted.");
+      setSuccess(true);
+      setTimeout(() => {
+        onOpenChange(false);
+        setSuccess(false);
+        setItems(Array.from({ length: 4 }).map(() => generateEmptyRow()));
+      }, 1500);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to submit requisition.");
+    }
   };
 
   if (!open) return null;

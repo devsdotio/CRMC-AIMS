@@ -848,9 +848,9 @@ function StepReview({ values, me }: { values: WizardFormValues, me?: MeProfile }
 
   // Use the actual logged-in user or fallback to mock
   const requester = {
-    name: me?.name || "Maria Santos",
-    email: me?.email || "m.santos@aims.org",
-    department: me?.department || "IT",
+    name: me?.name || "Your name",
+    email: me?.email || "Your email",
+    department: me?.department || "Unspecified",
   };
   
   const hasAsset = selectedItems.some(i => i.type === "asset");
@@ -1092,14 +1092,21 @@ export function NewBorrowRequestWizard({
         itemType: item.type,
       }));
 
+      if (!me?.id || !me.email) {
+        setErrorMessage("Your profile could not be loaded. Sign in again and retry.");
+        return;
+      }
+
+      const hasAsset = items.some((item) => item.itemType === "asset");
+
       const createdRequest = await createRequest({
-        requesterUserId: me?.id,
-        requesterName: me?.name || "Maria Santos",
-        requesterEmail: me?.email || "m.santos@aims.org",
-        department: me?.department || "IT",
+        requesterUserId: me.id,
+        requesterName: me.name,
+        requesterEmail: me.email,
+        department: me.department || "Unspecified",
         items,
         purpose: values.purpose,
-        expectedReturnDate: values.dateTo,
+        expectedReturnDate: hasAsset ? values.dateTo : undefined,
         notes: values.notes || undefined,
       });
 

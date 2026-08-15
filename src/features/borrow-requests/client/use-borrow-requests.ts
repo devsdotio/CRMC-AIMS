@@ -175,6 +175,34 @@ export function useRejectBorrowRequestMutation(): UseMutationResult<
   });
 }
 
+export function useCancelBorrowRequestMutation(): UseMutationResult<
+  BorrowRequest,
+  Error,
+  { id: string; note?: string }
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, note }) => borrowRequestsApi.cancel(id, note),
+    onSuccess: (_, { id }) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      qc.setQueriesData<any>({ queryKey: dashboardQueryKeys.snapshot() }, (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          summary: {
+            ...old.summary,
+            pendingApprovals: Math.max(0, (old.summary?.pendingApprovals || 1) - 1),
+          },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          pendingRequests: (old.pendingRequests || []).filter((r: any) => r.id !== id),
+        };
+      });
+      qc.invalidateQueries({ queryKey: borrowRequestQueryKeys.all });
+      qc.invalidateQueries({ queryKey: dashboardQueryKeys.all });
+    },
+  });
+}
+
 export function useReleaseBorrowRequestMutation(): UseMutationResult<
   BorrowRequest,
   Error,

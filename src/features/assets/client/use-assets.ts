@@ -13,8 +13,11 @@ import {
   type AssetLifecycleEvent,
   type FlagMaintenanceInput,
   type ReleaseAssetInput,
+  type ScanResolveResult,
 } from "@/features/assets/client/assets-api";
 import { assetQueryKeys } from "@/features/assets/client/query-keys";
+import { borrowLogQueryKeys } from "@/features/borrow-log/client/query-keys";
+import { dashboardQueryKeys } from "@/features/dashboard/client/query-keys";
 import type {
   Asset,
   AssetStatus,
@@ -28,6 +31,8 @@ function invalidateAssetCaches(
   assetId?: string
 ) {
   queryClient.invalidateQueries({ queryKey: assetQueryKeys.all });
+  queryClient.invalidateQueries({ queryKey: borrowLogQueryKeys.all });
+  queryClient.invalidateQueries({ queryKey: dashboardQueryKeys.all });
   if (assetId) {
     queryClient.invalidateQueries({ queryKey: assetQueryKeys.lifecycle(assetId) });
   }
@@ -217,6 +222,48 @@ export function useFlagMaintenanceMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: ({ id, payload }) => assetsApi.flagForMaintenance(id, payload),
+    onSuccess: (asset) => {
+      invalidateAssetCaches(queryClient, asset.id);
+      queryClient.setQueryData(assetQueryKeys.detail(asset.id), asset);
+    },
+  });
+}
+
+export function useResolveScanMutation(): UseMutationResult<
+  ScanResolveResult,
+  Error,
+  string
+> {
+  return useMutation({
+    mutationFn: (code) => assetsApi.resolveScan(code),
+  });
+}
+
+export function useScanReleaseMutation(): UseMutationResult<
+  Asset,
+  Error,
+  ReleaseAssetInput & { code: string }
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => assetsApi.scanRelease(payload),
+    onSuccess: (asset) => {
+      invalidateAssetCaches(queryClient, asset.id);
+      queryClient.setQueryData(assetQueryKeys.detail(asset.id), asset);
+    },
+  });
+}
+
+export function useScanReturnMutation(): UseMutationResult<
+  Asset,
+  Error,
+  ReturnAssetInput & { code: string }
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => assetsApi.scanReturn(payload),
     onSuccess: (asset) => {
       invalidateAssetCaches(queryClient, asset.id);
       queryClient.setQueryData(assetQueryKeys.detail(asset.id), asset);

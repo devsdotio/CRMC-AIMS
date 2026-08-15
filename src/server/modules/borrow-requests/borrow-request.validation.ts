@@ -47,9 +47,19 @@ export const createBorrowRequestSchema = z.object({
   purpose: z.string().trim().min(1).max(1000),
   expectedReturnDate: z
     .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "expectedReturnDate must be YYYY-MM-DD"),
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "expectedReturnDate must be YYYY-MM-DD")
+    .optional(),
   notes: z.string().trim().max(2000).optional(),
   requesterUserId: z.string().uuid().optional(),
+}).superRefine((data, ctx) => {
+  const hasAsset = data.items.some((item) => item.itemType === "asset");
+  if (hasAsset && !data.expectedReturnDate) {
+    ctx.addIssue({
+      code: "custom",
+      message: "expectedReturnDate is required when requesting assets.",
+      path: ["expectedReturnDate"],
+    });
+  }
 });
 
 export const approveBorrowRequestSchema = z.object({

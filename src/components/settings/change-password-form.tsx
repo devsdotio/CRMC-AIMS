@@ -1,16 +1,27 @@
 "use client";
 
 import { useState } from "react";
-import { KeyRound, Check, X, Lock } from "lucide-react";
+import { KeyRound, Check, X, Lock, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export function ChangePasswordForm() {
+export interface ChangePasswordFormProps {
+  saving?: boolean;
+  onChangePassword: (payload: {
+    currentPassword: string;
+    newPassword: string;
+  }) => Promise<void>;
+}
+
+export function ChangePasswordForm({
+  saving = false,
+  onChangePassword,
+}: ChangePasswordFormProps) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [error, setError] = useState("");
 
-  // Live password checklist validation
   const hasMinLength = newPassword.length >= 8;
   const hasUppercase = /[A-Z]/.test(newPassword);
   const hasNumber = /[0-9]/.test(newPassword);
@@ -23,15 +34,24 @@ export function ChangePasswordForm() {
     hasNumber &&
     isMatching;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isValid) return;
+    if (!isValid || saving) return;
 
-    setCurrentPassword("");
-    setNewPassword("");
-    setConfirmPassword("");
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 2500);
+    setError("");
+    try {
+      await onChangePassword({
+        currentPassword,
+        newPassword,
+      });
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setSavedSuccess(true);
+      setTimeout(() => setSavedSuccess(false), 2500);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update password.");
+    }
   };
 
   return (
@@ -47,7 +67,6 @@ export function ChangePasswordForm() {
       </div>
 
       <div className="space-y-4">
-        {/* Current Password */}
         <div className="space-y-1.5">
           <label htmlFor="current-password" className="block text-xs font-bold text-text">
             Current Password <span className="text-accent">*</span>
@@ -58,11 +77,11 @@ export function ChangePasswordForm() {
             value={currentPassword}
             onChange={(e) => setCurrentPassword(e.target.value)}
             placeholder="••••••••••••"
+            autoComplete="current-password"
             className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent"
           />
         </div>
 
-        {/* New Password */}
         <div className="space-y-1.5">
           <label htmlFor="new-password" className="block text-xs font-bold text-text">
             New Password <span className="text-accent">*</span>
@@ -73,11 +92,11 @@ export function ChangePasswordForm() {
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
             placeholder="••••••••••••"
+            autoComplete="new-password"
             className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent"
           />
         </div>
 
-        {/* Confirm New Password */}
         <div className="space-y-1.5">
           <label htmlFor="confirm-password" className="block text-xs font-bold text-text">
             Confirm New Password <span className="text-accent">*</span>
@@ -88,11 +107,11 @@ export function ChangePasswordForm() {
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             placeholder="••••••••••••"
+            autoComplete="new-password"
             className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent"
           />
         </div>
 
-        {/* Live Password Requirements Checklist */}
         <div className="p-3.5 rounded-xl border border-border bg-bg-subtle space-y-1 text-xs">
           <span className="text-[11px] font-bold uppercase tracking-wider text-text-secondary block mb-1">
             Password Security Checklist:
@@ -118,9 +137,10 @@ export function ChangePasswordForm() {
         </div>
       </div>
 
-      {/* Submit CTA */}
       <div className="flex items-center justify-between pt-3 border-t border-border">
-        {savedSuccess ? (
+        {error ? (
+          <span className="text-xs font-semibold text-status-outofservice-text">{error}</span>
+        ) : savedSuccess ? (
           <span className="inline-flex items-center gap-1 text-xs font-bold text-status-active-text bg-status-active-bg/15 px-3 py-1.5 rounded-md">
             <Check className="h-4 w-4" />
             Password updated successfully
@@ -131,15 +151,15 @@ export function ChangePasswordForm() {
 
         <button
           type="submit"
-          disabled={!isValid}
+          disabled={!isValid || saving}
           className={cn(
             "inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg transition-all duration-150 shadow-xs",
-            isValid
+            isValid && !saving
               ? "bg-accent text-accent-foreground hover:opacity-90 cursor-pointer"
               : "bg-bg-subtle text-text-secondary/40 border border-border/40 cursor-not-allowed opacity-60"
           )}
         >
-          <Lock className="h-3.5 w-3.5" />
+          {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Lock className="h-3.5 w-3.5" />}
           Update Password
         </button>
       </div>

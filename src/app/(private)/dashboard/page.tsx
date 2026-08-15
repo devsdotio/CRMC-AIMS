@@ -11,11 +11,6 @@ import { RecentActivityFeed } from "@/components/dashboard/recent-activity-feed"
 import { QueryErrorBanner } from "@/components/shared/query-error-banner";
 
 import { useDashboardSnapshotQuery } from "@/features/dashboard/client/use-dashboard";
-import {
-  useApproveBorrowRequestMutation,
-  useRejectBorrowRequestMutation,
-} from "@/features/borrow-requests/client/use-borrow-requests";
-import { useToast } from "@/components/providers/toast-context";
 
 export default function DashboardPage() {
   const {
@@ -25,9 +20,6 @@ export default function DashboardPage() {
     error,
     refetch,
   } = useDashboardSnapshotQuery();
-  const approveMutation = useApproveBorrowRequestMutation();
-  const rejectMutation = useRejectBorrowRequestMutation();
-  const toast = useToast();
 
   // Only true while the first fetch is in flight — never `!snapshot` after error.
   const loading = isLoading && !snapshot;
@@ -99,7 +91,6 @@ export default function DashboardPage() {
         <OverdueAssetsWidget
           assets={snapshot?.overdueAssets || []}
           loading={loading}
-          onSendReminder={(id) => console.log("Remind", id)}
         />
         <AssetsByCategoryChart
           data={snapshot?.categoryDistribution ?? []}

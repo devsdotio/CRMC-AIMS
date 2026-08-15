@@ -16,7 +16,7 @@ export function SettingsNav({
   onSectionChange,
   userRole,
 }: SettingsNavProps) {
-  const isAdmin = userRole === "admin";
+  const isAdmin = userRole === "admin" || userRole === "superadmin";
 
   const navItems: {
     id: SettingsSection;

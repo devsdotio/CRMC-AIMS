@@ -13,6 +13,7 @@ export {
   useApproveBorrowRequestMutation,
   useBorrowRequestQuery,
   useBorrowRequests,
+  useCancelBorrowRequestMutation,
   useCreateBorrowRequestMutation,
   useRejectBorrowRequestMutation,
   useReleaseBorrowRequestMutation,

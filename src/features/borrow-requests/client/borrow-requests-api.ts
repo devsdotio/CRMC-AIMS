@@ -18,7 +18,7 @@ export type CreateBorrowRequestPayload = {
     itemType: "asset" | "consumable";
   }[];
   purpose: string;
-  expectedReturnDate: string;
+  expectedReturnDate?: string;
   notes?: string;
   requesterUserId?: string;
 };
@@ -101,6 +101,14 @@ export const borrowRequestsApi = {
     const res = await fetchJson<ApiResponse<BorrowRequest>>(
       `/api/requests/${id}/reject`,
       { method: "POST", body: JSON.stringify({ reason }) }
+    );
+    return res.data;
+  },
+
+  async cancel(id: string, note?: string): Promise<BorrowRequest> {
+    const res = await fetchJson<ApiResponse<BorrowRequest>>(
+      `/api/requests/${id}/cancel`,
+      { method: "POST", body: JSON.stringify(note ? { note } : {}) }
     );
     return res.data;
   },

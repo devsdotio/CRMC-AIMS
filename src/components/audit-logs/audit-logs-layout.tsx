@@ -1,7 +1,15 @@
 "use client";
 
 import React, { ReactNode } from "react";
-import { Package, Layers, LucideIcon } from "lucide-react";
+import {
+  Package,
+  Layers,
+  ClipboardList,
+  FileSpreadsheet,
+  ShoppingCart,
+  History,
+  type LucideIcon,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AuditLogTab } from "@/app/(private)/audit-logs/page";
 
@@ -38,11 +46,34 @@ export function AuditLogsLayout({
       icon: Layers,
       count: counts["consumables"],
     },
+    {
+      id: "requests",
+      label: "Requests",
+      icon: ClipboardList,
+      count: counts["requests"],
+    },
+    {
+      id: "requisitions",
+      label: "Requisitions",
+      icon: FileSpreadsheet,
+      count: counts["requisitions"],
+    },
+    {
+      id: "purchaseOrders",
+      label: "Purchase Lots",
+      icon: ShoppingCart,
+      count: counts["purchaseOrders"],
+    },
+    {
+      id: "general",
+      label: "All Activity",
+      icon: History,
+      count: counts["general"],
+    },
   ];
 
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-bg">
-      {/* Tab Navigation Header */}
       <div className="px-4 md:px-6 border-b border-border bg-bg-subtle/70 shrink-0">
         <div className="flex gap-2 sm:gap-6 overflow-x-auto no-scrollbar">
           {tabs.map((tab) => {
@@ -79,7 +110,6 @@ export function AuditLogsLayout({
         </div>
       </div>
 
-      {/* Tab Panel Content */}
       <div className="flex-1 min-h-0 relative flex flex-col">{children}</div>
     </div>
   );

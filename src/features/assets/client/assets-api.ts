@@ -71,6 +71,15 @@ export type FlagMaintenanceInput = {
   notes?: string;
 };
 
+export type ScanResolveResult = {
+  kind: "asset";
+  code: string;
+  qrPayload: string;
+  asset: Asset;
+  suggestedAction: "release" | "return" | "project" | "blocked";
+  reason?: string;
+};
+
 export const assetsApi = {
   async listAssets(
     status?: AssetStatus,
@@ -138,20 +147,14 @@ export const assetsApi = {
     return response.data;
   },
 
-  async resolveScan(code: string) {
-    const response = await fetchJson<
-      ApiResponse<{
-        kind: "asset";
-        code: string;
-        qrPayload: string;
-        asset: Asset;
-        suggestedAction: "release" | "return" | "project" | "blocked";
-        reason?: string;
-      }>
-    >("/api/assets/scan/resolve", {
-      method: "POST",
-      body: JSON.stringify({ code }),
-    });
+  async resolveScan(code: string): Promise<ScanResolveResult> {
+    const response = await fetchJson<ApiResponse<ScanResolveResult>>(
+      "/api/assets/scan/resolve",
+      {
+        method: "POST",
+        body: JSON.stringify({ code }),
+      }
+    );
     return response.data;
   },
 

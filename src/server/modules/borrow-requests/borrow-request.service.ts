@@ -201,7 +201,8 @@ export class BorrowRequestService {
         department: input.department,
         items: input.items,
         purpose: input.purpose,
-        expectedReturnDate: input.expectedReturnDate,
+        expectedReturnDate:
+          input.expectedReturnDate ?? new Date().toISOString().slice(0, 10),
         status: "pending",
         notes: input.notes ?? null,
         rejectionReason: null,

@@ -19,13 +19,13 @@ import {
   LogOut,
   User,
   ChevronsUpDown,
-  ShoppingBag,
   History,
   PanelLeftClose,
   PanelLeftOpen,
   FileText,
   FolderKanban,
   Truck,
+  Wrench,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -140,8 +140,10 @@ export default function Sidebar({
         { name: "Assets", href: "/assets", icon: Package, roles: ["superadmin", "admin", "staff"] },
         { name: "Inventory", href: "/consumables", icon: Boxes, badge: lowStockCount, badgeTone: "warning", roles: ["superadmin", "admin", "staff"] },
         { name: "Requests", href: "/borrow-requests", icon: ClipboardList, badge: pendingCount, badgeTone: "accent", roles: ["superadmin", "admin", "staff"] },
+        { name: "Borrow Log", href: "/borrow-log", icon: Repeat, badge: overdueCount, badgeTone: "warning", roles: ["superadmin", "admin", "staff"] },
         { name: "Suppliers", href: "/suppliers", icon: Truck, roles: ["superadmin", "admin", "staff"] },
         { name: "Projects", href: "/projects", icon: FolderKanban, roles: ["superadmin", "admin"] },
+        { name: "Maintenance Logs", href: "/maintenance-logs", icon: Wrench, roles: ["superadmin", "admin", "staff"] },
         { name: "Audit Logs", href: "/audit-logs", icon: FileText, roles: ["superadmin", "admin"] },
         { name: "My Requests", href: "/borrower-db/requests", icon: ClipboardList, badge: pendingCount, badgeTone: "accent", roles: ["borrower"] },
         { name: "Borrow History", href: "/borrower-db/history", icon: History, roles: ["borrower"] },

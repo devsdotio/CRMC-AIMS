@@ -35,6 +35,26 @@ export const updateUserSchema = z
     message: "At least one field must be provided for an update.",
   });
 
+/** Self-service profile fields only — never role, status, or password. */
+export const updateMeSchema = z
+  .object({
+    name: z.string().trim().min(1).max(255).optional(),
+    department: z.string().trim().max(120).nullable().optional(),
+  })
+  .refine((data) => Object.keys(data).length > 0, {
+    message: "At least one field must be provided for an update.",
+  });
+
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, "Current password is required."),
+    newPassword: passwordSchema,
+  })
+  .refine((data) => data.currentPassword !== data.newPassword, {
+    message: "New password must be different from the current password.",
+    path: ["newPassword"],
+  });
+
 export const listUsersQuerySchema = z.object({
   role: appRoleSchema.optional(),
   status: profileStatusSchema.optional(),
@@ -45,4 +65,6 @@ export const userIdSchema = z.string().uuid("User id must be a valid UUID.");
 
 export type CreateUserBody = z.infer<typeof createUserSchema>;
 export type UpdateUserBody = z.infer<typeof updateUserSchema>;
+export type UpdateMeBody = z.infer<typeof updateMeSchema>;
+export type ChangePasswordBody = z.infer<typeof changePasswordSchema>;
 export type ListUsersQuery = z.infer<typeof listUsersQuerySchema>;
