@@ -17,6 +17,9 @@ import type {
 } from "./borrow-requests-api";
 import { borrowRequestsApi } from "./borrow-requests-api";
 import { borrowRequestQueryKeys } from "./query-keys";
+import { consumableQueryKeys } from "@/features/consumables/client/query-keys";
+import { purchaseLotQueryKeys } from "@/features/purchase-lots/client/query-keys";
+import { auditLogQueryKeys } from "@/features/audit-logs/client/query-keys";
 import { dashboardQueryKeys } from "@/features/dashboard/client/query-keys";
 import type { PaginatedResponse } from "@/features/shared/fetch-json";
 
@@ -197,6 +200,11 @@ export function useReleaseBorrowRequestMutation(): UseMutationResult<
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: borrowRequestQueryKeys.all });
+      qc.invalidateQueries({ queryKey: consumableQueryKeys.all });
+      qc.invalidateQueries({ queryKey: purchaseLotQueryKeys.all });
+      qc.invalidateQueries({ queryKey: auditLogQueryKeys.all });
+      qc.invalidateQueries({ queryKey: dashboardQueryKeys.all });
+      qc.invalidateQueries({ queryKey: ["audit-logs"] });
     },
   });
 }

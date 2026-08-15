@@ -5,18 +5,21 @@ import {
   X,
   Search,
   Calendar,
-  FileText,
   ChevronRight,
   ChevronLeft,
-  Loader2,
   Tag,
   AlertCircle,
+  Check,
   CheckCircle2,
   Package,
-  ListFilter,
   Briefcase,
   Clock,
-  Zap,
+  Layers,
+  FileCheck2,
+  FileText,
+  StickyNote,
+  Minus,
+  Plus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getCategoryStyle } from "@/constants/categories";
@@ -26,6 +29,7 @@ import { useAssetsQuery } from "@/features/assets/client/use-assets";
 import { useConsumablesQuery } from "@/features/consumables/client/use-consumables";
 import { useMeQuery } from "@/features/users/client/use-users";
 import type { MeProfile } from "@/features/users/client/users-api";
+import { LoadingState } from "@/components/providers/loading-context";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -41,54 +45,91 @@ function nextWeek() {
 
 // ─── Step Indicators ─────────────────────────────────────────────────────────
 
-const STEPS: { key: RequestWizardStep; label: string; Icon: React.ElementType }[] = [
-  { key: "type", label: "Request Type", Icon: ListFilter },
-  { key: "select", label: "Select Item", Icon: Package },
-  { key: "details", label: "Request Details", Icon: Calendar },
-  { key: "review", label: "Review & Submit", Icon: FileText },
+const STEPS: { key: RequestWizardStep; label: string; stepNumber: number }[] = [
+  { key: "type", label: "Request Type", stepNumber: 1 },
+  { key: "select", label: "Select Items", stepNumber: 2 },
+  { key: "details", label: "Request Details", stepNumber: 3 },
+  { key: "review", label: "Review & Submit", stepNumber: 4 },
 ];
 
-function StepIndicator({ current }: { current: RequestWizardStep }) {
+function MilestoneStepIndicator({ current }: { current: RequestWizardStep }) {
   const currentIdx = STEPS.findIndex((s) => s.key === current);
+
   return (
-    <div className="flex items-center gap-0" role="list" aria-label="Wizard steps">
-      {STEPS.map((step, idx) => {
-        const isDone = idx < currentIdx;
-        const isActive = idx === currentIdx;
-        const Icon = step.Icon;
-        return (
-          <div key={step.key} role="listitem" className="flex items-center">
-            <div
+    <nav aria-label="Request Progress" className="w-full">
+      <ol className="flex items-center justify-between w-full">
+        {STEPS.map((step, idx) => {
+          const isDone = idx < currentIdx;
+          const isActive = idx === currentIdx;
+          const isLast = idx === STEPS.length - 1;
+
+          return (
+            <li
+              key={step.key}
               className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all",
-                isActive
-                  ? "bg-accent text-accent-foreground"
-                  : isDone
-                  ? "bg-status-active-bg/20 text-status-active-text"
-                  : "bg-bg-subtle text-text-secondary"
+                "flex items-center",
+                isLast ? "flex-none" : "flex-1"
               )}
-              aria-current={isActive ? "step" : undefined}
             >
-              <Icon className="h-3.5 w-3.5" aria-hidden />
-              {step.label}
-            </div>
-            {idx < STEPS.length - 1 && (
-              <div
-                className={cn(
-                  "h-px w-6 mx-1 transition-colors",
-                  idx < currentIdx ? "bg-status-active-bg" : "bg-border"
-                )}
-                aria-hidden
-              />
-            )}
-          </div>
-        );
-      })}
-    </div>
+              <div className="flex items-center gap-2.5">
+                {/* Milestone Node */}
+                <div
+                  className={cn(
+                    "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-all duration-200",
+                    isDone
+                      ? "bg-accent text-accent-foreground shadow-xs"
+                      : isActive
+                      ? "bg-accent text-accent-foreground ring-4 ring-accent/20 shadow-xs"
+                      : "bg-bg-subtle border border-border text-text-secondary font-medium"
+                  )}
+                  aria-current={isActive ? "step" : undefined}
+                >
+                  {isDone ? (
+                    <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+                  ) : (
+                    <span>{step.stepNumber}</span>
+                  )}
+                </div>
+
+                {/* Milestone Label */}
+                <div className="hidden sm:block">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">
+                    Step {step.stepNumber}
+                  </p>
+                  <p
+                    className={cn(
+                      "text-xs leading-none transition-colors",
+                      isActive
+                        ? "font-bold text-text"
+                        : isDone
+                        ? "font-semibold text-text"
+                        : "font-medium text-text-secondary"
+                    )}
+                  >
+                    {step.label}
+                  </p>
+                </div>
+              </div>
+
+              {/* Connecting Milestone Bar */}
+              {!isLast && (
+                <div
+                  className={cn(
+                    "mx-3 flex-1 h-0.5 transition-all duration-300 rounded-full",
+                    idx < currentIdx ? "bg-accent" : "bg-border"
+                  )}
+                  aria-hidden="true"
+                />
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
   );
 }
 
-// ─── Step 0: Request Type ───────────────────────────────────────────────────
+// ─── Step 0: Request Type (Grouped with Distinct Vibrant Colors) ─────────────
 
 function StepType({
   value,
@@ -97,71 +138,215 @@ function StepType({
   value: "borrowable" | "assignable" | "consumable" | null;
   onChange: (type: "borrowable" | "assignable" | "consumable") => void;
 }) {
-  const options = [
+  const borrowGroup = [
     {
       id: "borrowable",
       title: "Borrow Equipment",
-      description: "Short-term loan of assets (e.g., projectors, laptops).",
+      subtitle: "Short-term temporary loan",
+      description: "Loan equipment (e.g. laptops, projectors, tools) with a scheduled return date.",
       icon: Clock,
+      badge: "Return Required",
+      color: "blue",
+      theme: {
+        iconBg: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+        badge: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30",
+        selectedCard: "border-blue-500 bg-blue-500/5 ring-2 ring-blue-500/30 shadow-xs",
+        selectedTitle: "text-blue-600 dark:text-blue-400",
+        selectedRadio: "border-blue-500 bg-blue-500 text-white",
+        activeIcon: "bg-blue-600 text-white border-transparent",
+      },
     },
     {
       id: "assignable",
       title: "Request Assignment",
-      description: "Long-term assignment of an asset to you.",
+      subtitle: "Long-term custody allocation",
+      description: "Direct equipment allocation designated for personal or departmental custody.",
       icon: Briefcase,
+      badge: "Custody Assignment",
+      color: "indigo",
+      theme: {
+        iconBg: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20",
+        badge: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/30",
+        selectedCard: "border-indigo-500 bg-indigo-500/5 ring-2 ring-indigo-500/30 shadow-xs",
+        selectedTitle: "text-indigo-600 dark:text-indigo-400",
+        selectedRadio: "border-indigo-500 bg-indigo-500 text-white",
+        activeIcon: "bg-indigo-600 text-white border-transparent",
+      },
     },
+  ] as const;
+
+  const requisitionGroup = [
     {
       id: "consumable",
-      title: "Request Supplies",
-      description: "Request consumable items (e.g., pens, paper).",
-      icon: Zap,
+      title: "Supplies Requisition",
+      subtitle: "Consumables & Office Supplies",
+      description: "Request consumable office stationery, printing materials, toner, or inventory supplies.",
+      icon: Layers,
+      badge: "Requisition",
+      color: "emerald",
+      theme: {
+        iconBg: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
+        badge: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30",
+        selectedCard: "border-emerald-500 bg-emerald-500/5 ring-2 ring-emerald-500/30 shadow-xs",
+        selectedTitle: "text-emerald-600 dark:text-emerald-400",
+        selectedRadio: "border-emerald-500 bg-emerald-500 text-white",
+        activeIcon: "bg-emerald-600 text-white border-transparent",
+      },
     },
   ] as const;
 
   return (
-    <div className="space-y-3">
-      {options.map((opt) => {
-        const isSelected = value === opt.id;
-        const Icon = opt.icon;
-        return (
-          <button
-            key={opt.id}
-            type="button"
-            onClick={() => onChange(opt.id)}
-            className={cn(
-              "w-full flex items-start gap-3 p-3 rounded-lg border text-left transition-all",
-              "focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
-              isSelected
-                ? "border-accent bg-accent/5 ring-1 ring-accent"
-                : "border-border bg-card hover:bg-bg-subtle hover:border-text-secondary/30"
-            )}
-          >
-            <div className={cn(
-              "h-9 w-9 shrink-0 rounded-md flex items-center justify-center border transition-colors",
-              isSelected ? "bg-accent border-transparent text-accent-foreground" : "bg-bg-subtle border-border text-text-secondary"
-            )}>
-              <Icon className="h-4 w-4" />
+    <div className="space-y-6">
+      {/* ── Group 1: Borrow Request ── */}
+      <section aria-labelledby="group-borrow-title" className="space-y-2.5">
+        <div className="flex items-center justify-between px-1">
+          <div className="flex items-center gap-2">
+            <div className="h-6 w-6 rounded-md bg-blue-500/10 flex items-center justify-center text-blue-600 dark:text-blue-400">
+              <Package className="h-3.5 w-3.5" />
             </div>
-            <div className="flex-1">
-              <p className={cn("text-sm font-semibold", isSelected ? "text-accent" : "text-text")}>
-                {opt.title}
-              </p>
-              <p className="text-xs text-text-secondary mt-0.5">{opt.description}</p>
+            <h3 id="group-borrow-title" className="text-sm font-bold text-text">
+              Borrow Request
+            </h3>
+          </div>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-text-secondary bg-bg-subtle px-2 py-0.5 rounded-full border border-border">
+            Asset Lending & Custody
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {borrowGroup.map((opt) => {
+            const isSelected = value === opt.id;
+            const Icon = opt.icon;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => onChange(opt.id)}
+                className={cn(
+                  "flex flex-col justify-between p-4 rounded-xl border text-left transition-all duration-150 relative",
+                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+                  isSelected
+                    ? opt.theme.selectedCard
+                    : "border-border bg-card hover:bg-bg-subtle hover:border-text-secondary/30"
+                )}
+              >
+                <div className="flex items-start justify-between gap-3 w-full">
+                  <div
+                    className={cn(
+                      "h-9 w-9 shrink-0 rounded-lg flex items-center justify-center border transition-colors",
+                      isSelected ? opt.theme.activeIcon : opt.theme.iconBg
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <div
+                    className={cn(
+                      "h-5 w-5 rounded-full flex items-center justify-center shrink-0 transition-colors border",
+                      isSelected ? opt.theme.selectedRadio : "border-border bg-card"
+                    )}
+                  >
+                    {isSelected && <Check className="h-3 w-3 stroke-[3] text-white" />}
+                  </div>
+                </div>
+
+                <div className="mt-3">
+                  <div className="flex items-center gap-2">
+                    <p className={cn("text-sm font-bold", isSelected ? opt.theme.selectedTitle : "text-text")}>
+                      {opt.title}
+                    </p>
+                  </div>
+                  <p className="text-[11px] font-medium text-text-secondary mt-0.5">
+                    {opt.subtitle}
+                  </p>
+                  <p className="text-xs text-text-secondary/80 mt-1.5 leading-relaxed">
+                    {opt.description}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* ── Group 2: Requisition ── */}
+      <section aria-labelledby="group-req-title" className="space-y-2.5">
+        <div className="flex items-center justify-between px-1">
+          <div className="flex items-center gap-2">
+            <div className="h-6 w-6 rounded-md bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+              <FileCheck2 className="h-3.5 w-3.5" />
             </div>
-            <div className={cn(
-              "h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-2",
-              isSelected ? "border-accent" : "border-border"
-            )}>
-              {isSelected && <div className="h-2.5 w-2.5 rounded-full bg-accent" />}
-            </div>
-          </button>
-        );
-      })}
+            <h3 id="group-req-title" className="text-sm font-bold text-text">
+              Requisition
+            </h3>
+          </div>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-text-secondary bg-bg-subtle px-2 py-0.5 rounded-full border border-border">
+            Supplies & Materials
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3">
+          {requisitionGroup.map((opt) => {
+            const isSelected = value === opt.id;
+            const Icon = opt.icon;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => onChange(opt.id)}
+                className={cn(
+                  "flex items-start gap-4 p-4 rounded-xl border text-left transition-all duration-150 relative",
+                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+                  isSelected
+                    ? opt.theme.selectedCard
+                    : "border-border bg-card hover:bg-bg-subtle hover:border-text-secondary/30"
+                )}
+              >
+                <div
+                  className={cn(
+                    "h-10 w-10 shrink-0 rounded-lg flex items-center justify-center border transition-colors",
+                    isSelected ? opt.theme.activeIcon : opt.theme.iconBg
+                  )}
+                >
+                  <Icon className="h-5 w-5" />
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className={cn("text-sm font-bold", isSelected ? opt.theme.selectedTitle : "text-text")}>
+                      {opt.title}
+                    </p>
+                    <span className={cn("text-[10px] font-semibold px-2 py-0.5 rounded-full border", opt.theme.badge)}>
+                      {opt.badge}
+                    </span>
+                  </div>
+                  <p className="text-[11px] font-medium text-text-secondary mt-0.5">
+                    {opt.subtitle}
+                  </p>
+                  <p className="text-xs text-text-secondary/80 mt-1 leading-relaxed">
+                    {opt.description}
+                  </p>
+                </div>
+
+                <div
+                  className={cn(
+                    "h-5 w-5 rounded-full flex items-center justify-center shrink-0 mt-1 transition-colors border",
+                    isSelected ? opt.theme.selectedRadio : "border-border bg-card"
+                  )}
+                >
+                  {isSelected && <Check className="h-3 w-3 stroke-[3] text-white" />}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </section>
     </div>
   );
 }
 
-// ─── Step 1: Select Item ─────────────────────────────────────────────────────
+// ─── Step 1: Select Item (with LoadingState & Pagination) ────────────────────
+
+const SELECT_PAGE_SIZE = 6;
 
 function StepSelect({
   value,
@@ -175,9 +360,17 @@ function StepSelect({
   requestType?: "borrowable" | "assignable" | "consumable" | null;
 }) {
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+
   const { data: assets = [], isLoading: assetsLoading } = useAssetsQuery();
   const { data: paginatedData, isLoading: consumablesLoading } = useConsumablesQuery();
   const consumables = useMemo(() => paginatedData?.data ?? [], [paginatedData?.data]);
+  const loading = assetsLoading || consumablesLoading;
+
+  // Reset page when search or request type changes
+  useEffect(() => {
+    setPage(1);
+  }, [search, requestType]);
 
   const BROWSE_ITEMS = useMemo(() => {
     return [
@@ -205,29 +398,35 @@ function StepSelect({
     ] as BrowseItem[];
   }, [assets, consumables]);
 
-  const items = BROWSE_ITEMS.filter((item) => {
-    // 0. Filter by explicit requestType
-    if (requestType === "borrowable" && item.type !== "asset") return false;
-    if (requestType === "assignable" && item.type !== "asset") return false;
-    if (requestType === "consumable" && item.type !== "consumable") return false;
+  const items = useMemo(() => {
+    return BROWSE_ITEMS.filter((item) => {
+      // 0. Filter by explicit requestType
+      if (requestType === "borrowable" && item.type !== "asset") return false;
+      if (requestType === "assignable" && item.type !== "asset") return false;
+      if (requestType === "consumable" && item.type !== "consumable") return false;
 
-    // 1. Filter by requested type (legacy initialType fallback)
-    if (!requestType) {
-      if (initialType === "borrow" && item.type !== "asset") return false;
-      if (initialType === "requisition" && item.type !== "consumable") return false;
-    }
+      // 1. Filter by requested type (legacy initialType fallback)
+      if (!requestType) {
+        if (initialType === "borrow" && item.type !== "asset") return false;
+        if (initialType === "requisition" && item.type !== "consumable") return false;
+      }
 
-    // 2. Filter by status (available for assets, not out_of_stock for consumables)
-    const isAvailable =
-      item.type === "asset" ? item.status === "active" : item.status !== "out_of_stock";
-    if (!isAvailable) return false;
+      // 2. Filter by status (available for assets, not out_of_stock for consumables)
+      const isAvailable =
+        item.type === "asset" ? item.status === "active" : item.status !== "out_of_stock";
+      if (!isAvailable) return false;
 
-    // 3. Filter by search term
-    return item.name.toLowerCase().includes(search.toLowerCase());
-  });
+      // 3. Filter by search term
+      return item.name.toLowerCase().includes(search.toLowerCase()) ||
+        (item.type === "asset" ? item.assetCode : item.itemCode).toLowerCase().includes(search.toLowerCase());
+    });
+  }, [BROWSE_ITEMS, requestType, initialType, search]);
 
-  const assetItems = items.filter(i => i.type === "asset");
-  const consumableItems = items.filter(i => i.type === "consumable");
+  const totalPages = Math.max(1, Math.ceil(items.length / SELECT_PAGE_SIZE));
+  const paginatedItems = useMemo(() => {
+    const start = (page - 1) * SELECT_PAGE_SIZE;
+    return items.slice(start, start + SELECT_PAGE_SIZE);
+  }, [items, page]);
 
   const renderItem = (item: BrowseItem) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -247,28 +446,32 @@ function StepSelect({
           }
         }}
         className={cn(
-          "w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors",
+          "w-full flex items-center gap-3 px-3.5 py-2.5 text-left transition-colors",
           "focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset",
-          isSelected ? "bg-accent/5" : "hover:bg-bg-subtle"
+          isSelected ? "bg-accent/10" : "hover:bg-bg-subtle"
         )}
         aria-pressed={isSelected}
       >
         <div
           className={cn(
-            "flex items-center justify-center w-4 h-4 rounded-sm border transition-colors shrink-0",
-            isSelected ? "bg-accent border-accent text-accent-foreground" : "border-border bg-card"
+            "flex items-center justify-center w-4.5 h-4.5 rounded-md border transition-all shrink-0",
+            isSelected
+              ? "bg-accent border-accent text-accent-foreground"
+              : "border-border bg-card"
           )}
         >
-          {isSelected && <CheckCircle2 className="h-3 w-3" />}
+          {isSelected && <Check className="h-3 w-3 stroke-[3]" />}
         </div>
         <div
-          className={cn("h-7 w-7 shrink-0 rounded-md flex items-center justify-center border", categoryMeta.bg, "border-transparent")}
+          className={cn("h-8 w-8 shrink-0 rounded-lg flex items-center justify-center border", categoryMeta.bg, "border-transparent")}
         >
-          <Tag className={cn("h-3 w-3", categoryMeta.text)} />
+          <Tag className={cn("h-3.5 w-3.5", categoryMeta.text)} />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-text truncate">{item.name}</p>
-          <p className="text-xs text-text-secondary font-mono">{code}</p>
+          <p className="text-sm font-semibold text-text truncate">{item.name}</p>
+          <p className="text-xs text-text-secondary font-mono">
+            {code} · <span className="capitalize">{categoryMeta.label}</span>
+          </p>
         </div>
       </button>
     );
@@ -276,55 +479,82 @@ function StepSelect({
 
   return (
     <div className="space-y-3 h-full flex flex-col">
+      {/* Search Bar */}
       <div className="relative shrink-0">
         <label htmlFor="search-items" className="sr-only">Search items</label>
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary" aria-hidden />
         <input
           id="search-items"
           type="search"
-          placeholder="Search items…"
+          placeholder="Search items by name or code…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full h-8 rounded-md border border-border bg-bg-subtle pl-8 pr-3 text-sm text-text placeholder:text-text-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          className="w-full h-9 rounded-lg border border-border bg-card pl-9 pr-3 text-sm text-text placeholder:text-text-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         />
       </div>
-      <div className="flex-1 min-h-0 overflow-y-auto rounded-lg border border-border">
-        {assetsLoading || consumablesLoading ? (
-          <div className="flex items-center justify-center p-8">
-            <Loader2 className="h-6 w-6 animate-spin text-accent" />
-          </div>
+
+      {/* Item List Container */}
+      <div className="flex-1 min-h-[260px] overflow-y-auto rounded-xl border border-border bg-card flex flex-col justify-between">
+        {loading ? (
+          <LoadingState
+            variant="inline"
+            icon="package"
+            message="Loading available items..."
+            subtitle="Fetching latest inventory records..."
+            className="py-12"
+          />
         ) : items.length === 0 ? (
-          <p className="p-4 text-xs text-center text-text-secondary">No items match your search.</p>
+          <div className="p-8 text-center my-auto">
+            <Package className="h-8 w-8 text-text-secondary/50 mx-auto mb-2" />
+            <p className="text-sm font-semibold text-text">No items found</p>
+            <p className="text-xs text-text-secondary mt-0.5">Try searching with a different term or change request type.</p>
+          </div>
         ) : (
           <div className="divide-y divide-border">
-            {assetItems.length > 0 && (
-              <div>
-                <div className="sticky top-0 bg-bg-subtle/95 backdrop-blur px-3 py-1.5 border-b border-border z-10">
-                  <p className="text-xs font-semibold text-text uppercase tracking-wider">Assets</p>
-                </div>
-                <div className="divide-y divide-border">
-                  {assetItems.map(renderItem)}
-                </div>
-              </div>
-            )}
-            {consumableItems.length > 0 && (
-              <div>
-                <div className="sticky top-0 bg-bg-subtle/95 backdrop-blur px-3 py-1.5 border-b border-border z-10">
-                  <p className="text-xs font-semibold text-text uppercase tracking-wider">Consumables</p>
-                </div>
-                <div className="divide-y divide-border">
-                  {consumableItems.map(renderItem)}
-                </div>
-              </div>
-            )}
+            {paginatedItems.map(renderItem)}
           </div>
         )}
       </div>
+
+      {/* Pagination Footer */}
+      {!loading && items.length > 0 && (
+        <div className="flex items-center justify-between px-1 shrink-0 text-xs text-text-secondary">
+          <p>
+            Showing <span className="font-semibold text-text">{(page - 1) * SELECT_PAGE_SIZE + 1}</span> to{" "}
+            <span className="font-semibold text-text">{Math.min(page * SELECT_PAGE_SIZE, items.length)}</span> of{" "}
+            <span className="font-semibold text-text">{items.length}</span> items
+          </p>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-border text-xs font-semibold text-text disabled:opacity-40 disabled:cursor-not-allowed hover:bg-bg-subtle transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+              Prev
+            </button>
+            <span className="px-2 font-medium">
+              {page} / {totalPages}
+            </span>
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-border text-xs font-semibold text-text disabled:opacity-40 disabled:cursor-not-allowed hover:bg-bg-subtle transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            >
+              Next
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-// ─── Step 2: Request Details ──────────────────────────────────────────────────
+// ─── Step 2: Request Details (1 Row for Dates & Quantity + Upgraded UI/UX) ──
 
 function StepDetails({
   items,
@@ -337,141 +567,275 @@ function StepDetails({
   onChange: (patch: Partial<Omit<WizardFormValues, "selectedItems">>) => void;
   errors: Record<string, string>;
 }) {
-  const hasConsumable = items.some(i => i.type === "consumable");
   const hasAsset = items.some(i => i.type === "asset");
+  const isTemporaryLoan = hasAsset && values.requestType !== "assignable";
+
+  // Primary/single item quantity handler for unified 1-row control
+  const primaryItem = items[0];
+  const primaryQty = primaryItem ? values.quantities[primaryItem.id] || 1 : 1;
+  const maxPrimaryQty = primaryItem && primaryItem.type === "consumable" ? primaryItem.currentQty : undefined;
+
+  const setPrimaryQty = useCallback((qty: number) => {
+    if (!primaryItem) return;
+    const clamped = Math.max(1, maxPrimaryQty ? Math.min(maxPrimaryQty, qty) : qty);
+    onChange({ quantities: { ...values.quantities, [primaryItem.id]: clamped } });
+  }, [primaryItem, maxPrimaryQty, values.quantities, onChange]);
 
   return (
     <div className="space-y-4">
-      {/* Selected item reminder */}
-      <div className="space-y-2 max-h-48 overflow-y-auto">
-        {items.map(item => (
-          <div key={item.id} className="flex items-center gap-3 rounded-lg bg-bg-subtle border border-border px-3 py-2">
-            <div
-              className={cn(
-                "h-8 w-8 shrink-0 rounded-lg flex items-center justify-center",
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                getCategoryStyle(item.category as any).bg
-              )}
-            >
-              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-              <Tag className={cn("h-3.5 w-3.5", getCategoryStyle(item.category as any).text)} />
+      {/* ── Selected Items Summary Card ── */}
+      <section aria-label="Selected Items" className="rounded-xl border border-border bg-card overflow-hidden shadow-xs">
+        <div className="bg-bg-subtle/70 px-3.5 py-2 border-b border-border flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Package className="h-3.5 w-3.5 text-accent" />
+            <span className="text-[11px] font-bold uppercase tracking-wider text-text">
+              Selected Item{items.length > 1 ? `s (${items.length})` : ""}
+            </span>
+          </div>
+          <span className="text-[10px] font-semibold text-text-secondary">
+            {values.requestType === "consumable" ? "Supplies Requisition" : values.requestType === "assignable" ? "Assignment Request" : "Borrow Loan"}
+          </span>
+        </div>
+
+        <div className="divide-y divide-border max-h-36 overflow-y-auto">
+          {items.map((item) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const catMeta = getCategoryStyle(item.category as any);
+            const itemQty = values.quantities[item.id] || 1;
+            const maxItemQty = item.type === "consumable" ? item.currentQty : undefined;
+
+            return (
+              <div key={item.id} className="p-3 flex items-center justify-between gap-3 hover:bg-bg-subtle/30 transition-colors">
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  <div className={cn("h-8 w-8 shrink-0 rounded-lg flex items-center justify-center border", catMeta.bg, "border-transparent")}>
+                    <Tag className={cn("h-4 w-4", catMeta.text)} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-bold text-text truncate">{item.name}</p>
+                    <p className="text-[11px] text-text-secondary font-mono">
+                      {item.type === "asset" ? item.assetCode : item.itemCode} · <span className="capitalize">{catMeta.label}</span>
+                    </p>
+                  </div>
+                </div>
+
+                {/* Multi-item inline quantity control if more than 1 item */}
+                {items.length > 1 && (
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="text-[11px] text-text-secondary font-semibold">Qty:</span>
+                    <div className="flex items-center rounded-lg border border-border bg-bg-subtle p-0.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newQ = Math.max(1, itemQty - 1);
+                          onChange({ quantities: { ...values.quantities, [item.id]: newQ } });
+                        }}
+                        disabled={itemQty <= 1}
+                        className="h-6 w-6 rounded-md flex items-center justify-center text-text-secondary hover:text-text hover:bg-card transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        aria-label="Decrease quantity"
+                      >
+                        <Minus className="h-3 w-3" />
+                      </button>
+                      <span className="w-7 text-center text-xs font-bold text-text">
+                        {itemQty}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newQ = maxItemQty ? Math.min(maxItemQty, itemQty + 1) : itemQty + 1;
+                          onChange({ quantities: { ...values.quantities, [item.id]: newQ } });
+                        }}
+                        disabled={maxItemQty ? itemQty >= maxItemQty : false}
+                        className="h-6 w-6 rounded-md flex items-center justify-center text-text-secondary hover:text-text hover:bg-card transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        aria-label="Increase quantity"
+                      >
+                        <Plus className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* ── 1 ROW FOR DATE AND QUANTITY (Responsive Grid) ── */}
+      <section aria-label="Schedule and Quantity" className="rounded-xl border border-border bg-card p-4 shadow-xs space-y-2">
+        <div className="flex items-center gap-2 mb-1">
+          <Calendar className="h-3.5 w-3.5 text-accent" />
+          <p className="text-[11px] font-bold uppercase tracking-wider text-text">
+            Schedule & Quantity Parameters
+          </p>
+        </div>
+
+        <div
+          className={cn(
+            "grid gap-3",
+            isTemporaryLoan
+              ? "grid-cols-1 sm:grid-cols-3"
+              : "grid-cols-1 sm:grid-cols-2"
+          )}
+        >
+          {/* Column 1: Date From / Date Needed */}
+          <div className="space-y-1.5">
+            <label htmlFor="dateFrom" className="flex items-center justify-between text-xs font-bold text-text">
+              <span>{!hasAsset ? "Date Needed" : "Checkout Date"}</span>
+              <span className="text-status-outofservice-bg">*</span>
+            </label>
+            <div className="relative">
+              <input
+                id="dateFrom"
+                type="date"
+                value={values.dateFrom}
+                min={today()}
+                onChange={(e) => onChange({ dateFrom: e.target.value })}
+                className={cn(
+                  "w-full h-10 rounded-xl border bg-bg-subtle/50 px-3 text-sm font-medium text-text transition-all",
+                  "focus:outline-none focus:bg-card focus:border-accent focus:ring-2 focus:ring-accent/20",
+                  errors.dateFrom ? "border-status-outofservice-bg bg-status-outofservice-bg/5" : "border-border"
+                )}
+                aria-describedby={errors.dateFrom ? "date-from-err" : undefined}
+              />
             </div>
-            <div className="flex-1">
-              <p className="text-sm font-semibold text-text">{item.name}</p>
-              <p className="text-xs text-text-secondary font-mono">
-                {item.type === "asset" ? item.assetCode : item.itemCode}
+            {errors.dateFrom && (
+              <p id="date-from-err" className="text-[11px] font-medium text-status-outofservice-bg flex items-center gap-1">
+                <AlertCircle className="h-3 w-3 shrink-0" />
+                {errors.dateFrom}
               </p>
-            </div>
-            <div className="space-y-1 shrink-0">
-              <label htmlFor={`qty_${item.id}`} className="sr-only">Quantity for {item.name}</label>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-text-secondary">Qty:</span>
+            )}
+          </div>
+
+          {/* Column 2: Expected Return Date (Only for temporary asset loans) */}
+          {isTemporaryLoan && (
+            <div className="space-y-1.5">
+              <label htmlFor="dateTo" className="flex items-center justify-between text-xs font-bold text-text">
+                <span>Expected Return</span>
+                <span className="text-status-outofservice-bg">*</span>
+              </label>
+              <div className="relative">
                 <input
-                  id={`qty_${item.id}`}
-                  type="number"
-                  min={1}
-                  max={item.type === "consumable" ? item.currentQty : undefined}
-                  value={values.quantities[item.id] || 1}
-                  onChange={(e) => {
-                    const newQ = { ...values.quantities, [item.id]: Math.max(1, Number(e.target.value)) };
-                    onChange({ quantities: newQ });
-                  }}
+                  id="dateTo"
+                  type="date"
+                  value={values.dateTo}
+                  min={values.dateFrom || today()}
+                  onChange={(e) => onChange({ dateTo: e.target.value })}
                   className={cn(
-                    "w-16 h-7 rounded-md border bg-card px-2 text-xs text-text focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
-                    errors[`qty_${item.id}`] ? "border-status-outofservice-bg" : "border-border"
+                    "w-full h-10 rounded-xl border bg-bg-subtle/50 px-3 text-sm font-medium text-text transition-all",
+                    "focus:outline-none focus:bg-card focus:border-accent focus:ring-2 focus:ring-accent/20",
+                    errors.dateTo ? "border-status-outofservice-bg bg-status-outofservice-bg/5" : "border-border"
                   )}
+                  aria-describedby={errors.dateTo ? "date-to-err" : undefined}
                 />
               </div>
-              {errors[`qty_${item.id}`] && (
-                <p className="text-[10px] text-status-outofservice-bg">{errors[`qty_${item.id}`]}</p>
+              {errors.dateTo && (
+                <p id="date-to-err" className="text-[11px] font-medium text-status-outofservice-bg flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3 shrink-0" />
+                  {errors.dateTo}
+                </p>
               )}
             </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Date range */}
-      <div className={cn("grid gap-3", hasAsset ? "grid-cols-2" : "grid-cols-1")}>
-        <div className="space-y-1">
-          <label htmlFor="dateFrom" className="block text-xs font-semibold text-text uppercase tracking-wider">
-            {!hasAsset ? "Date Needed" : "Date From"} <span className="text-status-outofservice-bg">*</span>
-          </label>
-          <input
-            id="dateFrom"
-            type="date"
-            value={values.dateFrom}
-            min={today()}
-            onChange={(e) => onChange({ dateFrom: e.target.value })}
-            className={cn(
-              "w-full h-8 rounded-md border bg-card px-2.5 text-sm text-text focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
-              errors.dateFrom ? "border-status-outofservice-bg" : "border-border"
-            )}
-            aria-describedby={errors.dateFrom ? "date-from-err" : undefined}
-          />
-          {errors.dateFrom && (
-            <p id="date-from-err" className="text-xs text-status-outofservice-bg">{errors.dateFrom}</p>
           )}
-        </div>
-        {hasAsset && (
-          <div className="space-y-1">
-            <label htmlFor="dateTo" className="block text-xs font-semibold text-text uppercase tracking-wider">
-              Date To <span className="text-status-outofservice-bg">*</span>
+
+          {/* Column 3: Quantity Input / Stepper */}
+          <div className="space-y-1.5">
+            <label htmlFor="primary-qty" className="flex items-center justify-between text-xs font-bold text-text">
+              <span>Quantity</span>
+              <span className="text-status-outofservice-bg">*</span>
             </label>
-            <input
-              id="dateTo"
-              type="date"
-              value={values.dateTo}
-              min={values.dateFrom || today()}
-              onChange={(e) => onChange({ dateTo: e.target.value })}
-              className={cn(
-                "w-full h-8 rounded-md border bg-card px-2.5 text-sm text-text focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
-                errors.dateTo ? "border-status-outofservice-bg" : "border-border"
-              )}
-              aria-describedby={errors.dateTo ? "date-to-err" : undefined}
-            />
-            {errors.dateTo && (
-              <p id="date-to-err" className="text-xs text-status-outofservice-bg">{errors.dateTo}</p>
+
+            {items.length <= 1 ? (
+              <div className="flex items-center h-10 rounded-xl border border-border bg-bg-subtle/50 p-1 transition-all focus-within:bg-card focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/20">
+                <button
+                  type="button"
+                  onClick={() => setPrimaryQty(primaryQty - 1)}
+                  disabled={primaryQty <= 1}
+                  className="h-8 w-8 rounded-lg flex items-center justify-center text-text-secondary hover:text-text hover:bg-bg-subtle transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                  aria-label="Decrease quantity"
+                >
+                  <Minus className="h-3.5 w-3.5" />
+                </button>
+                <input
+                  id="primary-qty"
+                  type="number"
+                  min={1}
+                  max={maxPrimaryQty}
+                  value={primaryQty}
+                  onChange={(e) => setPrimaryQty(Number(e.target.value))}
+                  className="w-full text-center bg-transparent text-sm font-bold text-text focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setPrimaryQty(primaryQty + 1)}
+                  disabled={maxPrimaryQty ? primaryQty >= maxPrimaryQty : false}
+                  className="h-8 w-8 rounded-lg flex items-center justify-center text-text-secondary hover:text-text hover:bg-bg-subtle transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                  aria-label="Increase quantity"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ) : (
+              <div className="h-10 rounded-xl border border-border bg-bg-subtle/30 px-3 flex items-center justify-between text-xs text-text-secondary">
+                <span>Total Items</span>
+                <span className="font-bold text-text bg-card px-2 py-0.5 rounded-md border border-border">
+                  {Object.values(values.quantities).reduce((a, b) => a + b, 0) || items.length} units
+                </span>
+              </div>
             )}
           </div>
-        )}
-      </div>
+        </div>
+      </section>
 
-      {/* Purpose */}
-      <div className="space-y-1">
-        <label htmlFor="purpose" className="block text-xs font-semibold text-text uppercase tracking-wider">
-          Purpose / Reason <span className="text-status-outofservice-bg">*</span>
-        </label>
+      {/* ── Purpose Input Card ── */}
+      <section aria-label="Purpose" className="rounded-xl border border-border bg-card p-4 shadow-xs space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <FileText className="h-3.5 w-3.5 text-accent" />
+            <label htmlFor="purpose" className="text-[11px] font-bold uppercase tracking-wider text-text">
+              Purpose / Justification <span className="text-status-outofservice-bg">*</span>
+            </label>
+          </div>
+          <span className="text-[10px] text-text-secondary font-medium">Required for approval</span>
+        </div>
+
         <textarea
           id="purpose"
           value={values.purpose}
           onChange={(e) => onChange({ purpose: e.target.value })}
           rows={3}
-          placeholder="Briefly describe why you need to borrow this item…"
+          placeholder="Briefly state the reason, project name, or clinical task for this request…"
           className={cn(
-            "w-full rounded-md border bg-card px-3 py-2 text-sm text-text placeholder:text-text-secondary resize-none focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
-            errors.purpose ? "border-status-outofservice-bg" : "border-border"
+            "w-full rounded-xl border bg-bg-subtle/50 p-3 text-sm text-text placeholder:text-text-secondary transition-all resize-none",
+            "focus:outline-none focus:bg-card focus:border-accent focus:ring-2 focus:ring-accent/20",
+            errors.purpose ? "border-status-outofservice-bg bg-status-outofservice-bg/5" : "border-border"
           )}
           aria-describedby={errors.purpose ? "purpose-err" : undefined}
         />
         {errors.purpose && (
-          <p id="purpose-err" className="text-xs text-status-outofservice-bg">{errors.purpose}</p>
+          <p id="purpose-err" className="text-[11px] font-medium text-status-outofservice-bg flex items-center gap-1">
+            <AlertCircle className="h-3 w-3 shrink-0" />
+            {errors.purpose}
+          </p>
         )}
-      </div>
+      </section>
 
-      {/* Notes */}
-      <div className="space-y-1">
-        <label htmlFor="notes" className="block text-xs font-semibold text-text uppercase tracking-wider">
-          Additional Notes <span className="text-text-secondary font-normal normal-case">(optional)</span>
-        </label>
+      {/* ── Additional Notes Input Card ── */}
+      <section aria-label="Additional Notes" className="rounded-xl border border-border bg-card p-4 shadow-xs space-y-2">
+        <div className="flex items-center gap-2">
+          <StickyNote className="h-3.5 w-3.5 text-text-secondary" />
+          <label htmlFor="notes" className="text-[11px] font-bold uppercase tracking-wider text-text">
+            Additional Notes <span className="text-text-secondary font-normal normal-case">(optional)</span>
+          </label>
+        </div>
+
         <textarea
           id="notes"
           value={values.notes}
           onChange={(e) => onChange({ notes: e.target.value })}
           rows={2}
-          placeholder="Any special requirements?"
-          className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-text placeholder:text-text-secondary resize-none focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          placeholder="Specify any special delivery instructions, accessories, or condition notes…"
+          className="w-full rounded-xl border border-border bg-bg-subtle/50 p-3 text-sm text-text placeholder:text-text-secondary transition-all resize-none focus:outline-none focus:bg-card focus:border-accent focus:ring-2 focus:ring-accent/20"
         />
-      </div>
+      </section>
     </div>
   );
 }
@@ -491,8 +855,33 @@ function StepReview({ values, me }: { values: WizardFormValues, me?: MeProfile }
   
   const hasAsset = selectedItems.some(i => i.type === "asset");
 
+  const requestTypeLabel =
+    values.requestType === "borrowable"
+      ? "Borrow Request (Short-Term Loan)"
+      : values.requestType === "assignable"
+      ? "Assignment Request (Long-Term Custody)"
+      : "Supplies Requisition";
+
+  const classificationColor =
+    values.requestType === "borrowable"
+      ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30"
+      : values.requestType === "assignable"
+      ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/30"
+      : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30";
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
+      {/* ── Request Type Header Badge ── */}
+      <div className="flex items-center justify-between p-3.5 rounded-lg border border-border bg-bg-subtle">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">Request Classification</p>
+          <p className="text-sm font-bold text-text mt-0.5">{requestTypeLabel}</p>
+        </div>
+        <span className={cn("text-xs font-semibold px-2.5 py-1 rounded-md border", classificationColor)}>
+          {values.requestType === "consumable" ? "Requisition" : "Borrow Request"}
+        </span>
+      </div>
+
       {/* ── Requester Details ────────────────────────────────────────────── */}
       <section aria-labelledby="requester-details-heading" className="space-y-2">
         <h3 id="requester-details-heading" className="text-[10px] font-bold uppercase tracking-widest text-text-secondary px-1">
@@ -517,10 +906,10 @@ function StepReview({ values, me }: { values: WizardFormValues, me?: MeProfile }
       {/* ── Request Details ──────────────────────────────────────────────── */}
       <section aria-labelledby="request-details-heading" className="space-y-2">
         <h3 id="request-details-heading" className="text-[10px] font-bold uppercase tracking-widest text-text-secondary px-1">
-          Request Details
+          Requested Items
         </h3>
         <div className="rounded-lg border border-border bg-card divide-y divide-border overflow-hidden">
-          {selectedItems.map((item, idx) => {
+          {selectedItems.map((item) => {
              // eslint-disable-next-line @typescript-eslint/no-explicit-any
              const categoryMeta = getCategoryStyle(item.category as any);
              return (
@@ -584,7 +973,7 @@ function StepReview({ values, me }: { values: WizardFormValues, me?: MeProfile }
       )}
 
       <p className="text-xs text-text-secondary text-center max-w-sm mx-auto">
-        By submitting, your request will be sent to the Property Custodian for review.
+        By submitting, your request will be sent to the Property Custodian / Department Head for review.
       </p>
     </div>
   );
@@ -696,6 +1085,7 @@ export function NewBorrowRequestWizard({
         itemDescription: item.name,
         assetId: item.type === "asset" ? item.id : undefined,
         assetCode: item.type === "asset" ? item.assetCode : undefined,
+        consumableId: item.type === "consumable" ? item.id : undefined,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         category: item.category as any,
         quantity: values.quantities[item.id] || 1,
@@ -724,6 +1114,20 @@ export function NewBorrowRequestWizard({
 
   if (!open) return null;
 
+  const headerTitle =
+    values.requestType === "consumable" || initialType === "requisition"
+      ? "New Requisition Request"
+      : values.requestType === "borrowable" || values.requestType === "assignable" || initialType === "borrow"
+      ? "New Borrow Request"
+      : "New Requests";
+
+  const categoryBadgeLabel =
+    values.requestType === "consumable"
+      ? "Requisition"
+      : values.requestType === "borrowable" || values.requestType === "assignable"
+      ? "Borrow Request"
+      : "Portal";
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -739,30 +1143,42 @@ export function NewBorrowRequestWizard({
       />
 
       {/* Panel */}
-      <div className="relative z-10 w-full max-w-3xl h-162.5 rounded-xl bg-card border border-border shadow-2xl flex flex-col">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-4 p-5 border-b border-border shrink-0">
-          <div>
-            <h2 id="wizard-title" className="text-base font-bold text-text">
-              {initialType === "requisition" || values.selectedItems.some(i => i.type === "consumable") ? "New Supplies Request" : "New Borrow Request"}
-            </h2>
-            <div className="mt-2">
-              <StepIndicator current={step} />
+      <div className="relative z-10 w-full max-w-3xl h-[680px] max-h-[92vh] rounded-xl bg-card border border-border shadow-2xl flex flex-col overflow-hidden">
+        {/* Header with Milestone Stepper */}
+        <div className="px-6 py-4.5 border-b border-border bg-card shrink-0 space-y-3.5">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 id="wizard-title" className="text-base font-bold text-text">
+                  {headerTitle}
+                </h2>
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/20">
+                  {categoryBadgeLabel}
+                </span>
+              </div>
+              <p className="text-xs text-text-secondary mt-0.5">
+                Complete the milestones below to submit your request for custodian review.
+              </p>
             </div>
+            <button
+              type="button"
+              onClick={() => onOpenChange(false)}
+              disabled={isSubmitting}
+              aria-label="Close wizard"
+              className="p-1.5 rounded-lg text-text-secondary hover:text-text hover:bg-bg-subtle transition-colors disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            >
+              <X className="h-5 w-5" />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => onOpenChange(false)}
-            disabled={isSubmitting}
-            aria-label="Close wizard"
-            className="p-1 rounded-lg text-text-secondary hover:text-text hover:bg-bg-subtle transition-colors disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-          >
-            <X className="h-5 w-5" />
-          </button>
+
+          {/* Milestone Stepper */}
+          <div className="pt-1">
+            <MilestoneStepIndicator current={step} />
+          </div>
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto p-5">
+        <div className="flex-1 overflow-y-auto p-6">
           {step === "type" && (
             <StepType
               value={values.requestType}
@@ -801,7 +1217,7 @@ export function NewBorrowRequestWizard({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between gap-3 p-5 border-t border-border shrink-0">
+        <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-border bg-card shrink-0">
           <button
             type="button"
             onClick={handleBack}
@@ -817,7 +1233,7 @@ export function NewBorrowRequestWizard({
               type="button"
               onClick={handleNext}
               disabled={(step === "type" && !canAdvanceType) || (step === "select" && !canAdvanceSelect)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold bg-accent text-accent-foreground hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              className="inline-flex items-center gap-1.5 px-5 py-2 rounded-lg text-sm font-semibold bg-accent text-accent-foreground hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-accent shadow-xs"
             >
               Next
               <ChevronRight className="h-4 w-4" />
@@ -827,11 +1243,11 @@ export function NewBorrowRequestWizard({
               type="button"
               onClick={handleSubmit}
               disabled={isSubmitting || isSubmitted}
-              className="inline-flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold bg-accent text-accent-foreground hover:opacity-90 transition-opacity disabled:opacity-70 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              className="inline-flex items-center gap-2 px-6 py-2 rounded-lg text-sm font-semibold bg-accent text-accent-foreground hover:opacity-90 transition-opacity disabled:opacity-70 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-accent shadow-xs"
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <div className="h-4 w-4 rounded-full border-2 border-accent-foreground/30 border-t-accent-foreground animate-spin" />
                   Submitting…
                 </>
               ) : isSubmitted ? (

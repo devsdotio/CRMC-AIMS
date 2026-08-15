@@ -353,11 +353,11 @@ export function BorrowerDashboard() {
         <div className="flex items-center gap-2 shrink-0 flex-wrap">
           <button
             type="button"
-            onClick={() => openWizard(null, "borrow")}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-accent text-accent-foreground text-sm font-semibold hover:opacity-90 active:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            onClick={() => openWizard(null)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-accent text-accent-foreground text-sm font-semibold hover:opacity-90 active:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-accent shadow-xs"
           >
             <Package className="h-4 w-4" aria-hidden />
-            Request
+            New Request
           </button>
         </div>
       </div>

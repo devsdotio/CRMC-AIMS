@@ -62,6 +62,7 @@ export const borrowRequests = pgTable(
         itemDescription: string;
         assetId?: string;
         assetCode?: string;
+        consumableId?: string;
         category: string;
         quantity: number;
         itemType: "asset" | "consumable";

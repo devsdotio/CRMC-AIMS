@@ -1,16 +1,25 @@
 import type {
   BorrowRequestHistoryEntry,
   BorrowRequestRow,
+  ConsumableRow,
+  StockHistoryEntry,
 } from "@/server/db/schema";
+import { consumables } from "@/server/db/schema/consumables";
 import { formatRelativeTime } from "@/lib/format-relative-time";
-import { generateOperationalCode, isoNow } from "@/server/shared/codes";
+import {
+  generateOperationalCode,
+  isoNow,
+  todayDateString,
+} from "@/server/shared/codes";
 import type { ActorContext } from "@/server/shared/auth";
 import { isAssetOperatorRole } from "@/server/shared/roles";
 import {
+  BadRequestError,
   ConflictError,
   NotFoundError,
   ForbiddenError,
 } from "@/server/shared/errors";
+import { eq, or } from "drizzle-orm";
 
 import { BorrowRequestRepository } from "./borrow-request.repository";
 import type {
@@ -21,6 +30,11 @@ import { AssetRepository } from "../assets/asset.repository";
 import { AuditLogRepository } from "../audit-logs/audit-logs.repository";
 import { BorrowLogService } from "../borrow-log/borrow-log.service";
 import { BorrowLogRepository } from "../borrow-log/borrow-log.repository";
+import { ConsumableRepository } from "../consumables/consumable.repository";
+import {
+  PurchaseLotService,
+  type LotCostAllocation,
+} from "../purchase-lots/purchase-lot.service";
 import { withTransaction } from "@/server/db/transaction";
 import {
   approveBorrowRequestSchema,
@@ -33,6 +47,12 @@ import {
   markUnreleasedBorrowRequestSchema,
   returnBorrowRequestSchema,
 } from "./borrow-request.validation";
+
+function money(value: string | number): string {
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n)) return "0.00";
+  return n.toFixed(2);
+}
 
 function toDTO(row: BorrowRequestRow): BorrowRequestDTO {
   const history = Array.isArray(row.history) ? row.history : [];
@@ -73,6 +93,37 @@ function historyEntry(
   };
 }
 
+function stockHistoryEntry(
+  type: StockHistoryEntry["type"],
+  quantityChange: number,
+  actor: string,
+  reason?: string,
+  notes?: string,
+  extra?: Partial<
+    Pick<
+      StockHistoryEntry,
+      | "unitCost"
+      | "supplierId"
+      | "supplierName"
+      | "lotCode"
+      | "totalCost"
+      | "lotAllocations"
+      | "recipientName"
+    >
+  >
+): StockHistoryEntry {
+  return {
+    id: crypto.randomUUID(),
+    date: todayDateString(),
+    type,
+    quantityChange,
+    actor,
+    ...(reason ? { reason } : {}),
+    ...(notes ? { notes } : {}),
+    ...extra,
+  };
+}
+
 export interface PaginatedMeta {
   total: number;
   page: number;
@@ -87,7 +138,9 @@ export class BorrowRequestService {
     private readonly auditLogs = new AuditLogRepository(),
     private readonly assetRepo = new AssetRepository(),
     private readonly borrowLogs = new BorrowLogService(),
-    private readonly borrowLogRepo = new BorrowLogRepository()
+    private readonly borrowLogRepo = new BorrowLogRepository(),
+    private readonly consumableRepo = new ConsumableRepository(),
+    private readonly purchaseLots = new PurchaseLotService()
   ) {}
 
   async list(
@@ -278,7 +331,7 @@ export class BorrowRequestService {
       ? `Released to: ${input.pickedUpBy}. ${input.note}`
       : `Released to: ${input.pickedUpBy}`;
 
-    // Open accountable borrow log first while request is still approved.
+    // Open accountable borrow log for assets first while request is still approved.
     for (const item of existing.items) {
       if (item.assetId) {
         const asset = await this.assetRepo.findById(item.assetId);
@@ -306,6 +359,171 @@ export class BorrowRequestService {
     ];
 
     const updated = await withTransaction(async (tx) => {
+      const releasedConsumables: Array<{
+        consumableId: string;
+        itemCode: string;
+        name: string;
+        quantity: number;
+        unit: string;
+        totalCost: string;
+      }> = [];
+
+      // Process consumable deductions and lot allocations
+      for (const item of existing.items) {
+        if (item.itemType === "consumable" || item.consumableId) {
+          let consumable: ConsumableRow | null = null;
+          if (item.consumableId) {
+            consumable = await this.consumableRepo.findByIdForUpdate(
+              item.consumableId,
+              tx
+            );
+          }
+          if (!consumable && item.itemDescription) {
+            const [found] = await tx
+              .select()
+              .from(consumables)
+              .where(
+                or(
+                  eq(consumables.name, item.itemDescription),
+                  eq(consumables.itemCode, item.itemDescription)
+                )
+              )
+              .for("update")
+              .limit(1);
+            consumable = found ?? null;
+          }
+
+          if (!consumable) {
+            throw new NotFoundError(
+              "Consumable",
+              item.consumableId || item.itemDescription
+            );
+          }
+
+          if (consumable.currentQty < item.quantity) {
+            throw new BadRequestError(
+              `Insufficient stock for ${consumable.name} (${consumable.itemCode}). Available: ${consumable.currentQty} ${consumable.unit}, requested: ${item.quantity}.`
+            );
+          }
+
+          const lineConfig = input.consumableLines?.find(
+            (cl) =>
+              (cl.consumableId && cl.consumableId === consumable!.id) ||
+              (cl.itemDescription &&
+                cl.itemDescription === item.itemDescription)
+          );
+
+          let lotAllocations: LotCostAllocation[] = [];
+
+          if (
+            lineConfig &&
+            !lineConfig.useFifo &&
+            lineConfig.allocations &&
+            lineConfig.allocations.length > 0
+          ) {
+            const totalAllocated = lineConfig.allocations.reduce(
+              (sum, a) => sum + a.quantity,
+              0
+            );
+            if (totalAllocated !== item.quantity) {
+              throw new BadRequestError(
+                `Lot allocations for ${consumable.name} must total ${item.quantity} (got ${totalAllocated}).`
+              );
+            }
+
+            for (const alloc of lineConfig.allocations) {
+              const result = alloc.lotId
+                ? await this.purchaseLots.consumeFromLotId(
+                    alloc.lotId,
+                    alloc.quantity,
+                    tx,
+                    consumable.id
+                  )
+                : await this.purchaseLots.consumeFromLot(
+                    alloc.lotCode!,
+                    alloc.quantity,
+                    tx,
+                    consumable.id
+                  );
+              lotAllocations.push(result.allocation);
+            }
+          } else {
+            lotAllocations = await this.purchaseLots.consumeFifo(
+              consumable.id,
+              item.quantity,
+              tx
+            );
+          }
+
+          const totalCost = lotAllocations.reduce(
+            (sum, a) => sum + Number(a.total || 0),
+            0
+          );
+          const primary =
+            lotAllocations.find((a) => !a.uncosted) ?? lotAllocations[0];
+
+          const stockHistory = [
+            ...(Array.isArray(consumable.history) ? consumable.history : []),
+            stockHistoryEntry(
+              "checkout",
+              -item.quantity,
+              actor.displayName,
+              `Request ${existing.requestCode}`,
+              noteWithPicker,
+              {
+                unitCost: primary?.unitCost,
+                supplierId: primary?.supplierId ?? undefined,
+                supplierName: primary?.supplierName ?? undefined,
+                lotCode: primary?.lotCode ?? undefined,
+                totalCost: money(totalCost),
+                lotAllocations,
+                recipientName: input.pickedUpBy,
+              }
+            ),
+          ];
+
+          await this.consumableRepo.update(
+            consumable.id,
+            {
+              currentQty: consumable.currentQty - item.quantity,
+              history: stockHistory,
+            },
+            tx
+          );
+
+          await this.auditLogs.create(
+            {
+              entityType: "consumable",
+              entityId: consumable.id,
+              action: "checkout",
+              actorName: actor.displayName,
+              actorUserId: actor.userId,
+              notes: `Released ${item.quantity} ${consumable.unit} for request ${existing.requestCode} to ${input.pickedUpBy}`,
+              metadata: {
+                requestCode: existing.requestCode,
+                recipientName: input.pickedUpBy,
+                quantity: item.quantity,
+                unit: consumable.unit,
+                previousQty: consumable.currentQty,
+                newQty: consumable.currentQty - item.quantity,
+                totalCost: money(totalCost),
+                lotAllocations,
+              },
+            },
+            tx
+          );
+
+          releasedConsumables.push({
+            consumableId: consumable.id,
+            itemCode: consumable.itemCode,
+            name: consumable.name,
+            quantity: item.quantity,
+            unit: consumable.unit,
+            totalCost: money(totalCost),
+          });
+        }
+      }
+
       const up = await this.repo.update(
         id,
         {
@@ -325,6 +543,12 @@ export class BorrowRequestService {
           actorName: actor.displayName,
           actorUserId: actor.userId,
           notes: noteWithPicker,
+          metadata: {
+            requestCode: existing.requestCode,
+            pickedUpBy: input.pickedUpBy,
+            releasedConsumablesCount: releasedConsumables.length,
+            releasedConsumables,
+          },
         },
         tx
       );
@@ -437,6 +661,15 @@ export class BorrowRequestService {
     if (!existing) throw new NotFoundError("Borrow request", id);
     if (existing.status !== "released") {
       throw new ConflictError("Only released requests can be marked returned.");
+    }
+
+    const hasReturnableAssets = existing.items.some(
+      (item) => item.itemType === "asset" || Boolean(item.assetId)
+    );
+    if (!hasReturnableAssets) {
+      throw new ConflictError(
+        "Consumable supply requests cannot be marked as returned because consumable items are consumed upon issuance."
+      );
     }
 
     const noteWithReturner = input.note

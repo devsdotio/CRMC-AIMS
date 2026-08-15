@@ -213,7 +213,7 @@ export default function GlobalHeader({
         </div> */}
 
         {/* Vertical Divider */}
-        <div className="h-6 w-px bg-[#E3E5EC] mx-0.5 hidden sm:block" />
+        {/* <div className="h-6 w-px bg-[#E3E5EC] mx-0.5 hidden sm:block" /> */}
 
         {/* Signed-in user identity */}
         <div

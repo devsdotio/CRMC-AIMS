@@ -88,18 +88,6 @@ export default function DashboardPage() {
         <PendingApprovalsWidget
           requests={snapshot?.pendingRequests || []}
           loading={loading}
-          onApprove={(id) =>
-            approveMutation.mutate({ id }, {
-              onSuccess: () => toast.success("Request approved."),
-              onError: (err) => toast.error(err.message || "Approve failed."),
-            })
-          }
-          onReject={(id) =>
-            rejectMutation.mutate({ id, reason: "Rejected from dashboard" }, {
-              onSuccess: () => toast.success("Request rejected."),
-              onError: (err) => toast.error(err.message || "Reject failed."),
-            })
-          }
         />
         <LowStockWidget
           items={snapshot?.lowStockItems || []}

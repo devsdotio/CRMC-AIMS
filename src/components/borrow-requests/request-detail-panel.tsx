@@ -118,6 +118,9 @@ export function RequestDetailPanel({
   const firstItem = request.items[0];
   const categoryMeta = getCategoryStyle(firstItem?.category || "office");
   const statusMeta = STATUS_STYLES[request.status];
+  const hasReturnableAssets = request.items?.some(
+    (item) => item.itemType === "asset" || Boolean(item.assetId)
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs transition-opacity duration-200">
@@ -155,12 +158,12 @@ export function RequestDetailPanel({
               )}
             </div>
             <p className="text-xs text-text-secondary font-medium mt-0.5 truncate">
-              Borrow Request • Requester: <strong className="text-text font-semibold">{request.requesterName}</strong>
+              {hasReturnableAssets ? "Borrow Request" : "Supplies Requisition"} • Requester: <strong className="text-text font-semibold">{request.requesterName}</strong>
             </p>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
-            {request.status === "released" && onReturn && (
+          {request.status === "released" && onReturn && hasReturnableAssets && (
+            <div className="flex items-center gap-2 shrink-0">
               <button
                 type="button"
                 onClick={() => onReturn(request)}
@@ -169,16 +172,8 @@ export function RequestDetailPanel({
                 <RotateCcw className="h-3.5 w-3.5" strokeWidth={2.5} />
                 Mark Returned
               </button>
-            )}
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close request detail panel"
-              className="p-1.5 rounded-lg text-text-secondary hover:text-text hover:bg-border transition-colors cursor-pointer"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Scrollable Panel Body */}
@@ -330,17 +325,24 @@ export function RequestDetailPanel({
           {/* Schedule */}
           <div className="space-y-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary">
-              Schedule & Return Date
+              {hasReturnableAssets ? "Schedule & Return Date" : "Schedule & Status"}
             </h3>
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div className="p-3 rounded-lg border border-border bg-bg">
                 <span className="text-text-secondary block mb-1">Requested On</span>
                 <span className="font-semibold text-text">{new Date(request.requestedAt).toLocaleDateString()}</span>
               </div>
-              <div className="p-3 rounded-lg border border-primary/25 bg-primary/5">
-                <span className="text-text-secondary block mb-1">Expected Return</span>
-                <span className="font-bold text-primary">{request.expectedReturnDate}</span>
-              </div>
+              {hasReturnableAssets ? (
+                <div className="p-3 rounded-lg border border-primary/25 bg-primary/5">
+                  <span className="text-text-secondary block mb-1">Expected Return</span>
+                  <span className="font-bold text-primary">{request.expectedReturnDate}</span>
+                </div>
+              ) : (
+                <div className="p-3 rounded-lg border border-border bg-bg-subtle">
+                  <span className="text-text-secondary block mb-1">Return Requirement</span>
+                  <span className="font-semibold text-text-secondary">Non-returnable (Consumable)</span>
+                </div>
+              )}
             </div>
           </div>
 

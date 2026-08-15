@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { Search, LayoutGrid, List, SlidersHorizontal } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { Search, LayoutGrid, List, SlidersHorizontal, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { BrowseItemCard, BrowseItemCardSkeleton } from "./browse-item-card";
+import { BrowseItemCard } from "./browse-item-card";
 import type { BrowseItem } from "./types";
+import { LoadingState } from "@/components/providers/loading-context";
 
 import { useAssetsQuery } from "@/features/assets/client/use-assets";
 import { useConsumablesQuery } from "@/features/consumables/client/use-consumables";
@@ -23,17 +24,25 @@ const CATEGORY_FILTERS = [
 
 type CategoryKey = (typeof CATEGORY_FILTERS)[number]["key"];
 
+const BROWSE_PAGE_SIZE = 9;
+
 export function BrowseTab() {
   const { cart, openWizard } = useBorrowerPortal();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<CategoryKey>("all");
   const [availableOnly, setAvailableOnly] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [page, setPage] = useState(1);
 
   const { data: assets = [], isLoading: assetsLoading } = useAssetsQuery();
   const { data: paginatedData, isLoading: consumablesLoading } = useConsumablesQuery();
   const consumables = useMemo(() => paginatedData?.data ?? [], [paginatedData?.data]);
   const loading = assetsLoading || consumablesLoading;
+
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [search, category, availableOnly]);
 
   const items = useMemo(() => {
     return [
@@ -78,6 +87,12 @@ export function BrowseTab() {
       return matchesSearch && matchesCategory && matchesAvailable;
     });
   }, [items, search, category, availableOnly]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / BROWSE_PAGE_SIZE));
+  const paginatedItems = useMemo(() => {
+    const start = (page - 1) * BROWSE_PAGE_SIZE;
+    return filtered.slice(start, start + BROWSE_PAGE_SIZE);
+  }, [filtered, page]);
 
   return (
     <div className="space-y-4">
@@ -176,7 +191,7 @@ export function BrowseTab() {
             className={cn(
               "px-3 py-1 rounded-full text-xs font-semibold border transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
               category === f.key
-                ? "bg-primary text-white border-primary"
+                ? "bg-accent text-accent-foreground border-accent"
                 : "bg-card border-border text-text-secondary hover:border-text-secondary/50 hover:text-text"
             )}
           >
@@ -185,32 +200,34 @@ export function BrowseTab() {
         ))}
       </div>
 
-      {/* Results count */}
+      {/* Results count & Pagination status */}
       {!loading && (
-        <p className="text-xs text-text-secondary">
-          Showing{" "}
-          <span className="font-semibold text-text">{filtered.length}</span>{" "}
-          {filtered.length === 1 ? "item" : "items"}
-        </p>
+        <div className="flex items-center justify-between text-xs text-text-secondary">
+          <p>
+            Showing{" "}
+            <span className="font-semibold text-text">
+              {filtered.length > 0 ? (page - 1) * BROWSE_PAGE_SIZE + 1 : 0}
+            </span>{" "}
+            to{" "}
+            <span className="font-semibold text-text">
+              {Math.min(page * BROWSE_PAGE_SIZE, filtered.length)}
+            </span>{" "}
+            of <span className="font-semibold text-text">{filtered.length}</span> items
+          </p>
+        </div>
       )}
 
       {/* Grid/List */}
       {loading ? (
-        viewMode === "grid" ? (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <BrowseItemCardSkeleton key={i} viewMode="grid" />
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-xl border border-border overflow-hidden">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <BrowseItemCardSkeleton key={i} viewMode="list" />
-            ))}
-          </div>
-        )
+        <LoadingState
+          variant="card"
+          icon="package"
+          message="Loading inventory catalog..."
+          subtitle="Fetching assets and consumable supplies..."
+          className="min-h-[300px]"
+        />
       ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="flex flex-col items-center justify-center py-16 text-center rounded-xl border border-border bg-card">
           <div className="h-12 w-12 rounded-full bg-bg-subtle flex items-center justify-center mb-4">
             <Search className="h-5 w-5 text-text-secondary" aria-hidden />
           </div>
@@ -233,7 +250,7 @@ export function BrowseTab() {
         </div>
       ) : viewMode === "grid" ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((item) => (
+          {paginatedItems.map((item) => (
             <BrowseItemCard
               key={item.id}
               item={item}
@@ -242,14 +259,45 @@ export function BrowseTab() {
           ))}
         </div>
       ) : (
-        <div className="rounded-xl border border-border overflow-hidden">
-          {filtered.map((item) => (
+        <div className="rounded-xl border border-border overflow-hidden bg-card">
+          {paginatedItems.map((item) => (
             <BrowseItemCard
               key={item.id}
               item={item}
               viewMode="list"
             />
           ))}
+        </div>
+      )}
+
+      {/* Pagination Controls */}
+      {!loading && totalPages > 1 && (
+        <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-card">
+          <p className="text-xs text-text-secondary">
+            Page <span className="font-semibold text-text">{page}</span> of{" "}
+            <span className="font-semibold text-text">{totalPages}</span>
+          </p>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-text disabled:opacity-40 disabled:cursor-not-allowed hover:bg-bg-subtle transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+              Previous
+            </button>
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-text disabled:opacity-40 disabled:cursor-not-allowed hover:bg-bg-subtle transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            >
+              Next
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
       )}
 
@@ -262,7 +310,7 @@ export function BrowseTab() {
           <button
             type="button"
             onClick={() => openWizard(cart)}
-            className="px-4 py-2 bg-accent text-accent-foreground rounded-full text-xs font-semibold hover:opacity-90 transition-opacity"
+            className="px-4 py-2 bg-accent text-accent-foreground rounded-full text-xs font-semibold hover:opacity-90 transition-opacity shadow-xs"
           >
             Checkout Request
           </button>

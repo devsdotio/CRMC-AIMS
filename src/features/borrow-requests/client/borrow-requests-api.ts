@@ -12,6 +12,7 @@ export type CreateBorrowRequestPayload = {
     itemDescription: string;
     assetId?: string;
     assetCode?: string;
+    consumableId?: string;
     category: BorrowRequest["items"][number]["category"];
     quantity: number;
     itemType: "asset" | "consumable";
@@ -31,6 +32,16 @@ export type ApproveBorrowRequestPayload = {
 export type ReleaseBorrowRequestPayload = {
   pickedUpBy: string;
   note?: string;
+  consumableLines?: Array<{
+    consumableId?: string;
+    itemDescription?: string;
+    useFifo?: boolean;
+    allocations?: Array<{
+      lotId?: string;
+      lotCode?: string;
+      quantity: number;
+    }>;
+  }>;
 };
 
 export const borrowRequestsApi = {

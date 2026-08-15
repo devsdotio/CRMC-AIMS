@@ -34,6 +34,7 @@ export interface BorrowRequest {
     itemDescription: string;
     assetId?: string;
     assetCode?: string;
+    consumableId?: string;
     category: AssetCategory;
     quantity: number;
     itemType: "asset" | "consumable";

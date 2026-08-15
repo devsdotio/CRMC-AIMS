@@ -1,26 +1,23 @@
 "use client";
 
 import {
-  Tag,
   Calendar,
-  Clock,
   CheckCircle2,
   XCircle,
-  AlertCircle,
   Hourglass,
-  X,
-  Package,
+  ChevronRight,
+  Send,
+  RotateCcw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getCategoryStyle } from "@/constants/categories";
 import type { PortalBorrowRequest } from "./types";
 
 interface MyRequestItemProps {
   request: PortalBorrowRequest;
-  onCancel: (request: PortalBorrowRequest) => void;
+  onCancel?: (request: PortalBorrowRequest) => void;
+  onViewDetails?: (request: PortalBorrowRequest) => void;
 }
 
-// Workflow status badges — deliberately different from asset condition tokens
 const WORKFLOW_STATUS_STYLES: Record<
   string,
   { label: string; badgeClass: string; Icon: React.ElementType }
@@ -42,11 +39,17 @@ const WORKFLOW_STATUS_STYLES: Record<
     badgeClass: "bg-destructive text-white border border-destructive/30",
     Icon: XCircle,
   },
+  released: {
+    label: "Released",
+    badgeClass:
+      "bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-500/30",
+    Icon: Send,
+  },
   returned: {
     label: "Completed",
     badgeClass:
-      "bg-bg-subtle text-text-secondary border-border",
-    Icon: CheckCircle2,
+      "bg-bg-subtle text-text border-border",
+    Icon: RotateCcw,
   },
 };
 
@@ -61,134 +64,103 @@ function Skeleton({ className }: { className?: string }) {
 
 export function MyRequestItemSkeleton() {
   return (
-    <div className="flex flex-col gap-3 p-4 md:px-6 border-b border-border bg-card">
-      <div className="flex items-center gap-2">
-        <Skeleton className="h-4 w-28" />
-        <Skeleton className="h-4 w-20 rounded-full" />
+    <div className="flex items-center justify-between p-4 md:px-5 border-b border-border bg-card">
+      <div className="space-y-2 flex-1 min-w-0 pr-4">
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-3.5 w-24" />
+          <Skeleton className="h-3.5 w-16" />
+        </div>
+        <Skeleton className="h-4.5 w-56" />
+        <Skeleton className="h-3.5 w-36" />
       </div>
-      <Skeleton className="h-5 w-56" />
-      <div className="flex gap-3">
-        <Skeleton className="h-3.5 w-32" />
-        <Skeleton className="h-3.5 w-28" />
+      <div className="flex items-center gap-3 shrink-0">
+        <Skeleton className="h-7 w-28 rounded-full" />
+        <Skeleton className="h-4 w-4 rounded" />
       </div>
     </div>
   );
 }
 
-export function MyRequestItem({ request, onCancel }: MyRequestItemProps) {
+export function MyRequestItem({ request, onViewDetails }: MyRequestItemProps) {
   const statusStyle =
     WORKFLOW_STATUS_STYLES[request.status] ?? WORKFLOW_STATUS_STYLES.pending;
   const StatusIcon = statusStyle.Icon;
 
-  const isApprovedWaiting =
-    request.status === "approved" && request.releasedStatus === "waiting_pickup";
+  const firstItem = request.items?.[0];
+  const moreCount = (request.items?.length || 0) - 1;
+
+  const itemSummary = firstItem
+    ? `${firstItem.itemDescription}${moreCount > 0 ? ` +${moreCount} more` : ""}`
+    : "Request";
+
+  const totalUnits = request.items?.reduce((acc, i) => acc + (i.quantity || 1), 0) || 1;
 
   return (
-    <article
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onViewDetails?.(request)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onViewDetails?.(request);
+        }
+      }}
       className={cn(
-        "flex flex-col gap-2.5 p-4 md:px-6 border-b border-border bg-card transition-colors border-l-4",
-        "hover:bg-bg-subtle/60",
-        request.status === "pending" && "border-l-status-repair-bg/60",
-        request.status === "approved" && "border-l-status-active-bg/60",
-        request.status === "rejected" && "border-l-status-outofservice-bg/60",
-        request.status === "returned" && "border-l-transparent"
+        "flex items-center justify-between gap-4 p-4 md:px-5 border-b border-border bg-card transition-all cursor-pointer group select-none",
+        "hover:bg-bg-subtle/80 focus:outline-none focus-visible:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset"
       )}
+      aria-label={`View details for ${request.requestCode}: ${itemSummary}`}
     >
-      {/* Row 1: Code, Status */}
-      <div className="flex items-center flex-wrap gap-2">
-        <span className="font-mono text-xs font-semibold text-text-secondary">
-          {request.requestCode}
-        </span>
-        <span className="text-text-secondary/30 text-xs">·</span>
-        <span className="text-[10px] font-bold uppercase tracking-wide text-text-secondary border border-border px-2 py-0.5 rounded-full bg-bg-subtle">
-          {request.items?.length ?? 0} Item(s)
-        </span>
+      {/* Left: Code, Primary Item Title, Date Range */}
+      <div className="flex-1 min-w-0 space-y-1">
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-xs font-bold text-text-secondary group-hover:text-accent transition-colors">
+            {request.requestCode}
+          </span>
+          <span className="text-text-secondary/30 text-xs">·</span>
+          <span className="text-xs text-text-secondary">
+            {new Date(request.requestedAt).toLocaleDateString("en-PH", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            })}
+          </span>
+          <span className="text-text-secondary/30 text-xs">·</span>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-text-secondary bg-bg-subtle border border-border px-1.5 py-0.5 rounded">
+            {totalUnits} {totalUnits === 1 ? "unit" : "units"}
+          </span>
+        </div>
 
-        {/* Status badge */}
+        <h3 className="text-sm font-bold text-text truncate group-hover:text-accent transition-colors">
+          {itemSummary}
+        </h3>
+
+        <div className="flex items-center gap-3 text-xs text-text-secondary">
+          <span className="flex items-center gap-1.5">
+            <Calendar className="h-3.5 w-3.5 text-accent" aria-hidden />
+            <span>
+              {request.requestedDateFrom}
+              {request.requestedDateTo && request.requestedDateTo !== request.requestedDateFrom &&
+                ` → ${request.requestedDateTo}`}
+            </span>
+          </span>
+        </div>
+      </div>
+
+      {/* Right: Status Badge & Chevron */}
+      <div className="flex items-center gap-3 shrink-0">
         <span
           className={cn(
-            "ml-auto inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold border whitespace-nowrap",
+            "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap",
             statusStyle.badgeClass
           )}
         >
-          <StatusIcon className="h-3 w-3 shrink-0" aria-hidden />
+          <StatusIcon className="h-3.5 w-3.5 shrink-0" aria-hidden />
           {statusStyle.label}
         </span>
+        <ChevronRight className="h-4 w-4 text-text-secondary/50 group-hover:text-text group-hover:translate-x-0.5 transition-all" />
       </div>
-
-      {/* Row 2: Items list */}
-      <div className="space-y-1.5 mt-1">
-        {request.items?.map((item, idx) => (
-          <h3 key={idx} className="text-sm font-bold text-text leading-snug">
-            {item.itemDescription}
-            <span className="ml-2 text-xs font-normal text-text-secondary">
-              × {item.quantity}{" "}
-              {item.itemType === "consumable" ? "unit(s)" : "item(s)"}
-            </span>
-          </h3>
-        ))}
-      </div>
-
-      {/* Row 3: Meta */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-text-secondary">
-        <span className="flex items-center gap-1">
-          <Calendar className="h-3.5 w-3.5 shrink-0" aria-hidden />
-          <span>
-            {request.requestedDateFrom}
-            {request.requestedDateTo !== request.requestedDateFrom &&
-              ` → ${request.requestedDateTo}`}
-          </span>
-        </span>
-        <span className="flex items-center gap-1">
-          <Clock className="h-3.5 w-3.5 shrink-0" aria-hidden />
-          Submitted{" "}
-          {new Date(request.requestedAt).toLocaleDateString("en-PH", {
-            month: "short",
-            day: "numeric",
-          })}
-        </span>
-      </div>
-
-      {/* Waiting for pickup indicator */}
-      {isApprovedWaiting && (
-        <div className="flex items-center gap-2 rounded-lg bg-status-active-bg/10 border border-status-active-bg/20 px-3 py-2">
-          <span className="relative flex h-2 w-2 shrink-0">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-status-active-bg opacity-70" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-status-active-bg" />
-          </span>
-          <p className="text-xs font-medium text-status-active-text">
-            Approved — please proceed to the Property Custodian&apos;s Office for pickup.
-          </p>
-        </div>
-      )}
-
-      {/* Rejection reason */}
-      {request.status === "rejected" && request.rejectionReason && (
-        <div className="flex items-start gap-2 rounded-lg bg-status-outofservice-bg/10 border border-status-outofservice-bg/20 px-3 py-2">
-          <AlertCircle
-            className="h-4 w-4 shrink-0 text-status-outofservice-bg mt-0.5"
-            aria-label="Rejection reason"
-          />
-          <p className="text-xs text-status-outofservice-bg dark:text-status-outofservice-text">
-            <span className="font-semibold">Reason: </span>
-            {request.rejectionReason}
-          </p>
-        </div>
-      )}
-
-      {/* Cancel action (pending only) */}
-      {request.status === "pending" && (
-        <div className="pt-1">
-          <button
-            type="button"
-            onClick={() => onCancel(request)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border text-text-secondary hover:border-rose-400 hover:text-rose-600 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-1"
-          >
-            <X className="h-3.5 w-3.5" aria-hidden />
-            Cancel Request
-          </button>
-        </div>
-      )}
-    </article>
+    </div>
   );
 }

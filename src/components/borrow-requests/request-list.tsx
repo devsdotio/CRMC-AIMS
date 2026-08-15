@@ -9,6 +9,7 @@ export interface RequestListProps {
   activeTab: TabFilter;
   loading?: boolean;
   transitioning?: boolean;
+  highlightedId?: string | null;
   onSelect: (request: BorrowRequest) => void;
   onApprove: (request: BorrowRequest) => void;
   onReject: (request: BorrowRequest) => void;
@@ -76,6 +77,7 @@ export function RequestList({
   activeTab,
   loading = false,
   transitioning = false,
+  highlightedId,
   onSelect,
   onApprove,
   onReject,
@@ -125,6 +127,7 @@ export function RequestList({
         <RequestListItem
           key={request.id}
           request={request}
+          isHighlighted={request.id === highlightedId}
           onSelect={onSelect}
           onApprove={onApprove}
           onReject={onReject}

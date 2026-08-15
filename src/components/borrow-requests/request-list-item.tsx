@@ -2,13 +2,14 @@
  
 import { getCategoryStyle } from "@/constants/categories";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, X, Calendar, User, Building2, Tag, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BorrowRequest,  RequestStatus } from "@/types/borrow-requests";
 
 export interface RequestListItemProps {
   request: BorrowRequest;
+  isHighlighted?: boolean;
   onSelect: (request: BorrowRequest) => void;
   onApprove: (request: BorrowRequest) => void;
   onReject: (request: BorrowRequest) => void;
@@ -29,6 +30,7 @@ const STATUS_STYLES: Record<RequestStatus, { bg: string; text: string; label: st
 
 export function RequestListItem({
   request,
+  isHighlighted = false,
   onSelect,
   onApprove,
   onReject,
@@ -36,10 +38,20 @@ export function RequestListItem({
   onReturn,
   onMarkUnreleased,
 }: RequestListItemProps) {
+  const rowRef = useRef<HTMLDivElement>(null);
   const [isMarkingUnreleased, setIsMarkingUnreleased] = useState(false);
   const firstItem = request.items?.[0];
   const categoryMeta = getCategoryStyle(firstItem?.category || "office");
   const statusMeta = STATUS_STYLES[request.status];
+  const hasReturnableAssets = request.items?.some(
+    (item) => item.itemType === "asset" || Boolean(item.assetId)
+  );
+
+  useEffect(() => {
+    if (isHighlighted && rowRef.current) {
+      rowRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [isHighlighted]);
 
   const handleMarkUnreleased = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -54,6 +66,7 @@ export function RequestListItem({
 
   return (
     <div
+      ref={rowRef}
       onClick={() => onSelect(request)}
       tabIndex={0}
       role="button"
@@ -64,8 +77,10 @@ export function RequestListItem({
         }
       }}
       className={cn(
-        "group relative flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 md:px-6 bg-bg border-b border-border transition-colors duration-150 cursor-pointer",
-        "hover:bg-bg-subtle/80 focus:outline-none focus-visible:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset"
+        "group relative flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 md:px-6 bg-bg border-b border-border transition-all duration-200 cursor-pointer",
+        isHighlighted
+          ? "bg-accent/10 border-l-4 border-l-accent ring-1 ring-accent/30 shadow-xs"
+          : "hover:bg-bg-subtle/80 focus:outline-none focus-visible:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset"
       )}
     >
       {/* Left Column: Requester & Item Info */}
@@ -192,8 +207,8 @@ export function RequestListItem({
           </div>
         )}
 
-        {/* Inline Actions (only for Released requests) */}
-        {request.status === "released" && onReturn && (
+        {/* Inline Actions (only for Released requests with returnable assets) */}
+        {request.status === "released" && onReturn && hasReturnableAssets && (
           <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
             <button
               type="button"

@@ -38,6 +38,7 @@ export const createBorrowRequestSchema = z.object({
       itemDescription: z.string().trim().min(1).max(500),
       assetId: z.string().uuid().optional(),
       assetCode: z.string().trim().max(64).optional(),
+      consumableId: z.string().uuid().optional(),
       category: assetCategorySchema,
       quantity: z.number().int().min(1).max(999).optional().default(1),
       itemType: z.enum(["asset", "consumable"]),
@@ -61,9 +62,23 @@ export const rejectBorrowRequestSchema = z.object({
   reason: z.string().trim().min(1, "Rejection reason is required.").max(1000),
 });
 
+const releaseConsumableAllocationSchema = z.object({
+  lotId: z.string().uuid().optional(),
+  lotCode: z.string().trim().min(1).max(64).optional(),
+  quantity: z.number().int().min(1),
+});
+
+const releaseConsumableLineSchema = z.object({
+  consumableId: z.string().uuid().optional(),
+  itemDescription: z.string().optional(),
+  useFifo: z.boolean().default(true),
+  allocations: z.array(releaseConsumableAllocationSchema).optional(),
+});
+
 export const releaseBorrowRequestSchema = z.object({
   note: z.string().trim().max(1000).optional(),
   pickedUpBy: z.string().trim().min(1, "Name of person who picked up the item is required.").max(255),
+  consumableLines: z.array(releaseConsumableLineSchema).optional(),
 });
 
 export const markUnreleasedBorrowRequestSchema = z.object({
