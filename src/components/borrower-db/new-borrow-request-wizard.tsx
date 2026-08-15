@@ -245,7 +245,7 @@ function StepType({
                       isSelected ? opt.theme.selectedRadio : "border-border bg-card"
                     )}
                   >
-                    {isSelected && <Check className="h-3 w-3 stroke-[3] text-white" />}
+                    {isSelected && <Check className="h-3 w-3 stroke-3 text-white" />}
                   </div>
                 </div>
 
@@ -333,7 +333,7 @@ function StepType({
                     isSelected ? opt.theme.selectedRadio : "border-border bg-card"
                   )}
                 >
-                  {isSelected && <Check className="h-3 w-3 stroke-[3] text-white" />}
+                  {isSelected && <Check className="h-3 w-3 stroke-3 text-white" />}
                 </div>
               </button>
             );
@@ -460,7 +460,7 @@ function StepSelect({
               : "border-border bg-card"
           )}
         >
-          {isSelected && <Check className="h-3 w-3 stroke-[3]" />}
+          {isSelected && <Check className="h-3 w-3 stroke-3" />}
         </div>
         <div
           className={cn("h-8 w-8 shrink-0 rounded-lg flex items-center justify-center border", categoryMeta.bg, "border-transparent")}
@@ -494,7 +494,7 @@ function StepSelect({
       </div>
 
       {/* Item List Container */}
-      <div className="flex-1 min-h-[260px] overflow-y-auto rounded-xl border border-border bg-card flex flex-col justify-between">
+      <div className="flex-1 min-h-65 overflow-y-auto rounded-xl border border-border bg-card flex flex-col justify-between">
         {loading ? (
           <LoadingState
             variant="inline"
@@ -1143,7 +1143,7 @@ export function NewBorrowRequestWizard({
       />
 
       {/* Panel */}
-      <div className="relative z-10 w-full max-w-3xl h-[680px] max-h-[92vh] rounded-xl bg-card border border-border shadow-2xl flex flex-col overflow-hidden">
+      <div className="relative z-10 w-full max-w-3xl h-170 max-h-[92vh] rounded-xl bg-card border border-border shadow-2xl flex flex-col overflow-hidden">
         {/* Header with Milestone Stepper */}
         <div className="px-6 py-4.5 border-b border-border bg-card shrink-0 space-y-3.5">
           <div className="flex items-center justify-between gap-4">

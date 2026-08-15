@@ -359,7 +359,7 @@ export function RequestDetailPanel({
                   return (
                     <li key={h.id} className="pl-6 relative">
                       <span className={cn(
-                        "absolute -left-[13px] top-1.5 h-6 w-6 rounded-full border-2 flex items-center justify-center bg-bg shadow-sm z-10",
+                        "absolute -left-3.25 top-1.5 h-6 w-6 rounded-full border-2 flex items-center justify-center bg-bg shadow-sm z-10",
                         style.bg,
                         (style as Record<string, string>).iconText || style.text
                       )}>

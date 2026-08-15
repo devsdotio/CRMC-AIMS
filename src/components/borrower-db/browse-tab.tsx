@@ -224,7 +224,7 @@ export function BrowseTab() {
           icon="package"
           message="Loading inventory catalog..."
           subtitle="Fetching assets and consumable supplies..."
-          className="min-h-[300px]"
+          className="min-h-75"
         />
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center rounded-xl border border-border bg-card">
