@@ -261,7 +261,7 @@ export function ConsumableAuditDetailPanel({
   if (!isOpen || !consumable) return null;
 
   const currentItem = activeConsumable || consumable;
-  const catStyle = getCategoryStyle(currentItem.category as any);
+  const catStyle = getCategoryStyle(currentItem.category);
   const isLowStock = currentItem.currentQty <= currentItem.minThreshold && currentItem.currentQty > 0;
   const isOutOfStock = currentItem.currentQty === 0;
 

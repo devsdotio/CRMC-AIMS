@@ -28,7 +28,7 @@ export function MyRequestsTab() {
   const [page, setPage] = useState(1);
 
   const { data: response, isLoading: loading } = useBorrowRequests();
-  const requests = response?.data ?? [];
+  const requests = useMemo(() => response?.data ?? [], [response?.data]);
   const { mutate: cancelRequest } = useRejectBorrowRequestMutation();
 
   useEffect(() => {

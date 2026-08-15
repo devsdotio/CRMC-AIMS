@@ -29,7 +29,10 @@ export function AuditQuickCodeLookup() {
 
   const { data: assets = [], isLoading: isAssetsLoading } = useAssetsQuery();
   const { data: consumableResponse, isLoading: isConsumablesLoading } = useConsumablesQuery({ limit: 100 });
-  const consumables = consumableResponse?.data || [];
+  const consumables = useMemo(
+    () => consumableResponse?.data ?? [],
+    [consumableResponse?.data]
+  );
 
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [selectedConsumable, setSelectedConsumable] = useState<ConsumableItem | null>(null);
@@ -275,7 +278,7 @@ export function AuditQuickCodeLookup() {
                     </div>
 
                     {matchedConsumables.map((con) => {
-                      const catStyle = getCategoryStyle(con.category as any);
+                      const catStyle = getCategoryStyle(con.category);
                       const isLow = con.currentQty <= con.minThreshold;
 
                       return (

@@ -83,7 +83,7 @@ function BorrowRequestsContent() {
     limit: 10,
   });
 
-  const requests = response?.data ?? [];
+  const requests = useMemo(() => response?.data ?? [], [response?.data]);
   const meta = response?.meta;
 
   // Modal & Drawer State

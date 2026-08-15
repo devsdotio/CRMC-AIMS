@@ -108,7 +108,7 @@ export function RequisitionsList() {
 
       return true;
     });
-  }, [requests, filters]);
+  }, [uniqueRequests, filters]);
 
   const handleFilterChange = (updated: Partial<AuditLogFilterValues>) => {
     setFilters((prev) => ({ ...prev, ...updated }));

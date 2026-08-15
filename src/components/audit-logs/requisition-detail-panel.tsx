@@ -120,7 +120,7 @@ export function RequisitionDetailPanel({
             </div>
             <div className="rounded-lg border border-border bg-bg overflow-hidden divide-y divide-border">
               {request.lines.map((line, idx) => {
-                const catStyle = getCategoryStyle(line.category as any);
+                const catStyle = getCategoryStyle(line.category);
                 return (
                   <div
                     key={line.id || idx}

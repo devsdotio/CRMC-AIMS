@@ -26,11 +26,10 @@ export function ConsumablesAuditList() {
   const toast = useToast();
 
   // Safely extract consumables array whether wrapped in paginated response or raw array
-  const consumables: ConsumableItem[] = useMemo(() => {
-    if (Array.isArray(response)) return response;
-    if (response && Array.isArray((response as any).data)) return (response as any).data;
-    return [];
-  }, [response]);
+  const consumables: ConsumableItem[] = useMemo(
+    () => response?.data ?? [],
+    [response?.data]
+  );
 
   const [filters, setFilters] = useState<AuditLogFilterValues>({
     search: "",
@@ -203,7 +202,7 @@ export function ConsumablesAuditList() {
             <div className="p-5 rounded-xl border border-border bg-bg shadow-xs">
               <ol className="relative border-l-2 border-border/60 ml-3 space-y-6">
                 {filteredConsumables.map((item) => {
-                  const catStyle = getCategoryStyle(item.category as any);
+                  const catStyle = getCategoryStyle(item.category);
                   const isLow = item.currentQty <= item.minThreshold && item.currentQty > 0;
                   const isOut = item.currentQty === 0;
                   const historyCount = Array.isArray(item.history) ? item.history.length : 0;
@@ -317,7 +316,7 @@ export function ConsumablesAuditList() {
                   </thead>
                   <tbody className="divide-y divide-border">
                     {filteredConsumables.map((item) => {
-                      const catStyle = getCategoryStyle(item.category as any);
+                      const catStyle = getCategoryStyle(item.category);
                       const isLow = item.currentQty <= item.minThreshold && item.currentQty > 0;
                       const isOut = item.currentQty === 0;
                       const hasRestock = item.lastRestocked && item.lastRestocked !== "—";

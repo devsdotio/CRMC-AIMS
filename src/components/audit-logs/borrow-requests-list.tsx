@@ -32,7 +32,10 @@ const STATUS_OPTIONS = [
 
 export function BorrowRequestsList() {
   const { data: response, isLoading, error } = useBorrowRequests();
-  const requests: BorrowRequest[] = response?.data || [];
+  const requests: BorrowRequest[] = useMemo(
+    () => response?.data ?? [],
+    [response?.data]
+  );
   const toast = useToast();
 
   const [filters, setFilters] = useState<AuditLogFilterValues>({
@@ -110,7 +113,7 @@ export function BorrowRequestsList() {
 
       return true;
     });
-  }, [requests, filters]);
+  }, [uniqueRequests, filters]);
 
   const handleFilterChange = (updated: Partial<AuditLogFilterValues>) => {
     setFilters((prev) => ({ ...prev, ...updated }));

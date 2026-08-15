@@ -89,7 +89,7 @@ export function PurchaseOrdersList() {
 
       return true;
     });
-  }, [lots, filters]);
+  }, [uniqueLots, filters]);
 
   const handleFilterChange = (updated: Partial<AuditLogFilterValues>) => {
     setFilters((prev) => ({ ...prev, ...updated }));
