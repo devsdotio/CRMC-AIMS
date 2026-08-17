@@ -15,6 +15,7 @@ import { AssetTable } from "@/components/assets/asset-table";
 import { AssetDetailPanel } from "@/components/assets/asset-detail-panel";
 import { AddEditAssetDialog } from "@/components/assets/add-edit-asset-dialog";
 import { ScanAssetDialog } from "@/components/assets/scan-asset-dialog";
+import { IssueAssetDialog } from "@/components/assets/issue-asset-dialog";
 import { QueryErrorBanner } from "@/components/shared/query-error-banner";
 import { OperatorReadOnlyBanner } from "@/components/shared/operator-read-only-banner";
 import { useToast } from "@/components/providers/toast-context";
@@ -51,6 +52,7 @@ export default function AssetsPage() {
     asset: null,
   });
   const [scanOpen, setScanOpen] = useState(false);
+  const [issueAsset, setIssueAsset] = useState<Asset | null>(null);
 
   // Filter & Sort Assets
   const filteredAssets = useMemo(() => {
@@ -253,6 +255,21 @@ export default function AssetsPage() {
               }
             : undefined
         }
+        onIssue={
+          canOperate
+            ? (asset) => {
+                setSelectedAsset(null);
+                setIssueAsset(asset);
+              }
+            : undefined
+        }
+      />
+
+      <IssueAssetDialog
+        asset={issueAsset}
+        isOpen={Boolean(issueAsset)}
+        onClose={() => setIssueAsset(null)}
+        onSuccess={(message) => toast.success(message)}
       />
 
       {canOperate && (

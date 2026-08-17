@@ -22,6 +22,9 @@ import { MaintenanceRepository } from "@/server/modules/maintenance/maintenance.
 import { ProjectRepository } from "./project.repository";
 import { ProjectAssetAssignmentRepository } from "./project-asset.repository";
 import { ProjectExpenseRepository } from "./project-expense.repository";
+import { BorrowLogService } from "@/server/modules/borrow-log/borrow-log.service";
+import { BorrowLogRepository } from "@/server/modules/borrow-log/borrow-log.repository";
+import { projectHolderLabel } from "@/server/shared/custody-labels";
 import type {
   ProjectAssetAssignmentDTO,
   ProjectAssetDamageReportDTO,
@@ -35,7 +38,7 @@ import {
 import { projectIdSchema } from "./project.validation";
 
 function holderLabel(projectCode: string, projectName: string): string {
-  return `Project: ${projectCode} (${projectName})`;
+  return projectHolderLabel(projectCode, projectName);
 }
 
 function toDTO(row: ProjectAssetAssignmentRow): ProjectAssetAssignmentDTO {
@@ -83,7 +86,9 @@ export class ProjectAssetService {
     private readonly lifecycle = new AssetLifecycleService(),
     private readonly auditLogs = new AuditLogRepository(),
     private readonly maintenance = new MaintenanceRepository(),
-    private readonly expenses = new ProjectExpenseRepository()
+    private readonly expenses = new ProjectExpenseRepository(),
+    private readonly borrowLogs = new BorrowLogService(),
+    private readonly borrowLogRepo = new BorrowLogRepository()
   ) {}
 
   private async requireMutableProject(projectId: string) {
@@ -123,34 +128,22 @@ export class ProjectAssetService {
     const project = await this.requireMutableProject(projectId);
     const input = assignAssetToProjectSchema.parse(rawInput);
 
+    await this.borrowLogs.release(
+      {
+        assetId: input.assetId,
+        projectId,
+        custodyKind: "assignment",
+        source: "project_legacy",
+        borrowerName: holderLabel(project.projectCode, project.name),
+        notes: input.notes,
+      },
+      actor
+    );
+
     return withTransaction(async (tx) => {
-      const asset = await this.assets.findByIdForUpdate(input.assetId, tx);
+      const asset = await this.assets.findById(input.assetId, tx);
       if (!asset) throw new NotFoundError("Asset", input.assetId);
 
-      if (asset.status !== "active") {
-        throw new BadRequestError(
-          "Only active assets can be assigned to a project."
-        );
-      }
-      if (asset.assignmentType !== "assignable") {
-        throw new BadRequestError(
-          "Only assignable assets can be assigned to a project. Mark the asset as Assignable first."
-        );
-      }
-      if (asset.currentHolder) {
-        throw new ConflictError(
-          `Asset is already in custody of “${asset.currentHolder}”. Return it first.`
-        );
-      }
-
-      const open = await this.assignments.findOpenByAssetId(asset.id, tx);
-      if (open) {
-        throw new ConflictError(
-          "Asset already has an open project assignment."
-        );
-      }
-
-      const holder = holderLabel(project.projectCode, project.name);
       const assignment = await this.assignments.create(
         {
           projectId,
@@ -166,35 +159,6 @@ export class ProjectAssetService {
           returnedByName: null,
           notes: input.notes ?? null,
           returnNotes: null,
-        },
-        tx
-      );
-
-      await this.assets.update(
-        asset.id,
-        {
-          currentHolder: holder,
-          lastUpdated: new Date(),
-        },
-        tx
-      );
-
-      await this.lifecycle.record(
-        {
-          assetId: asset.id,
-          assetCode: asset.assetCode,
-          eventType: "released",
-          actor,
-          fromStatus: asset.status,
-          toStatus: asset.status,
-          fromHolder: null,
-          toHolder: holder,
-          payload: {
-            projectId: project.id,
-            projectCode: project.projectCode,
-            assignmentId: assignment.id,
-            source: "project_assignment",
-          },
         },
         tx
       );
@@ -241,8 +205,20 @@ export class ProjectAssetService {
         throw new ConflictError("This assignment is no longer open.");
       }
 
-      const asset = await this.assets.findByIdForUpdate(assignment.assetId, tx);
-      if (!asset) throw new NotFoundError("Asset", assignment.assetId);
+      const openLog = await this.borrowLogRepo.findActiveByAssetId(
+        assignment.assetId,
+        tx
+      );
+      if (openLog) {
+        await this.borrowLogs.returnLog(
+          openLog.id,
+          {
+            condition: "good",
+            conditionNotes: input.notes,
+          },
+          actor
+        );
+      }
 
       const updated = await this.assignments.update(
         assignment.id,
@@ -252,34 +228,6 @@ export class ProjectAssetService {
           returnedByUserId: actor.userId,
           returnedByName: actor.displayName,
           returnNotes: input.notes ?? null,
-        },
-        tx
-      );
-
-      await this.assets.update(
-        asset.id,
-        {
-          currentHolder: null,
-          lastUpdated: new Date(),
-        },
-        tx
-      );
-
-      await this.lifecycle.record(
-        {
-          assetId: asset.id,
-          assetCode: asset.assetCode,
-          eventType: "returned",
-          actor,
-          fromStatus: asset.status,
-          toStatus: asset.status,
-          fromHolder: asset.currentHolder,
-          toHolder: null,
-          payload: {
-            projectId,
-            assignmentId: assignment.id,
-            source: "project_assignment",
-          },
         },
         tx
       );
@@ -294,8 +242,8 @@ export class ProjectAssetService {
           notes: input.notes ?? undefined,
           metadata: {
             projectId,
-            assetId: asset.id,
-            assetCode: asset.assetCode,
+            assetId: assignment.assetId,
+            assetCode: assignment.assetCode,
           },
         },
         tx

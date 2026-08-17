@@ -33,6 +33,9 @@ export const createBorrowRequestSchema = z.object({
   requesterEmail: z.string().trim().email().max(320),
   requesterPhone: z.string().trim().max(40).optional().default(""),
   department: z.string().trim().min(1).max(120),
+  departmentId: z.string().uuid().optional(),
+  requestType: z.enum(["borrowable", "assignable"]).optional(),
+  requestedByName: z.string().trim().max(255).optional(),
   items: z.array(
     z.object({
       itemDescription: z.string().trim().min(1).max(500),
@@ -53,11 +56,19 @@ export const createBorrowRequestSchema = z.object({
   requesterUserId: z.string().uuid().optional(),
 }).superRefine((data, ctx) => {
   const hasAsset = data.items.some((item) => item.itemType === "asset");
-  if (hasAsset && !data.expectedReturnDate) {
+  const requestType = data.requestType ?? "borrowable";
+  if (hasAsset && requestType === "borrowable" && !data.expectedReturnDate) {
     ctx.addIssue({
       code: "custom",
-      message: "expectedReturnDate is required when requesting assets.",
+      message: "expectedReturnDate is required for borrowable asset requests.",
       path: ["expectedReturnDate"],
+    });
+  }
+  if (requestType === "assignable" && data.items.some((i) => i.itemType === "consumable")) {
+    ctx.addIssue({
+      code: "custom",
+      message: "Assignable requests cannot include consumable items.",
+      path: ["items"],
     });
   }
 });

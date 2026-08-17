@@ -41,7 +41,7 @@ export interface BorrowRequest {
   }[];
   purpose: string;
   requestedAt: string;
-  expectedReturnDate: string;
+  expectedReturnDate?: string | null;
   status: RequestStatus;
   notes?: string;
   rejectionReason?: string;

@@ -1,8 +1,9 @@
-/**
- * Custody display helpers for assets held by departments vs projects.
- */
+/** Display labels for unified asset custody (department or project holders). */
 
-export function departmentHolderLabel(code: string, name: string): string {
+export function departmentHolderLabel(
+  code: string,
+  name: string
+): string {
   return `Dept: ${code} (${name})`;
 }
 
@@ -27,7 +28,9 @@ export function custodyBadgeLabel(
   custodyKind?: "borrow" | "assignment" | null
 ): string {
   if (!holder) return "Available";
-  if (isProjectCustody(holder)) return "On project";
+  if (isProjectCustody(holder)) {
+    return custodyKind === "assignment" ? "On project" : "On project";
+  }
   if (isDepartmentCustody(holder)) {
     return custodyKind === "assignment" ? "Assigned" : "Borrowed";
   }

@@ -64,6 +64,9 @@ function toDTO(row: BorrowRequestRow): BorrowRequestDTO {
     requesterEmail: row.requesterEmail,
     requesterPhone: row.requesterPhone,
     department: row.department,
+    departmentId: row.departmentId,
+    requestType: row.requestType ?? undefined,
+    requestedByName: row.requestedByName ?? undefined,
     items: row.items,
     purpose: row.purpose,
     requestedAt:
@@ -192,6 +195,8 @@ export class BorrowRequestService {
 
     const submitted = historyEntry("submitted", actor.displayName, "Request recorded");
 
+    const requestType = input.requestType ?? "borrowable";
+
     const row = await withTransaction(async (tx) => {
       const created = await this.repo.create({
         requestCode,
@@ -200,10 +205,15 @@ export class BorrowRequestService {
         requesterEmail: input.requesterEmail.toLowerCase(),
         requesterPhone: input.requesterPhone ?? "",
         department: departmentNameForRequest(actor, input.department),
+        departmentId: actor.departmentId ?? input.departmentId ?? null,
+        requestType,
+        requestedByName: input.requestedByName ?? null,
         items: input.items,
         purpose: input.purpose,
         expectedReturnDate:
-          input.expectedReturnDate ?? new Date().toISOString().slice(0, 10),
+          requestType === "borrowable"
+            ? (input.expectedReturnDate ?? new Date().toISOString().slice(0, 10))
+            : null,
         status: "pending",
         notes: input.notes ?? null,
         rejectionReason: null,
@@ -250,7 +260,15 @@ export class BorrowRequestService {
       if (item.assetId) {
         const asset = await this.assetRepo.findById(item.assetId);
         if (asset && asset.currentHolder) {
-          throw new ConflictError(`Cannot approve: Asset ${item.assetCode} is currently borrowed by ${asset.currentHolder}. It will remain in pending status until available.`);
+          throw new ConflictError(`Cannot approve: Asset ${item.assetCode} is currently in custody (${asset.currentHolder}).`);
+        }
+        if (asset && existing.requestType) {
+          if (existing.requestType === "borrowable" && asset.assignmentType !== "borrowable") {
+            throw new ConflictError(`Asset ${item.assetCode} is not borrowable.`);
+          }
+          if (existing.requestType === "assignable" && asset.assignmentType !== "assignable") {
+            throw new ConflictError(`Asset ${item.assetCode} is not assignable.`);
+          }
         }
       }
     }
@@ -333,7 +351,10 @@ export class BorrowRequestService {
       ? `Released to: ${input.pickedUpBy}. ${input.note}`
       : `Released to: ${input.pickedUpBy}`;
 
-    // Open accountable borrow log for assets first while request is still approved.
+    const requestType = existing.requestType ?? "borrowable";
+    const custodyKind = requestType === "assignable" ? "assignment" : "borrow";
+
+    // Open accountable custody log for assets first while request is still approved.
     for (const item of existing.items) {
       if (item.assetId) {
         const asset = await this.assetRepo.findById(item.assetId);
@@ -342,11 +363,18 @@ export class BorrowRequestService {
           {
             assetId: item.assetId,
             requestId: existing.id,
+            custodyKind,
+            source: "portal",
+            departmentId: existing.departmentId ?? undefined,
+            department: existing.department,
             borrowerName: input.pickedUpBy,
             borrowerEmail: existing.requesterEmail,
             borrowerPhone: existing.requesterPhone || "",
-            department: existing.department,
-            dueDate: this.borrowLogs.defaultDueDate(),
+            dueDate:
+              custodyKind === "borrow"
+                ? (existing.expectedReturnDate ?? this.borrowLogs.defaultDueDate())
+                : null,
+            requestedByName: existing.requestedByName ?? input.pickedUpBy,
             notes: noteWithPicker,
             borrowerUserId: existing.requesterUserId ?? undefined,
           },

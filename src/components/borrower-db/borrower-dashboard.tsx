@@ -97,8 +97,10 @@ function DashStatCard({ label, value, subtext, icon: Icon, tone = "default", isL
 function ActiveBorrowCard({ record }: { record: PortalBorrowLogRecord }) {
   const categoryMeta = getCategoryStyle(record.category);
   const isOverdue = record.status === "overdue";
-  const dueDate = new Date(record.dueDate);
-  const daysLeft = Math.ceil((dueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  const dueDate = record.dueDate ? new Date(record.dueDate) : null;
+  const daysLeft = dueDate
+    ? Math.ceil((dueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    : null;
 
   return (
     <div
@@ -126,14 +128,20 @@ function ActiveBorrowCard({ record }: { record: PortalBorrowLogRecord }) {
           <span
             className={cn(
               "text-xs font-semibold",
-              isOverdue ? "text-status-outofservice-bg dark:text-status-outofservice-text" : daysLeft <= 2 ? "text-status-repair-text" : "text-text-secondary"
+              isOverdue
+                ? "text-status-outofservice-bg dark:text-status-outofservice-text"
+                : daysLeft !== null && daysLeft <= 2
+                  ? "text-status-repair-text"
+                  : "text-text-secondary"
             )}
           >
-            {isOverdue
+            {!record.dueDate
+              ? "Assigned"
+              : isOverdue
               ? `${record.daysOverdue}d overdue`
               : daysLeft === 0
               ? "Due today"
-              : daysLeft < 0
+              : daysLeft !== null && daysLeft < 0
               ? "Overdue"
               : `${daysLeft}d left`}
           </span>
@@ -141,14 +149,14 @@ function ActiveBorrowCard({ record }: { record: PortalBorrowLogRecord }) {
       </div>
 
       <div className="shrink-0 text-right">
-        <p className="text-xs text-text-secondary">Due</p>
+        <p className="text-xs text-text-secondary">{record.dueDate ? "Due" : "Custody"}</p>
         <p
           className={cn(
             "text-xs font-bold",
             isOverdue ? "text-status-outofservice-bg dark:text-status-outofservice-text" : "text-text"
           )}
         >
-          {record.dueDate}
+          {record.dueDate ?? "Open assignment"}
         </p>
       </div>
     </div>

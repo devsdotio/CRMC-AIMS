@@ -8,10 +8,18 @@ import {
 import type { ActorContext } from "@/server/shared/auth";
 import { isAssetOperatorRole } from "@/server/shared/roles";
 import {
+  BadRequestError,
   ConflictError,
   NotFoundError,
   ForbiddenError,
 } from "@/server/shared/errors";
+import {
+  departmentHolderLabel,
+  projectHolderLabel,
+} from "@/server/shared/custody-labels";
+import { DepartmentRepository } from "@/server/modules/departments/department.repository";
+import { ProjectRepository } from "@/server/modules/projects/project.repository";
+import { ProjectAssetAssignmentRepository } from "@/server/modules/projects/project-asset.repository";
 import {
   isUniqueViolation,
   withTransaction,
@@ -45,7 +53,7 @@ export function toBorrowLogDTO(row: BorrowTransactionRow, history: import("@/ser
 
   if (row.status === "returned") {
     status = "returned";
-  } else if (row.dueDate < today) {
+  } else if (row.dueDate && row.dueDate < today) {
     status = "overdue";
     daysOverdue = daysBetween(row.dueDate, today);
   }
@@ -54,6 +62,11 @@ export function toBorrowLogDTO(row: BorrowTransactionRow, history: import("@/ser
     id: row.id,
     logCode: row.logCode,
     requestCode: row.requestCode ?? "",
+    custodyKind: row.custodyKind ?? "borrow",
+    departmentId: row.departmentId,
+    projectId: row.projectId,
+    source: row.source ?? "portal",
+    requestedByName: row.requestedByName ?? undefined,
     borrowerName: row.borrowerName,
     borrowerEmail: row.borrowerEmail,
     borrowerPhone: row.borrowerPhone,
@@ -65,7 +78,7 @@ export function toBorrowLogDTO(row: BorrowTransactionRow, history: import("@/ser
       row.releasedAt instanceof Date
         ? row.releasedAt.toISOString()
         : String(row.releasedAt),
-    dueDate: row.dueDate,
+    dueDate: row.dueDate ?? null,
     returnedAt: row.returnedAt
       ? row.returnedAt instanceof Date
         ? row.returnedAt.toISOString()
@@ -93,7 +106,10 @@ export class BorrowLogService {
     private readonly lifecycle = new AssetLifecycleService(),
     private readonly requests = new BorrowRequestRepository(),
     private readonly maintenance = new MaintenanceRepository(),
-    private readonly auditLogs = new AuditLogRepository()
+    private readonly auditLogs = new AuditLogRepository(),
+    private readonly departments = new DepartmentRepository(),
+    private readonly projects = new ProjectRepository(),
+    private readonly projectAssignments = new ProjectAssetAssignmentRepository()
   ) {}
 
   async list(rawQuery: unknown, actor?: ActorContext): Promise<BorrowLogDTO[]> {
@@ -140,6 +156,80 @@ export class BorrowLogService {
     }
   }
 
+  private async resolveDestination(
+    input: ReturnType<typeof releaseBorrowSchema.parse>,
+    tx: DbSession
+  ): Promise<{
+    departmentId: string | null;
+    projectId: string | null;
+    departmentLabel: string;
+    holderLabel: string;
+    custodyKind: "borrow" | "assignment";
+  }> {
+    let departmentId = input.departmentId ?? null;
+    let projectId = input.projectId ?? null;
+
+    if (departmentId && projectId) {
+      throw new BadRequestError(
+        "Specify exactly one destination: department or project."
+      );
+    }
+
+    const custodyKind =
+      input.custodyKind ?? (input.dueDate ? "borrow" : "assignment");
+
+    if (custodyKind === "borrow" && !input.dueDate) {
+      throw new BadRequestError("dueDate is required for borrowable custody.");
+    }
+
+    if (!departmentId && !projectId && input.department?.trim()) {
+      const dept = await this.departments.findByNameLower(
+        input.department.trim(),
+        tx
+      );
+      if (dept) departmentId = dept.id;
+    }
+
+    if (projectId) {
+      const project = await this.projects.findById(projectId, tx);
+      if (!project) throw new NotFoundError("Project", projectId);
+      return {
+        departmentId: null,
+        projectId,
+        departmentLabel: project.department?.trim() || project.name,
+        holderLabel: projectHolderLabel(project.projectCode, project.name),
+        custodyKind,
+      };
+    }
+
+    if (departmentId) {
+      const dept = await this.departments.findById(departmentId, tx);
+      if (!dept) throw new NotFoundError("Department", departmentId);
+      return {
+        departmentId,
+        projectId: null,
+        departmentLabel: dept.name,
+        holderLabel: departmentHolderLabel(dept.code, dept.name),
+        custodyKind,
+      };
+    }
+
+    const legacyDept = input.department?.trim();
+    if (!legacyDept) {
+      throw new BadRequestError(
+        "Destination department or project is required."
+      );
+    }
+
+    return {
+      departmentId: null,
+      projectId: null,
+      departmentLabel: legacyDept,
+      holderLabel: input.borrowerName?.trim() || legacyDept,
+      custodyKind,
+    };
+  }
+
   private async releaseInTx(
     input: ReturnType<typeof releaseBorrowSchema.parse>,
     actor: ActorContext,
@@ -152,10 +242,35 @@ export class BorrowLogService {
       throw new ConflictError("Asset is not available for release.");
     }
 
+    const destination = await this.resolveDestination(input, tx);
+
+    if (destination.custodyKind === "borrow" && asset.assignmentType !== "borrowable") {
+      throw new BadRequestError(
+        "Only borrowable assets can be released on a due-dated borrow."
+      );
+    }
+    if (
+      destination.custodyKind === "assignment" &&
+      asset.assignmentType !== "assignable"
+    ) {
+      throw new BadRequestError(
+        "Only assignable assets can be assigned long-term."
+      );
+    }
 
     const open = await this.repo.findActiveByAssetId(asset.id, tx);
     if (open) {
-      throw new ConflictError("Asset already has an active borrow log.");
+      throw new ConflictError("Asset already has an active custody log.");
+    }
+
+    const openProject = await this.projectAssignments.findOpenByAssetId(
+      asset.id,
+      tx
+    );
+    if (openProject) {
+      throw new ConflictError(
+        "Asset already has an open project assignment. Return it first."
+      );
     }
 
     let requestId: string | null = input.requestId ?? null;
@@ -172,6 +287,10 @@ export class BorrowLogService {
     }
 
     const logCode = generateOperationalCode("LOG");
+    const displayName =
+      input.borrowerName?.trim() ||
+      input.requestedByName?.trim() ||
+      destination.holderLabel;
 
     const row = await this.repo.create(
       {
@@ -183,12 +302,17 @@ export class BorrowLogService {
         assetName: asset.name,
         category: asset.category,
         borrowerUserId: input.borrowerUserId ?? null,
-        borrowerName: input.borrowerName,
+        borrowerName: displayName,
         borrowerEmail: (input.borrowerEmail ?? "").toLowerCase(),
         borrowerPhone: input.borrowerPhone ?? "",
-        department: input.department,
+        department: destination.departmentLabel,
+        custodyKind: destination.custodyKind,
+        departmentId: destination.departmentId,
+        projectId: destination.projectId,
+        source: input.source ?? "portal",
+        requestedByName: input.requestedByName ?? null,
         releasedAt: new Date(),
-        dueDate: input.dueDate,
+        dueDate: destination.custodyKind === "borrow" ? input.dueDate! : null,
         returnedAt: null,
         status: "active",
         conditionOnReturn: null,
@@ -215,8 +339,8 @@ export class BorrowLogService {
     await this.assets.update(
       asset.id,
       {
-        currentHolder: input.borrowerName,
-        department: input.department,
+        currentHolder: destination.holderLabel,
+        department: destination.departmentLabel,
         lastUpdated: new Date(),
       },
       tx
@@ -231,13 +355,17 @@ export class BorrowLogService {
         fromStatus: asset.status,
         toStatus: asset.status,
         fromHolder: asset.currentHolder,
-        toHolder: input.borrowerName,
+        toHolder: destination.holderLabel,
         payload: {
           logCode,
           logId: row.id,
           requestCode,
           requestId,
-          dueDate: input.dueDate,
+          dueDate: row.dueDate,
+          custodyKind: destination.custodyKind,
+          departmentId: destination.departmentId,
+          projectId: destination.projectId,
+          source: input.source ?? "portal",
           notes: input.notes ?? null,
           borrowerEmail: input.borrowerEmail ?? null,
         },
@@ -400,7 +528,7 @@ export class BorrowLogService {
 
       if (existing.requestId) {
         const req = await this.requests.findById(existing.requestId, tx);
-        if (req && req.status === "approved") {
+        if (req && (req.status === "released" || req.status === "approved")) {
           await this.requests.update(
             req.id,
             {
@@ -412,7 +540,7 @@ export class BorrowLogService {
                   action: "returned",
                   actor: actor.displayName,
                   timestamp: isoNow(),
-                  note: `Via borrow log ${existing.logCode}`,
+                  note: `Via custody log ${existing.logCode}`,
                 },
               ],
             },

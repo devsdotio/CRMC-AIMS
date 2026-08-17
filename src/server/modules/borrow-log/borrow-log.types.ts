@@ -7,6 +7,11 @@ export type BorrowLogDTO = {
   id: string;
   logCode: string;
   requestCode: string;
+  custodyKind: "borrow" | "assignment";
+  departmentId?: string | null;
+  projectId?: string | null;
+  source: "portal" | "admin_manual" | "project_legacy";
+  requestedByName?: string;
   borrowerName: string;
   borrowerEmail: string;
   borrowerPhone: string;
@@ -15,7 +20,7 @@ export type BorrowLogDTO = {
   assetName: string;
   category: string;
   releasedAt: string;
-  dueDate: string;
+  dueDate?: string | null;
   returnedAt?: string;
   daysOverdue?: number;
   status: "active" | "overdue" | "returned";
@@ -52,4 +57,4 @@ export interface IBorrowLogRepository {
     id: string,
     data: Partial<Omit<BorrowTransactionRow, "id" | "createdAt" | "logCode">>
   ): Promise<BorrowTransactionRow | null>;
-}
+};

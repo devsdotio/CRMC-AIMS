@@ -56,13 +56,16 @@ export type AssetLifecycleEvent = {
 };
 
 export type ReleaseAssetInput = {
-  /** Required — anonymous checkout is not allowed for accountability. */
-  borrowerName: string;
+  custodyKind?: "borrow" | "assignment";
+  departmentId?: string;
+  projectId?: string;
+  borrowerName?: string;
   borrowerDepartment?: string;
   borrowerEmail?: string;
   borrowerPhone?: string;
   notes?: string;
-  expectedReturnDate?: string;
+  expectedReturnDate?: string | null;
+  requestedByName?: string;
   requestId?: string;
 };
 

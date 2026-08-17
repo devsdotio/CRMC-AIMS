@@ -764,23 +764,40 @@ export class AssetService {
       throw new NotFoundError("Asset", id);
     }
 
-    if (existing.assignmentType === "assignable") {
+    const custodyKind =
+      input.custodyKind ??
+      (existing.assignmentType === "assignable" ? "assignment" : "borrow");
+
+    if (custodyKind === "borrow" && existing.assignmentType !== "borrowable") {
       throw new BadRequestError(
-        "This asset is assignable (project custody). Assign it from a project, not via borrow release."
+        "This asset is assignable. Use assignment custody with a department or project destination."
+      );
+    }
+    if (custodyKind === "assignment" && existing.assignmentType !== "assignable") {
+      throw new BadRequestError(
+        "This asset is borrowable. Use a due-dated borrow release instead."
       );
     }
 
     await this.borrowLogs.release(
       {
         assetId: id,
-        borrowerName: input.borrowerName,
-        borrowerEmail: input.borrowerEmail ?? "",
-        borrowerPhone: input.borrowerPhone ?? "",
+        custodyKind,
+        source: "admin_manual",
+        departmentId: input.departmentId,
+        projectId: input.projectId,
         department:
           input.borrowerDepartment?.trim() ||
           existing.department?.trim() ||
-          "Unassigned",
-        dueDate: input.expectedReturnDate ?? this.borrowLogs.defaultDueDate(),
+          undefined,
+        borrowerName: input.borrowerName,
+        borrowerEmail: input.borrowerEmail ?? "",
+        borrowerPhone: input.borrowerPhone ?? "",
+        dueDate:
+          custodyKind === "borrow"
+            ? (input.expectedReturnDate ?? this.borrowLogs.defaultDueDate())
+            : null,
+        requestedByName: input.requestedByName,
         notes: input.notes,
         requestId: input.requestId,
       },

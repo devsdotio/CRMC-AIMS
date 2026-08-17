@@ -8,6 +8,9 @@ export type CreateBorrowRequestPayload = {
   requesterEmail: string;
   requesterPhone?: string;
   department: string;
+  departmentId?: string;
+  requestType?: "borrowable" | "assignable";
+  requestedByName?: string;
   items: {
     itemDescription: string;
     assetId?: string;

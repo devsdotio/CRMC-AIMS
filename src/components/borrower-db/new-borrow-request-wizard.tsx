@@ -401,8 +401,14 @@ function StepSelect({
   const items = useMemo(() => {
     return BROWSE_ITEMS.filter((item) => {
       // 0. Filter by explicit requestType
-      if (requestType === "borrowable" && item.type !== "asset") return false;
-      if (requestType === "assignable" && item.type !== "asset") return false;
+      if (requestType === "borrowable") {
+        if (item.type !== "asset") return false;
+        if (item.assignmentType !== "borrowable") return false;
+      }
+      if (requestType === "assignable") {
+        if (item.type !== "asset") return false;
+        if (item.assignmentType !== "assignable") return false;
+      }
       if (requestType === "consumable" && item.type !== "consumable") return false;
 
       // 1. Filter by requested type (legacy initialType fallback)
@@ -1110,9 +1116,19 @@ export function NewBorrowRequestWizard({
         requesterName: me.name,
         requesterEmail: me.email,
         department: me.department || "Unspecified",
+        departmentId: me.departmentId,
+        requestType:
+          values.requestType === "assignable"
+            ? "assignable"
+            : values.requestType === "borrowable"
+              ? "borrowable"
+              : undefined,
         items,
         purpose: values.purpose,
-        expectedReturnDate: hasAsset ? values.dateTo : undefined,
+        expectedReturnDate:
+          hasAsset && values.requestType !== "assignable"
+            ? values.dateTo
+            : undefined,
         notes: values.notes || undefined,
       });
 

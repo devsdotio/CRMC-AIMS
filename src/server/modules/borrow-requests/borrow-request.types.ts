@@ -10,6 +10,9 @@ export type BorrowRequestDTO = {
   requesterEmail: string;
   requesterPhone: string;
   department: string;
+  departmentId?: string | null;
+  requestType?: "borrowable" | "assignable" | null;
+  requestedByName?: string;
   items: {
     itemDescription: string;
     assetId?: string;
@@ -22,7 +25,7 @@ export type BorrowRequestDTO = {
   purpose: string;
   requestedAt: string;
   relativeTime: string;
-  expectedReturnDate: string;
+  expectedReturnDate?: string | null;
   status: "pending" | "approved" | "rejected" | "released" | "unreleased" | "returned" | "cancelled";
   notes?: string;
   rejectionReason?: string;

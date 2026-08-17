@@ -42,24 +42,54 @@ export const updateAssetSchema = createAssetSchema
     message: "At least one field must be provided for an update.",
   });
 
-/** Borrower is subject/assignee; staff actor always from session (never body). */
-export const releaseAssetSchema = z.object({
-  borrowerName: z
-    .string()
-    .trim()
-    .min(1, "borrowerName is required for accountable release.")
-    .max(255),
-  borrowerDepartment: z.string().trim().min(1).max(120).optional(),
-  borrowerEmail: z.string().trim().email().max(320).optional(),
-  borrowerPhone: z.string().trim().max(40).optional(),
-  notes: z.string().trim().max(2000).optional(),
-  expectedReturnDate: z
-    .string()
-    .trim()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "expectedReturnDate must be YYYY-MM-DD.")
-    .optional(),
-  requestId: z.string().uuid().optional(),
-});
+/** Manual issue / accountable release to department XOR project. */
+export const releaseAssetSchema = z
+  .object({
+    custodyKind: z.enum(["borrow", "assignment"]).optional(),
+    departmentId: z.string().uuid().optional(),
+    projectId: z.string().uuid().optional(),
+    borrowerName: z.string().trim().max(255).optional(),
+    borrowerDepartment: z.string().trim().min(1).max(120).optional(),
+    borrowerEmail: z.string().trim().email().max(320).optional(),
+    borrowerPhone: z.string().trim().max(40).optional(),
+    notes: z.string().trim().max(2000).optional(),
+    expectedReturnDate: z
+      .string()
+      .trim()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "expectedReturnDate must be YYYY-MM-DD.")
+      .optional()
+      .nullable(),
+    requestedByName: z.string().trim().max(255).optional(),
+    requestId: z.string().uuid().optional(),
+  })
+  .superRefine((data, ctx) => {
+    const hasDept = Boolean(data.departmentId);
+    const hasProject = Boolean(data.projectId);
+    if (hasDept && hasProject) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Specify department or project, not both.",
+        path: ["departmentId"],
+      });
+    }
+    if (!hasDept && !hasProject && !data.borrowerDepartment?.trim()) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Destination department or project is required.",
+        path: ["departmentId"],
+      });
+    }
+    const kind =
+      data.custodyKind ??
+      (data.expectedReturnDate ? ("borrow" as const) : ("assignment" as const));
+    if (kind === "borrow" && !data.expectedReturnDate) {
+      ctx.addIssue({
+        code: "custom",
+        message: "expectedReturnDate is required for borrowable release.",
+        path: ["expectedReturnDate"],
+      });
+    }
+  });
 
 export const returnAssetSchema = z.object({
   condition: z.string().trim().min(1, "condition is required.").max(2000),

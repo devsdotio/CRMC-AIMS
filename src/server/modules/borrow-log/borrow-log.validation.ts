@@ -17,20 +17,60 @@ export const listBorrowLogQuerySchema = z.object({
   borrowerUserId: z.string().uuid().optional(),
 });
 
-export const releaseBorrowSchema = z.object({
-  assetId: z.string().uuid("assetId is required."),
-  requestId: z.string().uuid().optional(),
-  requestCode: z.string().trim().max(64).optional(),
-  borrowerName: z.string().trim().min(1).max(255),
-  borrowerEmail: z.string().trim().email().max(320).optional().default(""),
-  borrowerPhone: z.string().trim().max(40).optional().default(""),
-  department: z.string().trim().min(1).max(120),
-  dueDate: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "dueDate must be YYYY-MM-DD"),
-  notes: z.string().trim().max(2000).optional(),
-  borrowerUserId: z.string().uuid().optional(),
-});
+export const releaseBorrowSchema = z
+  .object({
+    assetId: z.string().uuid("assetId is required."),
+    requestId: z.string().uuid().optional(),
+    requestCode: z.string().trim().max(64).optional(),
+    custodyKind: z.enum(["borrow", "assignment"]).optional(),
+    source: z
+      .enum(["portal", "admin_manual", "project_legacy"])
+      .optional()
+      .default("portal"),
+    departmentId: z.string().uuid().optional(),
+    projectId: z.string().uuid().optional(),
+    /** Legacy / denormalized department label when id unknown. */
+    department: z.string().trim().max(120).optional(),
+    /** Display name for person who picked up (optional; destination is dept/project). */
+    borrowerName: z.string().trim().max(255).optional(),
+    borrowerEmail: z.string().trim().email().max(320).optional().default(""),
+    borrowerPhone: z.string().trim().max(40).optional().default(""),
+    dueDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "dueDate must be YYYY-MM-DD")
+      .optional()
+      .nullable(),
+    requestedByName: z.string().trim().max(255).optional(),
+    notes: z.string().trim().max(2000).optional(),
+    borrowerUserId: z.string().uuid().optional(),
+  })
+  .superRefine((data, ctx) => {
+    const hasDept = Boolean(data.departmentId);
+    const hasProject = Boolean(data.projectId);
+    if (hasDept && hasProject) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Specify exactly one destination: department or project.",
+        path: ["departmentId"],
+      });
+    }
+    if (!hasDept && !hasProject && !data.department?.trim()) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Destination department or project is required.",
+        path: ["departmentId"],
+      });
+    }
+    const kind =
+      data.custodyKind ?? (data.dueDate ? ("borrow" as const) : ("assignment" as const));
+    if (kind === "borrow" && !data.dueDate) {
+      ctx.addIssue({
+        code: "custom",
+        message: "dueDate is required for borrowable custody.",
+        path: ["dueDate"],
+      });
+    }
+  });
 
 export const returnBorrowSchema = z.object({
   condition: returnConditionSchema,

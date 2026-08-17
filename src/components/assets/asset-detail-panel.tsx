@@ -831,6 +831,7 @@ export interface AssetDetailPanelProps {
   isOpen: boolean;
   onClose: () => void;
   onEdit?: (asset: Asset) => void;
+  onIssue?: (asset: Asset) => void;
 }
 
 const STATUS_STYLES: Record<
@@ -864,6 +865,7 @@ export function AssetDetailPanel({
   isOpen,
   onClose,
   onEdit,
+  onIssue,
 }: AssetDetailPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   // Suppliers only needed when panel is open with a linked vendor — never on list paint.
@@ -937,6 +939,16 @@ export function AssetDetailPanel({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            {onIssue && !asset.currentHolder && asset.status === "active" && (
+            <button
+              type="button"
+              onClick={() => onIssue(asset)}
+              aria-label="Issue asset to department or project"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary text-primary-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+            >
+              Issue
+            </button>
+            )}
             {onEdit && (
             <button
               type="button"

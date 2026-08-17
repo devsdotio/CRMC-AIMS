@@ -197,7 +197,7 @@ function BorrowLogContent() {
                       <p className="text-xs text-text-secondary">{row.department}</p>
                     </td>
                     <td className="px-3 py-3.5 text-xs text-text-secondary hidden md:table-cell">
-                      {row.dueDate}
+                      {row.dueDate ?? "—"}
                     </td>
                     <td className="px-3 py-3.5">
                       {row.status === "overdue" ? (
