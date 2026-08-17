@@ -11,8 +11,8 @@ export interface RequestListItemProps {
   request: BorrowRequest;
   isHighlighted?: boolean;
   onSelect: (request: BorrowRequest) => void;
-  onApprove: (request: BorrowRequest) => void;
-  onReject: (request: BorrowRequest) => void;
+  onApprove?: (request: BorrowRequest) => void;
+  onReject?: (request: BorrowRequest) => void;
   onRelease?: (request: BorrowRequest) => void | Promise<void>;
   onReturn?: (request: BorrowRequest) => void | Promise<void>;
   onMarkUnreleased?: (request: BorrowRequest) => void | Promise<void>;
@@ -154,7 +154,7 @@ export function RequestListItem({
         </span>
 
         {/* Inline Actions (only for Pending requests) */}
-        {request.status === "pending" && (
+        {request.status === "pending" && onApprove && onReject && (
           <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
             <button
               type="button"

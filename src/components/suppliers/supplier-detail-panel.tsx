@@ -18,7 +18,7 @@ export function SupplierDetailPanel({
   supplier: Supplier | null;
   isOpen: boolean;
   onClose: () => void;
-  onEdit: (s: Supplier) => void;
+  onEdit?: (s: Supplier) => void;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const { data: lots = [], isLoading: lotsLoading } = usePurchaseLotsQuery({
@@ -148,6 +148,7 @@ export function SupplierDetailPanel({
           >
             Close
           </button>
+          {onEdit && (
           <button
             type="button"
             onClick={() => onEdit(supplier)}
@@ -156,6 +157,7 @@ export function SupplierDetailPanel({
             <Pencil className="h-3.5 w-3.5" />
             Edit
           </button>
+          )}
         </div>
       </aside>
     </div>

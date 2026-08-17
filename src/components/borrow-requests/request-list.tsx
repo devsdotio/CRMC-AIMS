@@ -11,8 +11,8 @@ export interface RequestListProps {
   transitioning?: boolean;
   highlightedId?: string | null;
   onSelect: (request: BorrowRequest) => void;
-  onApprove: (request: BorrowRequest) => void;
-  onReject: (request: BorrowRequest) => void;
+  onApprove?: (request: BorrowRequest) => void;
+  onReject?: (request: BorrowRequest) => void;
   onRelease?: (request: BorrowRequest) => void;
   onReturn?: (request: BorrowRequest) => void;
   onMarkUnreleased?: (request: BorrowRequest) => void;

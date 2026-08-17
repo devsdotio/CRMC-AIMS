@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 
-import { requireAssetOperator } from "@/server/shared/auth";
+import { requireActor, requireAssetOperator } from "@/server/shared/auth";
 import { created, handleError, ok } from "@/server/shared/http";
 
 import { MaintenanceLogService } from "./maintenance.service";
@@ -12,7 +12,7 @@ export class MaintenanceController {
 
   async list(request: NextRequest | Request) {
     try {
-      await requireAssetOperator();
+      await requireActor();
       const url = new URL(request.url);
       return ok(
         await this.service.list({
@@ -28,7 +28,7 @@ export class MaintenanceController {
 
   async get(id: string) {
     try {
-      await requireAssetOperator();
+      await requireActor();
       return ok(await this.service.getById(id));
     } catch (error) {
       return handleError(error);

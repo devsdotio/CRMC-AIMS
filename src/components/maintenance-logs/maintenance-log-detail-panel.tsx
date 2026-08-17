@@ -14,7 +14,7 @@ export interface MaintenanceLogDetailPanelProps {
   record: MaintenanceLogRecord | null;
   isOpen: boolean;
   onClose: () => void;
-  onResolve: (record: MaintenanceLogRecord) => void;
+  onResolve?: (record: MaintenanceLogRecord) => void;
 }
 
 export function MaintenanceLogDetailPanel({
@@ -177,7 +177,7 @@ export function MaintenanceLogDetailPanel({
         </div>
 
         {/* Action Footer (Only if unresolved) */}
-        {!record.isResolved && (
+        {!record.isResolved && onResolve && (
           <div className="p-4 border-t border-border bg-bg-subtle flex items-center justify-end shrink-0">
             <button
               type="button"

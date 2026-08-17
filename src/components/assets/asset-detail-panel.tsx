@@ -830,7 +830,7 @@ export interface AssetDetailPanelProps {
   asset: Asset | null;
   isOpen: boolean;
   onClose: () => void;
-  onEdit: (asset: Asset) => void;
+  onEdit?: (asset: Asset) => void;
 }
 
 const STATUS_STYLES: Record<
@@ -937,6 +937,7 @@ export function AssetDetailPanel({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            {onEdit && (
             <button
               type="button"
               onClick={() => onEdit(asset)}
@@ -946,6 +947,7 @@ export function AssetDetailPanel({
               <Edit3 className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Edit</span>
             </button>
+            )}
             <button
               type="button"
               onClick={onClose}

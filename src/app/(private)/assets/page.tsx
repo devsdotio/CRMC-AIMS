@@ -16,7 +16,9 @@ import { AssetDetailPanel } from "@/components/assets/asset-detail-panel";
 import { AddEditAssetDialog } from "@/components/assets/add-edit-asset-dialog";
 import { ScanAssetDialog } from "@/components/assets/scan-asset-dialog";
 import { QueryErrorBanner } from "@/components/shared/query-error-banner";
+import { OperatorReadOnlyBanner } from "@/components/shared/operator-read-only-banner";
 import { useToast } from "@/components/providers/toast-context";
+import { useAssetOperator } from "@/hooks/use-asset-operator";
 
 export default function AssetsPage() {
   const {
@@ -29,6 +31,7 @@ export default function AssetsPage() {
   const createMutation = useCreateAssetMutation();
   const updateMutation = useUpdateAssetMutation();
   const toast = useToast();
+  const { canOperate } = useAssetOperator();
 
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
 
@@ -187,6 +190,7 @@ export default function AssetsPage() {
             <QrCode className="h-4 w-4" strokeWidth={2.5} />
             Scan Code
           </button>
+          {canOperate && (
           <button
             type="button"
             onClick={() => setAddEditState({ isOpen: true, asset: null })}
@@ -195,6 +199,7 @@ export default function AssetsPage() {
             <Plus className="h-4 w-4" strokeWidth={2.5} />
             Add Asset
           </button>
+          )}
 
           <AssetViewToggle viewMode={viewMode} onViewChange={setViewMode} />
         </div>
@@ -208,6 +213,8 @@ export default function AssetsPage() {
         totalAssetsCount={assets.length}
         filteredAssetsCount={filteredAssets.length}
       />
+
+      {!canOperate && <OperatorReadOnlyBanner />}
 
       {isError && (
         <QueryErrorBanner
@@ -238,12 +245,18 @@ export default function AssetsPage() {
         asset={selectedAsset}
         isOpen={Boolean(selectedAsset)}
         onClose={() => setSelectedAsset(null)}
-        onEdit={(asset) => {
-          setSelectedAsset(null);
-          setAddEditState({ isOpen: true, asset });
-        }}
+        onEdit={
+          canOperate
+            ? (asset) => {
+                setSelectedAsset(null);
+                setAddEditState({ isOpen: true, asset });
+              }
+            : undefined
+        }
       />
 
+      {canOperate && (
+      <>
       {/* ── Add / Edit Asset Dialog ───────────────────────────────────── */}
       <AddEditAssetDialog
         isOpen={addEditState.isOpen}
@@ -251,6 +264,8 @@ export default function AssetsPage() {
         onClose={() => setAddEditState({ isOpen: false, asset: null })}
         onSave={handleSaveAsset}
       />
+      </>
+      )}
 
       <ScanAssetDialog
         isOpen={scanOpen}

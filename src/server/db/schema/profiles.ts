@@ -17,7 +17,7 @@ import { departments } from "./departments";
  * Roles:
  * - superadmin — developers (seeded; not grantable via normal admin UI)
  * - admin — creates staff/borrower accounts, manages users
- * - staff — property custodian operations
+ * - staff — browse-only in the ops shell this phase (no asset/inventory mutations)
  * - borrower — department login (one account per department; not a named person)
  *
  * There is no public self-signup. Accounts are provisioned via the service-role

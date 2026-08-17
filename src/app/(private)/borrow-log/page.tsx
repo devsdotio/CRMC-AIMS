@@ -7,8 +7,10 @@ import { cn } from "@/lib/utils";
 import { getCategoryStyle } from "@/constants/categories";
 import { OverdueBadge } from "@/components/ui/overdue-badge";
 import { QueryErrorBanner } from "@/components/shared/query-error-banner";
+import { OperatorReadOnlyBanner } from "@/components/shared/operator-read-only-banner";
 import { ReturnLogDialog } from "@/components/borrow-log/return-log-dialog";
 import { useToast } from "@/components/providers/toast-context";
+import { useAssetOperator } from "@/hooks/use-asset-operator";
 import {
   useBorrowLogQuery,
   useReturnBorrowMutation,
@@ -38,6 +40,7 @@ function BorrowLogContent() {
   const [search, setSearch] = useState("");
   const [returnTarget, setReturnTarget] = useState<BorrowLogRecord | null>(null);
   const toast = useToast();
+  const { canOperate } = useAssetOperator();
 
   const {
     data: records = [],
@@ -132,6 +135,8 @@ function BorrowLogContent() {
         </div>
       </div>
 
+      {!canOperate && <OperatorReadOnlyBanner />}
+
       {isError && (
         <QueryErrorBanner
           message={error?.message || "Failed to load borrow log."}
@@ -211,7 +216,7 @@ function BorrowLogContent() {
                       )}
                     </td>
                     <td className="px-5 py-3.5 text-right">
-                      {row.status !== "returned" && (
+                      {canOperate && row.status !== "returned" && (
                         <button
                           type="button"
                           onClick={() => setReturnTarget(row)}
@@ -229,12 +234,14 @@ function BorrowLogContent() {
         )}
       </main>
 
+      {canOperate && (
       <ReturnLogDialog
         record={returnTarget}
         isOpen={Boolean(returnTarget)}
         onClose={() => setReturnTarget(null)}
         onConfirm={handleReturn}
       />
+      )}
     </div>
   );
 }

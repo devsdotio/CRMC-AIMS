@@ -32,9 +32,9 @@ export interface ConsumableDetailPanelProps {
   item: ConsumableItem | null;
   isOpen: boolean;
   onClose: () => void;
-  onRestock: (item: ConsumableItem) => void;
-  onAdjust: (item: ConsumableItem) => void;
-  onRelease: (item: ConsumableItem, lot?: PurchaseLot | null) => void;
+  onRestock?: (item: ConsumableItem) => void;
+  onAdjust?: (item: ConsumableItem) => void;
+  onRelease?: (item: ConsumableItem, lot?: PurchaseLot | null) => void;
   onEdit?: (item: ConsumableItem) => void;
 }
 
@@ -226,7 +226,9 @@ export function ConsumableDetailPanel({
             />
           </div>
 
+          {(onRestock || onRelease || onAdjust || onEdit) && (
           <div className="grid grid-cols-2 gap-2">
+            {onRestock && (
             <button
               type="button"
               onClick={() => onRestock(displayItem)}
@@ -235,6 +237,8 @@ export function ConsumableDetailPanel({
               <PlusCircle className="h-4 w-4" />
               Restock
             </button>
+            )}
+            {onRelease && (
             <button
               type="button"
               onClick={() => onRelease(displayItem)}
@@ -243,6 +247,8 @@ export function ConsumableDetailPanel({
               <PackageMinus className="h-4 w-4" />
               Release (lot)
             </button>
+            )}
+            {onAdjust && (
             <button
               type="button"
               onClick={() => onAdjust(displayItem)}
@@ -251,6 +257,7 @@ export function ConsumableDetailPanel({
               <SlidersHorizontal className="h-4 w-4" />
               Adjust
             </button>
+            )}
             {onEdit && (
               <button
                 type="button"
@@ -261,6 +268,7 @@ export function ConsumableDetailPanel({
               </button>
             )}
           </div>
+          )}
 
           <div className="space-y-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary">
@@ -408,7 +416,7 @@ export function ConsumableDetailPanel({
                             label={`${lot.itemName} · ${lot.supplierName || "—"}`}
                             size={128}
                           />
-                          {!depleted && (
+                          {!depleted && onRelease && (
                             <button
                               type="button"
                               onClick={() => onRelease(displayItem, lot)}

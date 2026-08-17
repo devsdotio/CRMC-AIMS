@@ -231,7 +231,7 @@ export async function requireAssetOperator(): Promise<AppSession> {
   const session = await requireSession();
   if (!isAssetOperatorRole(session.profile.role)) {
     throw new ForbiddenError(
-      "Only staff and administrators can manage coded assets."
+      "Only administrators can manage assets and inventory."
     );
   }
   return session;

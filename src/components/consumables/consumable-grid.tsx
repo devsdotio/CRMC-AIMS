@@ -8,8 +8,8 @@ export interface ConsumableGridProps {
   items: ConsumableItem[];
   loading?: boolean;
   onSelect: (item: ConsumableItem) => void;
-  onRestock: (item: ConsumableItem) => void;
-  onAdjust: (item: ConsumableItem) => void;
+  onRestock?: (item: ConsumableItem) => void;
+  onAdjust?: (item: ConsumableItem) => void;
 }
 
 // ─── Matched Skeleton Card for Consumables Grid ──────────────────────────────

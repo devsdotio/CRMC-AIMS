@@ -8,8 +8,8 @@ import { StockLevelBar } from "./stock-level-bar";
 export interface ConsumableTableRowProps {
   item: ConsumableItem;
   onSelect: (item: ConsumableItem) => void;
-  onRestock: (item: ConsumableItem) => void;
-  onAdjust: (item: ConsumableItem) => void;
+  onRestock?: (item: ConsumableItem) => void;
+  onAdjust?: (item: ConsumableItem) => void;
 }
 
 export function ConsumableTableRow({
@@ -69,8 +69,10 @@ export function ConsumableTableRow({
       </td>
 
       {/* Actions */}
+      {(onAdjust || onRestock) && (
       <td className="px-5 py-3.5 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-end gap-2">
+          {onAdjust && (
           <button
             type="button"
             onClick={() => onAdjust(item)}
@@ -79,7 +81,9 @@ export function ConsumableTableRow({
             <SlidersHorizontal className="h-3.5 w-3.5" />
             Adjust
           </button>
+          )}
 
+          {onRestock && (
           <button
             type="button"
             onClick={() => onRestock(item)}
@@ -88,8 +92,10 @@ export function ConsumableTableRow({
             <PlusCircle className="h-3.5 w-3.5" />
             Restock
           </button>
+          )}
         </div>
       </td>
+      )}
     </tr>
   );
 }

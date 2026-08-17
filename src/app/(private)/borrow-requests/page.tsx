@@ -24,7 +24,9 @@ import { ApproveRejectDialog } from "@/components/borrow-requests/approve-reject
 import { ReleaseDialog } from "@/components/borrow-requests/release-dialog";
 import { ReturnDialog } from "@/components/borrow-requests/return-dialog";
 import { QueryErrorBanner } from "@/components/shared/query-error-banner";
+import { OperatorReadOnlyBanner } from "@/components/shared/operator-read-only-banner";
 import { useToast } from "@/components/providers/toast-context";
+import { useAssetOperator } from "@/hooks/use-asset-operator";
 
 function BorrowRequestsContent() {
   const searchParams = useSearchParams();
@@ -38,6 +40,7 @@ function BorrowRequestsContent() {
   const markUnreleasedMutation = useMarkUnreleasedBorrowRequestMutation();
   const returnMutation = useMarkReturnedBorrowRequestMutation();
   const toast = useToast();
+  const { canOperate } = useAssetOperator();
 
   const [activeTab, setActiveTab] = useState<TabFilter>(
     statusParam &&
@@ -285,6 +288,8 @@ function BorrowRequestsContent() {
         </p>
       </div>
 
+      {!canOperate && <OperatorReadOnlyBanner />}
+
       {/* ── Tabs Navigation Bar ───────────────────────────────────────── */}
       <BorrowRequestTabs
         activeTab={activeTab}
@@ -323,11 +328,11 @@ function BorrowRequestsContent() {
             setHighlightedId(req.id);
             setSelectedRequest(req);
           }}
-          onApprove={handleOpenApproveModal}
-          onReject={handleOpenRejectModal}
-          onRelease={handleOpenReleaseModal}
-          onReturn={handleOpenReturnModal}
-          onMarkUnreleased={handleMarkUnreleased}
+          onApprove={canOperate ? handleOpenApproveModal : undefined}
+          onReject={canOperate ? handleOpenRejectModal : undefined}
+          onRelease={canOperate ? handleOpenReleaseModal : undefined}
+          onReturn={canOperate ? handleOpenReturnModal : undefined}
+          onMarkUnreleased={canOperate ? handleMarkUnreleased : undefined}
         />
 
         {/* ── Pagination ────────────────────────────────────────────────── */}
@@ -383,13 +388,15 @@ function BorrowRequestsContent() {
         request={selectedRequest}
         isOpen={Boolean(selectedRequest)}
         onClose={() => setSelectedRequest(null)}
-        onApprove={handleOpenApproveModal}
-        onReject={handleOpenRejectModal}
-        onRelease={handleOpenReleaseModal}
-        onReturn={handleOpenReturnModal}
-        onMarkUnreleased={handleMarkUnreleased}
+        onApprove={canOperate ? handleOpenApproveModal : undefined}
+        onReject={canOperate ? handleOpenRejectModal : undefined}
+        onRelease={canOperate ? handleOpenReleaseModal : undefined}
+        onReturn={canOperate ? handleOpenReturnModal : undefined}
+        onMarkUnreleased={canOperate ? handleMarkUnreleased : undefined}
       />
 
+      {canOperate && (
+      <>
       {/* ── Approve / Reject Confirmation Modal ───────────────────────── */}
       <ApproveRejectDialog
         request={dialogState.request}
@@ -420,6 +427,8 @@ function BorrowRequestsContent() {
         }
         onConfirm={handleReturnConfirm}
       />
+      </>
+      )}
     </div>
   );
 }

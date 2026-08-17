@@ -16,6 +16,8 @@ import { MaintenanceLogDetailPanel } from "@/components/maintenance-logs/mainten
 import { FlagForMaintenanceDialog } from "@/components/maintenance-logs/flag-for-maintenance-dialog";
 import { ResolveMaintenanceDialog } from "@/components/maintenance-logs/resolve-maintenance-dialog";
 import { useToast } from "@/components/providers/toast-context";
+import { OperatorReadOnlyBanner } from "@/components/shared/operator-read-only-banner";
+import { useAssetOperator } from "@/hooks/use-asset-operator";
 
 export default function MaintenanceLogsPage() {
   const { data: records = [], isLoading } = useMaintenanceLogsQuery();
@@ -23,6 +25,7 @@ export default function MaintenanceLogsPage() {
   const flagMutation = useCreateMaintenanceLogMutation();
   const resolveMutation = useResolveMaintenanceLogMutation();
   const toast = useToast();
+  const { canOperate } = useAssetOperator();
 
   // Filter & Sort State
   const [filters, setFilters] = useState<MaintenanceLogFilterState>({
@@ -193,6 +196,7 @@ export default function MaintenanceLogsPage() {
 
         {/* Top Header Actions */}
         <div className="flex items-center gap-2.5">
+          {canOperate && (
           <button
             type="button"
             onClick={() => setFlagDialogOpen(true)}
@@ -201,8 +205,11 @@ export default function MaintenanceLogsPage() {
             <Wrench className="h-4 w-4" strokeWidth={2.5} />
             Flag for Maintenance
           </button>
+          )}
         </div>
       </div>
+
+      {!canOperate && <OperatorReadOnlyBanner />}
 
       {/* ── Search & Filter Controls ──────────────────────────────────── */}
       <MaintenanceLogFilters
@@ -218,7 +225,7 @@ export default function MaintenanceLogsPage() {
           records={filteredRecords}
           loading={isLoading}
           onSelect={setSelectedRecord}
-          onResolve={setResolveDialogRecord}
+          onResolve={canOperate ? setResolveDialogRecord : undefined}
         />
       </main>
 
@@ -227,12 +234,18 @@ export default function MaintenanceLogsPage() {
         record={selectedRecord}
         isOpen={Boolean(selectedRecord)}
         onClose={() => setSelectedRecord(null)}
-        onResolve={(rec) => {
-          setSelectedRecord(null);
-          setResolveDialogRecord(rec);
-        }}
+        onResolve={
+          canOperate
+            ? (rec) => {
+                setSelectedRecord(null);
+                setResolveDialogRecord(rec);
+              }
+            : undefined
+        }
       />
 
+      {canOperate && (
+      <>
       {/* ── Flag for Maintenance Dialog ─────────────────────────────── */}
       <FlagForMaintenanceDialog
         isOpen={flagDialogOpen}
@@ -249,6 +262,8 @@ export default function MaintenanceLogsPage() {
         onClose={() => setResolveDialogRecord(null)}
         onConfirmResolve={handleConfirmResolve}
       />
+      </>
+      )}
     </div>
   );
 }

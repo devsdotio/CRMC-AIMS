@@ -27,7 +27,7 @@ export function getApiDocs() {
           "### Roles",
           "- `superadmin` — bootstrap / platform",
           "- `admin` — user management + operations",
-          "- `staff` — property custodian operations",
+          "- `staff` — browse-only in the ops shell (no asset/inventory mutations this phase)",
           "- `borrower` — department portal login (one account per department)",
         ].join("\n"),
       },

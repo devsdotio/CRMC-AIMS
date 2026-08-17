@@ -31,7 +31,9 @@ import {
 } from "@/components/consumables/release-from-lot-dialog";
 import { useSuppliersQuery } from "@/features/suppliers/client";
 import { QueryErrorBanner } from "@/components/shared/query-error-banner";
+import { OperatorReadOnlyBanner } from "@/components/shared/operator-read-only-banner";
 import { useToast } from "@/components/providers/toast-context";
+import { useAssetOperator } from "@/hooks/use-asset-operator";
 
 export default function ConsumablesPage() {
   const { data: paginatedData, isLoading: isConsumablesLoading, isError, error, refetch } =
@@ -47,6 +49,7 @@ export default function ConsumablesPage() {
   const adjustMutation = useAdjustConsumableMutation();
   const releaseMutation = useReleaseFromLotMutation();
   const toast = useToast();
+  const { canOperate } = useAssetOperator();
 
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
 
@@ -283,6 +286,8 @@ export default function ConsumablesPage() {
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
+          {canOperate && (
+          <>
           <button
             type="button"
             onClick={() => {
@@ -312,10 +317,14 @@ export default function ConsumablesPage() {
             <Plus className="h-4 w-4" strokeWidth={2.5} />
             Add supply item
           </button>
+          </>
+          )}
 
           <AssetViewToggle viewMode={viewMode} onViewChange={setViewMode} />
         </div>
       </div>
+
+      {!canOperate && <OperatorReadOnlyBanner />}
 
       {actionError && (
         <div className="px-4 md:px-6 py-2 bg-destructive/10 border-b border-destructive/20 text-xs text-destructive shrink-0">
@@ -344,16 +353,32 @@ export default function ConsumablesPage() {
             items={filteredItems}
             loading={isLoading && !isError}
             onSelect={(item) => setSelectedId(item.id)}
-            onRestock={(item) => setRestockState({ isOpen: true, item })}
-            onAdjust={(item) => setAdjustState({ isOpen: true, item })}
+            onRestock={
+              canOperate
+                ? (item) => setRestockState({ isOpen: true, item })
+                : undefined
+            }
+            onAdjust={
+              canOperate
+                ? (item) => setAdjustState({ isOpen: true, item })
+                : undefined
+            }
           />
         ) : (
           <ConsumableTable
             items={filteredItems}
             loading={isLoading && !isError}
             onSelect={(item) => setSelectedId(item.id)}
-            onRestock={(item) => setRestockState({ isOpen: true, item })}
-            onAdjust={(item) => setAdjustState({ isOpen: true, item })}
+            onRestock={
+              canOperate
+                ? (item) => setRestockState({ isOpen: true, item })
+                : undefined
+            }
+            onAdjust={
+              canOperate
+                ? (item) => setAdjustState({ isOpen: true, item })
+                : undefined
+            }
           />
         )}
       </main>
@@ -362,12 +387,26 @@ export default function ConsumablesPage() {
         item={selectedItem}
         isOpen={Boolean(selectedItem)}
         onClose={() => setSelectedId(null)}
-        onRestock={(item) => setRestockState({ isOpen: true, item })}
-        onAdjust={(item) => setAdjustState({ isOpen: true, item })}
-        onRelease={(item, lot) => openRelease(item, lot)}
-        onEdit={(item) => setAddEditState({ isOpen: true, item })}
+        onRestock={
+          canOperate
+            ? (item) => setRestockState({ isOpen: true, item })
+            : undefined
+        }
+        onAdjust={
+          canOperate
+            ? (item) => setAdjustState({ isOpen: true, item })
+            : undefined
+        }
+        onRelease={canOperate ? (item, lot) => openRelease(item, lot) : undefined}
+        onEdit={
+          canOperate
+            ? (item) => setAddEditState({ isOpen: true, item })
+            : undefined
+        }
       />
 
+      {canOperate && (
+      <>
       <AddEditConsumableDialog
         isOpen={addEditState.isOpen}
         initialItem={addEditState.item}
@@ -402,6 +441,8 @@ export default function ConsumablesPage() {
         }
         onConfirm={handleConfirmRelease}
       />
+      </>
+      )}
     </div>
   );
 }
