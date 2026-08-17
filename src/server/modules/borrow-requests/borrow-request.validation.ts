@@ -21,6 +21,7 @@ export const listBorrowRequestsQuerySchema = z.object({
   department: z.string().trim().max(120).optional(),
   search: z.string().trim().max(200).optional(),
   requesterUserId: z.string().uuid().optional(),
+  requestType: z.enum(["borrowable", "assignable"]).optional(),
   page: z.coerce.number().int().min(1).optional().default(1),
   limit: z.coerce.number().int().min(1).max(100).optional().default(20),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),

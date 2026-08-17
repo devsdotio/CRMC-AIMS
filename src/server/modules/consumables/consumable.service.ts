@@ -33,7 +33,6 @@ import {
   listConsumablesQuerySchema,
   restockSchema,
   stockAdjustSchema,
-  stockMovementSchema,
   issueConsumableSchema,
   updateConsumableSchema,
 } from "./consumable.validation";
@@ -343,8 +342,7 @@ export class ConsumableService {
     rawInput: unknown,
     actor: ActorContext
   ): Promise<ConsumableDTO> {
-    const input = stockMovementSchema.parse(rawInput);
-    return this.issue(rawId, { ...input, useFifo: true }, actor);
+    return this.issue(rawId, rawInput, actor);
   }
 
   /**
@@ -627,29 +625,23 @@ export class ConsumableService {
       );
 
       let allocations: LotCostAllocation[] = [];
-      if (input.useFifo !== false && !input.lotId && !input.lotCode) {
-        allocations = await this.purchaseLots.consumeFifo(
-          existing.id,
-          input.quantity,
-          tx
-        );
-        this.rejectUncosted(allocations, existing.itemCode);
-      } else {
-        const result = input.lotId
-          ? await this.purchaseLots.consumeFromLotId(
-              input.lotId,
-              input.quantity,
-              tx,
-              existing.id
-            )
-          : await this.purchaseLots.consumeFromLot(
-              input.lotCode!,
-              input.quantity,
-              tx,
-              existing.id
-            );
-        allocations = [result.allocation];
+      if (!input.lotId && !input.lotCode) {
+        throw new BadRequestError("Select a purchase lot to issue from.");
       }
+      const result = input.lotId
+        ? await this.purchaseLots.consumeFromLotId(
+            input.lotId,
+            input.quantity,
+            tx,
+            existing.id
+          )
+        : await this.purchaseLots.consumeFromLot(
+            input.lotCode!,
+            input.quantity,
+            tx,
+            existing.id
+          );
+      allocations = [result.allocation];
 
       const totalCost = allocations.reduce((sum, a) => sum + Number(a.total), 0);
       const primary = allocations[0];

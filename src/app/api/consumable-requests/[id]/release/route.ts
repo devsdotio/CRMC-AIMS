@@ -4,11 +4,11 @@ import { consumableRequestController } from "@/server/modules/consumable-request
  * @swagger
  * /api/consumable-requests/{id}/release:
  *   post:
- *     summary: Release an approved request from specific lots (full issue)
+ *     summary: Issue an approved request from specific lots
  *     description: |
  *       Deducts `purchase_lots.quantity_remaining` and `consumables.current_qty`.
  *       Every request line must be included exactly once. Allocations per line
- *       must total the line's quantityRequested (or set useFifo=true).
+ *       must total the line's quantityRequested. Lot pick is required (no FIFO).
  *     tags: [ConsumableRequests]
  *     parameters:
  *       - in: path
@@ -29,10 +29,9 @@ import { consumableRequestController } from "@/server/modules/consumable-request
  *                 type: array
  *                 items:
  *                   type: object
- *                   required: [lineId]
+ *                   required: [lineId, allocations]
  *                   properties:
  *                     lineId: { type: string, format: uuid }
- *                     useFifo: { type: boolean }
  *                     allocations:
  *                       type: array
  *                       items:

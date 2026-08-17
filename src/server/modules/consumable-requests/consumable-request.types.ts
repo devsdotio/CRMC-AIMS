@@ -83,6 +83,7 @@ export interface IConsumableRequestRepository {
   countByStatus(
     filters?: Omit<ListConsumableRequestFilters, "status" | "page" | "limit">
   ): Promise<Record<string, number>>;
+  countPending(session?: unknown, userId?: string): Promise<number>;
   create(
     data: Omit<NewConsumableRequestRow, "id" | "createdAt" | "updatedAt">
   ): Promise<ConsumableRequestRow>;

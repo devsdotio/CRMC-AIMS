@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useState, useMemo, useEffect, useRef } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   useBorrowRequests,
   useApproveBorrowRequestMutation,
@@ -23,16 +23,36 @@ import { RequestDetailPanel } from "@/components/borrow-requests/request-detail-
 import { ApproveRejectDialog } from "@/components/borrow-requests/approve-reject-dialog";
 import { ReleaseDialog } from "@/components/borrow-requests/release-dialog";
 import { ReturnDialog } from "@/components/borrow-requests/return-dialog";
+import { SupplyRequestsQueue } from "@/components/consumable-requests/supply-requests-queue";
 import { QueryErrorBanner } from "@/components/shared/query-error-banner";
 import { OperatorReadOnlyBanner } from "@/components/shared/operator-read-only-banner";
 import { useToast } from "@/components/providers/toast-context";
 import { useAssetOperator } from "@/hooks/use-asset-operator";
+import { useConsumableRequests } from "@/features/consumable-requests/client";
+import { cn } from "@/lib/utils";
+
+type RequestKind = "borrow" | "assign" | "supply";
+
+function parseKind(raw: string | null): RequestKind {
+  if (raw === "assign" || raw === "supply" || raw === "borrow") return raw;
+  return "borrow";
+}
 
 function BorrowRequestsContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const requestIdParam =
     searchParams.get("requestId") || searchParams.get("highlightId");
   const statusParam = searchParams.get("status") as TabFilter | null;
+  const kind = parseKind(searchParams.get("kind"));
+
+  const setKind = (next: RequestKind) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("kind", next);
+    params.delete("requestId");
+    params.delete("highlightId");
+    router.replace(`/borrow-requests?${params.toString()}`);
+  };
 
   const approveMutation = useApproveBorrowRequestMutation();
   const rejectMutation = useRejectBorrowRequestMutation();
@@ -84,6 +104,23 @@ function BorrowRequestsContent() {
     endDate: filters.endDate || undefined,
     page: filters.page,
     limit: 10,
+    requestType: kind === "assign" ? "assignable" : "borrowable",
+    enabled: kind !== "supply",
+  });
+
+  const { data: borrowPendingMeta } = useBorrowRequests({
+    status: "pending",
+    requestType: "borrowable",
+    limit: 1,
+  });
+  const { data: assignPendingMeta } = useBorrowRequests({
+    status: "pending",
+    requestType: "assignable",
+    limit: 1,
+  });
+  const { data: supplyPendingMeta } = useConsumableRequests({
+    status: "pending",
+    limit: 1,
   });
 
   const requests = useMemo(() => response?.data ?? [], [response?.data]);
@@ -159,6 +196,12 @@ function BorrowRequestsContent() {
   const totalCount = meta?.counts
     ? Object.values(meta.counts).reduce((a, b) => a + (b || 0), 0)
     : 0;
+
+  const kindPending = {
+    borrow: borrowPendingMeta?.meta.total ?? 0,
+    assign: assignPendingMeta?.meta.total ?? 0,
+    supply: supplyPendingMeta?.meta.total ?? 0,
+  };
 
   // Handlers for state updates
   const handleFilterChange = (
@@ -280,16 +323,57 @@ function BorrowRequestsContent() {
       {/* ── Page Header Banner ────────────────────────────────────────── */}
       <div className="px-4 md:px-6 pt-5 pb-3 bg-bg shrink-0">
         <h1 className="text-xl font-bold tracking-tight text-text">
-          Borrow Requests Queue
+          Requests
         </h1>
         <p className="text-xs text-text-secondary mt-0.5">
-          Review, approve, or decline incoming property borrow requests submitted
-          by hospital personnel.
+          Review borrow, assignment, and supply requests in one queue.
         </p>
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {(
+            [
+              ["borrow", "Borrow Requests"],
+              ["assign", "Assign Requests"],
+              ["supply", "Supply Requests"],
+            ] as const
+          ).map(([id, label]) => {
+            const count = kindPending[id];
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setKind(id)}
+                className={cn(
+                  "inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md border",
+                  kind === id
+                    ? "bg-bg-subtle border-primary text-text"
+                    : "border-border text-text-secondary hover:text-text"
+                )}
+              >
+                {label}
+                {count > 0 && (
+                  <span
+                    className={cn(
+                      "min-w-5 h-5 px-1.5 rounded-full text-[10px] font-bold tabular-nums flex items-center justify-center",
+                      kind === id
+                        ? "bg-accent text-accent-foreground"
+                        : "bg-status-repair-bg/20 text-text"
+                    )}
+                  >
+                    {count > 99 ? "99+" : count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {!canOperate && <OperatorReadOnlyBanner />}
 
+      {kind === "supply" ? (
+        <SupplyRequestsQueue />
+      ) : (
+        <>
       {/* ── Tabs Navigation Bar ───────────────────────────────────────── */}
       <BorrowRequestTabs
         activeTab={activeTab}
@@ -428,6 +512,8 @@ function BorrowRequestsContent() {
         onConfirm={handleReturnConfirm}
       />
       </>
+      )}
+        </>
       )}
     </div>
   );

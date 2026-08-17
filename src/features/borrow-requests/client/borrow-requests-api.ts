@@ -45,6 +45,7 @@ export const borrowRequestsApi = {
     startDate?: string;
     endDate?: string;
     assetId?: string;
+    requestType?: "borrowable" | "assignable";
   }): Promise<PaginatedResponse<BorrowRequest[]>> {
     const sp = new URLSearchParams();
     if (params?.status) sp.set("status", params.status);
@@ -55,6 +56,7 @@ export const borrowRequestsApi = {
     if (params?.page) sp.set("page", params.page.toString());
     if (params?.limit) sp.set("limit", params.limit.toString());
     if (params?.assetId) sp.set("assetId", params.assetId);
+    if (params?.requestType) sp.set("requestType", params.requestType);
     const qs = sp.toString();
     const res = await fetchJson<ApiResponse<PaginatedResponse<BorrowRequest[]>>>(
       qs ? `/api/requests?${qs}` : "/api/requests"

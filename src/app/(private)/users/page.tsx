@@ -260,7 +260,6 @@ export default function UsersPage() {
         isOpen={inviteDialogOpen}
         onClose={() => setInviteDialogOpen(false)}
         onCreateUser={handleCreateUser}
-        canInviteAdmin={canInviteAdmin}
         departments={departments}
       />
 

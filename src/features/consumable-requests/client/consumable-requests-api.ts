@@ -25,8 +25,7 @@ export type ReleaseConsumableRequestPayload = {
   note?: string;
   lines: Array<{
     lineId: string;
-    useFifo?: boolean;
-    allocations?: Array<{
+    allocations: Array<{
       lotId?: string;
       lotCode?: string;
       quantity: number;

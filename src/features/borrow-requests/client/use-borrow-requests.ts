@@ -32,10 +32,14 @@ export function useBorrowRequests(filters?: {
   startDate?: string;
   endDate?: string;
   assetId?: string;
+  requestType?: "borrowable" | "assignable";
+  enabled?: boolean;
 }): UseQueryResult<PaginatedResponse<BorrowRequest[]>, Error> {
+  const { enabled = true, ...listFilters } = filters ?? {};
   return useQuery({
-    queryKey: borrowRequestQueryKeys.list(filters),
-    queryFn: () => borrowRequestsApi.list(filters),
+    queryKey: borrowRequestQueryKeys.list(listFilters),
+    queryFn: () => borrowRequestsApi.list(listFilters),
+    enabled,
     placeholderData: keepPreviousData,
   });
 }

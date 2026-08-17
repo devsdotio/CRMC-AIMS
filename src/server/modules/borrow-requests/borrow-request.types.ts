@@ -38,6 +38,7 @@ export type ListBorrowRequestFilters = {
   department?: string;
   search?: string;
   requesterUserId?: string;
+  requestType?: "borrowable" | "assignable";
   page?: number;
   limit?: number;
   startDate?: string;

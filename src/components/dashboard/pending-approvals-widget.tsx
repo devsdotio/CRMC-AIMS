@@ -13,6 +13,7 @@ export interface PendingRequest {
   itemDescription: string;
   requestedAt: string;
   relativeTime: string;
+  kind?: "borrow" | "assign" | "supply";
 }
 
 export interface PendingApprovalsWidgetProps {
@@ -100,12 +101,12 @@ export function PendingApprovalsWidget({
             <div>
               <p className="text-sm font-semibold text-text">No pending requests</p>
               <p className="text-xs text-text-secondary mt-0.5">
-                All property borrow requests have been reviewed.
+                All requests have been reviewed.
               </p>
             </div>
           </div>
         ) : (
-          <ul className="px-5 divide-y divide-border/60" aria-label="Pending borrow requests">
+          <ul className="px-5 divide-y divide-border/60" aria-label="Pending requests">
             {requests.slice(0, 5).map((req) => (
               <li
                 key={req.id}
@@ -129,7 +130,7 @@ export function PendingApprovalsWidget({
                 {/* Single View Request Action */}
                 <div className="shrink-0">
                   <Link
-                    href={`/borrow-requests?requestId=${req.id}&status=pending`}
+                    href={`/borrow-requests?kind=${req.kind ?? "borrow"}&requestId=${req.id}&status=pending`}
                     className={cn(
                       "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold",
                       "bg-accent text-accent-foreground shadow-xs hover:opacity-90 transition-opacity",

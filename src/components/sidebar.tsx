@@ -139,7 +139,6 @@ export default function Sidebar({
         { name: "Assets", href: "/assets", icon: Package, roles: ["superadmin", "admin", "staff"] },
         { name: "Inventory", href: "/consumables", icon: Boxes, badge: lowStockCount, badgeTone: "warning", roles: ["superadmin", "admin", "staff"] },
         { name: "Requests", href: "/borrow-requests", icon: ClipboardList, badge: pendingCount, badgeTone: "accent", roles: ["superadmin", "admin", "staff"] },
-        { name: "Supply requests", href: "/consumable-requests", icon: Boxes, roles: ["superadmin", "admin", "staff"] },
         { name: "Borrow Log", href: "/borrow-log", icon: Repeat, badge: overdueCount, badgeTone: "warning", roles: ["superadmin", "admin", "staff"] },
         { name: "Issue history", href: "/issue-history", icon: History, roles: ["superadmin", "admin", "staff"] },
         { name: "Suppliers", href: "/suppliers", icon: Truck, roles: ["superadmin", "admin", "staff"] },

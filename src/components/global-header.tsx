@@ -34,8 +34,8 @@ const ROUTE_MAP: Record<string, RouteMeta> = {
     category: "Overview",
   },
   "/borrow-requests": {
-    title: "Borrow Requests",
-    subtitle: "Review and approve pending asset borrowing requests",
+    title: "Requests",
+    subtitle: "Borrow, assignment, and supply request queues",
     category: "Operations",
   },
   "/assets": {
@@ -54,8 +54,8 @@ const ROUTE_MAP: Record<string, RouteMeta> = {
     category: "Operations",
   },
   "/consumable-requests": {
-    title: "Supply requests",
-    subtitle: "Department consumable requisitions — approve and release",
+    title: "Requests",
+    subtitle: "Borrow, assignment, and supply request queues",
     category: "Operations",
   },
   "/maintenance-logs": {

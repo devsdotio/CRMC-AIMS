@@ -147,6 +147,19 @@ export class ConsumableRequestRepository
     return result;
   }
 
+  async countPending(session?: DbSession, userId?: string): Promise<number> {
+    const db = this.db(session);
+    const conditions = [eq(consumableRequests.status, "pending")];
+    if (userId) {
+      conditions.push(eq(consumableRequests.requesterUserId, userId));
+    }
+    const [row] = await db
+      .select({ value: count() })
+      .from(consumableRequests)
+      .where(and(...conditions));
+    return Number(row?.value ?? 0);
+  }
+
   async create(
     data: Omit<NewConsumableRequestRow, "id" | "createdAt" | "updatedAt">,
     session?: DbSession

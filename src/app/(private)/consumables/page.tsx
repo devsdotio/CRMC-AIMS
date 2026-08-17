@@ -10,12 +10,7 @@ import {
   useAdjustConsumableMutation,
   type StockAdjustPayload,
 } from "@/features/consumables/client/use-consumables";
-import {
-  usePurchaseLotsQuery,
-  useReleaseFromLotMutation,
-} from "@/features/purchase-lots/client";
 import type { ConsumableItem, ConsumableFilterState } from "@/types/inventory";
-import type { PurchaseLot } from "@/types/purchase-lots";
 import { getStockSeverity } from "@/components/consumables/utils";
 import { ConsumableFilters } from "@/components/consumables/consumable-filters";
 import { AssetViewToggle } from "@/components/assets/asset-view-toggle";
@@ -25,10 +20,6 @@ import { ConsumableDetailPanel } from "@/components/consumables/consumable-detai
 import { AddEditConsumableDialog } from "@/components/consumables/add-edit-consumable-dialog";
 import { RestockDialog } from "@/components/consumables/restock-dialog";
 import { AdjustStockDialog } from "@/components/consumables/adjust-stock-dialog";
-import {
-  ReleaseFromLotDialog,
-  type ReleaseFromLotInput,
-} from "@/components/consumables/release-from-lot-dialog";
 import { IssueConsumableDialog } from "@/components/consumables/issue-consumable-dialog";
 import { useSuppliersQuery } from "@/features/suppliers/client";
 import { QueryErrorBanner } from "@/components/shared/query-error-banner";
@@ -48,7 +39,6 @@ export default function ConsumablesPage() {
   const updateMutation = useUpdateConsumableMutation();
   const restockMutation = useRestockConsumableMutation();
   const adjustMutation = useAdjustConsumableMutation();
-  const releaseMutation = useReleaseFromLotMutation();
   const toast = useToast();
   const { canOperate } = useAssetOperator();
 
@@ -82,24 +72,13 @@ export default function ConsumablesPage() {
     isOpen: boolean;
     item: ConsumableItem | null;
   }>({ isOpen: false, item: null });
-  const [releaseState, setReleaseState] = useState<{
-    isOpen: boolean;
-    item: ConsumableItem | null;
-    lot: PurchaseLot | null;
-  }>({ isOpen: false, item: null, lot: null });
   const [issueItem, setIssueItem] = useState<ConsumableItem | null>(null);
+  const [issueLotId, setIssueLotId] = useState<string | undefined>(undefined);
 
   // Suppliers only matter for Restock dialog (add/edit loads its own registry list).
   const { data: suppliers = [] } = useSuppliersQuery({
     activeOnly: true,
     enabled: restockState.isOpen,
-  });
-
-  const releaseItemId = releaseState.item?.id;
-  const { data: releaseLots = [] } = usePurchaseLotsQuery({
-    consumableId: releaseItemId,
-    itemType: "consumable",
-    enabled: Boolean(releaseState.isOpen && releaseItemId),
   });
 
   const [actionError, setActionError] = useState<string | null>(null);
@@ -169,11 +148,6 @@ export default function ConsumablesPage() {
       stockLevel: "all",
       sortBy: "critical",
     });
-  };
-
-  const openRelease = (item: ConsumableItem, lot?: PurchaseLot | null) => {
-    setActionError(null);
-    setReleaseState({ isOpen: true, item, lot: lot ?? null });
   };
 
   const handleSaveConsumable = async (itemData: Partial<ConsumableItem>) => {
@@ -256,16 +230,6 @@ export default function ConsumablesPage() {
     }
   };
 
-  const handleConfirmRelease = async (input: ReleaseFromLotInput) => {
-    try {
-      await releaseMutation.mutateAsync(input);
-      toast.success("Items released successfully.");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Release failed.");
-      throw err;
-    }
-  };
-
   return (
     <div
       className="h-full flex flex-col min-h-0 overflow-hidden bg-bg-subtle rounded-md"
@@ -282,8 +246,8 @@ export default function ConsumablesPage() {
             </span>
           </div>
           <p className="text-xs text-text-secondary mt-0.5 max-w-xl">
-            Non-serialized stock (paper, ink, cleaning). Multi-supplier lots
-            hold unit cost; release via lot QR for accountable issue logs.
+            Non-serialized stock (paper, ink, cleaning). Issue from a specific
+            purchase lot so cost stays on the movement.
           </p>
         </div>
 
@@ -293,6 +257,7 @@ export default function ConsumablesPage() {
           <button
             type="button"
             onClick={() => {
+              setIssueLotId(undefined);
               if (selectedItem) setIssueItem(selectedItem);
               else if (filteredItems[0]) setIssueItem(filteredItems[0]);
             }}
@@ -300,18 +265,6 @@ export default function ConsumablesPage() {
           >
             <PackageMinus className="h-4 w-4 text-primary" />
             <span>Issue</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              if (selectedItem) openRelease(selectedItem);
-              else if (filteredItems[0]) openRelease(filteredItems[0]);
-            }}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-border bg-bg text-text hover:border-primary transition-colors cursor-pointer"
-          >
-            <PackageMinus className="h-4 w-4 text-primary" />
-            <span>Release from lot</span>
           </button>
 
           <button
@@ -411,7 +364,14 @@ export default function ConsumablesPage() {
             ? (item) => setAdjustState({ isOpen: true, item })
             : undefined
         }
-        onRelease={canOperate ? (item, lot) => openRelease(item, lot) : undefined}
+        onRelease={
+          canOperate
+            ? (item, lot) => {
+                setIssueLotId(lot?.id);
+                setIssueItem(item);
+              }
+            : undefined
+        }
         onEdit={
           canOperate
             ? (item) => setAddEditState({ isOpen: true, item })
@@ -447,20 +407,12 @@ export default function ConsumablesPage() {
       <IssueConsumableDialog
         item={issueItem}
         isOpen={Boolean(issueItem)}
-        onClose={() => setIssueItem(null)}
+        initialLotId={issueLotId}
+        onClose={() => {
+          setIssueItem(null);
+          setIssueLotId(undefined);
+        }}
         onSuccess={(message) => toast.success(message)}
-      />
-
-      <ReleaseFromLotDialog
-        isOpen={releaseState.isOpen}
-        item={releaseState.item}
-        lots={releaseLots}
-        initialLot={releaseState.lot}
-        isSubmitting={releaseMutation.isPending}
-        onClose={() =>
-          setReleaseState({ isOpen: false, item: null, lot: null })
-        }
-        onConfirm={handleConfirmRelease}
       />
       </>
       )}

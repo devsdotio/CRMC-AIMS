@@ -39,6 +39,16 @@ export class BorrowRequestRepository implements IBorrowRequestRepository {
     if (filters.requesterUserId) {
       conditions.push(eq(borrowRequests.requesterUserId, filters.requesterUserId));
     }
+    if (filters.requestType === "assignable") {
+      conditions.push(eq(borrowRequests.requestType, "assignable"));
+    } else if (filters.requestType === "borrowable") {
+      conditions.push(
+        or(
+          eq(borrowRequests.requestType, "borrowable"),
+          sql`${borrowRequests.requestType} is null`
+        )!
+      );
+    }
     if (filters.search?.trim()) {
       const q = `%${filters.search.trim()}%`;
       conditions.push(

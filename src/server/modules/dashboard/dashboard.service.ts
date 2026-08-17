@@ -2,6 +2,7 @@ import { AssetRepository } from "@/server/modules/assets/asset.repository";
 import { BorrowRequestRepository } from "@/server/modules/borrow-requests/borrow-request.repository";
 import { BorrowLogRepository } from "@/server/modules/borrow-log/borrow-log.repository";
 import { ConsumableRepository } from "@/server/modules/consumables/consumable.repository";
+import { ConsumableRequestRepository } from "@/server/modules/consumable-requests/consumable-request.repository";
 import { formatRelativeTime } from "@/lib/format-relative-time";
 import { getDb } from "@/server/db";
 import { assetLifecycleEvents } from "@/server/db/schema";
@@ -22,6 +23,7 @@ export type DashboardPendingRequest = {
   itemDescription: string;
   requestedAt: string;
   relativeTime: string;
+  kind: "borrow" | "assign" | "supply";
 };
 
 export type DashboardOverdueAsset = {
@@ -76,8 +78,57 @@ export class DashboardService {
     private readonly requests = new BorrowRequestRepository(),
     private readonly borrowLog = new BorrowLogRepository(),
     private readonly consumables = new ConsumableRepository(),
+    private readonly consumableRequests = new ConsumableRequestRepository(),
     private readonly assets = new AssetRepository()
   ) {}
+
+  private mergePendingRequests(
+    borrowRows: Array<{
+      id: string;
+      requesterName: string;
+      department: string;
+      requestType?: "borrowable" | "assignable" | null;
+      items: Array<{ itemDescription: string }>;
+      requestedAt: Date | string;
+    }>,
+    supplyRows: Array<{
+      id: string;
+      requesterName: string;
+      department: string;
+      purpose: string;
+      requestCode: string;
+      requestedAt: Date | string;
+    }>,
+    limit: number
+  ): DashboardPendingRequest[] {
+    const fromBorrow: DashboardPendingRequest[] = borrowRows.map((r) => ({
+      id: r.id,
+      requesterName: r.requesterName,
+      department: r.department,
+      itemDescription: r.items[0]?.itemDescription || "Multiple items",
+      requestedAt:
+        r.requestedAt instanceof Date
+          ? r.requestedAt.toISOString()
+          : String(r.requestedAt),
+      relativeTime: formatRelativeTime(r.requestedAt),
+      kind: r.requestType === "assignable" ? "assign" : "borrow",
+    }));
+    const fromSupply: DashboardPendingRequest[] = supplyRows.map((r) => ({
+      id: r.id,
+      requesterName: r.requesterName,
+      department: r.department,
+      itemDescription: r.purpose || r.requestCode,
+      requestedAt:
+        r.requestedAt instanceof Date
+          ? r.requestedAt.toISOString()
+          : String(r.requestedAt),
+      relativeTime: formatRelativeTime(r.requestedAt),
+      kind: "supply",
+    }));
+    return [...fromBorrow, ...fromSupply]
+      .sort((a, b) => Date.parse(b.requestedAt) - Date.parse(a.requestedAt))
+      .slice(0, limit);
+  }
 
   /**
    * Sidebar badges only — cheap COUNT queries, no full list payload.
@@ -87,7 +138,10 @@ export class DashboardService {
     if (userId) {
       const [activeBorrows, pendingApprovals, overdueAssets] = await Promise.all([
         this.borrowLog.countActive(undefined, userId),
-        this.requests.countPending(undefined, userId),
+        Promise.all([
+          this.requests.countPending(undefined, userId),
+          this.consumableRequests.countPending(undefined, userId),
+        ]).then(([a, b]) => a + b),
         this.borrowLog.countOverdue(undefined, userId),
       ]);
       return {
@@ -101,7 +155,10 @@ export class DashboardService {
     const [activeBorrows, pendingApprovals, lowStockItems, overdueAssets] =
       await Promise.all([
         this.borrowLog.countActive(),
-        this.requests.countPending(),
+        Promise.all([
+          this.requests.countPending(),
+          this.consumableRequests.countPending(),
+        ]).then(([a, b]) => a + b),
         this.consumables.countLowStock(),
         this.borrowLog.countOverdue(),
       ]);
@@ -120,12 +177,20 @@ export class DashboardService {
       pendingApprovals,
       overdueAssets,
       pendingRows,
+      pendingSupplyRows,
       overdueRows,
     ] = await Promise.all([
       this.borrowLog.countActive(undefined, userId),
-      this.requests.countPending(undefined, userId),
+      Promise.all([
+        this.requests.countPending(undefined, userId),
+        this.consumableRequests.countPending(undefined, userId),
+      ]).then(([a, b]) => a + b),
       this.borrowLog.countOverdue(undefined, userId),
       this.requests.list({ status: "pending", requesterUserId: userId }),
+      this.consumableRequests.list({
+        status: "pending",
+        requesterUserId: userId,
+      }),
       this.borrowLog.list({ status: "overdue", borrowerUserId: userId }),
     ]);
 
@@ -136,17 +201,11 @@ export class DashboardService {
         lowStockItems: 0,
         overdueAssets,
       },
-      pendingRequests: pendingRows.slice(0, limit).map((r) => ({
-        id: r.id,
-        requesterName: r.requesterName,
-        department: r.department,
-        itemDescription: r.items[0]?.itemDescription || "Multiple items",
-        requestedAt:
-          r.requestedAt instanceof Date
-            ? r.requestedAt.toISOString()
-            : String(r.requestedAt),
-        relativeTime: formatRelativeTime(r.requestedAt),
-      })),
+      pendingRequests: this.mergePendingRequests(
+        pendingRows,
+        pendingSupplyRows,
+        limit
+      ),
       overdueAssets: overdueRows.slice(0, limit).map((row) => {
         const dto = toBorrowLogDTO(row);
         return {
@@ -172,16 +231,21 @@ export class DashboardService {
       lowStockItems,
       overdueAssets,
       pendingRows,
+      pendingSupplyRows,
       overdueRows,
       allConsumables,
       allAssets,
       recentLifecycle,
     ] = await Promise.all([
       this.borrowLog.countActive(),
-      this.requests.countPending(),
+      Promise.all([
+        this.requests.countPending(),
+        this.consumableRequests.countPending(),
+      ]).then(([a, b]) => a + b),
       this.consumables.countLowStock(),
       this.borrowLog.countOverdue(),
       this.requests.list({ status: "pending" }),
+      this.consumableRequests.list({ status: "pending" }),
       this.borrowLog.list({ status: "overdue" }),
       this.consumables.getLowStockItems(limit),
       this.assets.getCategoryDistribution(),
@@ -209,17 +273,11 @@ export class DashboardService {
         lowStockItems,
         overdueAssets,
       },
-      pendingRequests: pendingRows.slice(0, limit).map((r) => ({
-        id: r.id,
-        requesterName: r.requesterName,
-        department: r.department,
-        itemDescription: r.items[0]?.itemDescription || "Multiple items",
-        requestedAt:
-          r.requestedAt instanceof Date
-            ? r.requestedAt.toISOString()
-            : String(r.requestedAt),
-        relativeTime: formatRelativeTime(r.requestedAt),
-      })),
+      pendingRequests: this.mergePendingRequests(
+        pendingRows,
+        pendingSupplyRows,
+        limit
+      ),
       overdueAssets: overdueRows.slice(0, limit).map((row) => {
         const dto = toBorrowLogDTO(row);
         return {

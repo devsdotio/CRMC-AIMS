@@ -5,17 +5,20 @@ import { PackageMinus, X } from "lucide-react";
 import type { ConsumableItem } from "@/types/inventory";
 import { useDepartmentsQuery } from "@/features/departments/client";
 import { useProjectsQuery } from "@/features/projects/client";
+import { usePurchaseLotsQuery } from "@/features/purchase-lots/client/use-purchase-lots";
 import { fetchJson, type ApiResponse } from "@/features/shared/fetch-json";
 import { useQueryClient } from "@tanstack/react-query";
 import { consumableQueryKeys } from "@/features/consumables/client/query-keys";
 import { purchaseLotQueryKeys } from "@/features/purchase-lots/client/query-keys";
 import { stockMovementQueryKeys } from "@/features/stock-movements/client/query-keys";
+import { formatPhp } from "@/components/projects/format-money";
 
 export interface IssueConsumableDialogProps {
   item: ConsumableItem | null;
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: (message: string) => void;
+  initialLotId?: string;
 }
 
 type DestinationKind = "department" | "project";
@@ -25,15 +28,23 @@ export function IssueConsumableDialog({
   isOpen,
   onClose,
   onSuccess,
+  initialLotId,
 }: IssueConsumableDialogProps) {
   const qc = useQueryClient();
   const { data: departments = [] } = useDepartmentsQuery();
   const { data: projects = [] } = useProjectsQuery();
+  const { data: lots = [] } = usePurchaseLotsQuery({
+    consumableId: item?.id,
+    itemType: "consumable",
+    enabled: isOpen && Boolean(item?.id),
+  });
+  const availableLots = lots.filter((lot) => lot.quantityRemaining > 0);
 
   const [destinationKind, setDestinationKind] =
     useState<DestinationKind>("department");
   const [departmentId, setDepartmentId] = useState("");
   const [projectId, setProjectId] = useState("");
+  const [lotId, setLotId] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [receivedBy, setReceivedBy] = useState("");
   const [requestedByName, setRequestedByName] = useState("");
@@ -48,12 +59,13 @@ export function IssueConsumableDialog({
     setReceivedBy("");
     setRequestedByName("");
     setNotes("");
+    setLotId(initialLotId ?? "");
     setDepartmentId(departments[0]?.id ?? "");
     setProjectId(
       projects.find((p) => p.status !== "completed")?.id ?? projects[0]?.id ?? ""
     );
     setDestinationKind("department");
-  }, [isOpen, item, departments, projects]);
+  }, [isOpen, item, departments, projects, initialLotId]);
 
   if (!isOpen || !item) return null;
 
@@ -66,6 +78,21 @@ export function IssueConsumableDialog({
     }
     if (destinationKind === "project" && !projectId) {
       setError("Select a project.");
+      return;
+    }
+    if (!lotId) {
+      setError("Select a purchase lot to issue from.");
+      return;
+    }
+    const selectedLot = availableLots.find((lot) => lot.id === lotId);
+    if (!selectedLot) {
+      setError("Select a purchase lot with remaining stock.");
+      return;
+    }
+    if (quantity > selectedLot.quantityRemaining) {
+      setError(
+        `Selected lot only has ${selectedLot.quantityRemaining} ${item.unit} remaining.`
+      );
       return;
     }
     if (item.currentQty < 1) {
@@ -92,7 +119,7 @@ export function IssueConsumableDialog({
             departmentId:
               destinationKind === "department" ? departmentId : undefined,
             projectId: destinationKind === "project" ? projectId : undefined,
-            useFifo: true,
+            lotId,
             receivedBy: receivedBy.trim() || undefined,
             requestedByName: requestedByName.trim() || undefined,
             notes: notes.trim() || undefined,
@@ -139,7 +166,8 @@ export function IssueConsumableDialog({
 
         <div className="p-5 space-y-4">
           <p className="text-xs text-text-secondary">
-            Manual issue from on-hand stock. Destination is exactly one department or project. Consumables are not returned.
+            Manual issue from a specific purchase lot. Destination is exactly one
+            department or project. Consumables are not returned.
           </p>
 
           <div className="flex gap-2">
@@ -202,6 +230,31 @@ export function IssueConsumableDialog({
               </select>
             </label>
           )}
+
+          <label className="block space-y-1">
+            <span className="text-[11px] font-bold uppercase text-text-secondary">
+              Purchase lot
+            </span>
+            <select
+              value={lotId}
+              onChange={(e) => setLotId(e.target.value)}
+              className="w-full h-9 px-3 text-sm border border-border rounded-lg bg-bg"
+              required
+            >
+              <option value="">Select a lot…</option>
+              {availableLots.map((lot) => (
+                <option key={lot.id} value={lot.id}>
+                  {lot.lotCode} · {lot.quantityRemaining} remaining (
+                  {formatPhp(Number(lot.unitCost))}/unit)
+                </option>
+              ))}
+            </select>
+            {availableLots.length === 0 && (
+              <p className="text-[11px] text-status-repair-text">
+                No lots with remaining stock. Restock first.
+              </p>
+            )}
+          </label>
 
           <label className="block space-y-1">
             <span className="text-[11px] font-bold uppercase text-text-secondary">

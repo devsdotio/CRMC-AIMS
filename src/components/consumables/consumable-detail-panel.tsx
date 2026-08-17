@@ -228,7 +228,7 @@ export function ConsumableDetailPanel({
               className="inline-flex items-center justify-center gap-1.5 p-2.5 rounded-lg text-xs font-bold border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 cursor-pointer"
             >
               <PackageMinus className="h-4 w-4" />
-              Release (lot)
+              Issue
             </button>
             )}
             {onAdjust && (
@@ -406,7 +406,7 @@ export function ConsumableDetailPanel({
                               className="w-full inline-flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 cursor-pointer"
                             >
                               <PackageMinus className="h-3.5 w-3.5" />
-                              Release from this lot
+                              Issue from this lot
                             </button>
                           )}
                         </div>

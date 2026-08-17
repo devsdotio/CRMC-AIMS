@@ -1,15 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import {
-  AlertCircle,
-  Info,
-  Layers,
-  Loader2,
-  User,
-} from "lucide-react";
+import { AlertCircle, Layers, Loader2, User } from "lucide-react";
 
-import { cn } from "@/lib/utils";
 import { formatPhp } from "@/components/projects/format-money";
 import { usePurchaseLotsQuery } from "@/features/purchase-lots/client/use-purchase-lots";
 import type { ConsumableRequest } from "@/features/consumable-requests/client";
@@ -25,19 +18,14 @@ export interface ReleaseConsumableRequestDialogProps {
   ) => Promise<void>;
 }
 
-type LotSelectionState = {
-  useFifo: boolean;
-  selectedLotId?: string;
-};
-
 function ReleaseLineLotRow({
   line,
-  state,
+  selectedLotId,
   onChange,
 }: {
   line: ConsumableRequest["lines"][number];
-  state: LotSelectionState;
-  onChange: (updated: LotSelectionState) => void;
+  selectedLotId?: string;
+  onChange: (lotId: string) => void;
 }) {
   const { data: lots = [], isLoading } = usePurchaseLotsQuery({
     consumableId: line.consumableId,
@@ -50,103 +38,53 @@ function ReleaseLineLotRow({
     [lots]
   );
 
-  const selectedLot = availableLots.find((l) => l.id === state.selectedLotId);
+  const selectedLot = availableLots.find((l) => l.id === selectedLotId);
   const isShortfall =
-    !state.useFifo &&
-    selectedLot &&
-    selectedLot.quantityRemaining < line.quantityRequested;
+    selectedLot && selectedLot.quantityRemaining < line.quantityRequested;
 
   return (
     <div className="rounded-lg border border-border bg-bg-subtle/40 p-3.5 space-y-2.5">
-      <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-xs font-bold text-text truncate">{line.itemName}</p>
-          <p className="text-[11px] text-text-secondary font-mono">
-            {line.itemCode} · qty {line.quantityRequested} {line.unit}
-          </p>
-        </div>
+      <div className="min-w-0">
+        <p className="text-xs font-bold text-text truncate">{line.itemName}</p>
+        <p className="text-[11px] text-text-secondary font-mono">
+          {line.itemCode} · qty {line.quantityRequested} {line.unit}
+        </p>
       </div>
 
-      <div className="space-y-2 pt-1 border-t border-border/50">
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => onChange({ useFifo: true })}
-            className={cn(
-              "flex-1 py-1.5 px-2.5 rounded-md text-xs font-semibold border transition-all text-center",
-              state.useFifo
-                ? "bg-accent text-accent-foreground border-accent shadow-xs"
-                : "bg-bg text-text-secondary border-border hover:text-text hover:bg-bg-subtle"
-            )}
-          >
-            Auto (FIFO)
-          </button>
-          <button
-            type="button"
-            disabled={availableLots.length === 0}
-            onClick={() =>
-              onChange({
-                useFifo: false,
-                selectedLotId: state.selectedLotId || availableLots[0]?.id,
-              })
-            }
-            className={cn(
-              "flex-1 py-1.5 px-2.5 rounded-md text-xs font-semibold border transition-all text-center disabled:opacity-50 disabled:cursor-not-allowed",
-              !state.useFifo
-                ? "bg-accent text-accent-foreground border-accent shadow-xs"
-                : "bg-bg text-text-secondary border-border hover:text-text hover:bg-bg-subtle"
-            )}
-          >
-            Select lot ({availableLots.length})
-          </button>
-        </div>
-
-        {state.useFifo ? (
-          <p className="text-[11px] text-text-secondary flex items-center gap-1.5 pt-0.5">
-            <Info className="h-3.5 w-3.5 shrink-0 text-accent" />
-            <span>
-              Deducts from oldest costed lots first for this line quantity.
-            </span>
+      <div className="space-y-1.5 pt-1 border-t border-border/50">
+        <label className="block text-[11px] font-semibold text-text">
+          Issue from lot
+        </label>
+        {isLoading ? (
+          <p className="text-xs text-text-secondary animate-pulse">
+            Loading lots…
+          </p>
+        ) : availableLots.length === 0 ? (
+          <p className="text-xs text-status-repair-text">
+            No active lots with remaining stock. Restock first.
           </p>
         ) : (
-          <div className="space-y-1.5 pt-1">
-            <label className="block text-[11px] font-semibold text-text">
-              Deduct from lot
-            </label>
-            {isLoading ? (
-              <p className="text-xs text-text-secondary animate-pulse">
-                Loading lots…
-              </p>
-            ) : availableLots.length === 0 ? (
-              <p className="text-xs text-status-repair-text">
-                No active lots with remaining stock.
-              </p>
-            ) : (
-              <select
-                value={state.selectedLotId || availableLots[0]?.id || ""}
-                onChange={(e) =>
-                  onChange({ useFifo: false, selectedLotId: e.target.value })
-                }
-                className="w-full px-2.5 py-1.5 bg-bg border border-border rounded-md text-xs text-text focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent"
-              >
-                {availableLots.map((lot) => (
-                  <option key={lot.id} value={lot.id}>
-                    {lot.lotCode} · {lot.quantityRemaining} remaining (
-                    {formatPhp(Number(lot.unitCost))}/unit)
-                  </option>
-                ))}
-              </select>
-            )}
-            {isShortfall && (
-              <div className="flex items-start gap-1.5 rounded bg-status-repair-bg/10 border border-status-repair-bg/30 p-2 text-[11px] text-status-repair-text">
-                <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                <span>
-                  Selected lot only has {selectedLot.quantityRemaining}{" "}
-                  remaining (line needs {line.quantityRequested}). Choose
-                  another lot or use FIFO.
-                </span>
-              </div>
-            )}
+          <select
+            value={selectedLotId || ""}
+            onChange={(e) => onChange(e.target.value)}
+            className="w-full px-2.5 py-1.5 bg-bg border border-border rounded-md text-xs text-text focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent"
+          >
+            <option value="">Select a lot…</option>
+            {availableLots.map((lot) => (
+              <option key={lot.id} value={lot.id}>
+                {lot.lotCode} · {lot.quantityRemaining} remaining (
+                {formatPhp(Number(lot.unitCost))}/unit)
+              </option>
+            ))}
+          </select>
+        )}
+        {isShortfall && selectedLot && (
+          <div className="flex items-start gap-1.5 rounded bg-status-repair-bg/10 border border-status-repair-bg/30 p-2 text-[11px] text-status-repair-text">
+            <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+            <span>
+              Selected lot only has {selectedLot.quantityRemaining} remaining
+              (line needs {line.quantityRequested}). Choose another lot.
+            </span>
           </div>
         )}
       </div>
@@ -164,20 +102,14 @@ export function ReleaseConsumableRequestDialog({
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [lotSelections, setLotSelections] = useState<
-    Record<string, LotSelectionState>
-  >({});
+  const [lotByLine, setLotByLine] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!isOpen || !request) return;
     setReceivedBy(request.department);
     setNote("");
     setError("");
-    const initial: Record<string, LotSelectionState> = {};
-    for (const line of request.lines) {
-      initial[line.id] = { useFifo: true };
-    }
-    setLotSelections(initial);
+    setLotByLine({});
   }, [isOpen, request]);
 
   useEffect(() => {
@@ -196,27 +128,30 @@ export function ReleaseConsumableRequestDialog({
       setError("Name of person who received the supplies is required.");
       return;
     }
+    const missing = request.lines.filter((line) => !lotByLine[line.id]);
+    if (missing.length > 0) {
+      setError("Select a lot for every line.");
+      return;
+    }
     setError("");
     setIsSubmitting(true);
     try {
       await onConfirm(request, {
         receivedBy: receivedBy.trim(),
         note: note.trim() || undefined,
-        lines: request.lines.map((line) => {
-          const sel = lotSelections[line.id] ?? { useFifo: true };
-          return {
-            lineId: line.id,
-            useFifo: sel.useFifo,
-            allocations:
-              !sel.useFifo && sel.selectedLotId
-                ? [{ lotId: sel.selectedLotId, quantity: line.quantityRequested }]
-                : undefined,
-          };
-        }),
+        lines: request.lines.map((line) => ({
+          lineId: line.id,
+          allocations: [
+            {
+              lotId: lotByLine[line.id],
+              quantity: line.quantityRequested,
+            },
+          ],
+        })),
       });
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Release failed.");
+      setError(err instanceof Error ? err.message : "Issue failed.");
     } finally {
       setIsSubmitting(false);
     }
@@ -234,7 +169,7 @@ export function ReleaseConsumableRequestDialog({
         className="relative w-full max-w-lg max-h-[90vh] bg-bg rounded-xl shadow-xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200 border border-border"
       >
         <div className="px-6 py-4.5 border-b border-border bg-bg-subtle/50 shrink-0">
-          <h2 className="text-base font-bold text-text">Release supplies</h2>
+          <h2 className="text-base font-bold text-text">Issue supplies</h2>
           <p className="mt-0.5 text-xs text-text-secondary font-mono">
             {request.requestCode} · {request.department}
           </p>
@@ -248,19 +183,16 @@ export function ReleaseConsumableRequestDialog({
             <div className="space-y-2.5">
               <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-text-secondary">
                 <Layers className="h-3.5 w-3.5 text-accent" />
-                <span>Lot allocation per line</span>
+                <span>Lot per line</span>
               </div>
               <div className="space-y-2.5">
                 {request.lines.map((line) => (
                   <ReleaseLineLotRow
                     key={line.id}
                     line={line}
-                    state={lotSelections[line.id] ?? { useFifo: true }}
-                    onChange={(updated) =>
-                      setLotSelections((prev) => ({
-                        ...prev,
-                        [line.id]: updated,
-                      }))
+                    selectedLotId={lotByLine[line.id]}
+                    onChange={(lotId) =>
+                      setLotByLine((prev) => ({ ...prev, [line.id]: lotId }))
                     }
                   />
                 ))}
@@ -328,7 +260,7 @@ export function ReleaseConsumableRequestDialog({
               className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg bg-primary text-primary-foreground disabled:opacity-60"
             >
               {isSubmitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-              Release & deduct stock
+              Issue & deduct stock
             </button>
           </div>
         </form>

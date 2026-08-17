@@ -188,13 +188,12 @@ export const stockAdjustSchema = z
 
 export const consumableIdSchema = z.string().uuid("Invalid consumable id.");
 
-/** Admin walk-up issue from on-hand stock. */
+/** Admin walk-up issue from on-hand stock. Lot must be chosen (no FIFO). */
 export const issueConsumableSchema = z
   .object({
     quantity: z.number().int().positive("quantity must be positive."),
     departmentId: z.string().uuid().optional(),
     projectId: z.string().uuid().optional(),
-    useFifo: z.boolean().optional().default(true),
     lotId: z.string().uuid().optional(),
     lotCode: z.string().trim().min(1).max(64).optional(),
     receivedBy: z.string().trim().max(255).optional(),
@@ -212,10 +211,10 @@ export const issueConsumableSchema = z
         path: ["departmentId"],
       });
     }
-    if (!data.useFifo && !data.lotId && !data.lotCode) {
+    if (!data.lotId && !data.lotCode) {
       ctx.addIssue({
         code: "custom",
-        message: "Provide a lot (lotId/lotCode) or set useFifo=true.",
+        message: "Select a purchase lot to issue from.",
         path: ["lotId"],
       });
     }

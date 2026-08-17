@@ -538,8 +538,8 @@ export class ConsumableRequestService {
   }
 
   /**
-   * Full release: every request line must be covered exactly once.
-   * Admin picks lots (or FIFO per line). Deducts lot remainders + item qty.
+   * Full issue: every request line must be covered exactly once.
+   * Admin picks lots (no FIFO). Deducts lot remainders + item qty.
    */
   async release(
     rawId: string,
@@ -616,48 +616,33 @@ export class ConsumableRequestService {
         }
 
         let lotAllocations: LotCostAllocation[] = [];
-
-        if (releaseLine.useFifo) {
-          lotAllocations = await this.purchaseLots.consumeFifo(
-            item.id,
-            line.quantityRequested,
-            tx
+        const allocations = releaseLine.allocations ?? [];
+        const allocatedQty = allocations.reduce(
+          (sum, a) => sum + a.quantity,
+          0
+        );
+        if (allocatedQty !== line.quantityRequested) {
+          throw new BadRequestError(
+            `Line ${line.lineNo} (${item.itemCode}): allocations must total ${line.quantityRequested} (got ${allocatedQty}).`
           );
-          const uncosted = lotAllocations.find((a) => a.uncosted);
-          if (uncosted) {
-            throw new BadRequestError(
-              `Cannot FIFO-release ${item.itemCode}: not enough costed lot quantity (short ${uncosted.quantity}). Pick lots explicitly or restock first.`
-            );
-          }
-        } else {
-          const allocations = releaseLine.allocations ?? [];
-          const allocatedQty = allocations.reduce(
-            (sum, a) => sum + a.quantity,
-            0
-          );
-          if (allocatedQty !== line.quantityRequested) {
-            throw new BadRequestError(
-              `Line ${line.lineNo} (${item.itemCode}): allocations must total ${line.quantityRequested} (got ${allocatedQty}).`
-            );
-          }
+        }
 
-          for (const alloc of allocations) {
-            const result = alloc.lotId
-              ? await this.purchaseLots.consumeFromLotId(
-                  alloc.lotId,
-                  alloc.quantity,
-                  tx,
-                  item.id
-                )
-              : await this.purchaseLots.consumeFromLot(
-                  alloc.lotCode!,
-                  alloc.quantity,
-                  tx,
-                  item.id
-                );
+        for (const alloc of allocations) {
+          const result = alloc.lotId
+            ? await this.purchaseLots.consumeFromLotId(
+                alloc.lotId,
+                alloc.quantity,
+                tx,
+                item.id
+              )
+            : await this.purchaseLots.consumeFromLot(
+                alloc.lotCode!,
+                alloc.quantity,
+                tx,
+                item.id
+              );
 
-            lotAllocations.push(result.allocation);
-          }
+          lotAllocations.push(result.allocation);
         }
 
         const totalCost = lotAllocations.reduce(

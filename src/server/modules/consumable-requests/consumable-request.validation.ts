@@ -81,10 +81,7 @@ const lotAllocationSchema = z
 
 const releaseLineSchema = z.object({
   lineId: z.string().uuid(),
-  /** Explicit lot picks (preferred). */
-  allocations: z.array(lotAllocationSchema).min(1).optional(),
-  /** Admin shortcut: FIFO across lots for this line qty. */
-  useFifo: z.boolean().optional().default(false),
+  allocations: z.array(lotAllocationSchema).min(1, "Select a lot for this line."),
 });
 
 export const releaseConsumableRequestSchema = z
@@ -96,19 +93,6 @@ export const releaseConsumableRequestSchema = z
       .min(1, "Name of person who received the supplies is required.")
       .max(255),
     lines: z.array(releaseLineSchema).min(1),
-  })
-  .superRefine((body, ctx) => {
-    for (let i = 0; i < body.lines.length; i++) {
-      const line = body.lines[i]!;
-      if (!line.useFifo && (!line.allocations || line.allocations.length === 0)) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["lines", i, "allocations"],
-          message:
-            "Provide lot allocations or set useFifo=true for each release line.",
-        });
-      }
-    }
   });
 
 export const consumableRequestIdSchema = z.string().uuid("Invalid request id.");
