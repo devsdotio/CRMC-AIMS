@@ -5,13 +5,14 @@ import { X, Edit, AlertTriangle, Check, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { UserAccount, UserRole, UserStatus } from "@/types/users";
 import { ROLE_DEFINITIONS, INVITABLE_ROLES } from "@/constants/roles";
+import type { DepartmentDTO } from "@/features/departments/client";
 
 export interface EditUserSaveInput {
   id: string;
   name: string;
   email: string;
   role: UserRole;
-  department: string;
+  departmentId: string | null;
   status: UserStatus;
   password?: string;
 }
@@ -23,6 +24,7 @@ export interface EditUserDialogProps {
   onClose: () => void;
   onSave: (updated: EditUserSaveInput) => void | Promise<void>;
   canInviteAdmin?: boolean;
+  departments?: DepartmentDTO[];
 }
 
 interface EditUserDialogFormProps {
@@ -31,6 +33,7 @@ interface EditUserDialogFormProps {
   canInviteAdmin: boolean;
   onClose: () => void;
   onSave: (updated: EditUserSaveInput) => void | Promise<void>;
+  departments: DepartmentDTO[];
 }
 
 function EditUserDialogForm({
@@ -39,11 +42,12 @@ function EditUserDialogForm({
   canInviteAdmin,
   onClose,
   onSave,
+  departments,
 }: EditUserDialogFormProps) {
   const [name, setName] = useState(() => user.name);
   const email = user.email;
   const [role, setRole] = useState<UserRole>(() => user.role);
-  const [department, setDepartment] = useState(() => user.department);
+  const [departmentId, setDepartmentId] = useState(() => user.departmentId ?? "");
   const [status, setStatus] = useState<UserStatus>(() => user.status);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -67,10 +71,19 @@ function EditUserDialogForm({
     (user.role === "admin" || user.role === "superadmin") &&
     role !== user.role;
 
+  const isDepartmentAccount = role === "borrower";
+  const availableDepartments = departments.filter(
+    (d) => !d.accountUserId || d.id === user.departmentId
+  );
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
-      setError("Please enter the user's full name.");
+      setError("Please enter a display name.");
+      return;
+    }
+    if (isDepartmentAccount && !departmentId) {
+      setError("Select a department for this login.");
       return;
     }
     if (password || confirmPassword) {
@@ -92,7 +105,7 @@ function EditUserDialogForm({
         name: name.trim(),
         email: user.email,
         role,
-        department: department.trim(),
+        departmentId: isDepartmentAccount ? departmentId : null,
         status,
         ...(password ? { password } : {}),
       });
@@ -173,16 +186,35 @@ function EditUserDialogForm({
           </div>
 
           <div className="space-y-1">
-            <label htmlFor="edit-dept-input" className="block text-xs font-semibold text-text">
-              Department
+            <label htmlFor="edit-dept-select" className="block text-xs font-semibold text-text">
+              Department {isDepartmentAccount && <span className="text-accent">*</span>}
             </label>
-            <input
-              id="edit-dept-input"
-              type="text"
-              value={department}
-              onChange={(e) => setDepartment(e.target.value)}
-              className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent"
-            />
+            {isDepartmentAccount ? (
+              <select
+                id="edit-dept-select"
+                value={departmentId}
+                onChange={(e) => {
+                  const nextId = e.target.value;
+                  setDepartmentId(nextId);
+                  const next = departments.find((d) => d.id === nextId);
+                  if (next && (!name.trim() || name === user.department)) {
+                    setName(next.name);
+                  }
+                }}
+                className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent"
+              >
+                <option value="">Select a department…</option>
+                {availableDepartments.map((dept) => (
+                  <option key={dept.id} value={dept.id}>
+                    {dept.name} ({dept.code})
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <p className="text-[11px] text-text-secondary pt-1">
+                Staff and admin accounts are not tied to a department login.
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -318,7 +350,7 @@ function EditUserDialogForm({
                     </div>
 
                     <div className="flex-1 min-w-0">
-                      <span className="text-xs font-bold text-text">{rDef.title} Role</span>
+                      <span className="text-xs font-bold text-text">{rDef.title}</span>
                       <p className="text-[11px] text-text-secondary mt-0.5 leading-snug">
                         {rDef.description}
                       </p>
@@ -383,6 +415,7 @@ export function EditUserDialog({
   onClose,
   onSave,
   canInviteAdmin = false,
+  departments = [],
 }: EditUserDialogProps) {
   if (!isOpen || !user) return null;
 
@@ -394,6 +427,7 @@ export function EditUserDialog({
       canInviteAdmin={canInviteAdmin}
       onClose={onClose}
       onSave={onSave}
+      departments={departments}
     />
   );
 }

@@ -1,6 +1,6 @@
 import type { UserRole } from "./users";
 
-export type SettingsSection = "account" | "categories";
+export type SettingsSection = "account" | "categories" | "departments";
 
 export type CategoryType = "asset" | "consumable";
 

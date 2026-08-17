@@ -12,6 +12,7 @@ import {
   todayDateString,
 } from "@/server/shared/codes";
 import type { ActorContext } from "@/server/shared/auth";
+import { departmentNameForRequest } from "@/server/shared/auth";
 import { isAssetOperatorRole } from "@/server/shared/roles";
 import {
   BadRequestError,
@@ -198,7 +199,7 @@ export class BorrowRequestService {
         requesterName: input.requesterName,
         requesterEmail: input.requesterEmail.toLowerCase(),
         requesterPhone: input.requesterPhone ?? "",
-        department: input.department,
+        department: departmentNameForRequest(actor, input.department),
         items: input.items,
         purpose: input.purpose,
         expectedReturnDate:

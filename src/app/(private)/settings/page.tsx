@@ -5,8 +5,15 @@ import type { SettingsSection, CategoryItem, UserProfile } from "@/types/setting
 import { SettingsNav } from "@/components/settings/settings-nav";
 import { AccountSection } from "@/components/settings/account-section";
 import { CategoriesSection } from "@/components/settings/categories-section";
+import { DepartmentsSection } from "@/components/settings/departments-section";
 
 import { useCategoriesQuery, useCreateCategoryMutation, useUpdateCategoryMutation, useDeleteCategoryMutation } from "@/features/categories/client/use-categories";
+import {
+  useCreateDepartmentMutation,
+  useDeleteDepartmentMutation,
+  useDepartmentsQuery,
+  useUpdateDepartmentMutation,
+} from "@/features/departments/client";
 import {
   useChangePasswordMutation,
   useMeQuery,
@@ -39,6 +46,18 @@ export default function SettingsPage() {
   const createCategoryMutation = useCreateCategoryMutation();
   const updateCategoryMutation = useUpdateCategoryMutation();
   const deleteCategoryMutation = useDeleteCategoryMutation();
+  const {
+    data: departments = [],
+    isLoading: departmentsLoading,
+    isError: departmentsError,
+    error: departmentsErr,
+    refetch: refetchDepartments,
+  } = useDepartmentsQuery({
+    enabled: activeSection === "departments",
+  });
+  const createDepartmentMutation = useCreateDepartmentMutation();
+  const updateDepartmentMutation = useUpdateDepartmentMutation();
+  const deleteDepartmentMutation = useDeleteDepartmentMutation();
   const toast = useToast();
 
   const profile: UserProfile | null = me
@@ -67,6 +86,10 @@ export default function SettingsPage() {
       title: "Category Management",
       description: "Configure asset and supply categories used throughout the system",
     },
+    departments: {
+      title: "Departments",
+      description: "Create offices that can hold a department login and receive issued items",
+    },
   };
 
   const currentMeta = sectionMeta[activeSection];
@@ -74,7 +97,6 @@ export default function SettingsPage() {
   const handleSaveProfile = async (updated: Partial<UserProfile>) => {
     await updateMeMutation.mutateAsync({
       name: updated.name,
-      department: updated.department,
     });
     toast.success("Profile updated.");
   };
@@ -108,6 +130,39 @@ export default function SettingsPage() {
       toast.success("Category deleted.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to delete category.");
+    }
+  };
+
+  const handleSaveDepartment = async (input: {
+    id?: string;
+    code: string;
+    name: string;
+  }) => {
+    if (input.id) {
+      await updateDepartmentMutation.mutateAsync({
+        id: input.id,
+        payload: { code: input.code, name: input.name },
+      });
+      toast.success("Department updated.");
+    } else {
+      await createDepartmentMutation.mutateAsync({
+        code: input.code,
+        name: input.name,
+      });
+      toast.success("Department created.");
+    }
+  };
+
+  const handleDeleteDepartment = async (department: (typeof departments)[number]) => {
+    if (department.accountUserId) return;
+    if (!window.confirm(`Delete department “${department.name}”?`)) return;
+    try {
+      await deleteDepartmentMutation.mutateAsync(department.id);
+      toast.success("Department deleted.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to delete department."
+      );
     }
   };
 
@@ -173,6 +228,28 @@ export default function SettingsPage() {
                   consumableCategories={consumableCategories}
                   onSaveCategory={handleSaveCategory}
                   onDeleteCategory={handleDeleteCategory}
+                />
+              )}
+            </>
+          )}
+
+          {activeSection === "departments" && canManageCategories && (
+            <>
+              {departmentsError && (
+                <QueryErrorBanner
+                  message={
+                    departmentsErr?.message || "Failed to load departments."
+                  }
+                  onRetry={() => void refetchDepartments()}
+                />
+              )}
+              {departmentsLoading && departments.length === 0 && !departmentsError ? (
+                <p className="text-xs text-text-secondary">Loading departments…</p>
+              ) : (
+                <DepartmentsSection
+                  departments={departments}
+                  onSave={handleSaveDepartment}
+                  onDelete={handleDeleteDepartment}
                 />
               )}
             </>

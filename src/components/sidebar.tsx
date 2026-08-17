@@ -152,7 +152,7 @@ export default function Sidebar({
     {
       label: "Administration",
       items: [
-        { name: "Users & Roles", href: "/users", icon: Users, roles: ["superadmin", "admin"] },
+        { name: "Users & Departments", href: "/users", icon: Users, roles: ["superadmin", "admin"] },
         { name: "Settings", href: "/settings", icon: Settings, roles: ["superadmin", "admin"] },
       ],
     },

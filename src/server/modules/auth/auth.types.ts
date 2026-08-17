@@ -24,6 +24,7 @@ export interface AuthProfileDTO {
   role: AppRole;
   status: ProfileStatus;
   department: string | null;
+  departmentId: string | null;
 }
 
 export interface AuthSessionDTO {

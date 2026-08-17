@@ -25,6 +25,7 @@ import {
   PortalBorrowLogRecord,
 } from "./types";
 import { useDashboardSnapshotQuery } from "@/features/dashboard/client/use-dashboard";
+import { useMeQuery } from "@/features/users/client";
 import type { DashboardPendingRequest } from "@/server/modules/dashboard/dashboard.service";
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
@@ -275,6 +276,7 @@ function QuickActionBtn({
 export function BorrowerDashboard() {
   const { openWizard } = useBorrowerPortal();
   const { data: snapshot, isLoading } = useDashboardSnapshotQuery();
+  const { data: me } = useMeQuery();
   const loading = isLoading || !snapshot;
 
   const stats = snapshot?.summary;
@@ -337,9 +339,11 @@ export function BorrowerDashboard() {
           <TrendingUp className="h-6 w-6 text-accent" aria-hidden />
         </div>
         <div className="flex-1">
-          <h1 className="text-lg font-bold text-text">Welcome to your Dashboard!</h1>
+          <h1 className="text-lg font-bold text-text">
+            {me?.department ? `${me.department} portal` : "Department portal"}
+          </h1>
           <p className="text-sm text-text-secondary mt-0.5">
-            Here&apos;s a summary of your borrowing activity. You have{" "}
+            Request items for your department. You have{" "}
             {loading ? (
               <span className="inline-block w-12 h-3.5 bg-border animate-pulse rounded align-middle" />
             ) : (
@@ -361,6 +365,13 @@ export function BorrowerDashboard() {
           </button>
         </div>
       </div>
+
+      {me && !me.departmentId && (
+        <div className="rounded-xl border border-status-repair-bg/40 bg-status-repair-bg/10 px-4 py-3 text-xs text-status-repair-text">
+          This login is not linked to a department yet. Ask Property Custodian
+          to assign a department before submitting requests.
+        </div>
+      )}
 
       {/* ── Stat Cards ──────────────────────────────────────────────── */}
       <section aria-label="Borrowing overview">

@@ -1,11 +1,15 @@
+import { sql } from "drizzle-orm";
 import {
   index,
   pgEnum,
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+
+import { departments } from "./departments";
 
 /**
  * Application profiles linked 1:1 to Supabase Auth users.
@@ -14,7 +18,7 @@ import {
  * - superadmin — developers (seeded; not grantable via normal admin UI)
  * - admin — creates staff/borrower accounts, manages users
  * - staff — property custodian operations
- * - borrower — request / borrow only (restricted shell)
+ * - borrower — department login (one account per department; not a named person)
  *
  * There is no public self-signup. Accounts are provisioned via the service-role
  * admin API (+ a row in this table).
@@ -41,7 +45,12 @@ export const profiles = pgTable(
     fullName: text("full_name").notNull(),
     role: appRoleEnum("role").notNull().default("staff"),
     status: profileStatusEnum("status").notNull().default("active"),
+    /** Denormalized department name for display / legacy request rows. */
     department: text("department"),
+    /** Required for role = borrower. Source of truth for department accounts. */
+    departmentId: uuid("department_id").references(() => departments.id, {
+      onDelete: "restrict",
+    }),
 
     /** Staff who provisioned this account (null for seed/superadmin bootstrap). */
     createdByUserId: uuid("created_by_user_id"),
@@ -64,6 +73,10 @@ export const profiles = pgTable(
     index("profiles_status_idx").on(table.status),
     index("profiles_email_idx").on(table.email),
     index("profiles_last_active_at_idx").on(table.lastActiveAt),
+    index("profiles_department_id_idx").on(table.departmentId),
+    uniqueIndex("profiles_one_borrower_per_department_idx")
+      .on(table.departmentId)
+      .where(sql`${table.role} = 'borrower' AND ${table.departmentId} is not null`),
   ]
 );
 

@@ -5,6 +5,7 @@ import { X, UserPlus,  Send, EyeOff, Eye, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { UserRole } from "@/types/users";
 import { ROLE_DEFINITIONS, INVITABLE_ROLES } from "@/constants/roles";
+import type { DepartmentDTO } from "@/features/departments/client";
 
 export interface CreateUserDialogProps {
   isOpen: boolean;
@@ -13,11 +14,12 @@ export interface CreateUserDialogProps {
     name: string;
     email: string;
     role: UserRole;
-    department: string;
+    departmentId?: string;
     password: string;
   }) => void | Promise<void>;
   /** When true, admin role is offered (superadmin only). */
   canInviteAdmin?: boolean;
+  departments?: DepartmentDTO[];
 }
 
 /** @deprecated Use CreateUserDialogProps */
@@ -27,17 +29,19 @@ interface CreateUserDialogFormProps {
   onClose: () => void;
   onCreateUser: CreateUserDialogProps["onCreateUser"];
   canInviteAdmin: boolean;
+  departments: DepartmentDTO[];
 }
 
 function CreateUserDialogForm({
   onClose,
   onCreateUser,
   canInviteAdmin,
+  departments,
 }: CreateUserDialogFormProps) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<UserRole>("staff");
-  const [department, setDepartment] = useState("Property Custodian Office");
+  const [departmentId, setDepartmentId] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -55,10 +59,30 @@ function CreateUserDialogForm({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose, isSubmitting]);
 
+  const availableDepartments = departments.filter((d) => !d.accountUserId);
+  const selectedDepartment = departments.find((d) => d.id === departmentId);
+  const isDepartmentAccount = role === "borrower";
+
+  const handleRoleChange = (next: UserRole) => {
+    setRole(next);
+    if (next === "borrower" && selectedDepartment) {
+      setName(selectedDepartment.name);
+    }
+    if (error) setError("");
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isDepartmentAccount && !departmentId) {
+      setError("Select a department for this login.");
+      return;
+    }
     if (!name.trim()) {
-      setError("Please enter the staff member's full name.");
+      setError(
+        isDepartmentAccount
+          ? "Please enter the department account display name."
+          : "Please enter the staff member's full name."
+      );
       return;
     }
     if (!email.trim() || !email.includes("@")) {
@@ -81,7 +105,7 @@ function CreateUserDialogForm({
         name: name.trim(),
         email: email.trim(),
         role,
-        department: department.trim(),
+        departmentId: isDepartmentAccount ? departmentId : undefined,
         password,
       });
       setSuccessMessage(`Account created for ${email.trim()}`);
@@ -111,10 +135,10 @@ function CreateUserDialogForm({
             </div>
             <div>
               <h3 id="create-user-dialog-title" className="text-base font-bold text-text leading-tight">
-                Create User Account
+                Create Account
               </h3>
               <p className="text-xs text-text-secondary mt-0.5">
-                Set email, role, and initial password — no self-signup / invite email
+                Staff/admin users, or a department login (email + password)
               </p>
             </div>
           </div>
@@ -144,7 +168,11 @@ function CreateUserDialogForm({
                   setName(e.target.value);
                   if (error) setError("");
                 }}
-                placeholder="e.g. Maria Santos"
+                placeholder={
+                  isDepartmentAccount
+                    ? "Defaults to the department name"
+                    : "e.g. Maria Santos"
+                }
                 className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent"
               />
             </div>
@@ -168,17 +196,42 @@ function CreateUserDialogForm({
           </div>
 
           <div className="space-y-1">
-            <label htmlFor="create-dept-input" className="block text-xs font-semibold text-text">
-              Department
+            <label htmlFor="create-dept-select" className="block text-xs font-semibold text-text">
+              Department {isDepartmentAccount && <span className="text-accent">*</span>}
             </label>
-            <input
-              id="create-dept-input"
-              type="text"
-              value={department}
-              onChange={(e) => setDepartment(e.target.value)}
-              placeholder="e.g. Property Custodian Office, IT, Finance"
-              className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent"
-            />
+            {isDepartmentAccount ? (
+              <>
+                <select
+                  id="create-dept-select"
+                  value={departmentId}
+                  onChange={(e) => {
+                    const nextId = e.target.value;
+                    setDepartmentId(nextId);
+                    const next = departments.find((d) => d.id === nextId);
+                    if (next) setName(next.name);
+                    if (error) setError("");
+                  }}
+                  className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent"
+                >
+                  <option value="">Select a department…</option>
+                  {availableDepartments.map((dept) => (
+                    <option key={dept.id} value={dept.id}>
+                      {dept.name} ({dept.code})
+                    </option>
+                  ))}
+                </select>
+                {availableDepartments.length === 0 && (
+                  <p className="text-[11px] text-text-secondary">
+                    Every department already has a login, or none exist yet. Add
+                    a department in Settings first.
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="text-[11px] text-text-secondary pt-1">
+                Staff and admin accounts are not tied to a department login.
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -246,7 +299,7 @@ function CreateUserDialogForm({
                     type="button"
                     role="radio"
                     aria-checked={isSelected}
-                    onClick={() => setRole(rKey)}
+                    onClick={() => handleRoleChange(rKey)}
                     className={cn(
                       "flex items-start gap-3 p-3 rounded-xl border text-left transition-all duration-150 cursor-pointer outline-none w-full",
                       "focus-visible:ring-2 focus-visible:ring-accent",
@@ -269,7 +322,7 @@ function CreateUserDialogForm({
                     </div>
 
                     <div className="flex-1 min-w-0">
-                      <span className="text-xs font-bold text-text">{rDef.title} Role</span>
+                      <span className="text-xs font-bold text-text">{rDef.title}</span>
                       <p className="text-[11px] text-text-secondary mt-0.5 leading-snug">
                         {rDef.description}
                       </p>
@@ -317,6 +370,7 @@ export function CreateUserDialog({
   onClose,
   onCreateUser,
   canInviteAdmin = false,
+  departments = [],
 }: CreateUserDialogProps) {
   if (!isOpen) return null;
 
@@ -326,6 +380,7 @@ export function CreateUserDialog({
       onClose={onClose}
       onCreateUser={onCreateUser}
       canInviteAdmin={canInviteAdmin}
+      departments={departments}
     />
   );
 }

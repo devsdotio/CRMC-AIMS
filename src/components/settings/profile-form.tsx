@@ -29,8 +29,7 @@ export function ProfileForm({
     setError("");
   }
 
-  const isDirty =
-    name !== profile.name || department !== profile.department;
+  const isDirty = name !== profile.name;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,7 +39,6 @@ export function ProfileForm({
     try {
       await onSaveProfile({
         name: name.trim(),
-        department: department.trim(),
       });
       setSavedSuccess(true);
       setTimeout(() => setSavedSuccess(false), 2500);
@@ -64,7 +62,7 @@ export function ProfileForm({
         <div>
           <h3 className="text-base font-bold text-text">Account Profile</h3>
           <p className="text-xs text-text-secondary mt-0.5">
-            Update your display name and assigned department
+            Update your display name. Department is assigned by an administrator.
           </p>
         </div>
 
@@ -105,15 +103,18 @@ export function ProfileForm({
 
         <div className="space-y-1.5">
           <label htmlFor="profile-dept" className="block text-xs font-bold text-text">
-            Assigned Department
+            Department
           </label>
           <input
             id="profile-dept"
             type="text"
-            value={department}
-            onChange={(e) => setDepartment(e.target.value)}
-            className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent"
+            value={department || "—"}
+            readOnly
+            className="w-full h-9 px-3 text-xs bg-bg-subtle border border-border rounded-lg text-text-secondary cursor-not-allowed"
           />
+          <p className="text-[11px] text-text-secondary">
+            Department is assigned on the account by an administrator.
+          </p>
         </div>
       </div>
 

@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getDb } from "@/server/db";
 import { profiles, type ProfileRow } from "@/server/db/schema";
 import {
+  BadRequestError,
   ForbiddenError,
   UnauthorizedError,
 } from "@/server/shared/errors";
@@ -43,6 +44,8 @@ export interface ActorContext {
   email: string | null;
   displayName: string;
   role: AppRole;
+  departmentId: string | null;
+  departmentName: string | null;
 }
 
 export interface AppSession {
@@ -57,7 +60,26 @@ export function toActorContext(user: User, profile: ProfileRow): ActorContext {
     email: profile.email || user.email || null,
     displayName: profile.fullName || user.email || user.id,
     role: profile.role,
+    departmentId: profile.departmentId ?? null,
+    departmentName: profile.department ?? null,
   };
+}
+
+/**
+ * Portal requests always belong to the logged-in department.
+ * Operators may still pass a department string (legacy / later admin-on-behalf).
+ */
+export function departmentNameForRequest(
+  actor: ActorContext,
+  submittedDepartment: string
+): string {
+  if (actor.role !== "borrower") return submittedDepartment;
+  if (!actor.departmentId || !actor.departmentName) {
+    throw new BadRequestError(
+      "This department account is not linked to a department. Ask an administrator to assign one."
+    );
+  }
+  return actor.departmentName;
 }
 
 async function loadProfile(userId: string): Promise<ProfileRow | null> {

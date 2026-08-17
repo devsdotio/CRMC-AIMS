@@ -4,6 +4,7 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { formatRelativeTime } from "@/lib/format-relative-time";
+import { isUniqueViolation } from "@/server/db/transaction";
 import {
   BadRequestError,
   ConflictError,
@@ -11,10 +12,12 @@ import {
   NotFoundError,
 } from "@/server/shared/errors";
 import type { ActorContext } from "@/server/shared/auth";
+import { invalidateProfileCache } from "@/server/shared/auth";
 import {
   assignableRolesFor,
   type AppRole,
 } from "@/server/shared/roles";
+import { DepartmentRepository } from "@/server/modules/departments/department.repository";
 
 import { ProfileRepository } from "./user.repository";
 import type {
@@ -22,6 +25,7 @@ import type {
   IProfileRepository,
   ListUsersFilters,
   ProfileDTO,
+  ProfileWithDepartment,
   UpdateUserInput,
 } from "./user.types";
 import {
@@ -38,8 +42,9 @@ function toDateString(value: Date | string): string {
   return value.toISOString().slice(0, 10);
 }
 
-export function toProfileDTO(row: ProfileRow): ProfileDTO {
+export function toProfileDTO(row: ProfileWithDepartment): ProfileDTO {
   const lastActiveAt = row.lastActiveAt ?? null;
+  const departmentName = row.linkedDepartmentName ?? row.department;
 
   return {
     id: row.userId,
@@ -47,7 +52,9 @@ export function toProfileDTO(row: ProfileRow): ProfileDTO {
     name: row.fullName,
     role: row.role,
     status: row.status,
-    department: row.department,
+    department: departmentName,
+    departmentId: row.departmentId ?? null,
+    departmentCode: row.linkedDepartmentCode ?? null,
     dateAdded: toDateString(row.createdAt),
     lastActive:
       row.status === "deactivated"
@@ -93,7 +100,8 @@ function assertCanMutateTarget(actor: ActorContext, target: ProfileRow) {
 
 export class UserService {
   constructor(
-    private readonly profileRepository: IProfileRepository = new ProfileRepository()
+    private readonly profileRepository: IProfileRepository = new ProfileRepository(),
+    private readonly departmentRepository: DepartmentRepository = new DepartmentRepository()
   ) {}
 
   async getMe(actor: ActorContext): Promise<ProfileDTO> {
@@ -132,12 +140,13 @@ export class UserService {
 
     const updated = await this.profileRepository.update(actor.userId, {
       ...(input.name !== undefined ? { fullName: input.name } : {}),
-      ...(input.department !== undefined ? { department: input.department } : {}),
     });
 
     if (!updated) {
       throw new NotFoundError("Profile", actor.userId);
     }
+
+    invalidateProfileCache(actor.userId);
 
     if (input.name !== undefined) {
       try {
@@ -150,7 +159,40 @@ export class UserService {
       }
     }
 
-    return toProfileDTO(updated);
+    const fresh = await this.profileRepository.findByUserId(actor.userId);
+    if (!fresh) throw new NotFoundError("Profile", actor.userId);
+    return toProfileDTO(fresh);
+  }
+
+  private async resolveDepartmentForAccount(
+    role: AppRole,
+    departmentId: string | null | undefined,
+    currentUserId?: string
+  ): Promise<{ departmentId: string | null; departmentName: string | null }> {
+    if (role !== "borrower") {
+      return { departmentId: null, departmentName: null };
+    }
+
+    if (!departmentId) {
+      throw new BadRequestError(
+        "A department is required for a department account."
+      );
+    }
+
+    const department = await this.departmentRepository.findById(departmentId);
+    if (!department) {
+      throw new NotFoundError("Department", departmentId);
+    }
+
+    const existingAccount =
+      await this.profileRepository.findBorrowerByDepartmentId(department.id);
+    if (existingAccount && existingAccount.userId !== currentUserId) {
+      throw new ConflictError(
+        `${department.name} already has a department account (${existingAccount.email}).`
+      );
+    }
+
+    return { departmentId: department.id, departmentName: department.name };
   }
 
   async changePassword(
@@ -228,12 +270,18 @@ export class UserService {
 
     const admin = createAdminClient();
 
+    const link = await this.resolveDepartmentForAccount(
+      input.role,
+      input.departmentId
+    );
+    const fullName = input.name.trim() || link.departmentName || input.email;
+
     const { data, error } = await admin.auth.admin.createUser({
       email,
       password: input.password,
       email_confirm: true,
       user_metadata: {
-        full_name: input.name.trim(),
+        full_name: fullName,
       },
     });
 
@@ -248,18 +296,23 @@ export class UserService {
     }
 
     try {
-      const row = await this.profileRepository.create({
+      await this.profileRepository.create({
         userId: data.user.id,
         email,
-        fullName: input.name.trim(),
+        fullName,
         role: input.role,
         status: "active",
-        department: input.department?.trim() || null,
+        department: link.departmentName,
+        departmentId: link.departmentId,
         createdByUserId: actor.userId,
         lastActiveAt: null,
       });
 
-      return toProfileDTO(row);
+      const created = await this.profileRepository.findByUserId(data.user.id);
+      if (!created) {
+        throw new Error("Profile was created but could not be reloaded.");
+      }
+      return toProfileDTO(created);
     } catch (error) {
       // Roll back auth user if profile insert fails so admins can retry cleanly
       try {
@@ -268,13 +321,13 @@ export class UserService {
         // Best-effort cleanup
       }
 
-      if (
-        typeof error === "object" &&
-        error !== null &&
-        "code" in error &&
-        String((error as { code: unknown }).code) === "23505"
-      ) {
-        throw new ConflictError("A profile with this email already exists.");
+      if (error instanceof ConflictError || error instanceof BadRequestError) {
+        throw error;
+      }
+      if (isUniqueViolation(error)) {
+        throw new ConflictError(
+          "This email is already registered, or that department already has an account."
+        );
       }
       throw error;
     }
@@ -312,28 +365,51 @@ export class UserService {
       }
     }
 
+    const nextRole = input.role ?? existing.role;
+    const departmentIdChanged = input.departmentId !== undefined;
+    const nextDepartmentId = departmentIdChanged
+      ? input.departmentId
+      : existing.departmentId;
+
+    const link = await this.resolveDepartmentForAccount(
+      nextRole,
+      nextDepartmentId,
+      userId
+    );
+
     const hasProfileFields =
       input.name !== undefined ||
       input.role !== undefined ||
-      input.department !== undefined ||
+      departmentIdChanged ||
       input.status !== undefined;
 
-    let updated: ProfileRow | null = existing;
-
     if (hasProfileFields) {
-      updated = await this.profileRepository.update(userId, {
-        ...(input.name !== undefined ? { fullName: input.name } : {}),
-        ...(input.role !== undefined ? { role: input.role } : {}),
-        ...(input.department !== undefined
-          ? { department: input.department }
-          : {}),
-        ...(input.status !== undefined ? { status: input.status } : {}),
-      });
+      try {
+        const updated = await this.profileRepository.update(userId, {
+          ...(input.name !== undefined ? { fullName: input.name } : {}),
+          ...(input.role !== undefined ? { role: input.role } : {}),
+          departmentId: link.departmentId,
+          department: link.departmentName,
+          ...(input.status !== undefined ? { status: input.status } : {}),
+        });
 
-      if (!updated) {
-        throw new NotFoundError("User", userId);
+        if (!updated) {
+          throw new NotFoundError("User", userId);
+        }
+      } catch (error) {
+        if (error instanceof ConflictError || error instanceof NotFoundError) {
+          throw error;
+        }
+        if (isUniqueViolation(error)) {
+          throw new ConflictError(
+            "That department already has a department account."
+          );
+        }
+        throw error;
       }
     }
+
+    invalidateProfileCache(userId);
 
     // Sync display name onto auth metadata (best-effort)
     if (input.name !== undefined) {
@@ -359,14 +435,9 @@ export class UserService {
       }
     }
 
-    // Password-only update: re-read for fresh DTO
-    if (!hasProfileFields) {
-      const row = await this.profileRepository.findByUserId(userId);
-      if (!row) throw new NotFoundError("User", userId);
-      return toProfileDTO(row);
-    }
-
-    return toProfileDTO(updated!);
+    const row = await this.profileRepository.findByUserId(userId);
+    if (!row) throw new NotFoundError("User", userId);
+    return toProfileDTO(row);
   }
 
   async deactivateUser(rawId: string, actor: ActorContext): Promise<ProfileDTO> {

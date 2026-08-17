@@ -2,39 +2,80 @@ import { and, asc, eq, ilike, isNull, lt, or } from "drizzle-orm";
 
 import { getDb } from "@/server/db";
 import {
+  departments,
   profiles,
   type NewProfileRow,
   type ProfileRow,
 } from "@/server/db/schema";
 
-import type { IProfileRepository, ListUsersFilters } from "./user.types";
+import type {
+  IProfileRepository,
+  ListUsersFilters,
+  ProfileWithDepartment,
+} from "./user.types";
 
 /** Minimum interval between last-active writes for the same user. */
 const LAST_ACTIVE_TOUCH_MS = 5 * 60 * 1000;
 
+type JoinedRow = {
+  profile: ProfileRow;
+  linkedDepartmentName: string | null;
+  linkedDepartmentCode: string | null;
+};
+
+function flatten(row: JoinedRow): ProfileWithDepartment {
+  return {
+    ...row.profile,
+    linkedDepartmentName: row.linkedDepartmentName,
+    linkedDepartmentCode: row.linkedDepartmentCode,
+  };
+}
+
 export class ProfileRepository implements IProfileRepository {
-  async findByUserId(userId: string): Promise<ProfileRow | null> {
+  private joinedSelect() {
     const db = getDb();
-    const [row] = await db
-      .select()
+    return db
+      .select({
+        profile: profiles,
+        linkedDepartmentName: departments.name,
+        linkedDepartmentCode: departments.code,
+      })
       .from(profiles)
+      .leftJoin(departments, eq(profiles.departmentId, departments.id));
+  }
+
+  async findByUserId(userId: string): Promise<ProfileWithDepartment | null> {
+    const [row] = await this.joinedSelect()
       .where(eq(profiles.userId, userId))
       .limit(1);
-    return row ?? null;
+    return row ? flatten(row) : null;
   }
 
-  async findByEmail(email: string): Promise<ProfileRow | null> {
+  async findByEmail(email: string): Promise<ProfileWithDepartment | null> {
+    const [row] = await this.joinedSelect()
+      .where(eq(profiles.email, email.toLowerCase()))
+      .limit(1);
+    return row ? flatten(row) : null;
+  }
+
+  async findBorrowerByDepartmentId(
+    departmentId: string
+  ): Promise<ProfileRow | null> {
     const db = getDb();
     const [row] = await db
       .select()
       .from(profiles)
-      .where(eq(profiles.email, email.toLowerCase()))
+      .where(
+        and(
+          eq(profiles.departmentId, departmentId),
+          eq(profiles.role, "borrower")
+        )
+      )
       .limit(1);
     return row ?? null;
   }
 
-  async list(filters: ListUsersFilters = {}): Promise<ProfileRow[]> {
-    const db = getDb();
+  async list(filters: ListUsersFilters = {}): Promise<ProfileWithDepartment[]> {
     const conditions = [];
 
     if (filters.role) {
@@ -50,15 +91,15 @@ export class ProfileRepository implements IProfileRepository {
       );
     }
 
-    if (conditions.length === 0) {
-      return db.select().from(profiles).orderBy(asc(profiles.fullName));
-    }
+    const query =
+      conditions.length === 0
+        ? this.joinedSelect().orderBy(asc(profiles.fullName))
+        : this.joinedSelect()
+            .where(and(...conditions))
+            .orderBy(asc(profiles.fullName));
 
-    return db
-      .select()
-      .from(profiles)
-      .where(and(...conditions))
-      .orderBy(asc(profiles.fullName));
+    const rows = await query;
+    return rows.map(flatten);
   }
 
   async create(data: NewProfileRow): Promise<ProfileRow> {

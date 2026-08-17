@@ -120,6 +120,13 @@
       "when": 1786352000000,
       "tag": "0016_borrow_request_cancelled",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1786353000000,
+      "tag": "0017_department_accounts",
+      "breakpoints": true
     }
   ]
 }

@@ -885,11 +885,11 @@ function StepReview({ values, me }: { values: WizardFormValues, me?: MeProfile }
       {/* ── Requester Details ────────────────────────────────────────────── */}
       <section aria-labelledby="requester-details-heading" className="space-y-2">
         <h3 id="requester-details-heading" className="text-[10px] font-bold uppercase tracking-widest text-text-secondary px-1">
-          Requester Details
+          Requesting department
         </h3>
         <div className="rounded-lg border border-border bg-card p-3 grid grid-cols-2 gap-y-3 gap-x-4 text-sm">
           <div>
-            <p className="text-[10px] uppercase tracking-wider text-text-secondary font-semibold">Name</p>
+            <p className="text-[10px] uppercase tracking-wider text-text-secondary font-semibold">Department account</p>
             <p className="font-medium text-text mt-0.5">{requester.name}</p>
           </div>
           <div>
@@ -1094,6 +1094,12 @@ export function NewBorrowRequestWizard({
 
       if (!me?.id || !me.email) {
         setErrorMessage("Your profile could not be loaded. Sign in again and retry.");
+        return;
+      }
+      if (!me.departmentId) {
+        setErrorMessage(
+          "This login is not linked to a department. Ask an administrator to assign one."
+        );
         return;
       }
 

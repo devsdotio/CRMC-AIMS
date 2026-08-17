@@ -17,8 +17,9 @@ export const ROLE_DEFINITIONS: Record<UserRole, RoleDefinition> = {
     badgeStyle: "outlined",
   },
   borrower: {
-    title: "Borrower / Requester",
-    description: "Request access — submit borrow requests for equipment, request consumable stock, and track personal request status.",
+    title: "Department account",
+    description:
+      "Shared login for one department — request borrowable, assignable, and consumable items on behalf of that office.",
     badgeStyle: "muted",
   },
 };

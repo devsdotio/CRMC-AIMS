@@ -8,6 +8,8 @@ export type ProfileDTO = {
   role: UserRole;
   status: UserStatus;
   department: string | null;
+  departmentId: string | null;
+  departmentCode: string | null;
   dateAdded: string;
   lastActive: string | null;
   lastActiveAt: string | null;
@@ -18,14 +20,14 @@ export type CreateUserPayload = {
   name: string;
   email: string;
   role: Exclude<UserRole, "superadmin">;
-  department?: string;
+  departmentId?: string;
   password: string;
 };
 
 export type UpdateUserPayload = {
   name?: string;
   role?: Exclude<UserRole, "superadmin">;
-  department?: string | null;
+  departmentId?: string | null;
   status?: UserStatus;
   /** Admin-set password replacement. Omit to leave password unchanged. */
   password?: string;
@@ -33,7 +35,6 @@ export type UpdateUserPayload = {
 
 export type UpdateMePayload = {
   name?: string;
-  department?: string | null;
 };
 
 export type ChangePasswordPayload = {
@@ -59,6 +60,8 @@ export function toUserAccount(profile: ProfileDTO): UserAccount {
     role: profile.role,
     status: profile.status,
     department: profile.department ?? "",
+    departmentId: profile.departmentId ?? null,
+    departmentCode: profile.departmentCode ?? null,
     dateAdded: profile.dateAdded,
     lastActive,
     activitySummary:

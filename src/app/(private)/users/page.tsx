@@ -22,6 +22,7 @@ import {
   useUsersQuery,
 } from "@/features/users/client";
 import { useToast } from "@/components/providers/toast-context";
+import { useDepartmentsQuery } from "@/features/departments/client";
 
 export default function UsersPage() {
   const { data: me, error: meError } = useMeQuery();
@@ -37,6 +38,7 @@ export default function UsersPage() {
   const deactivateUser = useDeactivateUserMutation();
   const reactivateUser = useReactivateUserMutation();
   const toast = useToast();
+  const { data: departments = [] } = useDepartmentsQuery();
 
   const currentUserId = me?.id ?? "";
   const canInviteAdmin = me?.role === "superadmin";
@@ -98,7 +100,7 @@ export default function UsersPage() {
     name: string;
     email: string;
     role: UserRole;
-    department: string;
+    departmentId?: string;
     password: string;
   }) => {
     setPageError(null);
@@ -110,10 +112,10 @@ export default function UsersPage() {
         name: input.name,
         email: input.email,
         role: input.role,
-        department: input.department || undefined,
+        departmentId: input.departmentId,
         password: input.password,
       });
-      toast.success("User account created.");
+      toast.success("Account created.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to create user.");
       throw err;
@@ -131,7 +133,7 @@ export default function UsersPage() {
         payload: {
           name: input.name,
           role: input.role,
-          department: input.department || null,
+          departmentId: input.role === "borrower" ? input.departmentId : null,
           status: input.status,
           ...(input.password ? { password: input.password } : {}),
         },
@@ -184,7 +186,7 @@ export default function UsersPage() {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-bold tracking-tight text-text">
-              Users & Roles Management
+              Users & Department Accounts
             </h1>
             <span className="px-2 py-0.5 text-xs font-bold bg-bg-subtle text-text-secondary rounded-full border border-border">
               {filteredUsers.length} of {users.length} accounts
@@ -192,8 +194,8 @@ export default function UsersPage() {
             </span>
           </div>
           <p className="text-xs text-text-secondary mt-0.5">
-            Set passwords, deactivate or reactivate accounts, and track last
-            activity. Superadmins may also create admins.
+            Set passwords and department logins. Create departments in Settings
+            first, then attach one login per department.
           </p>
         </div>
 
@@ -259,6 +261,7 @@ export default function UsersPage() {
         onClose={() => setInviteDialogOpen(false)}
         onCreateUser={handleCreateUser}
         canInviteAdmin={canInviteAdmin}
+        departments={departments}
       />
 
       <EditUserDialog
@@ -268,6 +271,7 @@ export default function UsersPage() {
         onClose={() => setEditDialogUser(null)}
         onSave={handleSaveUser}
         canInviteAdmin={canInviteAdmin}
+        departments={departments}
       />
 
       <DeactivateUserDialog

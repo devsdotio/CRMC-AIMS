@@ -28,7 +28,7 @@ export function getApiDocs() {
           "- `superadmin` — bootstrap / platform",
           "- `admin` — user management + operations",
           "- `staff` — property custodian operations",
-          "- `borrower` — request / borrow portal only",
+          "- `borrower` — department portal login (one account per department)",
         ].join("\n"),
       },
       tags: [
@@ -56,6 +56,7 @@ export function getApiDocs() {
         { name: "Requests", description: "Borrow and release requests (legacy tag)" },
         { name: "Dashboard", description: "Admin dashboard data" },
         { name: "Users", description: "User account administration" },
+        { name: "Departments", description: "Department master data and department logins" },
         { name: "Projects", description: "Projects, expenses, and assignments" },
       ],
       // Default: require JWT (OAuth2 password *or* raw Bearer JWT).

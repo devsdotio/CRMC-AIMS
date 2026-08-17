@@ -17,6 +17,8 @@ export interface UserAccount {
   role: UserRole;
   status: UserStatus;
   department: string;
+  departmentId: string | null;
+  departmentCode: string | null;
   dateAdded: string;
   lastActive: string;
   activitySummary?: string;

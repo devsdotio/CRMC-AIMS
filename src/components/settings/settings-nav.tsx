@@ -1,6 +1,6 @@
 "use client";
 
-import { User, Tags } from "lucide-react";
+import { User, Tags, Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { SettingsSection } from "@/types/settings";
 import type { UserRole } from "@/types/users";
@@ -36,6 +36,13 @@ export function SettingsNav({
       label: "Categories",
       description: "Manage institutional asset and supply categories",
       icon: Tags,
+      adminOnly: true,
+    },
+    {
+      id: "departments",
+      label: "Departments",
+      description: "Department list used for logins and issue destinations",
+      icon: Building2,
       adminOnly: true,
     },
   ];
