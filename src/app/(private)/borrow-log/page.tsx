@@ -100,7 +100,7 @@ function BorrowLogContent() {
               </span>
             </div>
             <p className="text-xs text-text-secondary mt-0.5">
-              Active custody, overdue returns, and completed borrow transactions.
+              Custody log with visible <span className="font-mono">LOG-</span> codes. Borrowable (due date) and assignable (open) issues.
             </p>
           </div>
         </div>
@@ -163,10 +163,16 @@ function BorrowLogContent() {
             <thead className="sticky top-0 bg-bg-subtle border-b border-border">
               <tr>
                 <th className="px-5 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-text-secondary">
+                  Code
+                </th>
+                <th className="px-5 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-text-secondary">
                   Asset
                 </th>
                 <th className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-text-secondary">
-                  Borrower
+                  Holder
+                </th>
+                <th className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-text-secondary hidden lg:table-cell">
+                  Kind
                 </th>
                 <th className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-text-secondary hidden md:table-cell">
                   Due
@@ -185,6 +191,24 @@ function BorrowLogContent() {
                 return (
                   <tr key={row.id} className="hover:bg-bg-subtle/60">
                     <td className="px-5 py-3.5">
+                      <p className="font-mono text-xs font-semibold text-text">
+                        {row.logCode}
+                      </p>
+                      {row.requestCode ? (
+                        <p className="text-[10px] font-mono text-text-secondary">
+                          {row.requestCode}
+                        </p>
+                      ) : (
+                        <p className="text-[10px] text-text-secondary">
+                          {row.source === "admin_manual"
+                            ? "Manual issue"
+                            : row.source === "project_legacy"
+                              ? "Project"
+                              : "Portal"}
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-5 py-3.5">
                       <p className="font-medium text-text">{row.assetName}</p>
                       <p className="text-xs font-mono text-text-secondary">
                         {row.assetCode}
@@ -193,8 +217,21 @@ function BorrowLogContent() {
                       </p>
                     </td>
                     <td className="px-3 py-3.5">
-                      <p className="text-text">{row.borrowerName}</p>
-                      <p className="text-xs text-text-secondary">{row.department}</p>
+                      <p className="text-text">{row.department}</p>
+                      {row.requestedByName ? (
+                        <p className="text-xs text-text-secondary">
+                          Requested by {row.requestedByName}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-text-secondary">
+                          {row.borrowerName}
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-3 py-3.5 hidden lg:table-cell">
+                      <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border bg-bg-subtle text-text-secondary border-border">
+                        {row.custodyKind === "assignment" ? "Assignable" : "Borrowable"}
+                      </span>
                     </td>
                     <td className="px-3 py-3.5 text-xs text-text-secondary hidden md:table-cell">
                       {row.dueDate ?? "—"}

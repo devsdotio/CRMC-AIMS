@@ -4,6 +4,46 @@ export type {
   RecordMovementLine,
   RecordStockMovementsInput,
   StockMovementDirection,
+  StockMovementDTO,
   StockMovementReason,
 } from "./stock-movement.service";
 export { allocationsToMovementLines } from "./stock-movement.service";
+
+import type { NextRequest } from "next/server";
+
+import { requireActor } from "@/server/shared/auth";
+import { handleError, ok } from "@/server/shared/http";
+
+import { StockMovementService } from "./stock-movement.service";
+
+export class StockMovementController {
+  constructor(
+    private readonly service: StockMovementService = new StockMovementService()
+  ) {}
+
+  async list(request: NextRequest | Request) {
+    try {
+      await requireActor();
+      const url = new URL(request.url);
+      return ok(
+        await this.service.list({
+          reason: url.searchParams.get("reason") ?? undefined,
+          limit: url.searchParams.get("limit") ?? undefined,
+        })
+      );
+    } catch (error) {
+      return handleError(error);
+    }
+  }
+
+  async listByConsumable(id: string) {
+    try {
+      await requireActor();
+      return ok(await this.service.listByConsumable(id));
+    } catch (error) {
+      return handleError(error);
+    }
+  }
+}
+
+export const stockMovementController = new StockMovementController();

@@ -20,10 +20,12 @@ import {
 
 import { cn } from "@/lib/utils";
 import { LoadingState } from "@/components/providers/loading-context";
-import type { ConsumableItem, StockHistoryEntry } from "@/types/inventory";
+import type { ConsumableItem } from "@/types/inventory";
 import type { PurchaseLot } from "@/types/purchase-lots";
 import { useConsumableQuery } from "@/features/consumables/client/use-consumables";
 import { usePurchaseLotsQuery } from "@/features/purchase-lots/client";
+import { useConsumableMovementsQuery } from "@/features/stock-movements/client";
+import type { StockMovement } from "@/features/stock-movements/client";
 import { formatPhp } from "@/components/projects/format-money";
 import { StockLevelBar } from "./stock-level-bar";
 import { LotQrCodeDisplay } from "./lot-qr-code-display";
@@ -38,71 +40,52 @@ export interface ConsumableDetailPanelProps {
   onEdit?: (item: ConsumableItem) => void;
 }
 
-function historyTypeLabel(type: StockHistoryEntry["type"]) {
-  if (type === "restock") return "Restock";
-  if (type === "checkout") return "Release / checkout";
+function movementReasonLabel(reason: StockMovement["reason"]) {
+  if (reason === "restock") return "Restock";
+  if (reason === "issue") return "Issue";
   return "Adjustment";
 }
 
-function getHistoryEntryIcon(type: StockHistoryEntry["type"]) {
-  switch (type) {
+function getMovementIcon(reason: StockMovement["reason"]) {
+  switch (reason) {
     case "restock":
       return <PackagePlus className="h-3.5 w-3.5" />;
-    case "checkout":
+    case "issue":
       return <PackageMinus className="h-3.5 w-3.5" />;
-    case "adjustment":
-      return <SlidersHorizontal className="h-3.5 w-3.5" />;
     default:
-      return <History className="h-3.5 w-3.5" />;
+      return <SlidersHorizontal className="h-3.5 w-3.5" />;
   }
 }
 
-function getHistoryEntryStyle(
-  type: StockHistoryEntry["type"],
-  quantityChange: number
+function getMovementStyle(
+  reason: StockMovement["reason"],
+  direction: StockMovement["direction"]
 ) {
-  switch (type) {
-    case "restock":
-      return {
-        bg: "bg-status-active-bg/20 border-status-active-bg/40",
-        text: "text-status-active-text",
-        badge:
-          "bg-status-active-bg/15 text-status-active-text border-status-active-bg/30",
-        iconText: "text-status-active-text",
-      };
-    case "checkout":
-      return {
-        bg: "bg-primary/15 border-primary/30",
-        text: "text-primary dark:text-primary-foreground",
-        badge:
-          "bg-primary/10 text-primary dark:text-primary-foreground border-primary/25",
-        iconText: "text-primary dark:text-primary-foreground",
-      };
-    case "adjustment":
-      if (quantityChange > 0) {
-        return {
-          bg: "bg-category-computing-bg border-category-computing-text/30",
-          text: "text-category-computing-text",
-          badge:
-            "bg-category-computing-bg text-category-computing-text border-category-computing-text/30",
-          iconText: "text-category-computing-text",
-        };
-      }
-      return {
-        bg: "bg-status-repair-bg/20 border-status-repair-bg/40",
-        text: "text-status-repair-text",
-        badge:
-          "bg-status-repair-bg/15 text-status-repair-text border-status-repair-bg/30",
-        iconText: "text-status-repair-text",
-      };
-    default:
-      return {
-        bg: "bg-bg-subtle border-border",
-        text: "text-text-secondary",
-        badge: "bg-bg-subtle text-text-secondary border-border",
-        iconText: "text-text-secondary",
-      };
+  if (reason === "restock" || (reason === "adjust" && direction === "in")) {
+    return {
+      bg: "bg-status-active-bg/20 border-status-active-bg/40",
+      text: "text-status-active-text",
+      badge:
+        "bg-status-active-bg/15 text-status-active-text border-status-active-bg/30",
+      iconText: "text-status-active-text",
+    };
   }
+  if (reason === "issue") {
+    return {
+      bg: "bg-primary/15 border-primary/30",
+      text: "text-primary dark:text-primary-foreground",
+      badge:
+        "bg-primary/10 text-primary dark:text-primary-foreground border-primary/25",
+      iconText: "text-primary dark:text-primary-foreground",
+    };
+  }
+  return {
+    bg: "bg-status-repair-bg/20 border-status-repair-bg/40",
+    text: "text-status-repair-text",
+    badge:
+      "bg-status-repair-bg/15 text-status-repair-text border-status-repair-bg/30",
+    iconText: "text-status-repair-text",
+  };
 }
 
 export function ConsumableDetailPanel({
@@ -130,19 +113,19 @@ export function ConsumableDetailPanel({
     itemType: "consumable",
     enabled: Boolean(isOpen && item?.id),
   });
+  const { data: movements = [], isLoading: movementsLoading } =
+    useConsumableMovementsQuery(item?.id ?? "", {
+      enabled: Boolean(isOpen && item?.id),
+    });
 
   const openLots = useMemo(
     () => lots.filter((l) => l.quantityRemaining > 0),
     [lots]
   );
 
-  const historyNewestFirst = detailItem?.history?.length
-    ? [...detailItem.history].reverse()
-    : [];
-
-  const displayedHistory = isHistoryExpanded
-    ? historyNewestFirst
-    : historyNewestFirst.slice(0, 4);
+  const displayedMovements = isHistoryExpanded
+    ? movements
+    : movements.slice(0, 4);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -435,31 +418,31 @@ export function ConsumableDetailPanel({
             )}
           </div>
 
-          {/* Accountability history */}
+          {/* Stock movement ledger */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
                 <History className="h-3.5 w-3.5" />
-                Accountability log
+                Stock ledger
               </h3>
               <Link
-                href={`/dashboard/audit-logs?search=${encodeURIComponent(displayItem.itemCode)}`}
-                title="View full history in Audit Logs"
+                href={`/issue-history?kind=supply&item=${encodeURIComponent(displayItem.itemCode)}`}
+                title="View issue history"
                 className="p-1 rounded-md text-text-secondary hover:text-primary hover:bg-bg-subtle transition-colors cursor-pointer"
-                aria-label="View full history in Audit Logs"
+                aria-label="View issue history"
               >
                 <ExternalLink className="h-3.5 w-3.5" />
               </Link>
             </div>
 
-            {detailLoading && historyNewestFirst.length === 0 ? (
+            {movementsLoading && movements.length === 0 ? (
               <LoadingState
                 variant="card"
                 icon="layers"
-                message="Loading accountability log…"
-                subtitle="Retrieving stock movement history"
+                message="Loading stock ledger…"
+                subtitle="Retrieving in/out movements"
               />
-            ) : historyNewestFirst.length === 0 ? (
+            ) : movements.length === 0 ? (
               <div className="p-4 rounded-xl border border-border bg-bg shadow-xs">
                 <p className="text-xs text-text-secondary text-center py-3">
                   No stock movements logged yet.
@@ -470,11 +453,12 @@ export function ConsumableDetailPanel({
                 <>
                   <div className="relative">
                     <ol className="relative border-l-2 border-border/60 ml-3 space-y-6">
-                      {displayedHistory.map((h) => {
-                        const isPositive = h.quantityChange > 0;
-                        const style = getHistoryEntryStyle(h.type, h.quantityChange);
+                      {displayedMovements.map((m) => {
+                        const signedQty =
+                          m.direction === "out" ? -m.qty : m.qty;
+                        const style = getMovementStyle(m.reason, m.direction);
                         return (
-                          <li key={h.id} className="relative pl-6">
+                          <li key={m.id} className="relative pl-6">
                             <span
                               className={cn(
                                 "absolute -left-3.25 top-1.5 h-6 w-6 rounded-full border-2 flex items-center justify-center bg-bg shadow-sm z-10",
@@ -482,7 +466,7 @@ export function ConsumableDetailPanel({
                                 style.iconText
                               )}
                             >
-                              {getHistoryEntryIcon(h.type)}
+                              {getMovementIcon(m.reason)}
                             </span>
                             <div className="flex items-start justify-between gap-2 text-xs pt-1.5">
                               <div className="flex items-center gap-2 flex-wrap">
@@ -492,7 +476,7 @@ export function ConsumableDetailPanel({
                                     style.text
                                   )}
                                 >
-                                  {historyTypeLabel(h.type)}
+                                  {movementReasonLabel(m.reason)}
                                 </span>
                                 <span
                                   className={cn(
@@ -500,63 +484,58 @@ export function ConsumableDetailPanel({
                                     style.badge
                                   )}
                                 >
-                                  {isPositive ? "+" : ""}
-                                  {h.quantityChange} {displayItem.unit}
+                                  {signedQty > 0 ? "+" : ""}
+                                  {signedQty} {displayItem.unit}
+                                </span>
+                                <span className="font-mono text-[10px] font-semibold text-text-secondary">
+                                  {m.movementCode}
                                 </span>
                               </div>
                               <time className="text-[11px] text-text-secondary shrink-0 font-medium">
-                                {h.date}
+                                {new Date(m.createdAt).toLocaleDateString()}
                               </time>
                             </div>
                             <p className="text-xs text-text-secondary mt-0.5 font-medium">
-                              By <span className="font-semibold text-text">{h.actor}</span>
-                              {h.recipientName
-                                ? ` · to ${h.recipientName}`
+                              By{" "}
+                              <span className="font-semibold text-text">
+                                {m.actorName}
+                              </span>
+                              {m.destinationLabel
+                                ? ` · ${m.destinationLabel}`
                                 : null}
                             </p>
-                            {(h.lotCode ||
-                              h.supplierName ||
-                              h.unitCost ||
-                              h.totalCost) && (
+                            {(m.lotCode || m.unitCost || m.lineTotal) && (
                               <div className="mt-1.5 text-[11px] space-y-0.5 rounded border border-border bg-bg-subtle px-2 py-1.5">
-                                {h.lotCode && (
-                                  <p>
-                                    <span className="text-text-secondary">Lot </span>
-                                    <span className="font-mono font-semibold">
-                                      {h.lotCode}
-                                    </span>
-                                  </p>
-                                )}
-                                {h.supplierName && (
+                                {m.lotCode && (
                                   <p>
                                     <span className="text-text-secondary">
-                                      Supplier{" "}
+                                      Lot{" "}
                                     </span>
-                                    <span className="font-semibold">
-                                      {h.supplierName}
+                                    <span className="font-mono font-semibold">
+                                      {m.lotCode}
                                     </span>
                                   </p>
                                 )}
-                                {(h.unitCost || h.totalCost) && (
+                                {(m.unitCost || m.lineTotal) && (
                                   <p>
-                                    {h.unitCost && (
+                                    {m.unitCost && (
                                       <>
                                         <span className="text-text-secondary">
                                           Unit{" "}
                                         </span>
                                         <span className="font-semibold">
-                                          {formatPhp(Number(h.unitCost))}
+                                          {formatPhp(Number(m.unitCost))}
                                         </span>
                                       </>
                                     )}
-                                    {h.totalCost && (
+                                    {m.lineTotal && (
                                       <>
                                         <span className="text-text-secondary">
                                           {" "}
                                           · Line{" "}
                                         </span>
                                         <span className="font-semibold">
-                                          {formatPhp(Number(h.totalCost))}
+                                          {formatPhp(Number(m.lineTotal))}
                                         </span>
                                       </>
                                     )}
@@ -564,15 +543,9 @@ export function ConsumableDetailPanel({
                                 )}
                               </div>
                             )}
-                            {h.reason && (
-                              <p className="text-[11px] text-text-secondary font-medium mt-1">
-                                <span className="font-semibold text-text">Reason:</span>{" "}
-                                {h.reason}
-                              </p>
-                            )}
-                            {h.notes && (
+                            {m.notes && (
                               <p className="text-xs text-text bg-bg-subtle p-2 rounded mt-1.5 border border-border">
-                                {h.notes}
+                                {m.notes}
                               </p>
                             )}
                           </li>
@@ -580,12 +553,12 @@ export function ConsumableDetailPanel({
                       })}
                     </ol>
 
-                    {historyNewestFirst.length > 4 && !isHistoryExpanded && (
+                    {movements.length > 4 && !isHistoryExpanded && (
                       <div className="absolute inset-x-0 bottom-0 h-20 bg-linear-to-t from-bg via-bg/85 to-transparent pointer-events-none" />
                     )}
                   </div>
 
-                  {historyNewestFirst.length > 4 && (
+                  {movements.length > 4 && (
                     <div
                       className={cn(
                         "relative z-10 flex justify-center",
@@ -603,7 +576,7 @@ export function ConsumableDetailPanel({
                           </>
                         ) : (
                           <>
-                            See more ({historyNewestFirst.length - 4} more){" "}
+                            See more ({movements.length - 4} more){" "}
                             <ChevronDown className="h-3.5 w-3.5" />
                           </>
                         )}

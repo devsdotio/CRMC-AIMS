@@ -10,6 +10,7 @@ import {
 
 import type { PurchaseLot } from "@/types/purchase-lots";
 import { consumableQueryKeys } from "@/features/consumables/client/query-keys";
+import { stockMovementQueryKeys } from "@/features/stock-movements/client/query-keys";
 import { purchaseLotsApi, type LotReleaseResult } from "./purchase-lots-api";
 import { purchaseLotQueryKeys } from "./query-keys";
 
@@ -45,6 +46,7 @@ export function useReleaseFromLotMutation(): UseMutationResult<
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: purchaseLotQueryKeys.all });
       qc.invalidateQueries({ queryKey: consumableQueryKeys.all });
+      qc.invalidateQueries({ queryKey: stockMovementQueryKeys.all });
     },
   });
 }

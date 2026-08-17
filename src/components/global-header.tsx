@@ -45,7 +45,17 @@ const ROUTE_MAP: Record<string, RouteMeta> = {
   },
   "/borrow-log": {
     title: "Borrow & Return Log",
-    subtitle: "Track active borrowings, returns, and overdue items",
+    subtitle: "Asset custody with LOG codes — borrowable and assignable",
+    category: "Operations",
+  },
+  "/issue-history": {
+    title: "Issue history",
+    subtitle: "Asset LOG and supply MOV transaction codes",
+    category: "Operations",
+  },
+  "/consumable-requests": {
+    title: "Supply requests",
+    subtitle: "Department consumable requisitions — approve and release",
     category: "Operations",
   },
   "/maintenance-logs": {

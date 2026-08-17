@@ -425,8 +425,26 @@ function LifecycleDetailsSection({ item }: { item: Extract<UnifiedTimelineItem, 
       )}
 
       {/* Event Notes or Conditions */}
-      {Boolean(event.payload.notes || event.payload.condition || event.payload.description) && (
+      {(Boolean(
+        event.payload.notes ||
+          event.payload.condition ||
+          event.payload.description ||
+          event.payload.logCode ||
+          event.payload.requestCode
+      )) && (
         <div className="rounded bg-bg/80 p-2 border border-border/50 space-y-1">
+          {event.payload.logCode != null && (
+            <p className="text-text leading-relaxed font-mono text-[11px]">
+              <strong className="text-text-secondary font-sans">Custody code:</strong>{" "}
+              {String(event.payload.logCode)}
+            </p>
+          )}
+          {event.payload.requestCode != null && (
+            <p className="text-text leading-relaxed font-mono text-[11px]">
+              <strong className="text-text-secondary font-sans">Request:</strong>{" "}
+              {String(event.payload.requestCode)}
+            </p>
+          )}
           {event.payload.description && (
             <p className="text-text leading-relaxed">
               <strong className="text-text-secondary">Description:</strong> {String(event.payload.description)}
@@ -688,7 +706,13 @@ function AssetHistoryTimeline({ asset }: { asset: Asset }) {
                 (Boolean(item.changes && Object.keys(item.changes).length > 0) ||
                   Boolean(item.event.fromStatus || item.event.toStatus) ||
                   Boolean(item.event.fromHolder || item.event.toHolder) ||
-                  Boolean(item.event.payload.notes || item.event.payload.description || item.event.payload.condition))) ||
+                  Boolean(
+                    item.event.payload.notes ||
+                      item.event.payload.description ||
+                      item.event.payload.condition ||
+                      item.event.payload.logCode ||
+                      item.event.payload.requestCode
+                  ))) ||
               item.kind === "maintenance";
 
             return (

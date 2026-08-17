@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ClipboardList } from "lucide-react";
 import { QueryErrorBanner } from "@/components/shared/query-error-banner";
 import { OperatorReadOnlyBanner } from "@/components/shared/operator-read-only-banner";
+import { ReleaseConsumableRequestDialog } from "@/components/consumable-requests/release-consumable-request-dialog";
 import { useToast } from "@/components/providers/toast-context";
 import { useAssetOperator } from "@/hooks/use-asset-operator";
 import {
@@ -13,6 +14,7 @@ import {
   useReleaseConsumableRequestMutation,
   type ConsumableRequest,
 } from "@/features/consumable-requests/client";
+import type { ReleaseConsumableRequestPayload } from "@/features/consumable-requests/client/consumable-requests-api";
 
 export default function ConsumableRequestsPage() {
   const { canOperate } = useAssetOperator();
@@ -20,6 +22,9 @@ export default function ConsumableRequestsPage() {
   const [status, setStatus] = useState<
     ConsumableRequest["status"] | undefined
   >("pending");
+  const [releaseTarget, setReleaseTarget] = useState<ConsumableRequest | null>(
+    null
+  );
   const { data, isLoading, isError, error, refetch } = useConsumableRequests({
     status,
     limit: 50,
@@ -49,25 +54,13 @@ export default function ConsumableRequestsPage() {
     }
   };
 
-  const handleRelease = async (row: ConsumableRequest) => {
-    const receivedBy =
-      window.prompt("Received by (person who picked up)?")?.trim() ||
-      row.department;
-    try {
-      await release.mutateAsync({
-        id: row.id,
-        payload: {
-          receivedBy,
-          lines: row.lines.map((line) => ({
-            lineId: line.id,
-            useFifo: true,
-          })),
-        },
-      });
-      toast.success(`${row.requestCode} released.`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Release failed.");
-    }
+  const handleReleaseConfirm = async (
+    row: ConsumableRequest,
+    payload: ReleaseConsumableRequestPayload
+  ) => {
+    await release.mutateAsync({ id: row.id, payload });
+    toast.success(`${row.requestCode} released. Stock deducted.`);
+    setReleaseTarget(null);
   };
 
   return (
@@ -80,7 +73,8 @@ export default function ConsumableRequestsPage() {
           </h1>
         </div>
         <p className="text-xs text-text-secondary mt-0.5">
-          Department portal requisitions. Approve, then release from on-hand lots (FIFO). Consumables are not returned.
+          Department portal requisitions. Approve, then release with FIFO or a
+          specific lot per line. Consumables are not returned.
         </p>
       </div>
 
@@ -132,7 +126,10 @@ export default function ConsumableRequestsPage() {
         ) : (
           <ul className="divide-y divide-border">
             {rows.map((row) => (
-              <li key={row.id} className="px-4 md:px-6 py-4 flex flex-col md:flex-row md:items-center gap-3">
+              <li
+                key={row.id}
+                className="px-4 md:px-6 py-4 flex flex-col md:flex-row md:items-center gap-3"
+              >
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-mono text-text-secondary">
                     {row.requestCode}
@@ -167,10 +164,10 @@ export default function ConsumableRequestsPage() {
                 {canOperate && row.status === "approved" && (
                   <button
                     type="button"
-                    onClick={() => void handleRelease(row)}
+                    onClick={() => setReleaseTarget(row)}
                     className="px-3 py-1.5 text-xs font-semibold rounded-md bg-primary text-primary-foreground shrink-0"
                   >
-                    Release (FIFO)
+                    Release…
                   </button>
                 )}
               </li>
@@ -178,6 +175,13 @@ export default function ConsumableRequestsPage() {
           </ul>
         )}
       </main>
+
+      <ReleaseConsumableRequestDialog
+        request={releaseTarget}
+        isOpen={Boolean(releaseTarget)}
+        onClose={() => setReleaseTarget(null)}
+        onConfirm={handleReleaseConfirm}
+      />
     </div>
   );
 }

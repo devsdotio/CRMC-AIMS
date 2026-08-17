@@ -142,6 +142,7 @@ export default function Sidebar({
         { name: "Requests", href: "/borrow-requests", icon: ClipboardList, badge: pendingCount, badgeTone: "accent", roles: ["superadmin", "admin", "staff"] },
         { name: "Supply requests", href: "/consumable-requests", icon: Boxes, roles: ["superadmin", "admin", "staff"] },
         { name: "Borrow Log", href: "/borrow-log", icon: Repeat, badge: overdueCount, badgeTone: "warning", roles: ["superadmin", "admin", "staff"] },
+        { name: "Issue history", href: "/issue-history", icon: History, roles: ["superadmin", "admin", "staff"] },
         { name: "Suppliers", href: "/suppliers", icon: Truck, roles: ["superadmin", "admin", "staff"] },
         { name: "Projects", href: "/projects", icon: FolderKanban, roles: ["superadmin", "admin"] },
         { name: "Maintenance Logs", href: "/maintenance-logs", icon: Wrench, roles: ["superadmin", "admin", "staff"] },

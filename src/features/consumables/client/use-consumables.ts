@@ -21,10 +21,12 @@ import {
 export type { StockAdjustPayload };
 import { consumableQueryKeys } from "./query-keys";
 import { purchaseLotQueryKeys } from "@/features/purchase-lots/client/query-keys";
+import { stockMovementQueryKeys } from "@/features/stock-movements/client/query-keys";
 
 function invalidate(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: consumableQueryKeys.all });
   qc.invalidateQueries({ queryKey: purchaseLotQueryKeys.all });
+  qc.invalidateQueries({ queryKey: stockMovementQueryKeys.all });
 }
 
 export function useConsumablesQuery(filters?: {

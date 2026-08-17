@@ -13,6 +13,7 @@ import type { PaginatedResponse } from "@/features/shared/fetch-json";
 import { consumableQueryKeys } from "@/features/consumables/client/query-keys";
 import { purchaseLotQueryKeys } from "@/features/purchase-lots/client/query-keys";
 import { dashboardQueryKeys } from "@/features/dashboard/client/query-keys";
+import { stockMovementQueryKeys } from "@/features/stock-movements/client/query-keys";
 
 import {
   consumableRequestsApi,
@@ -27,6 +28,7 @@ function invalidate(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: consumableQueryKeys.all });
   qc.invalidateQueries({ queryKey: purchaseLotQueryKeys.all });
   qc.invalidateQueries({ queryKey: dashboardQueryKeys.all });
+  qc.invalidateQueries({ queryKey: stockMovementQueryKeys.all });
 }
 
 export function useConsumableRequests(filters?: {
