@@ -1022,28 +1022,27 @@ export function NewBorrowRequestWizard({
   const { mutateAsync: createConsumableRequest, isPending: isSubmittingSupply, isSuccess: isSubmittedSupply, reset: resetSupply } = useCreateConsumableRequestMutation();
   const isSubmitting = isSubmittingAsset || isSubmittingSupply;
   const isSubmitted = isSubmittedAsset || isSubmittedSupply;
-  const resetMutation = () => {
+  const resetMutation = useCallback(() => {
     resetAsset();
     resetSupply();
-  };
+  }, [resetAsset, resetSupply]);
   const { data: me } = useMeQuery();
 
   useEffect(() => {
-    if (open) {
-      setStep(prefilledItems && prefilledItems.length > 0 ? "details" : "type");
-      setValues({
-        requestType: initialType === "requisition" ? "consumable" : initialType === "borrow" ? "borrowable" : null,
-        selectedItems: prefilledItems ?? [],
-        dateFrom: today(),
-        dateTo: nextWeek(),
-        quantities: {},
-        purpose: "",
-        notes: "",
-      });
-      setFieldErrors({});
-      setErrorMessage("");
-      resetMutation();
-    }
+    if (!open) return;
+    setStep(prefilledItems && prefilledItems.length > 0 ? "details" : "type");
+    setValues({
+      requestType: initialType === "requisition" ? "consumable" : initialType === "borrow" ? "borrowable" : null,
+      selectedItems: prefilledItems ?? [],
+      dateFrom: today(),
+      dateTo: nextWeek(),
+      quantities: {},
+      purpose: "",
+      notes: "",
+    });
+    setFieldErrors({});
+    setErrorMessage("");
+    resetMutation();
   }, [open, prefilledItems, resetMutation, initialType]);
 
   const patchValues = useCallback(
