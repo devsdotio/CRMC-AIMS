@@ -6,7 +6,8 @@ import { cn } from "@/lib/utils";
 import { RequisitionItemRow } from "./RequisitionItemRow";
 import { SignatureBlock } from "./SignatureBlock";
 import type { RequisitionItem } from "./types";
-import { useCreateBorrowRequestMutation } from "@/features/borrow-requests/client/use-borrow-requests";
+import { useCreateConsumableRequestMutation } from "@/features/consumable-requests/client/use-consumable-requests";
+import { useConsumablesQuery } from "@/features/consumables/client/use-consumables";
 import { useMeQuery } from "@/features/users/client/use-users";
 import { useToast } from "@/components/providers/toast-context";
 
@@ -41,8 +42,10 @@ export function RequisitionSlip({
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const { data: me } = useMeQuery();
-  const { mutateAsync: createRequest, isPending: isSubmitting } =
-    useCreateBorrowRequestMutation();
+  const { data: catalogPage } = useConsumablesQuery({ limit: 100 });
+  const catalog = catalogPage?.data ?? [];
+  const { mutateAsync: createConsumableRequest, isPending: isSubmitting } =
+    useCreateConsumableRequestMutation();
   const toast = useToast();
 
   useEffect(() => {
@@ -95,10 +98,57 @@ export function RequisitionSlip({
       setError("Your profile could not be loaded. Sign in again and retry.");
       return;
     }
+    if (!me.departmentId) {
+      setError(
+        "This login is not linked to a department. Ask an administrator to assign one."
+      );
+      return;
+    }
 
     const validItems = items.filter(
       (item) => item.qty && item.qty > 0 && item.description.trim()
     );
+    const unmatched: string[] = [];
+    const linesByConsumableId = new Map<string, { quantity: number; notes?: string }>();
+
+    for (const item of validItems) {
+      const needle = item.description.trim().toLowerCase();
+      const match = catalog.find(
+        (c) =>
+          c.name.toLowerCase() === needle ||
+          c.itemCode.toLowerCase() === needle
+      );
+      if (!match) {
+        unmatched.push(item.description.trim());
+        continue;
+      }
+      const extra = [
+        item.costCenterCode.trim()
+          ? `cost center ${item.costCenterCode.trim()}`
+          : null,
+        item.suggestedDealer.trim()
+          ? `dealer ${item.suggestedDealer.trim()}`
+          : null,
+        item.estimatedCost != null ? `est. ${item.estimatedCost}` : null,
+      ].filter(Boolean);
+      const existing = linesByConsumableId.get(match.id);
+      const quantity = (existing?.quantity ?? 0) + (item.qty ?? 1);
+      const notes = [...(existing?.notes ? [existing.notes] : []), ...extra].join(
+        "; "
+      );
+      linesByConsumableId.set(match.id, {
+        quantity,
+        notes: notes || undefined,
+      });
+    }
+
+    if (unmatched.length > 0) {
+      setError(
+        `Unknown catalog supply: ${unmatched.join(", ")}. Use the exact item name or code from Browse.`
+      );
+      return;
+    }
+
     const purpose =
       validItems.find((item) => item.purpose.trim())?.purpose.trim() ||
       "Supplies requisition";
@@ -108,38 +158,21 @@ export function RequisitionSlip({
         ? `Recommending: ${recommendingPerson.trim()}`
         : null,
       budgetOfficer.trim() ? `Budget officer: ${budgetOfficer.trim()}` : null,
-      ...validItems
-        .filter((item) => item.costCenterCode.trim() || item.suggestedDealer.trim())
-        .map((item) => {
-          const bits = [
-            item.costCenterCode.trim()
-              ? `cost center ${item.costCenterCode.trim()}`
-              : null,
-            item.suggestedDealer.trim()
-              ? `dealer ${item.suggestedDealer.trim()}`
-              : null,
-            item.estimatedCost != null
-              ? `est. ${item.estimatedCost}`
-              : null,
-          ].filter(Boolean);
-          return bits.length ? `${item.description}: ${bits.join(", ")}` : null;
-        }),
     ].filter(Boolean);
 
     try {
-      await createRequest({
+      await createConsumableRequest({
         requesterUserId: me.id,
         requesterName: requisitionedBy.trim(),
         requesterEmail: me.email,
-        department: me.department || "Unspecified",
-        items: validItems.map((item) => ({
-          itemDescription: item.description.trim(),
-          category: "Supplies",
-          quantity: item.qty ?? 1,
-          itemType: "consumable" as const,
-        })),
+        departmentId: me.departmentId,
         purpose,
         notes: notesParts.join(" · ") || undefined,
+        lines: [...linesByConsumableId.entries()].map(([consumableId, line]) => ({
+          consumableId,
+          quantity: line.quantity,
+          notes: line.notes,
+        })),
       });
       toast.success("Requisition submitted.");
       setSuccess(true);

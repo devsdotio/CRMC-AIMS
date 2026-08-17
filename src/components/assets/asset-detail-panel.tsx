@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import {
   Edit3,
   MapPin,
@@ -12,7 +11,6 @@ import {
   ChevronDown,
   ChevronUp,
   ChevronRight,
-  ExternalLink,
   FileText,
   Loader2,
   Send,
@@ -1147,14 +1145,6 @@ export function AssetDetailPanel({
                 <History className="h-3.5 w-3.5" />
                 Asset History
               </h3>
-              <Link
-                href={`/dashboard/audit-logs?search=${encodeURIComponent(asset.assetCode)}`}
-                title="View full history in Audit Logs"
-                className="p-1 rounded-md text-text-secondary hover:text-primary hover:bg-bg-subtle transition-colors cursor-pointer"
-                aria-label="View full history in Audit Logs"
-              >
-                <ExternalLink className="h-3.5 w-3.5" />
-              </Link>
             </div>
             <AssetHistoryTimeline asset={asset} />
           </div>

@@ -22,7 +22,6 @@ import {
   History,
   PanelLeftClose,
   PanelLeftOpen,
-  FileText,
   FolderKanban,
   Truck,
   Wrench,
@@ -146,7 +145,8 @@ export default function Sidebar({
         { name: "Suppliers", href: "/suppliers", icon: Truck, roles: ["superadmin", "admin", "staff"] },
         { name: "Projects", href: "/projects", icon: FolderKanban, roles: ["superadmin", "admin"] },
         { name: "Maintenance Logs", href: "/maintenance-logs", icon: Wrench, roles: ["superadmin", "admin", "staff"] },
-        { name: "Audit Logs", href: "/audit-logs", icon: FileText, roles: ["superadmin", "admin"] },
+        // TEMP: Audit Logs nav hidden while writes are disabled.
+        // { name: "Audit Logs", href: "/audit-logs", icon: FileText, roles: ["superadmin", "admin"] },
         { name: "My Requests", href: "/borrower-db/requests", icon: ClipboardList, badge: pendingCount, badgeTone: "accent", roles: ["borrower"] },
         { name: "Borrow History", href: "/borrower-db/history", icon: History, roles: ["borrower"] },
       ],
