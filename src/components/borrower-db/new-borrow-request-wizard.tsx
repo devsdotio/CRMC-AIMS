@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 import { getCategoryStyle } from "@/constants/categories";
 import type { BrowseItem, WizardFormValues, RequestWizardStep, PortalBorrowRequest } from "./types";
 import { useCreateBorrowRequestMutation } from "@/features/borrow-requests/client/use-borrow-requests";
+import { useCreateConsumableRequestMutation } from "@/features/consumable-requests/client";
 import { useAssetsQuery } from "@/features/assets/client/use-assets";
 import { useConsumablesQuery } from "@/features/consumables/client/use-consumables";
 import { useMeQuery } from "@/features/users/client/use-users";
@@ -1017,7 +1018,14 @@ export function NewBorrowRequestWizard({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [errorMessage, setErrorMessage] = useState("");
 
-  const { mutateAsync: createRequest, isPending: isSubmitting, isSuccess: isSubmitted, reset: resetMutation } = useCreateBorrowRequestMutation();
+  const { mutateAsync: createRequest, isPending: isSubmittingAsset, isSuccess: isSubmittedAsset, reset: resetAsset } = useCreateBorrowRequestMutation();
+  const { mutateAsync: createConsumableRequest, isPending: isSubmittingSupply, isSuccess: isSubmittedSupply, reset: resetSupply } = useCreateConsumableRequestMutation();
+  const isSubmitting = isSubmittingAsset || isSubmittingSupply;
+  const isSubmitted = isSubmittedAsset || isSubmittedSupply;
+  const resetMutation = () => {
+    resetAsset();
+    resetSupply();
+  };
   const { data: me } = useMeQuery();
 
   useEffect(() => {
@@ -1110,6 +1118,55 @@ export function NewBorrowRequestWizard({
       }
 
       const hasAsset = items.some((item) => item.itemType === "asset");
+
+      if (values.requestType === "consumable") {
+        const created = await createConsumableRequest({
+          requesterUserId: me.id,
+          requesterName: me.name,
+          requesterEmail: me.email,
+          department: me.department || "Unspecified",
+          departmentId: me.departmentId,
+          purpose: values.purpose,
+          notes: values.notes || undefined,
+          lines: items
+            .filter((item) => item.consumableId)
+            .map((item) => ({
+              consumableId: item.consumableId!,
+              quantity: item.quantity,
+            })),
+        });
+        onSuccess({
+          id: created.id,
+          requestCode: created.requestCode,
+          requesterName: created.requesterName,
+          requesterEmail: created.requesterEmail,
+          requesterPhone: created.requesterPhone,
+          department: created.department,
+          items: created.lines.map((line) => ({
+            itemDescription: line.itemName,
+            consumableId: line.consumableId,
+            category: line.category,
+            quantity: line.quantityRequested,
+            itemType: "consumable" as const,
+          })),
+          purpose: created.purpose,
+          requestedAt: created.requestedAt,
+          expectedReturnDate: null,
+          status: created.status,
+          notes: created.notes,
+          history: created.history.map((h) => ({
+            id: h.id,
+            action: h.action === "submitted" ? "submitted" : h.action,
+            actor: h.actor,
+            timestamp: h.timestamp,
+            note: h.note,
+          })),
+          requestedDateFrom: created.requestedAt.slice(0, 10),
+          requestedDateTo: created.requestedAt.slice(0, 10),
+        });
+        onOpenChange(false);
+        return;
+      }
 
       const createdRequest = await createRequest({
         requesterUserId: me.id,

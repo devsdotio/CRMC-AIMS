@@ -44,6 +44,10 @@ export type ConsumableRequestDTO = {
   requesterEmail: string;
   requesterPhone: string;
   department: string;
+  departmentId?: string | null;
+  projectId?: string | null;
+  source?: "portal" | "admin_manual";
+  requestedByName?: string;
   purpose: string;
   status: ConsumableRequestRow["status"];
   notes?: string;

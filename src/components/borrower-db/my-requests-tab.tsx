@@ -10,6 +10,7 @@ import type { PortalBorrowRequest, RequestStatusFilter } from "./types";
 import { LoadingState } from "@/components/providers/loading-context";
 
 import { useBorrowRequests, useCancelBorrowRequestMutation } from "@/features/borrow-requests/client/use-borrow-requests";
+import { useConsumableRequests, useCancelConsumableRequestMutation } from "@/features/consumable-requests/client";
 import { useToast } from "@/components/providers/toast-context";
 
 const STATUS_FILTERS: { key: RequestStatusFilter; label: string }[] = [
@@ -28,30 +29,95 @@ export function MyRequestsTab() {
   const [selectedRequest, setSelectedRequest] = useState<PortalBorrowRequest | null>(null);
   const [page, setPage] = useState(1);
 
-  const { data: response, isLoading: loading } = useBorrowRequests();
-  const requests = useMemo(() => response?.data ?? [], [response?.data]);
+  const { data: response, isLoading: loadingAssets } = useBorrowRequests();
+  const { data: supplyResponse, isLoading: loadingSupplies } = useConsumableRequests();
+  const assetRequests = useMemo(() => response?.data ?? [], [response?.data]);
+  const supplyRequests = useMemo(
+    () => supplyResponse?.data ?? [],
+    [supplyResponse?.data]
+  );
+  const loading = loadingAssets || loadingSupplies;
   const { mutate: cancelRequest } = useCancelBorrowRequestMutation();
+  const { mutate: cancelSupply } = useCancelConsumableRequestMutation();
   const toast = useToast();
 
   useEffect(() => {
     setPage(1);
   }, [statusFilter]);
 
-  const handleCancelConfirmed = (requestId: string) => {
-    cancelRequest(
-      { id: requestId, note: "Cancelled by borrower" },
-      {
-        onSuccess: () => toast.success("Request cancelled."),
-        onError: (err) =>
-          toast.error(err instanceof Error ? err.message : "Failed to cancel request."),
-      }
+  const requests = useMemo<PortalBorrowRequest[]>(() => {
+    const mappedAssets: PortalBorrowRequest[] = assetRequests.map((row) => ({
+      ...row,
+      requestedDateFrom: row.requestedAt.slice(0, 10),
+      requestedDateTo: (row.expectedReturnDate ?? row.requestedAt).slice(0, 10),
+    }));
+    const mappedSupplies: PortalBorrowRequest[] = supplyRequests.map((row) => ({
+      id: row.id,
+      requestCode: row.requestCode,
+      requesterName: row.requesterName,
+      requesterEmail: row.requesterEmail,
+      requesterPhone: row.requesterPhone,
+      department: row.department,
+      items: row.lines.map((line) => ({
+        itemDescription: line.itemName,
+        consumableId: line.consumableId,
+        category: line.category,
+        quantity: line.quantityRequested,
+        itemType: "consumable" as const,
+      })),
+      purpose: row.purpose,
+      requestedAt: row.requestedAt,
+      expectedReturnDate: null,
+      status:
+        row.status === "released"
+          ? "released"
+          : row.status === "cancelled"
+            ? "cancelled"
+            : row.status,
+      notes: row.notes,
+      rejectionReason: row.rejectionReason,
+      history: row.history.map((h) => ({
+        id: h.id,
+        action: h.action as PortalBorrowRequest["history"][number]["action"],
+        actor: h.actor,
+        timestamp: h.timestamp,
+        note: h.note,
+      })),
+      requestedDateFrom: row.requestedAt.slice(0, 10),
+      requestedDateTo: row.requestedAt.slice(0, 10),
+    }));
+    return [...mappedSupplies, ...mappedAssets].sort((a, b) =>
+      b.requestedAt.localeCompare(a.requestedAt)
     );
+  }, [assetRequests, supplyRequests]);
+
+  const handleCancelConfirmed = (requestId: string) => {
+    const target = requests.find((r) => r.id === requestId);
+    const isSupply = Boolean(
+      target?.items.every((i) => i.itemType === "consumable")
+    );
+    const onDone = {
+      onSuccess: () => toast.success("Request cancelled."),
+      onError: (err: Error) =>
+        toast.error(err instanceof Error ? err.message : "Failed to cancel request."),
+    };
+    if (isSupply) {
+      cancelSupply({ id: requestId, note: "Cancelled by department" }, onDone);
+      return;
+    }
+    cancelRequest({ id: requestId, note: "Cancelled by borrower" }, onDone);
+  };
+
+  const matchesFilter = (r: PortalBorrowRequest, key: RequestStatusFilter) => {
+    if (key === "all") return true;
+    if (key === "returned") {
+      return r.status === "returned" || r.status === "released";
+    }
+    return r.status === key;
   };
 
   const filtered = useMemo(() => {
-    return statusFilter === "all"
-      ? requests
-      : requests.filter((r) => r.status === statusFilter);
+    return requests.filter((r) => matchesFilter(r, statusFilter));
   }, [requests, statusFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / REQUESTS_PAGE_SIZE));
@@ -72,7 +138,7 @@ export function MyRequestsTab() {
           const count =
             f.key === "all"
               ? requests.length
-              : requests.filter((r) => r.status === f.key).length;
+              : requests.filter((r) => matchesFilter(r, f.key)).length;
 
           const isActive = statusFilter === f.key;
 

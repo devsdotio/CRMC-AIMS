@@ -43,11 +43,26 @@ export const updateConsumableSchema = z
     message: "At least one field is required.",
   });
 
-export const stockMovementSchema = z.object({
-  quantity: z.number().int().positive("quantity must be positive."),
-  reason: z.string().trim().max(500).optional(),
-  notes: z.string().trim().max(2000).optional(),
-});
+export const stockMovementSchema = z
+  .object({
+    quantity: z.number().int().positive("quantity must be positive."),
+    reason: z.string().trim().max(500).optional(),
+    notes: z.string().trim().max(2000).optional(),
+    departmentId: z.string().uuid().optional(),
+    projectId: z.string().uuid().optional(),
+    receivedBy: z.string().trim().max(255).optional(),
+  })
+  .superRefine((data, ctx) => {
+    const hasDept = Boolean(data.departmentId);
+    const hasProject = Boolean(data.projectId);
+    if (hasDept === hasProject) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Specify exactly one destination: department or project.",
+        path: ["departmentId"],
+      });
+    }
+  });
 
 /**
  * Restock with cost tracking (phase 1.5).
@@ -173,8 +188,42 @@ export const stockAdjustSchema = z
 
 export const consumableIdSchema = z.string().uuid("Invalid consumable id.");
 
+/** Admin walk-up issue from on-hand stock. */
+export const issueConsumableSchema = z
+  .object({
+    quantity: z.number().int().positive("quantity must be positive."),
+    departmentId: z.string().uuid().optional(),
+    projectId: z.string().uuid().optional(),
+    useFifo: z.boolean().optional().default(true),
+    lotId: z.string().uuid().optional(),
+    lotCode: z.string().trim().min(1).max(64).optional(),
+    receivedBy: z.string().trim().max(255).optional(),
+    requestedByName: z.string().trim().max(255).optional(),
+    notes: z.string().trim().max(2000).optional(),
+    reason: z.string().trim().max(500).optional(),
+  })
+  .superRefine((data, ctx) => {
+    const hasDept = Boolean(data.departmentId);
+    const hasProject = Boolean(data.projectId);
+    if (hasDept === hasProject) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Specify exactly one destination: department or project.",
+        path: ["departmentId"],
+      });
+    }
+    if (!data.useFifo && !data.lotId && !data.lotCode) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Provide a lot (lotId/lotCode) or set useFifo=true.",
+        path: ["lotId"],
+      });
+    }
+  });
+
 export type CreateConsumableBody = z.infer<typeof createConsumableSchema>;
 export type UpdateConsumableBody = z.infer<typeof updateConsumableSchema>;
 export type StockMovementBody = z.infer<typeof stockMovementSchema>;
 export type RestockBody = z.infer<typeof restockSchema>;
 export type StockAdjustBody = z.infer<typeof stockAdjustSchema>;
+export type IssueConsumableBody = z.infer<typeof issueConsumableSchema>;

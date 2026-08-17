@@ -1,0 +1,114 @@
+import type { ConsumableRequestDTO } from "@/server/modules/consumable-requests/consumable-request.types";
+import { fetchJson, type ApiResponse, type PaginatedResponse } from "@/features/shared/fetch-json";
+
+export type ConsumableRequest = ConsumableRequestDTO;
+
+export type CreateConsumableRequestPayload = {
+  requesterName: string;
+  requesterEmail: string;
+  requesterPhone?: string;
+  department?: string;
+  departmentId?: string;
+  projectId?: string;
+  requestedByName?: string;
+  purpose: string;
+  notes?: string;
+  requesterUserId?: string;
+  lines: Array<{
+    consumableId: string;
+    quantity: number;
+    notes?: string;
+  }>;
+};
+
+export type ReleaseConsumableRequestPayload = {
+  receivedBy: string;
+  note?: string;
+  lines: Array<{
+    lineId: string;
+    useFifo?: boolean;
+    allocations?: Array<{
+      lotId?: string;
+      lotCode?: string;
+      quantity: number;
+    }>;
+  }>;
+};
+
+export const consumableRequestsApi = {
+  async list(params?: {
+    status?: ConsumableRequest["status"];
+    department?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<PaginatedResponse<ConsumableRequest[]>> {
+    const sp = new URLSearchParams();
+    if (params?.status) sp.set("status", params.status);
+    if (params?.department) sp.set("department", params.department);
+    if (params?.search) sp.set("search", params.search);
+    if (params?.startDate) sp.set("startDate", params.startDate);
+    if (params?.endDate) sp.set("endDate", params.endDate);
+    if (params?.page) sp.set("page", params.page.toString());
+    if (params?.limit) sp.set("limit", params.limit.toString());
+    const qs = sp.toString();
+    const res = await fetchJson<ApiResponse<PaginatedResponse<ConsumableRequest[]>>>(
+      qs ? `/api/consumable-requests?${qs}` : "/api/consumable-requests"
+    );
+    return res.data;
+  },
+
+  async getById(id: string): Promise<ConsumableRequest> {
+    const res = await fetchJson<ApiResponse<ConsumableRequest>>(
+      `/api/consumable-requests/${id}`
+    );
+    return res.data;
+  },
+
+  async create(
+    payload: CreateConsumableRequestPayload
+  ): Promise<ConsumableRequest> {
+    const res = await fetchJson<ApiResponse<ConsumableRequest>>(
+      "/api/consumable-requests",
+      { method: "POST", body: JSON.stringify(payload) }
+    );
+    return res.data;
+  },
+
+  async approve(id: string, note?: string): Promise<ConsumableRequest> {
+    const res = await fetchJson<ApiResponse<ConsumableRequest>>(
+      `/api/consumable-requests/${id}/approve`,
+      { method: "POST", body: JSON.stringify({ note }) }
+    );
+    return res.data;
+  },
+
+  async reject(id: string, reason: string): Promise<ConsumableRequest> {
+    const res = await fetchJson<ApiResponse<ConsumableRequest>>(
+      `/api/consumable-requests/${id}/reject`,
+      { method: "POST", body: JSON.stringify({ reason }) }
+    );
+    return res.data;
+  },
+
+  async cancel(id: string, note?: string): Promise<ConsumableRequest> {
+    const res = await fetchJson<ApiResponse<ConsumableRequest>>(
+      `/api/consumable-requests/${id}/cancel`,
+      { method: "POST", body: JSON.stringify({ note }) }
+    );
+    return res.data;
+  },
+
+  async release(
+    id: string,
+    payload: ReleaseConsumableRequestPayload
+  ): Promise<ConsumableRequest> {
+    const res = await fetchJson<ApiResponse<ConsumableRequest>>(
+      `/api/consumable-requests/${id}/release`,
+      { method: "POST", body: JSON.stringify(payload) }
+    );
+    return res.data;
+  },
+};

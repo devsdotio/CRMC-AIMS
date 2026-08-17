@@ -19,6 +19,8 @@ import type { ConsumableItem } from "@/types/inventory";
 import type { PurchaseLot } from "@/types/purchase-lots";
 import { formatPhp } from "@/components/projects/format-money";
 import { cn } from "@/lib/utils";
+import { useDepartmentsQuery } from "@/features/departments/client";
+import { useProjectsQuery } from "@/features/projects/client";
 
 function lotPayload(lot: PurchaseLot) {
   return lot.qrPayload?.trim() || `CRMC-AIMS-LOT:${lot.lotCode}`;
@@ -30,6 +32,8 @@ export type ReleaseFromLotInput = {
   recipientName?: string;
   reason?: string;
   notes?: string;
+  departmentId?: string;
+  projectId?: string;
 };
 
 export interface ReleaseFromLotDialogProps {
@@ -66,6 +70,8 @@ export function ReleaseFromLotDialog({
   onClose,
   onConfirm,
 }: ReleaseFromLotDialogProps) {
+  const { data: departments = [] } = useDepartmentsQuery();
+  const { data: projects = [] } = useProjectsQuery();
   const availableLots = useMemo(
     () => lots.filter((lot) => lot.quantityRemaining > 0),
     [lots]
@@ -80,6 +86,11 @@ export function ReleaseFromLotDialog({
   const [customReason, setCustomReason] = useState("");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
+  const [destinationKind, setDestinationKind] = useState<"department" | "project">(
+    "department"
+  );
+  const [departmentId, setDepartmentId] = useState("");
+  const [projectId, setProjectId] = useState("");
 
   useEffect(() => {
     if (!isOpen) return;
@@ -96,7 +107,12 @@ export function ReleaseFromLotDialog({
     setCustomReason("");
     setNotes("");
     setError("");
-  }, [isOpen, initialLot, availableLots]);
+    setDestinationKind("department");
+    setDepartmentId(departments[0]?.id ?? "");
+    setProjectId(
+      projects.find((p) => p.status !== "completed")?.id ?? projects[0]?.id ?? ""
+    );
+  }, [isOpen, initialLot, availableLots, departments, projects]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -154,7 +170,17 @@ export function ReleaseFromLotDialog({
       return;
     }
     if (quantity > item.currentQty) {
-      setError(`Only ${item.currentQty} ${item.unit} available in stock.`);
+      setError(
+        `Not on hand. Only ${item.currentQty} ${item.unit} available. Restock first.`
+      );
+      return;
+    }
+    if (destinationKind === "department" && !departmentId) {
+      setError("Select a department.");
+      return;
+    }
+    if (destinationKind === "project" && !projectId) {
+      setError("Select a project.");
       return;
     }
 
@@ -170,6 +196,9 @@ export function ReleaseFromLotDialog({
         recipientName: recipientName.trim() || undefined,
         reason: finalReason,
         notes: notes.trim() || undefined,
+        departmentId:
+          destinationKind === "department" ? departmentId : undefined,
+        projectId: destinationKind === "project" ? projectId : undefined,
       });
       onClose();
     } catch (err) {
@@ -216,6 +245,61 @@ export function ReleaseFromLotDialog({
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div className="space-y-1.5">
+            <span className="text-xs font-bold text-text">Destination</span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setDestinationKind("department")}
+                className={cn(
+                  "flex-1 py-2 text-xs font-semibold rounded-lg border",
+                  destinationKind === "department"
+                    ? "border-primary bg-primary/5 text-text"
+                    : "border-border text-text-secondary"
+                )}
+              >
+                Department
+              </button>
+              <button
+                type="button"
+                onClick={() => setDestinationKind("project")}
+                className={cn(
+                  "flex-1 py-2 text-xs font-semibold rounded-lg border",
+                  destinationKind === "project"
+                    ? "border-primary bg-primary/5 text-text"
+                    : "border-border text-text-secondary"
+                )}
+              >
+                Project
+              </button>
+            </div>
+            {destinationKind === "department" ? (
+              <select
+                value={departmentId}
+                onChange={(e) => setDepartmentId(e.target.value)}
+                className="w-full h-9 px-3 text-xs border border-border rounded-lg bg-bg"
+              >
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name} ({d.code})
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <select
+                value={projectId}
+                onChange={(e) => setProjectId(e.target.value)}
+                className="w-full h-9 px-3 text-xs border border-border rounded-lg bg-bg"
+              >
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} ({p.projectCode})
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
           {/* Stock Lot Selection */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">

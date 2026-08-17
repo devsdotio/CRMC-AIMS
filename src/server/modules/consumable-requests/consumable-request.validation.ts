@@ -31,19 +31,32 @@ const requestLineInputSchema = z.object({
   notes: z.string().trim().max(1000).optional(),
 });
 
-export const createConsumableRequestSchema = z.object({
-  requesterName: z.string().trim().min(1).max(255),
-  requesterEmail: z.string().trim().email().max(320),
-  requesterPhone: z.string().trim().max(40).optional().default(""),
-  department: z.string().trim().min(1).max(120),
-  purpose: z.string().trim().min(1).max(1000),
-  notes: z.string().trim().max(2000).optional(),
-  requesterUserId: z.string().uuid().optional(),
-  lines: z
-    .array(requestLineInputSchema)
-    .min(1, "At least one product line is required.")
-    .max(50),
-});
+export const createConsumableRequestSchema = z
+  .object({
+    requesterName: z.string().trim().min(1).max(255),
+    requesterEmail: z.string().trim().email().max(320),
+    requesterPhone: z.string().trim().max(40).optional().default(""),
+    department: z.string().trim().min(1).max(120).optional(),
+    departmentId: z.string().uuid().optional(),
+    projectId: z.string().uuid().optional(),
+    requestedByName: z.string().trim().max(255).optional(),
+    purpose: z.string().trim().min(1).max(1000),
+    notes: z.string().trim().max(2000).optional(),
+    requesterUserId: z.string().uuid().optional(),
+    lines: z
+      .array(requestLineInputSchema)
+      .min(1, "At least one product line is required.")
+      .max(50),
+  })
+  .superRefine((data, ctx) => {
+    if (data.departmentId && data.projectId) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Specify department or project, not both.",
+        path: ["departmentId"],
+      });
+    }
+  });
 
 export const approveConsumableRequestSchema = z.object({
   note: z.string().trim().max(1000).optional(),

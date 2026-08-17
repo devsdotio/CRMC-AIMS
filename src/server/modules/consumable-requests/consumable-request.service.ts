@@ -29,6 +29,10 @@ import {
 } from "@/server/modules/purchase-lots/purchase-lot.service";
 
 import { ConsumableRequestRepository } from "./consumable-request.repository";
+import {
+  StockMovementService,
+  allocationsToMovementLines,
+} from "@/server/modules/stock-movements";
 import type {
   ConsumableRequestDTO,
   ConsumableRequestLineDTO,
@@ -102,6 +106,10 @@ function toDTO(
     requesterEmail: row.requesterEmail,
     requesterPhone: row.requesterPhone,
     department: row.department,
+    departmentId: row.departmentId,
+    projectId: row.projectId,
+    source: row.source ?? "portal",
+    requestedByName: row.requestedByName ?? undefined,
     purpose: row.purpose,
     status: row.status,
     notes: row.notes ?? undefined,
@@ -189,7 +197,8 @@ export class ConsumableRequestService {
     private readonly repo = new ConsumableRequestRepository(),
     private readonly consumables = new ConsumableRepository(),
     private readonly purchaseLots = new PurchaseLotService(),
-    private readonly auditLogs = new AuditLogRepository()
+    private readonly auditLogs = new AuditLogRepository(),
+    private readonly movements = new StockMovementService()
   ) {}
 
   private async hydrate(
@@ -294,6 +303,22 @@ export class ConsumableRequestService {
       "Consumable request recorded"
     );
 
+    const departmentId = isAssetOperatorRole(actor.role)
+      ? (input.departmentId ?? actor.departmentId ?? null)
+      : actor.departmentId ?? null;
+
+    if (!isAssetOperatorRole(actor.role) && !departmentId) {
+      throw new BadRequestError(
+        "This login is not linked to a department. Ask an administrator to assign one."
+      );
+    }
+
+    if (input.projectId && !isAssetOperatorRole(actor.role)) {
+      throw new ForbiddenError(
+        "Department accounts cannot request supplies for a project."
+      );
+    }
+
     const dto = await withTransaction(async (tx) => {
       const created = await this.repo.create(
         {
@@ -302,7 +327,16 @@ export class ConsumableRequestService {
           requesterName: input.requesterName,
           requesterEmail: input.requesterEmail.toLowerCase(),
           requesterPhone: input.requesterPhone ?? "",
-          department: departmentNameForRequest(actor, input.department),
+          department: departmentNameForRequest(
+            actor,
+            input.department ?? actor.departmentName ?? "Unspecified"
+          ),
+          departmentId,
+          projectId: isAssetOperatorRole(actor.role)
+            ? (input.projectId ?? null)
+            : null,
+          source: isAssetOperatorRole(actor.role) ? "admin_manual" : "portal",
+          requestedByName: input.requestedByName ?? null,
           purpose: input.purpose,
           status: "pending",
           notes: input.notes ?? null,
@@ -339,7 +373,10 @@ export class ConsumableRequestService {
           metadata: {
             requestCode,
             lineCount: lines.length,
-            department: departmentNameForRequest(actor, input.department),
+            department: departmentNameForRequest(
+              actor,
+              input.department ?? actor.departmentName ?? "Unspecified"
+            ),
           },
         },
         tx
@@ -574,7 +611,7 @@ export class ConsumableRequestService {
 
         if (item.currentQty < line.quantityRequested) {
           throw new BadRequestError(
-            `Insufficient stock for ${item.itemCode}. Available: ${item.currentQty} ${item.unit}, requested: ${line.quantityRequested}.`
+            `Not on hand for ${item.itemCode}. Available: ${item.currentQty} ${item.unit}, requested: ${line.quantityRequested}. Restock first. Purchase orders will be added later.`
           );
         }
 
@@ -655,6 +692,21 @@ export class ConsumableRequestService {
           {
             currentQty: item.currentQty - line.quantityRequested,
             history,
+          },
+          tx
+        );
+
+        await this.movements.record(
+          {
+            consumableId: item.id,
+            direction: "out",
+            reason: "issue",
+            actor,
+            departmentId: existing.departmentId,
+            projectId: existing.projectId,
+            requestId: existing.id,
+            notes: noteWithReceiver,
+            lines: allocationsToMovementLines(lotAllocations),
           },
           tx
         );

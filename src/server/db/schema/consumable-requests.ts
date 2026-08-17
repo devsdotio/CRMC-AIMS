@@ -12,7 +12,14 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { consumables } from "./consumables";
+import { departments } from "./departments";
+import { projects } from "./projects";
 import { purchaseLots } from "./purchase-lots";
+
+export const consumableRequestSourceEnum = pgEnum("consumable_request_source", [
+  "portal",
+  "admin_manual",
+]);
 
 /**
  * Dedicated consumable issue queue (multi-line).
@@ -51,6 +58,14 @@ export const consumableRequests = pgTable(
     requesterEmail: text("requester_email").notNull(),
     requesterPhone: text("requester_phone").notNull().default(""),
     department: text("department").notNull(),
+    departmentId: uuid("department_id").references(() => departments.id, {
+      onDelete: "restrict",
+    }),
+    projectId: uuid("project_id").references(() => projects.id, {
+      onDelete: "restrict",
+    }),
+    source: consumableRequestSourceEnum("source").notNull().default("portal"),
+    requestedByName: text("requested_by_name"),
 
     purpose: text("purpose").notNull(),
     status: consumableRequestStatusEnum("status").notNull().default("pending"),
@@ -86,6 +101,8 @@ export const consumableRequests = pgTable(
   (table) => [
     index("consumable_requests_status_idx").on(table.status),
     index("consumable_requests_department_idx").on(table.department),
+    index("consumable_requests_department_id_idx").on(table.departmentId),
+    index("consumable_requests_project_id_idx").on(table.projectId),
     index("consumable_requests_requested_at_idx").on(table.requestedAt),
     index("consumable_requests_requester_user_id_idx").on(table.requesterUserId),
   ]

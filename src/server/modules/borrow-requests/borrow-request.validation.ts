@@ -71,6 +71,14 @@ export const createBorrowRequestSchema = z.object({
       path: ["items"],
     });
   }
+  if (data.items.some((i) => i.itemType === "consumable")) {
+    ctx.addIssue({
+      code: "custom",
+      message:
+        "Consumable supplies must be requested on the supplies path, not mixed with coded assets.",
+      path: ["items"],
+    });
+  }
 });
 
 export const approveBorrowRequestSchema = z.object({

@@ -9,7 +9,7 @@ import {
   ConflictError,
   NotFoundError,
 } from "@/server/shared/errors";
-import { withTransaction } from "@/server/db/transaction";
+import { withTransaction, type DbSession } from "@/server/db/transaction";
 import { parseScanPayload } from "@/server/shared/qr";
 import {
   PurchaseLotService,
@@ -18,6 +18,12 @@ import {
 import type { PurchaseLotDTO } from "@/server/modules/purchase-lots/purchase-lot.types";
 import { scanReleaseLotSchema } from "@/server/modules/purchase-lots/purchase-lot.validation";
 import { CategoryRepository } from "@/server/modules/categories/category.repository";
+import { DepartmentRepository } from "@/server/modules/departments/department.repository";
+import { ProjectRepository } from "@/server/modules/projects/project.repository";
+import {
+  StockMovementService,
+  allocationsToMovementLines,
+} from "@/server/modules/stock-movements";
 
 import { ConsumableRepository } from "./consumable.repository";
 import type { ConsumableDTO } from "./consumable.types";
@@ -28,6 +34,7 @@ import {
   restockSchema,
   stockAdjustSchema,
   stockMovementSchema,
+  issueConsumableSchema,
   updateConsumableSchema,
 } from "./consumable.validation";
 
@@ -97,8 +104,45 @@ export class ConsumableService {
   constructor(
     private readonly repo = new ConsumableRepository(),
     private readonly purchaseLots = new PurchaseLotService(),
-    private readonly taxonomy = new CategoryRepository()
+    private readonly taxonomy = new CategoryRepository(),
+    private readonly departments = new DepartmentRepository(),
+    private readonly projects = new ProjectRepository(),
+    private readonly movements = new StockMovementService()
   ) {}
+
+  private async resolveIssueDestination(
+    departmentId: string | undefined,
+    projectId: string | undefined,
+    tx?: DbSession
+  ): Promise<{ departmentId: string | null; projectId: string | null }> {
+    if (departmentId && projectId) {
+      throw new BadRequestError(
+        "Specify exactly one destination: department or project."
+      );
+    }
+    if (projectId) {
+      const project = await this.projects.findById(projectId, tx);
+      if (!project) throw new NotFoundError("Project", projectId);
+      return { departmentId: null, projectId };
+    }
+    if (departmentId) {
+      const dept = await this.departments.findById(departmentId, tx);
+      if (!dept) throw new NotFoundError("Department", departmentId);
+      return { departmentId, projectId: null };
+    }
+    throw new BadRequestError(
+      "Specify exactly one destination: department or project."
+    );
+  }
+
+  private rejectUncosted(allocations: LotCostAllocation[], itemCode: string) {
+    const uncosted = allocations.find((a) => a.uncosted);
+    if (uncosted) {
+      throw new BadRequestError(
+        `Not on hand for ${itemCode}: not enough costed lot quantity (short ${uncosted.quantity}). Restock first. Purchase orders will be added later.`
+      );
+    }
+  }
 
   private async resolveConsumableCategoryName(rawName: string): Promise<string> {
     const found = await this.taxonomy.findByTypeAndName("consumable", rawName);
@@ -269,6 +313,27 @@ export class ConsumableService {
         tx
       );
       if (!updated) throw new NotFoundError("Consumable", id);
+
+      await this.movements.record(
+        {
+          consumableId: existing.id,
+          direction: "in",
+          reason: "restock",
+          actor,
+          notes: input.notes ?? input.reason ?? null,
+          lines: [
+            {
+              qty: input.quantity,
+              purchaseLotId: lot.id,
+              lotCode: lot.lotCode,
+              unitCost: lot.unitCost,
+              lineTotal: lot.totalCost,
+            },
+          ],
+        },
+        tx
+      );
+
       return toDTO(updated);
     });
   }
@@ -287,17 +352,22 @@ export class ConsumableService {
 
       if (existing.currentQty < input.quantity) {
         throw new BadRequestError(
-          `Insufficient stock. Available: ${existing.currentQty} ${existing.unit}.`
+          `Not on hand. Available: ${existing.currentQty} ${existing.unit}. Restock first. Purchase orders will be added later.`
         );
       }
 
-      // FIFO cost snapshot — preserves supplier pricing for reports even if
-      // unit costs change on later restocks.
+      const dest = await this.resolveIssueDestination(
+        input.departmentId,
+        input.projectId,
+        tx
+      );
+
       const allocations = await this.purchaseLots.consumeFifo(
         existing.id,
         input.quantity,
         tx
       );
+      this.rejectUncosted(allocations, existing.itemCode);
 
       const totalCost = allocations.reduce(
         (sum, a) => sum + Number(a.total),
@@ -333,6 +403,21 @@ export class ConsumableService {
         tx
       );
       if (!updated) throw new NotFoundError("Consumable", id);
+
+      await this.movements.record(
+        {
+          consumableId: existing.id,
+          direction: "out",
+          reason: "issue",
+          actor,
+          departmentId: dest.departmentId,
+          projectId: dest.projectId,
+          notes: input.notes ?? input.reason ?? null,
+          lines: allocationsToMovementLines(allocations),
+        },
+        tx
+      );
+
       return toDTO(updated);
     });
   }
@@ -385,9 +470,15 @@ export class ConsumableService {
 
       if (existing.currentQty < input.quantity) {
         throw new BadRequestError(
-          `Insufficient stock on ${existing.itemCode}. Available: ${existing.currentQty} ${existing.unit}.`
+          `Not on hand for ${existing.itemCode}. Available: ${existing.currentQty} ${existing.unit}. Restock first. Purchase orders will be added later.`
         );
       }
+
+      const dest = await this.resolveIssueDestination(
+        input.departmentId,
+        input.projectId,
+        tx
+      );
 
       const { lot, allocation } = await this.purchaseLots.consumeFromLot(
         preview.lotCode,
@@ -424,6 +515,20 @@ export class ConsumableService {
         tx
       );
       if (!updated) throw new NotFoundError("Consumable", existing.id);
+
+      await this.movements.record(
+        {
+          consumableId: existing.id,
+          direction: "out",
+          reason: "issue",
+          actor,
+          departmentId: dest.departmentId,
+          projectId: dest.projectId,
+          notes: input.notes ?? input.reason ?? null,
+          lines: allocationsToMovementLines([allocation]),
+        },
+        tx
+      );
 
       return {
         consumable: toDTO(updated),
@@ -551,6 +656,130 @@ export class ConsumableService {
         tx
       );
       if (!updated) throw new NotFoundError("Consumable", id);
+
+      await this.movements.record(
+        {
+          consumableId: existing.id,
+          direction: input.quantityChange > 0 ? "in" : "out",
+          reason: "adjust",
+          actor,
+          notes: input.notes ?? input.reason,
+          lines: allocationsToMovementLines(lotAllocations),
+        },
+        tx
+      );
+
+      return toDTO(updated);
+    });
+  }
+
+  /**
+   * Admin walk-up issue: dest required, stock deducted immediately.
+   * Same engine as checkout / lot scan — never a pending request.
+   */
+  async issue(
+    rawId: string,
+    rawInput: unknown,
+    actor: ActorContext
+  ): Promise<ConsumableDTO> {
+    const id = consumableIdSchema.parse(rawId);
+    const input = issueConsumableSchema.parse(rawInput);
+
+    return withTransaction(async (tx) => {
+      const existing = await this.repo.findByIdForUpdate(id, tx);
+      if (!existing) throw new NotFoundError("Consumable", id);
+
+      if (existing.currentQty < input.quantity) {
+        throw new BadRequestError(
+          `Not on hand for ${existing.itemCode}. Available: ${existing.currentQty} ${existing.unit}. Restock first. Purchase orders will be added later.`
+        );
+      }
+
+      const dest = await this.resolveIssueDestination(
+        input.departmentId,
+        input.projectId,
+        tx
+      );
+
+      let allocations: LotCostAllocation[] = [];
+      if (input.useFifo !== false && !input.lotId && !input.lotCode) {
+        allocations = await this.purchaseLots.consumeFifo(
+          existing.id,
+          input.quantity,
+          tx
+        );
+        this.rejectUncosted(allocations, existing.itemCode);
+      } else {
+        const result = input.lotId
+          ? await this.purchaseLots.consumeFromLotId(
+              input.lotId,
+              input.quantity,
+              tx,
+              existing.id
+            )
+          : await this.purchaseLots.consumeFromLot(
+              input.lotCode!,
+              input.quantity,
+              tx,
+              existing.id
+            );
+        allocations = [result.allocation];
+      }
+
+      const totalCost = allocations.reduce((sum, a) => sum + Number(a.total), 0);
+      const primary = allocations[0];
+      const destNote = [
+        input.reason,
+        input.requestedByName ? `Requested by: ${input.requestedByName}` : null,
+        input.receivedBy ? `Received by: ${input.receivedBy}` : null,
+      ]
+        .filter(Boolean)
+        .join(". ");
+
+      const history = [
+        ...(Array.isArray(existing.history) ? existing.history : []),
+        historyEntry(
+          "checkout",
+          -input.quantity,
+          actor.displayName,
+          destNote || "Admin issue",
+          input.notes,
+          {
+            unitCost: primary?.unitCost,
+            supplierId: primary?.supplierId ?? undefined,
+            supplierName: primary?.supplierName ?? undefined,
+            lotCode: primary?.lotCode ?? undefined,
+            totalCost: totalCost.toFixed(2),
+            lotAllocations: allocations,
+            recipientName: input.receivedBy,
+          }
+        ),
+      ];
+
+      const updated = await this.repo.update(
+        id,
+        {
+          currentQty: existing.currentQty - input.quantity,
+          history,
+        },
+        tx
+      );
+      if (!updated) throw new NotFoundError("Consumable", id);
+
+      await this.movements.record(
+        {
+          consumableId: existing.id,
+          direction: "out",
+          reason: "issue",
+          actor,
+          departmentId: dest.departmentId,
+          projectId: dest.projectId,
+          notes: input.notes ?? destNote ?? null,
+          lines: allocationsToMovementLines(allocations),
+        },
+        tx
+      );
+
       return toDTO(updated);
     });
   }

@@ -29,6 +29,7 @@ import {
   ReleaseFromLotDialog,
   type ReleaseFromLotInput,
 } from "@/components/consumables/release-from-lot-dialog";
+import { IssueConsumableDialog } from "@/components/consumables/issue-consumable-dialog";
 import { useSuppliersQuery } from "@/features/suppliers/client";
 import { QueryErrorBanner } from "@/components/shared/query-error-banner";
 import { OperatorReadOnlyBanner } from "@/components/shared/operator-read-only-banner";
@@ -86,6 +87,7 @@ export default function ConsumablesPage() {
     item: ConsumableItem | null;
     lot: PurchaseLot | null;
   }>({ isOpen: false, item: null, lot: null });
+  const [issueItem, setIssueItem] = useState<ConsumableItem | null>(null);
 
   // Suppliers only matter for Restock dialog (add/edit loads its own registry list).
   const { data: suppliers = [] } = useSuppliersQuery({
@@ -291,6 +293,18 @@ export default function ConsumablesPage() {
           <button
             type="button"
             onClick={() => {
+              if (selectedItem) setIssueItem(selectedItem);
+              else if (filteredItems[0]) setIssueItem(filteredItems[0]);
+            }}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-border bg-bg text-text hover:border-primary transition-colors cursor-pointer"
+          >
+            <PackageMinus className="h-4 w-4 text-primary" />
+            <span>Issue</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
               if (selectedItem) openRelease(selectedItem);
               else if (filteredItems[0]) openRelease(filteredItems[0]);
             }}
@@ -428,6 +442,13 @@ export default function ConsumablesPage() {
         isOpen={adjustState.isOpen}
         onClose={() => setAdjustState({ isOpen: false, item: null })}
         onConfirmAdjust={handleConfirmAdjust}
+      />
+
+      <IssueConsumableDialog
+        item={issueItem}
+        isOpen={Boolean(issueItem)}
+        onClose={() => setIssueItem(null)}
+        onSuccess={(message) => toast.success(message)}
       />
 
       <ReleaseFromLotDialog
