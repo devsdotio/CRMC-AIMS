@@ -39,21 +39,26 @@ import { borrowRequestController } from "@/server/modules/borrow-requests";
  *             required:
  *               - requesterName
  *               - requesterEmail
- *               - department
- *               - itemDescription
- *               - category
+ *               - items
  *               - purpose
- *               - expectedReturnDate
  *             properties:
  *               requesterName: { type: string }
  *               requesterEmail: { type: string, format: email }
  *               requesterPhone: { type: string }
- *               department: { type: string }
- *               itemDescription: { type: string }
- *               assetId: { type: string, format: uuid }
- *               assetCode: { type: string }
- *               category: { type: string }
- *               quantity: { type: integer, default: 1 }
+ *               departmentId: { type: string, format: uuid }
+ *               requestType: { type: string, enum: [borrowable, assignable] }
+ *               items:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   required: [itemDescription, category, itemType]
+ *                   properties:
+ *                     itemDescription: { type: string }
+ *                     assetId: { type: string, format: uuid }
+ *                     assetCode: { type: string }
+ *                     category: { type: string }
+ *                     quantity: { type: integer, default: 1 }
+ *                     itemType: { type: string, enum: [asset] }
  *               purpose: { type: string }
  *               expectedReturnDate: { type: string, format: date, example: "2026-08-20" }
  *               notes: { type: string }

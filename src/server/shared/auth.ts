@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 
 import { createClient } from "@/lib/supabase/server";
 import { getDb } from "@/server/db";
-import { profiles, type ProfileRow } from "@/server/db/schema";
+import { departments, profiles, type ProfileRow } from "@/server/db/schema";
 import {
   BadRequestError,
   ForbiddenError,
@@ -66,20 +66,40 @@ export function toActorContext(user: User, profile: ProfileRow): ActorContext {
 }
 
 /**
- * Portal requests always belong to the logged-in department.
- * Operators may still pass a department string (legacy / later admin-on-behalf).
+ * Resolve department from the departments table (source of truth).
+ * Portal accounts always use the session's department_id — never client text.
  */
-export function departmentNameForRequest(
-  actor: ActorContext,
-  submittedDepartment: string
-): string {
-  if (actor.role !== "borrower") return submittedDepartment;
-  if (!actor.departmentId || !actor.departmentName) {
-    throw new BadRequestError(
-      "This department account is not linked to a department. Ask an administrator to assign one."
-    );
+export async function resolveDepartmentSnapshot(opts: {
+  actor: ActorContext;
+  submittedDepartmentId?: string | null;
+  requireDepartment?: boolean;
+}): Promise<{ departmentId: string | null; departmentName: string | null }> {
+  const departmentId =
+    opts.actor.role === "borrower"
+      ? opts.actor.departmentId
+      : (opts.submittedDepartmentId ?? null);
+
+  if (!departmentId) {
+    if (opts.requireDepartment || opts.actor.role === "borrower") {
+      throw new BadRequestError(
+        opts.actor.role === "borrower"
+          ? "This department account is not linked to a department. Ask an administrator to assign one."
+          : "A department is required."
+      );
+    }
+    return { departmentId: null, departmentName: null };
   }
-  return actor.departmentName;
+
+  const db = getDb();
+  const [row] = await db
+    .select({ id: departments.id, name: departments.name })
+    .from(departments)
+    .where(eq(departments.id, departmentId))
+    .limit(1);
+  if (!row) {
+    throw new BadRequestError("Unknown department.");
+  }
+  return { departmentId: row.id, departmentName: row.name };
 }
 
 async function loadProfile(userId: string): Promise<ProfileRow | null> {

@@ -29,8 +29,6 @@ export const releaseBorrowSchema = z
       .default("portal"),
     departmentId: z.string().uuid().optional(),
     projectId: z.string().uuid().optional(),
-    /** Legacy / denormalized department label when id unknown. */
-    department: z.string().trim().max(120).optional(),
     /** Display name for person who picked up (optional; destination is dept/project). */
     borrowerName: z.string().trim().max(255).optional(),
     borrowerEmail: z.string().trim().email().max(320).optional().default(""),
@@ -54,7 +52,7 @@ export const releaseBorrowSchema = z
         path: ["departmentId"],
       });
     }
-    if (!hasDept && !hasProject && !data.department?.trim()) {
+    if (!hasDept && !hasProject) {
       ctx.addIssue({
         code: "custom",
         message: "Destination department or project is required.",

@@ -12,7 +12,7 @@ import {
   todayDateString,
 } from "@/server/shared/codes";
 import type { ActorContext } from "@/server/shared/auth";
-import { departmentNameForRequest } from "@/server/shared/auth";
+import { resolveDepartmentSnapshot } from "@/server/shared/auth";
 import { isAssetOperatorRole } from "@/server/shared/roles";
 import {
   BadRequestError,
@@ -303,21 +303,27 @@ export class ConsumableRequestService {
       "Consumable request recorded"
     );
 
-    const departmentId = isAssetOperatorRole(actor.role)
-      ? (input.departmentId ?? actor.departmentId ?? null)
-      : actor.departmentId ?? null;
-
-    if (!isAssetOperatorRole(actor.role) && !departmentId) {
-      throw new BadRequestError(
-        "This login is not linked to a department. Ask an administrator to assign one."
-      );
-    }
-
     if (input.projectId && !isAssetOperatorRole(actor.role)) {
       throw new ForbiddenError(
         "Department accounts cannot request supplies for a project."
       );
     }
+
+    if (
+      isAssetOperatorRole(actor.role) &&
+      !input.departmentId &&
+      !input.projectId
+    ) {
+      throw new BadRequestError(
+        "Specify a department or project destination."
+      );
+    }
+
+    const dest = await resolveDepartmentSnapshot({
+      actor,
+      submittedDepartmentId: input.projectId ? null : input.departmentId,
+      requireDepartment: !input.projectId,
+    });
 
     const dto = await withTransaction(async (tx) => {
       const created = await this.repo.create(
@@ -327,11 +333,8 @@ export class ConsumableRequestService {
           requesterName: input.requesterName,
           requesterEmail: input.requesterEmail.toLowerCase(),
           requesterPhone: input.requesterPhone ?? "",
-          department: departmentNameForRequest(
-            actor,
-            input.department ?? actor.departmentName ?? "Unspecified"
-          ),
-          departmentId,
+          department: dest.departmentName ?? "",
+          departmentId: dest.departmentId,
           projectId: isAssetOperatorRole(actor.role)
             ? (input.projectId ?? null)
             : null,
@@ -373,10 +376,7 @@ export class ConsumableRequestService {
           metadata: {
             requestCode,
             lineCount: lines.length,
-            department: departmentNameForRequest(
-              actor,
-              input.department ?? actor.departmentName ?? "Unspecified"
-            ),
+            department: dest.departmentName ?? "",
           },
         },
         tx

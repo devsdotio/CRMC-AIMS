@@ -72,7 +72,7 @@ export const releaseAssetSchema = z
         path: ["departmentId"],
       });
     }
-    if (!hasDept && !hasProject && !data.borrowerDepartment?.trim()) {
+    if (!hasDept && !hasProject) {
       ctx.addIssue({
         code: "custom",
         message: "Destination department or project is required.",

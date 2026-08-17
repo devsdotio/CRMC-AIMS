@@ -20,9 +20,16 @@ import { assetController } from "@/server/modules/assets";
  *           schema:
  *             type: object
  *             properties:
- *               borrowerName:
+ *               custodyKind:
  *                 type: string
- *               borrowerDepartment:
+ *                 enum: [borrow, assignment]
+ *               departmentId:
+ *                 type: string
+ *                 format: uuid
+ *               projectId:
+ *                 type: string
+ *                 format: uuid
+ *               borrowerName:
  *                 type: string
  *               notes:
  *                 type: string
@@ -31,7 +38,7 @@ import { assetController } from "@/server/modules/assets";
  *                 format: date
  *     responses:
  *       200:
- *         description: Asset released; lifecycle event recorded with staff actor
+ *         description: Asset released; lifecycle event recorded with operator actor
  *       401:
  *         description: Authentication required
  *       404:

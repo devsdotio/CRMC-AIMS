@@ -7,7 +7,6 @@ export type CreateConsumableRequestPayload = {
   requesterName: string;
   requesterEmail: string;
   requesterPhone?: string;
-  department?: string;
   departmentId?: string;
   projectId?: string;
   requestedByName?: string;

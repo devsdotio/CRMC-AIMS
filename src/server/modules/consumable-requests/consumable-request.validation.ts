@@ -36,7 +36,6 @@ export const createConsumableRequestSchema = z
     requesterName: z.string().trim().min(1).max(255),
     requesterEmail: z.string().trim().email().max(320),
     requesterPhone: z.string().trim().max(40).optional().default(""),
-    department: z.string().trim().min(1).max(120).optional(),
     departmentId: z.string().uuid().optional(),
     projectId: z.string().uuid().optional(),
     requestedByName: z.string().trim().max(255).optional(),

@@ -32,7 +32,6 @@ export const createBorrowRequestSchema = z.object({
   requesterName: z.string().trim().min(1).max(255),
   requesterEmail: z.string().trim().email().max(320),
   requesterPhone: z.string().trim().max(40).optional().default(""),
-  department: z.string().trim().min(1).max(120),
   departmentId: z.string().uuid().optional(),
   requestType: z.enum(["borrowable", "assignable"]).optional(),
   requestedByName: z.string().trim().max(255).optional(),
@@ -41,10 +40,9 @@ export const createBorrowRequestSchema = z.object({
       itemDescription: z.string().trim().min(1).max(500),
       assetId: z.string().uuid().optional(),
       assetCode: z.string().trim().max(64).optional(),
-      consumableId: z.string().uuid().optional(),
       category: assetCategorySchema,
       quantity: z.number().int().min(1).max(999).optional().default(1),
-      itemType: z.enum(["asset", "consumable"]),
+      itemType: z.literal("asset"),
     })
   ).min(1, "At least one item is required."),
   purpose: z.string().trim().min(1).max(1000),
@@ -55,28 +53,12 @@ export const createBorrowRequestSchema = z.object({
   notes: z.string().trim().max(2000).optional(),
   requesterUserId: z.string().uuid().optional(),
 }).superRefine((data, ctx) => {
-  const hasAsset = data.items.some((item) => item.itemType === "asset");
   const requestType = data.requestType ?? "borrowable";
-  if (hasAsset && requestType === "borrowable" && !data.expectedReturnDate) {
+  if (requestType === "borrowable" && !data.expectedReturnDate) {
     ctx.addIssue({
       code: "custom",
       message: "expectedReturnDate is required for borrowable asset requests.",
       path: ["expectedReturnDate"],
-    });
-  }
-  if (requestType === "assignable" && data.items.some((i) => i.itemType === "consumable")) {
-    ctx.addIssue({
-      code: "custom",
-      message: "Assignable requests cannot include consumable items.",
-      path: ["items"],
-    });
-  }
-  if (data.items.some((i) => i.itemType === "consumable")) {
-    ctx.addIssue({
-      code: "custom",
-      message:
-        "Consumable supplies must be requested on the supplies path, not mixed with coded assets.",
-      path: ["items"],
     });
   }
 });
@@ -91,23 +73,9 @@ export const rejectBorrowRequestSchema = z.object({
   reason: z.string().trim().min(1, "Rejection reason is required.").max(1000),
 });
 
-const releaseConsumableAllocationSchema = z.object({
-  lotId: z.string().uuid().optional(),
-  lotCode: z.string().trim().min(1).max(64).optional(),
-  quantity: z.number().int().min(1),
-});
-
-const releaseConsumableLineSchema = z.object({
-  consumableId: z.string().uuid().optional(),
-  itemDescription: z.string().optional(),
-  useFifo: z.boolean().default(true),
-  allocations: z.array(releaseConsumableAllocationSchema).optional(),
-});
-
 export const releaseBorrowRequestSchema = z.object({
   note: z.string().trim().max(1000).optional(),
   pickedUpBy: z.string().trim().min(1, "Name of person who picked up the item is required.").max(255),
-  consumableLines: z.array(releaseConsumableLineSchema).optional(),
 });
 
 export const markUnreleasedBorrowRequestSchema = z.object({

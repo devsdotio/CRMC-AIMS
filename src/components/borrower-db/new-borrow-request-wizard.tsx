@@ -1123,7 +1123,6 @@ export function NewBorrowRequestWizard({
           requesterUserId: me.id,
           requesterName: me.name,
           requesterEmail: me.email,
-          department: me.department || "Unspecified",
           departmentId: me.departmentId,
           purpose: values.purpose,
           notes: values.notes || undefined,
@@ -1171,7 +1170,6 @@ export function NewBorrowRequestWizard({
         requesterUserId: me.id,
         requesterName: me.name,
         requesterEmail: me.email,
-        department: me.department || "Unspecified",
         departmentId: me.departmentId,
         requestType:
           values.requestType === "assignable"
@@ -1179,7 +1177,16 @@ export function NewBorrowRequestWizard({
             : values.requestType === "borrowable"
               ? "borrowable"
               : undefined,
-        items,
+        items: items
+          .filter((item) => item.itemType === "asset")
+          .map((item) => ({
+            itemDescription: item.itemDescription,
+            assetId: item.assetId,
+            assetCode: item.assetCode,
+            category: item.category,
+            quantity: item.quantity,
+            itemType: "asset" as const,
+          })),
         purpose: values.purpose,
         expectedReturnDate:
           hasAsset && values.requestType !== "assignable"

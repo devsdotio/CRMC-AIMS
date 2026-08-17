@@ -14,7 +14,6 @@ export type {
 export { consumableQueryKeys } from "./query-keys";
 export {
   useAdjustConsumableMutation,
-  useCheckoutConsumableMutation,
   useConsumableQuery,
   useConsumablesQuery,
   useCreateConsumableMutation,

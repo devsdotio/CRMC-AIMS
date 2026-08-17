@@ -343,83 +343,8 @@ export class ConsumableService {
     rawInput: unknown,
     actor: ActorContext
   ): Promise<ConsumableDTO> {
-    const id = consumableIdSchema.parse(rawId);
     const input = stockMovementSchema.parse(rawInput);
-
-    return withTransaction(async (tx) => {
-      const existing = await this.repo.findByIdForUpdate(id, tx);
-      if (!existing) throw new NotFoundError("Consumable", id);
-
-      if (existing.currentQty < input.quantity) {
-        throw new BadRequestError(
-          `Not on hand. Available: ${existing.currentQty} ${existing.unit}. Restock first. Purchase orders will be added later.`
-        );
-      }
-
-      const dest = await this.resolveIssueDestination(
-        input.departmentId,
-        input.projectId,
-        tx
-      );
-
-      const allocations = await this.purchaseLots.consumeFifo(
-        existing.id,
-        input.quantity,
-        tx
-      );
-      this.rejectUncosted(allocations, existing.itemCode);
-
-      const totalCost = allocations.reduce(
-        (sum, a) => sum + Number(a.total),
-        0
-      );
-      const primary = allocations.find((a) => !a.uncosted) ?? allocations[0];
-
-      const history = [
-        ...(Array.isArray(existing.history) ? existing.history : []),
-        historyEntry(
-          "checkout",
-          -input.quantity,
-          actor.displayName,
-          input.reason,
-          input.notes,
-          {
-            unitCost: primary?.unitCost,
-            supplierId: primary?.supplierId ?? undefined,
-            supplierName: primary?.supplierName ?? undefined,
-            lotCode: primary?.lotCode ?? undefined,
-            totalCost: totalCost.toFixed(2),
-            lotAllocations: allocations,
-          }
-        ),
-      ];
-
-      const updated = await this.repo.update(
-        id,
-        {
-          currentQty: existing.currentQty - input.quantity,
-          history,
-        },
-        tx
-      );
-      if (!updated) throw new NotFoundError("Consumable", id);
-
-      await this.movements.record(
-        {
-          consumableId: existing.id,
-          direction: "out",
-          reason: "issue",
-          actor,
-          departmentId: dest.departmentId,
-          projectId: dest.projectId,
-          notes: input.notes ?? input.reason ?? null,
-          lines: allocationsToMovementLines(allocations),
-        },
-        tx
-      );
-
-      return toDTO(updated);
-    });
+    return this.issue(rawId, { ...input, useFifo: true }, actor);
   }
 
   /**

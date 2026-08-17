@@ -6,7 +6,7 @@ import { assetController } from "@/server/modules/assets";
  *   post:
  *     summary: Scan QR / code → asset identity + suggested custody action
  *     description: |
- *       Staff mobile entry point. Pass the camera-decoded payload (`CRMC-AIMS:…`)
+ *       Operator scanner entry point. Pass the camera-decoded payload (`CRMC-AIMS:…`)
  *       or bare asset code. Returns whether to release, return, or use project UI.
  *     tags: [Assets]
  *     requestBody:

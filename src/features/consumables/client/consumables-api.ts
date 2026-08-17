@@ -115,17 +115,6 @@ export const consumablesApi = {
     return res.data;
   },
 
-  async checkout(
-    id: string,
-    payload: StockMovementPayload
-  ): Promise<ConsumableItem> {
-    const res = await fetchJson<ApiResponse<ConsumableItem>>(
-      `/api/consumables/${id}/checkout`,
-      { method: "POST", body: JSON.stringify(payload) }
-    );
-    return res.data;
-  },
-
   async adjust(
     id: string,
     payload: StockAdjustPayload

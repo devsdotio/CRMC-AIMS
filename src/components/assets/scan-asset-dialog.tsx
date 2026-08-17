@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Loader2, QrCode, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -9,12 +9,16 @@ import {
   useScanReturnMutation,
 } from "@/features/assets/client/use-assets";
 import type { ScanResolveResult } from "@/features/assets/client/assets-api";
+import { useDepartmentsQuery } from "@/features/departments/client";
+import { useProjectsQuery } from "@/features/projects/client";
 
 function nextWeek(): string {
   const d = new Date();
   d.setDate(d.getDate() + 7);
   return d.toISOString().slice(0, 10);
 }
+
+type DestinationKind = "department" | "project";
 
 export function ScanAssetDialog({
   isOpen,
@@ -28,8 +32,11 @@ export function ScanAssetDialog({
   const [code, setCode] = useState("");
   const [resolved, setResolved] = useState<ScanResolveResult | null>(null);
   const [error, setError] = useState("");
-  const [borrowerName, setBorrowerName] = useState("");
-  const [borrowerDepartment, setBorrowerDepartment] = useState("");
+  const [receivedBy, setReceivedBy] = useState("");
+  const [destinationKind, setDestinationKind] =
+    useState<DestinationKind>("department");
+  const [departmentId, setDepartmentId] = useState("");
+  const [projectId, setProjectId] = useState("");
   const [expectedReturnDate, setExpectedReturnDate] = useState(nextWeek);
   const [condition, setCondition] = useState("good");
   const [flagMaintenance, setFlagMaintenance] = useState(false);
@@ -37,23 +44,43 @@ export function ScanAssetDialog({
   const resolveMutation = useResolveScanMutation();
   const releaseMutation = useScanReleaseMutation();
   const returnMutation = useScanReturnMutation();
+  const { data: departments = [] } = useDepartmentsQuery();
+  const { data: projects = [] } = useProjectsQuery();
 
   const busy =
     resolveMutation.isPending ||
     releaseMutation.isPending ||
     returnMutation.isPending;
 
+  const custodyKind = useMemo(() => {
+    if (!resolved) return "borrow" as const;
+    return resolved.asset.assignmentType === "assignable"
+      ? ("assignment" as const)
+      : ("borrow" as const);
+  }, [resolved]);
+
   useEffect(() => {
     if (!isOpen) return;
     setCode("");
     setResolved(null);
     setError("");
-    setBorrowerName("");
-    setBorrowerDepartment("");
+    setReceivedBy("");
     setExpectedReturnDate(nextWeek());
     setCondition("good");
     setFlagMaintenance(false);
-  }, [isOpen]);
+    setDepartmentId(departments[0]?.id ?? "");
+    setProjectId(
+      projects.find((p) => p.status !== "completed")?.id ?? projects[0]?.id ?? ""
+    );
+    setDestinationKind("department");
+  }, [isOpen, departments, projects]);
+
+  useEffect(() => {
+    if (!resolved) return;
+    setDestinationKind(
+      resolved.asset.assignmentType === "assignable" ? "project" : "department"
+    );
+  }, [resolved]);
 
   if (!isOpen) return null;
 
@@ -76,17 +103,29 @@ export function ScanAssetDialog({
   const handleRelease = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!resolved) return;
-    if (!borrowerName.trim()) {
-      setError("Borrower name is required.");
+    if (destinationKind === "department" && !departmentId) {
+      setError("Select a department.");
+      return;
+    }
+    if (destinationKind === "project" && !projectId) {
+      setError("Select a project.");
+      return;
+    }
+    if (custodyKind === "borrow" && !expectedReturnDate) {
+      setError("Due date is required for borrowable assets.");
       return;
     }
     setError("");
     try {
       await releaseMutation.mutateAsync({
         code: resolved.code,
-        borrowerName: borrowerName.trim(),
-        borrowerDepartment: borrowerDepartment.trim() || undefined,
-        expectedReturnDate: expectedReturnDate || undefined,
+        custodyKind,
+        departmentId:
+          destinationKind === "department" ? departmentId : undefined,
+        projectId: destinationKind === "project" ? projectId : undefined,
+        borrowerName: receivedBy.trim() || undefined,
+        expectedReturnDate:
+          custodyKind === "borrow" ? expectedReturnDate : null,
       });
       onSuccess(`${resolved.asset.assetCode} released.`);
       onClose();
@@ -186,24 +225,69 @@ export function ScanAssetDialog({
 
               {resolved.suggestedAction === "release" && (
                 <form onSubmit={handleRelease} className="space-y-2">
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setDestinationKind("department")}
+                      className={`flex-1 py-1.5 text-xs font-semibold rounded-lg border ${
+                        destinationKind === "department"
+                          ? "border-primary bg-primary/5 text-text"
+                          : "border-border text-text-secondary"
+                      }`}
+                    >
+                      Department
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDestinationKind("project")}
+                      className={`flex-1 py-1.5 text-xs font-semibold rounded-lg border ${
+                        destinationKind === "project"
+                          ? "border-primary bg-primary/5 text-text"
+                          : "border-border text-text-secondary"
+                      }`}
+                    >
+                      Project
+                    </button>
+                  </div>
+                  {destinationKind === "department" ? (
+                    <select
+                      value={departmentId}
+                      onChange={(e) => setDepartmentId(e.target.value)}
+                      className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg"
+                    >
+                      {departments.map((dept) => (
+                        <option key={dept.id} value={dept.id}>
+                          {dept.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <select
+                      value={projectId}
+                      onChange={(e) => setProjectId(e.target.value)}
+                      className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg"
+                    >
+                      {projects.map((project) => (
+                        <option key={project.id} value={project.id}>
+                          {project.projectCode} · {project.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                   <input
-                    value={borrowerName}
-                    onChange={(e) => setBorrowerName(e.target.value)}
-                    placeholder="Borrower name"
+                    value={receivedBy}
+                    onChange={(e) => setReceivedBy(e.target.value)}
+                    placeholder="Received by (optional)"
                     className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg"
                   />
-                  <input
-                    value={borrowerDepartment}
-                    onChange={(e) => setBorrowerDepartment(e.target.value)}
-                    placeholder="Department"
-                    className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg"
-                  />
-                  <input
-                    type="date"
-                    value={expectedReturnDate}
-                    onChange={(e) => setExpectedReturnDate(e.target.value)}
-                    className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg"
-                  />
+                  {custodyKind === "borrow" && (
+                    <input
+                      type="date"
+                      value={expectedReturnDate}
+                      onChange={(e) => setExpectedReturnDate(e.target.value)}
+                      className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg"
+                    />
+                  )}
                   <button
                     type="submit"
                     disabled={busy}

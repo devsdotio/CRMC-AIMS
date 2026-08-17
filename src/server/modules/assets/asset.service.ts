@@ -786,10 +786,6 @@ export class AssetService {
         source: "admin_manual",
         departmentId: input.departmentId,
         projectId: input.projectId,
-        department:
-          input.borrowerDepartment?.trim() ||
-          existing.department?.trim() ||
-          undefined,
         borrowerName: input.borrowerName,
         borrowerEmail: input.borrowerEmail ?? "",
         borrowerPhone: input.borrowerPhone ?? "",
@@ -807,7 +803,7 @@ export class AssetService {
     return this.getAssetById(id);
   }
 
-  /** Staff mobile scan → release (QR payload or bare asset code). */
+  /** Operator scan → release (QR payload or bare asset code). */
   async scanRelease(
     rawInput: unknown,
     actor: ActorContext
@@ -900,7 +896,7 @@ export class AssetService {
     return this.getAssetById(id);
   }
 
-  /** Staff mobile scan → receive/return (QR payload or bare asset code). */
+  /** Operator scan → receive/return (QR payload or bare asset code). */
   async scanReturn(
     rawInput: unknown,
     actor: ActorContext

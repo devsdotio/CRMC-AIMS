@@ -182,14 +182,6 @@ export class BorrowLogService {
       throw new BadRequestError("dueDate is required for borrowable custody.");
     }
 
-    if (!departmentId && !projectId && input.department?.trim()) {
-      const dept = await this.departments.findByNameLower(
-        input.department.trim(),
-        tx
-      );
-      if (dept) departmentId = dept.id;
-    }
-
     if (projectId) {
       const project = await this.projects.findById(projectId, tx);
       if (!project) throw new NotFoundError("Project", projectId);
@@ -214,20 +206,9 @@ export class BorrowLogService {
       };
     }
 
-    const legacyDept = input.department?.trim();
-    if (!legacyDept) {
-      throw new BadRequestError(
-        "Destination department or project is required."
-      );
-    }
-
-    return {
-      departmentId: null,
-      projectId: null,
-      departmentLabel: legacyDept,
-      holderLabel: input.borrowerName?.trim() || legacyDept,
-      custodyKind,
-    };
+    throw new BadRequestError(
+      "Destination department or project is required."
+    );
   }
 
   private async releaseInTx(
