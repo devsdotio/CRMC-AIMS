@@ -21,6 +21,7 @@ export class BorrowRequestController {
         startDate: url.searchParams.get("startDate") ?? undefined,
         endDate: url.searchParams.get("endDate") ?? undefined,
         requestType: url.searchParams.get("requestType") ?? undefined,
+        assetId: url.searchParams.get("assetId") ?? undefined,
         page: url.searchParams.has("page") ? Number(url.searchParams.get("page")) : undefined,
         limit: url.searchParams.has("limit") ? Number(url.searchParams.get("limit")) : undefined,
       }, session);

@@ -67,7 +67,12 @@ export class BorrowRequestRepository implements IBorrowRequestRepository {
       conditions.push(sql`date(${borrowRequests.requestedAt}) <= ${filters.endDate}`);
     }
     if (filters.assetId) {
-      conditions.push(sql`${borrowRequests.items} @> ${`[{"assetId":"${filters.assetId}"}]`}::jsonb`);
+      conditions.push(
+        sql`EXISTS (
+          SELECT 1 FROM jsonb_array_elements(${borrowRequests.items}) AS item
+          WHERE item->>'assetId' = ${filters.assetId}
+        )`
+      );
     }
     return conditions;
   }

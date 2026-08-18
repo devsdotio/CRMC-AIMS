@@ -504,6 +504,17 @@ function MaintenanceDetailsSection({ maintenance }: { maintenance: MaintenanceLo
   );
 }
 
+function requestIncludesAsset(
+  request: BorrowRequest,
+  asset: Pick<Asset, "id" | "assetCode">
+): boolean {
+  return request.items.some(
+    (item) =>
+      item.assetId === asset.id ||
+      (Boolean(item.assetCode) && item.assetCode === asset.assetCode)
+  );
+}
+
 function AssetHistoryTimeline({ asset }: { asset: Asset }) {
   const [isListExpanded, setIsListExpanded] = useState(false);
   const [expandedItemIds, setExpandedItemIds] = useState<Set<string>>(new Set());
@@ -511,6 +522,7 @@ function AssetHistoryTimeline({ asset }: { asset: Asset }) {
   const { data: requestData, isLoading: isRequestsLoading } = useBorrowRequests({
     assetId: asset.id,
     limit: 50,
+    enabled: Boolean(asset.id),
   });
 
   const { data: lifecycleData, isLoading: isLifecycleLoading } = useAssetLifecycleQuery(
@@ -535,7 +547,7 @@ function AssetHistoryTimeline({ asset }: { asset: Asset }) {
     });
   };
 
-  const isLoading = isRequestsLoading && isLifecycleLoading;
+  const isLoading = isRequestsLoading || isLifecycleLoading;
 
   if (isLoading) {
     return (
@@ -545,8 +557,12 @@ function AssetHistoryTimeline({ asset }: { asset: Asset }) {
     );
   }
 
-  const requests = requestData?.data || [];
-  const lifecycleEvents = lifecycleData || [];
+  const requests = (requestData?.data || []).filter((req) =>
+    requestIncludesAsset(req, asset)
+  );
+  const lifecycleEvents = (lifecycleData || []).filter(
+    (ev) => ev.assetId === asset.id
+  );
   const timeline: UnifiedTimelineItem[] = [];
 
   // 1. Map Borrow Requests
