@@ -26,6 +26,8 @@ export interface Asset {
   serialNumber?: string;
   location: string;
   currentHolder?: string;
+  /** Approved request holding this unit until issue. */
+  reservedForRequestId?: string | null;
   department?: string;
   purchaseDate?: string;
   value?: number;

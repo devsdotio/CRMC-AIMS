@@ -34,6 +34,8 @@ export interface BrowseAssetItem {
   assetCode: string;
   location: string;
   notes?: string;
+  currentHolder?: string;
+  reservedForRequestId?: string | null;
   /** If unavailable, reason to show in disabled tooltip */
   unavailableReason?: string;
 }

@@ -20,6 +20,7 @@ const assetListColumns = {
   serialNumber: assets.serialNumber,
   location: assets.location,
   currentHolder: assets.currentHolder,
+  reservedForRequestId: assets.reservedForRequestId,
   department: assets.department,
   purchaseDate: assets.purchaseDate,
   value: assets.value,
@@ -83,6 +84,7 @@ export class AssetRepository implements IAssetRepository {
     if (filters?.availableOnly) {
       conditions.push(eq(assets.status, "active"));
       conditions.push(isNull(assets.currentHolder));
+      conditions.push(isNull(assets.reservedForRequestId));
     }
     if (filters?.search?.trim()) {
       const q = `%${filters.search.trim()}%`;

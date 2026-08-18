@@ -967,7 +967,11 @@ export function AssetDetailPanel({
                       : "bg-status-outofservice-bg/20 text-status-outofservice-text border-status-outofservice-bg/30"
                   )}
                 >
-                  {asset.currentHolder ? "Borrowed / In-Use" : statusMeta.label}
+                  {asset.currentHolder
+                    ? "Borrowed / In-Use"
+                    : asset.reservedForRequestId
+                      ? "Reserved"
+                      : statusMeta.label}
                 </span>
               )}
             </div>
@@ -977,7 +981,7 @@ export function AssetDetailPanel({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {onIssue && !asset.currentHolder && asset.status === "active" && (
+            {onIssue && !asset.currentHolder && !asset.reservedForRequestId && asset.status === "active" && (
             <button
               type="button"
               onClick={() => onIssue(asset)}
@@ -1035,6 +1039,10 @@ export function AssetDetailPanel({
                   {asset.currentHolder ? (
                     <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-primary text-white uppercase tracking-wider">
                       {custodyBadgeLabel(asset.currentHolder)}
+                    </span>
+                  ) : asset.reservedForRequestId ? (
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-status-repair-bg/20 text-status-repair-text uppercase tracking-wider border border-status-repair-bg/30">
+                      Reserved
                     </span>
                   ) : (
                     <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-status-active-bg text-white uppercase tracking-wider">
@@ -1098,6 +1106,10 @@ export function AssetDetailPanel({
                         title={`${asset.currentHolder} ${asset.department ? `(${asset.department})` : ""}`}
                       >
                         {asset.currentHolder}
+                      </span>
+                    ) : asset.reservedForRequestId ? (
+                      <span className="text-status-repair-text">
+                        Reserved for approved request
                       </span>
                     ) : (
                       <span className="text-status-active-text">

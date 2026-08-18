@@ -239,7 +239,11 @@ export function IssueAssetDialog({
           </button>
           <button
             type="submit"
-            disabled={releaseMutation.isPending || Boolean(asset.currentHolder)}
+            disabled={
+              releaseMutation.isPending ||
+              Boolean(asset.currentHolder) ||
+              Boolean(asset.reservedForRequestId)
+            }
             className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg bg-primary text-primary-foreground disabled:opacity-50"
           >
             <PackageMinus className="h-3.5 w-3.5" />

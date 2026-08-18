@@ -207,6 +207,12 @@ export function ConsumableDetailPanel({
               minThreshold={displayItem.minThreshold}
               unit={displayItem.unit}
             />
+            {(displayItem.reservedQty ?? 0) > 0 && (
+              <p className="text-[11px] text-status-repair-text">
+                {displayItem.reservedQty} {displayItem.unit} reserved for approved
+                supply requests · {displayItem.availableQty ?? displayItem.currentQty - displayItem.reservedQty} available to issue
+              </p>
+            )}
           </div>
 
           {(onRestock || onRelease || onAdjust || onEdit) && (

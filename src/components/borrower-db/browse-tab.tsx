@@ -10,6 +10,8 @@ import { LoadingState } from "@/components/providers/loading-context";
 import { useAssetsQuery } from "@/features/assets/client/use-assets";
 import { useConsumablesQuery } from "@/features/consumables/client/use-consumables";
 import { useBorrowerPortal } from "./context";
+import { isAssetAvailableForRequest } from "@/lib/assets-custody";
+import { availableQty } from "@/components/consumables/utils";
 
 const CATEGORY_FILTERS = [
   { key: "all", label: "All" },
@@ -48,6 +50,7 @@ export function BrowseTab() {
     return [
       ...assets
         .filter(a => a.assignmentType === "borrowable")
+        .filter(a => isAssetAvailableForRequest(a))
         .map(a => ({
         id: a.id,
         name: a.name,
@@ -57,17 +60,20 @@ export function BrowseTab() {
         assetCode: a.assetCode,
         location: a.location,
       })),
-      ...consumables.map(c => ({
+      ...consumables.map(c => {
+        const free = c.availableQty ?? availableQty(c);
+        return {
         id: c.id,
         name: c.name,
         category: c.category,
         type: "consumable" as const,
-        status: c.currentQty <= 0 ? "out_of_stock" : c.currentQty <= c.minThreshold ? "low_stock" : "available",
+        status: free <= 0 ? "out_of_stock" : free <= c.minThreshold ? "low_stock" : "available",
         itemCode: c.itemCode,
-        currentQty: c.currentQty,
+        currentQty: free,
         unit: c.unit,
         location: c.location,
-      }))
+      };
+      })
     ] as BrowseItem[];
   }, [assets, consumables]);
 

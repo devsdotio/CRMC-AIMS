@@ -31,6 +31,8 @@ import { useConsumablesQuery } from "@/features/consumables/client/use-consumabl
 import { useMeQuery } from "@/features/users/client/use-users";
 import type { MeProfile } from "@/features/users/client/users-api";
 import { LoadingState } from "@/components/providers/loading-context";
+import { isAssetAvailableForRequest } from "@/lib/assets-custody";
+import { availableQty } from "@/components/consumables/utils";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -384,18 +386,23 @@ function StepSelect({
         assignmentType: a.assignmentType,
         assetCode: a.assetCode,
         location: a.location,
+        reservedForRequestId: a.reservedForRequestId,
+        currentHolder: a.currentHolder,
       })),
-      ...consumables.map(c => ({
+      ...consumables.map(c => {
+        const free = c.availableQty ?? availableQty(c);
+        return {
         id: c.id,
         name: c.name,
         category: c.category,
         type: "consumable" as const,
-        status: c.currentQty <= 0 ? "out_of_stock" : c.currentQty <= c.minThreshold ? "low_stock" : "available",
+        status: free <= 0 ? "out_of_stock" : free <= c.minThreshold ? "low_stock" : "available",
         itemCode: c.itemCode,
-        currentQty: c.currentQty,
+        currentQty: free,
         unit: c.unit,
         location: c.location,
-      }))
+      };
+      })
     ] as BrowseItem[];
   }, [assets, consumables]);
 
@@ -420,7 +427,9 @@ function StepSelect({
 
       // 2. Filter by status (available for assets, not out_of_stock for consumables)
       const isAvailable =
-        item.type === "asset" ? item.status === "active" : item.status !== "out_of_stock";
+        item.type === "asset"
+          ? isAssetAvailableForRequest(item)
+          : item.status !== "out_of_stock";
       if (!isAvailable) return false;
 
       // 3. Filter by search term

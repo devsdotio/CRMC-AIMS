@@ -162,6 +162,12 @@ export class ProjectExpenseService {
           `Insufficient stock. Available: ${item.currentQty} ${item.unit}.`
         );
       }
+      const freeQty = Math.max(0, item.currentQty - (item.reservedQty ?? 0));
+      if (input.quantity > freeQty) {
+        throw new BadRequestError(
+          `Only ${freeQty} ${item.unit} available (${item.reservedQty ?? 0} reserved for approved supply requests).`
+        );
+      }
 
       let remaining = input.quantity;
       let totalCost = 0;

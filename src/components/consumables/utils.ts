@@ -5,6 +5,13 @@
 
 import type { StockSeverity } from "@/types/inventory";
 
+export function availableQty(item: {
+  currentQty: number;
+  reservedQty?: number | null;
+}): number {
+  return Math.max(0, item.currentQty - (item.reservedQty ?? 0));
+}
+
 /**
  * Named helper utility calculating stock severity.
  * - Critical: currentQty <= minThreshold

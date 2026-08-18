@@ -61,6 +61,11 @@ export function ConsumableTableRow({
           minThreshold={item.minThreshold}
           unit={item.unit}
         />
+        {(item.reservedQty ?? 0) > 0 && (
+          <p className="mt-1 text-[10px] text-status-repair-text">
+            {item.reservedQty} reserved
+          </p>
+        )}
       </td>
 
       {/* Last Restocked */}

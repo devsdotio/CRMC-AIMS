@@ -222,6 +222,14 @@ export class BorrowLogService {
     if (asset.status !== "active" || asset.currentHolder) {
       throw new ConflictError("Asset is not available for release.");
     }
+    if (
+      asset.reservedForRequestId &&
+      asset.reservedForRequestId !== (input.requestId ?? null)
+    ) {
+      throw new ConflictError(
+        "Asset is reserved for an approved request. Issue that request, or unrelease it first."
+      );
+    }
 
     const destination = await this.resolveDestination(input, tx);
 
@@ -322,6 +330,7 @@ export class BorrowLogService {
       {
         currentHolder: destination.holderLabel,
         department: destination.departmentLabel,
+        reservedForRequestId: null,
         lastUpdated: new Date(),
       },
       tx

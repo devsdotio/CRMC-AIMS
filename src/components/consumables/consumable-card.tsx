@@ -58,6 +58,11 @@ export function ConsumableCard({
             minThreshold={item.minThreshold}
             unit={item.unit}
           />
+          {(item.reservedQty ?? 0) > 0 && (
+            <p className="mt-1.5 text-[11px] text-status-repair-text">
+              {item.reservedQty} reserved · {item.availableQty ?? item.currentQty - item.reservedQty} available
+            </p>
+          )}
         </div>
       </div>
 

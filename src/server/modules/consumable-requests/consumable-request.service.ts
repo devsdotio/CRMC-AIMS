@@ -407,6 +407,30 @@ export class ConsumableRequestService {
     ];
 
     const updated = await withTransaction(async (tx) => {
+      const lines = await this.repo.listLinesByRequestId(id, tx);
+      if (lines.length === 0) {
+        throw new BadRequestError("Request has no product lines.");
+      }
+
+      for (const line of lines) {
+        const item = await this.consumables.findByIdForUpdate(
+          line.consumableId,
+          tx
+        );
+        if (!item) throw new NotFoundError("Consumable", line.consumableId);
+        const freeQty = Math.max(0, item.currentQty - (item.reservedQty ?? 0));
+        if (line.quantityRequested > freeQty) {
+          throw new BadRequestError(
+            `Not enough unreserved stock for ${item.itemCode}. Available: ${freeQty} ${item.unit}, requested: ${line.quantityRequested}.`
+          );
+        }
+        await this.consumables.update(
+          item.id,
+          { reservedQty: (item.reservedQty ?? 0) + line.quantityRequested },
+          tx
+        );
+      }
+
       const up = await this.repo.update(
         id,
         {
@@ -495,8 +519,11 @@ export class ConsumableRequestService {
     const input = cancelConsumableRequestSchema.parse(rawInput ?? {});
     const existing = await this.repo.findById(id);
     if (!existing) throw new NotFoundError("Consumable request", id);
-    if (existing.status !== "pending") {
-      throw new ConflictError("Only pending requests can be cancelled.");
+    if (existing.status !== "pending" && existing.status !== "approved") {
+      throw new ConflictError("Only pending or approved requests can be cancelled.");
+    }
+    if (existing.status === "approved" && !isAssetOperatorRole(actor.role)) {
+      throw new ForbiddenError("Only an operator can cancel an approved supply request.");
     }
 
     if (
@@ -512,6 +539,27 @@ export class ConsumableRequestService {
     ];
 
     const updated = await withTransaction(async (tx) => {
+      if (existing.status === "approved") {
+        const lines = await this.repo.listLinesByRequestId(id, tx);
+        for (const line of lines) {
+          const item = await this.consumables.findByIdForUpdate(
+            line.consumableId,
+            tx
+          );
+          if (!item) continue;
+          await this.consumables.update(
+            item.id,
+            {
+              reservedQty: Math.max(
+                0,
+                (item.reservedQty ?? 0) - line.quantityRequested
+              ),
+            },
+            tx
+          );
+        }
+      }
+
       const up = await this.repo.update(
         id,
         { status: "cancelled", history },
@@ -676,6 +724,10 @@ export class ConsumableRequestService {
           item.id,
           {
             currentQty: item.currentQty - line.quantityRequested,
+            reservedQty: Math.max(
+              0,
+              (item.reservedQty ?? 0) - line.quantityRequested
+            ),
             history,
           },
           tx

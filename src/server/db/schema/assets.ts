@@ -67,6 +67,11 @@ export const assets = pgTable(
     serialNumber: text("serial_number"),
     location: text("location").notNull(),
     currentHolder: text("current_holder"),
+    /**
+     * Set when a borrow/assign request is approved and waiting to be issued.
+     * Cleared on release (holder takes over) or unrelease.
+     */
+    reservedForRequestId: uuid("reserved_for_request_id"),
     department: text("department"),
     purchaseDate: date("purchase_date", { mode: "string" }),
     value: numeric("value", { precision: 14, scale: 2 }),
@@ -96,6 +101,7 @@ export const assets = pgTable(
     index("assets_location_idx").on(table.location),
     index("assets_supplier_id_idx").on(table.supplierId),
     index("assets_model_id_idx").on(table.modelId),
+    index("assets_reserved_for_request_id_idx").on(table.reservedForRequestId),
   ]
 );
 

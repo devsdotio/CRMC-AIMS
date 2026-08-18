@@ -104,6 +104,7 @@ export function toAssetDTO(row: AssetRow): AssetDTOWithMeta {
     serialNumber: row.serialNumber ?? undefined,
     location: row.location,
     currentHolder: row.currentHolder ?? undefined,
+    reservedForRequestId: row.reservedForRequestId ?? null,
     department: row.department ?? undefined,
     purchaseDate: row.purchaseDate ?? undefined,
     value: parseValue(row.value),
@@ -231,6 +232,18 @@ export class AssetService {
         reason: asset.currentHolder
           ? `Currently held by ${asset.currentHolder}.`
           : "Open borrow log found.",
+      };
+    }
+
+    if (asset.reservedForRequestId) {
+      return {
+        kind: "asset",
+        code: asset.assetCode,
+        qrPayload: asset.qrPayload,
+        asset,
+        suggestedAction: "blocked",
+        reason:
+          "Asset is reserved for an approved request. Issue that request from the queue.",
       };
     }
 
@@ -717,9 +730,9 @@ export class AssetService {
 
     const open = await this.borrowLogRepo.findActiveByAssetId(id);
     const openProject = await this.projectAssignments.findOpenByAssetId(id);
-    if (open || openProject || existing.currentHolder) {
+    if (open || openProject || existing.currentHolder || existing.reservedForRequestId) {
       throw new ConflictError(
-        "Cannot delete an asset that is currently checked out or assigned to a project. Return it first."
+        "Cannot delete an asset that is currently checked out, reserved, or assigned to a project. Return or unrelease it first."
       );
     }
 

@@ -156,6 +156,33 @@ export class BorrowRequestService {
 
     const requestType = input.requestType ?? "borrowable";
 
+    for (const item of input.items) {
+      if (!item.assetId) continue;
+      const asset = await this.assetRepo.findById(item.assetId);
+      if (!asset) throw new NotFoundError("Asset", item.assetId);
+      if (asset.status !== "active") {
+        throw new ConflictError(
+          `Asset ${asset.assetCode} is not available (${asset.status.replace(/_/g, " ")}).`
+        );
+      }
+      if (asset.currentHolder) {
+        throw new ConflictError(
+          `Asset ${asset.assetCode} is currently in custody (${asset.currentHolder}).`
+        );
+      }
+      if (asset.reservedForRequestId) {
+        throw new ConflictError(
+          `Asset ${asset.assetCode} is already reserved for an approved request.`
+        );
+      }
+      if (requestType === "borrowable" && asset.assignmentType !== "borrowable") {
+        throw new ConflictError(`Asset ${asset.assetCode} is not borrowable.`);
+      }
+      if (requestType === "assignable" && asset.assignmentType !== "assignable") {
+        throw new ConflictError(`Asset ${asset.assetCode} is not assignable.`);
+      }
+    }
+
     const row = await withTransaction(async (tx) => {
       const created = await this.repo.create({
         requestCode,
@@ -213,31 +240,48 @@ export class BorrowRequestService {
       historyEntry("approved", actor.displayName, input.note),
     ];
 
-    // Note: Since a single request can now contain multiple items, we shouldn't necessarily block the whole request
-    // if ONE item is already checked out, or we should block it all. For simplicity, we just check all requested assets.
-    for (const item of existing.items) {
-      if (item.assetId) {
-        const asset = await this.assetRepo.findById(item.assetId);
-        if (asset && asset.currentHolder) {
-          throw new ConflictError(`Cannot approve: Asset ${item.assetCode} is currently in custody (${asset.currentHolder}).`);
+    const updated = await withTransaction(async (tx) => {
+      for (const item of existing.items) {
+        if (!item.assetId) continue;
+        const asset = await this.assetRepo.findByIdForUpdate(item.assetId, tx);
+        if (!asset) throw new NotFoundError("Asset", item.assetId);
+        if (asset.status !== "active") {
+          throw new ConflictError(
+            `Cannot approve: Asset ${asset.assetCode} is not available (${asset.status.replace(/_/g, " ")}).`
+          );
         }
-        if (asset && existing.requestType) {
-          if (existing.requestType === "borrowable" && asset.assignmentType !== "borrowable") {
-            throw new ConflictError(`Asset ${item.assetCode} is not borrowable.`);
-          }
-          if (existing.requestType === "assignable" && asset.assignmentType !== "assignable") {
-            throw new ConflictError(`Asset ${item.assetCode} is not assignable.`);
-          }
+        if (asset.currentHolder) {
+          throw new ConflictError(
+            `Cannot approve: Asset ${asset.assetCode} is currently in custody (${asset.currentHolder}).`
+          );
+        }
+        if (asset.reservedForRequestId) {
+          throw new ConflictError(
+            `Cannot approve: Asset ${asset.assetCode} is already reserved for another request.`
+          );
+        }
+        if (existing.requestType === "borrowable" && asset.assignmentType !== "borrowable") {
+          throw new ConflictError(`Asset ${asset.assetCode} is not borrowable.`);
+        }
+        if (existing.requestType === "assignable" && asset.assignmentType !== "assignable") {
+          throw new ConflictError(`Asset ${asset.assetCode} is not assignable.`);
         }
       }
-    }
 
-    const updated = await withTransaction(async (tx) => {
       const up = await this.repo.update(id, {
         status: "approved",
         history,
       }, tx);
       if (!up) throw new NotFoundError("Borrow request", id);
+
+      for (const item of existing.items) {
+        if (!item.assetId) continue;
+        await this.assetRepo.update(
+          item.assetId,
+          { reservedForRequestId: up.id, lastUpdated: new Date() },
+          tx
+        );
+      }
 
       await this.auditLogs.create({
         entityType: "borrow_request",
@@ -479,7 +523,11 @@ export class BorrowRequestService {
 
       for (const item of up.items) {
         if (item.assetId) {
-          await this.assetRepo.update(item.assetId, { currentHolder: null }, tx);
+          await this.assetRepo.update(
+            item.assetId,
+            { currentHolder: null, reservedForRequestId: null, lastUpdated: new Date() },
+            tx
+          );
         }
       }
 

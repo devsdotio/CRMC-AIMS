@@ -70,6 +70,11 @@ export function AssetCard({ asset, onSelect }: AssetCardProps) {
               {custodyBadgeLabel(asset.currentHolder)}
             </span>
           )}
+          {!asset.currentHolder && asset.reservedForRequestId && (
+            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-status-repair-bg/20 text-status-repair-text border border-status-repair-bg/30">
+              Reserved
+            </span>
+          )}
           <span
             className={cn(
               "px-2.5 py-0.5 rounded-full text-[11px] font-bold",
@@ -119,7 +124,10 @@ export function AssetCard({ asset, onSelect }: AssetCardProps) {
               )}
               title={asset.currentHolder || undefined}
             >
-              {custodyDetailLabel(asset.currentHolder)}
+              {custodyDetailLabel(
+                asset.currentHolder,
+                Boolean(asset.reservedForRequestId)
+              )}
             </span>
           </div>
         </div>

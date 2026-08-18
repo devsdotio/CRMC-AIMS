@@ -46,8 +46,13 @@ function getStockSeverity(
   return "healthy";
 }
 
+function availableQty(row: { currentQty: number; reservedQty?: number | null }): number {
+  return Math.max(0, row.currentQty - (row.reservedQty ?? 0));
+}
+
 function toDTO(row: ConsumableRow): ConsumableDTO {
   const history = Array.isArray(row.history) ? row.history : [];
+  const reservedQty = row.reservedQty ?? 0;
   return {
     id: row.id,
     itemCode: row.itemCode,
@@ -55,6 +60,8 @@ function toDTO(row: ConsumableRow): ConsumableDTO {
     category: row.category,
     unit: row.unit,
     currentQty: row.currentQty,
+    reservedQty,
+    availableQty: availableQty({ currentQty: row.currentQty, reservedQty }),
     minThreshold: row.minThreshold,
     location: row.location,
     supplier: row.supplier ?? undefined,
@@ -467,6 +474,12 @@ export class ConsumableService {
           `Not on hand for ${existing.itemCode}. Available: ${existing.currentQty} ${existing.unit}. Restock first. Purchase orders will be added later.`
         );
       }
+      const freeQty = availableQty(existing);
+      if (input.quantity > freeQty) {
+        throw new BadRequestError(
+          `Only ${freeQty} ${existing.unit} available to issue for ${existing.itemCode} (${existing.reservedQty ?? 0} reserved for approved supply requests).`
+        );
+      }
 
       const dest = await this.resolveIssueDestination(
         input.departmentId,
@@ -548,6 +561,12 @@ export class ConsumableService {
       if (next < 0) {
         throw new BadRequestError(
           `Cannot deduct ${Math.abs(input.quantityChange)} ${existing.unit}. Only ${existing.currentQty} ${existing.unit} available in stock.`
+        );
+      }
+      const reservedQty = existing.reservedQty ?? 0;
+      if (next < reservedQty) {
+        throw new BadRequestError(
+          `Cannot reduce stock below ${reservedQty} ${existing.unit} reserved for approved supply requests.`
         );
       }
 
@@ -686,6 +705,12 @@ export class ConsumableService {
       if (existing.currentQty < input.quantity) {
         throw new BadRequestError(
           `Not on hand for ${existing.itemCode}. Available: ${existing.currentQty} ${existing.unit}. Restock first. Purchase orders will be added later.`
+        );
+      }
+      const freeQty = availableQty(existing);
+      if (input.quantity > freeQty) {
+        throw new BadRequestError(
+          `Only ${freeQty} ${existing.unit} available to issue for ${existing.itemCode} (${existing.reservedQty ?? 0} reserved for approved supply requests).`
         );
       }
 

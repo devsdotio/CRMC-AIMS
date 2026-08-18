@@ -28,7 +28,7 @@ export interface ListAssetsFilters extends PaginationParams {
   modelId?: string;
   category?: string;
   search?: string;
-  /** When true, only units with no current holder. */
+  /** When true, only units with no current holder and no approved reservation. */
   availableOnly?: boolean;
 }
 

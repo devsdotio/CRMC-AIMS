@@ -107,6 +107,13 @@ function AdjustStockDialogForm({
       );
       return;
     }
+    const reservedQty = item.reservedQty ?? 0;
+    if (isReducing && newExpectedQty < reservedQty) {
+      setError(
+        `Cannot reduce stock below ${reservedQty} ${item.unit} reserved for approved supply requests.`
+      );
+      return;
+    }
     if (!reason.trim()) {
       setError("A reason is mandatory for auditing stock adjustments.");
       return;

@@ -7,6 +7,7 @@ import { useToast } from "@/components/providers/toast-context";
 import { useAssetOperator } from "@/hooks/use-asset-operator";
 import {
   useApproveConsumableRequestMutation,
+  useCancelConsumableRequestMutation,
   useConsumableRequests,
   useRejectConsumableRequestMutation,
   useReleaseConsumableRequestMutation,
@@ -30,6 +31,7 @@ export function SupplyRequestsQueue() {
   const rows = data?.data ?? [];
   const approve = useApproveConsumableRequestMutation();
   const reject = useRejectConsumableRequestMutation();
+  const cancel = useCancelConsumableRequestMutation();
   const release = useReleaseConsumableRequestMutation();
 
   const handleApprove = async (row: ConsumableRequest) => {
@@ -52,7 +54,21 @@ export function SupplyRequestsQueue() {
     }
   };
 
-  const handleReleaseConfirm = async (
+  const handleCancelApproved = async (row: ConsumableRequest) => {
+    if (
+      !window.confirm(
+        `Cancel ${row.requestCode}? Reserved stock will be released back to available quantity.`
+      )
+    ) {
+      return;
+    }
+    try {
+      await cancel.mutateAsync({ id: row.id });
+      toast.success(`${row.requestCode} cancelled. Reservation released.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Cancel failed.");
+    }
+  };
     row: ConsumableRequest,
     payload: ReleaseConsumableRequestPayload
   ) => {
@@ -145,13 +161,22 @@ export function SupplyRequestsQueue() {
                   </div>
                 )}
                 {canOperate && row.status === "approved" && (
-                  <button
-                    type="button"
-                    onClick={() => setReleaseTarget(row)}
-                    className="px-3 py-1.5 text-xs font-semibold rounded-md bg-primary text-primary-foreground shrink-0"
-                  >
-                    Issue…
-                  </button>
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setReleaseTarget(row)}
+                      className="px-3 py-1.5 text-xs font-semibold rounded-md bg-primary text-primary-foreground"
+                    >
+                      Issue…
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleCancelApproved(row)}
+                      className="px-3 py-1.5 text-xs font-semibold rounded-md border border-border"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 )}
               </li>
             ))}

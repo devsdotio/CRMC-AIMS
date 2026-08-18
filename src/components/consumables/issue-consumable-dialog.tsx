@@ -12,6 +12,7 @@ import { consumableQueryKeys } from "@/features/consumables/client/query-keys";
 import { purchaseLotQueryKeys } from "@/features/purchase-lots/client/query-keys";
 import { stockMovementQueryKeys } from "@/features/stock-movements/client/query-keys";
 import { formatPhp } from "@/components/projects/format-money";
+import { availableQty } from "@/components/consumables/utils";
 
 export interface IssueConsumableDialogProps {
   item: ConsumableItem | null;
@@ -69,6 +70,8 @@ export function IssueConsumableDialog({
 
   if (!isOpen || !item) return null;
 
+  const freeQty = item.availableQty ?? availableQty(item);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -95,15 +98,17 @@ export function IssueConsumableDialog({
       );
       return;
     }
-    if (item.currentQty < 1) {
+    if (item.currentQty < 1 || freeQty < 1) {
       setError(
-        "Not on hand. Restock first. Purchase orders will be added later."
+        freeQty < 1 && (item.reservedQty ?? 0) > 0
+          ? "On-hand stock is reserved for approved supply requests."
+          : "Not on hand. Restock first. Purchase orders will be added later."
       );
       return;
     }
-    if (quantity > item.currentQty) {
+    if (quantity > freeQty) {
       setError(
-        `Not on hand. Available: ${item.currentQty} ${item.unit}. Restock first.`
+        `Not on hand. Available: ${freeQty} ${item.unit}${(item.reservedQty ?? 0) > 0 ? ` (${item.reservedQty} reserved)` : ""}. Restock first.`
       );
       return;
     }
@@ -152,7 +157,10 @@ export function IssueConsumableDialog({
           <div>
             <h2 className="text-sm font-bold text-text">Issue supplies</h2>
             <p className="text-xs text-text-secondary mt-0.5 font-mono">
-              {item.itemCode} · {item.currentQty} {item.unit} on hand
+              {item.itemCode} · {freeQty} {item.unit} available
+              {(item.reservedQty ?? 0) > 0
+                ? ` (${item.reservedQty} reserved)`
+                : ""}
             </p>
           </div>
           <button
@@ -263,7 +271,7 @@ export function IssueConsumableDialog({
             <input
               type="number"
               min={1}
-              max={item.currentQty}
+              max={freeQty}
               value={quantity}
               onChange={(e) => setQuantity(Number(e.target.value))}
               className="w-full h-9 px-3 text-sm border border-border rounded-lg bg-bg"
@@ -321,7 +329,7 @@ export function IssueConsumableDialog({
           </button>
           <button
             type="submit"
-            disabled={pending || item.currentQty < 1}
+            disabled={pending || freeQty < 1}
             className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg bg-primary text-primary-foreground disabled:opacity-50"
           >
             <PackageMinus className="h-3.5 w-3.5" />
