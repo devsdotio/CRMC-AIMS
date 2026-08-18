@@ -198,33 +198,104 @@ export class ConsumableService {
       throw new ConflictError(`Item code ${itemCode} already exists.`);
     }
 
-    const history: StockHistoryEntry[] =
-      input.currentQty > 0
-        ? [
-            historyEntry(
-              "restock",
-              input.currentQty,
-              actor.displayName,
-              "Initial stock"
-            ),
-          ]
-        : [];
-
-    const row = await this.repo.create({
+    const baseRow = {
       itemCode,
       name: input.name,
       category: categoryName,
       unit: input.unit,
-      currentQty: input.currentQty,
       minThreshold: input.minThreshold,
       location: input.location,
       supplier: input.supplier ?? null,
-      lastRestocked: input.currentQty > 0 ? new Date() : null,
       notes: input.notes ?? null,
-      history,
-    });
+    };
 
-    return toDTO(row);
+    if (input.currentQty <= 0) {
+      const row = await this.repo.create({
+        ...baseRow,
+        currentQty: 0,
+        lastRestocked: null,
+        history: [],
+      });
+      return toDTO(row);
+    }
+
+    return withTransaction(async (tx) => {
+      const row = await this.repo.create(
+        {
+          ...baseRow,
+          currentQty: input.currentQty,
+          lastRestocked: new Date(),
+          history: [],
+        },
+        tx
+      );
+
+      const lot = await this.purchaseLots.recordLot(
+        {
+          itemType: "consumable",
+          consumableId: row.id,
+          itemCode: row.itemCode,
+          itemName: row.name,
+          supplierName: input.supplier ?? null,
+          quantity: input.currentQty,
+          unitCost: "0.00",
+          purchasedOn: todayDateString(),
+          reference: "Initial stock",
+          notes: input.notes ?? "Opening balance on item create",
+          recordedByUserId: actor.userId,
+          recordedByName: actor.displayName,
+        },
+        tx
+      );
+
+      const history: StockHistoryEntry[] = [
+        historyEntry(
+          "restock",
+          input.currentQty,
+          actor.displayName,
+          "Initial stock",
+          input.notes,
+          {
+            unitCost: lot.unitCost,
+            supplierId: lot.supplierId ?? undefined,
+            supplierName: lot.supplierName ?? undefined,
+            lotCode: lot.lotCode,
+          }
+        ),
+      ];
+
+      const updated = await this.repo.update(
+        row.id,
+        {
+          history,
+          ...(lot.supplierName ? { supplier: lot.supplierName } : {}),
+        },
+        tx
+      );
+      if (!updated) throw new NotFoundError("Consumable", row.id);
+
+      await this.movements.record(
+        {
+          consumableId: row.id,
+          direction: "in",
+          reason: "restock",
+          actor,
+          notes: input.notes ?? "Initial stock",
+          lines: [
+            {
+              qty: input.currentQty,
+              purchaseLotId: lot.id,
+              lotCode: lot.lotCode,
+              unitCost: lot.unitCost,
+              lineTotal: lot.totalCost,
+            },
+          ],
+        },
+        tx
+      );
+
+      return toDTO(updated);
+    });
   }
 
   async update(rawId: string, rawInput: unknown): Promise<ConsumableDTO> {

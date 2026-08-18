@@ -298,6 +298,11 @@ function AddEditConsumableDialogForm({
                 disabled={isSubmitting || isEditing}
                 className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-70"
               />
+              {!isEditing && (
+                <p className="text-[11px] text-text-secondary">
+                  Creates an opening purchase lot you can issue from.
+                </p>
+              )}
             </div>
             <div className="space-y-1">
               <label
