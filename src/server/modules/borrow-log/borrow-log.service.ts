@@ -166,8 +166,8 @@ export class BorrowLogService {
     holderLabel: string;
     custodyKind: "borrow" | "assignment";
   }> {
-    let departmentId = input.departmentId ?? null;
-    let projectId = input.projectId ?? null;
+    const departmentId = input.departmentId ?? null;
+    const projectId = input.projectId ?? null;
 
     if (departmentId && projectId) {
       throw new BadRequestError(

@@ -69,6 +69,8 @@ export function SupplyRequestsQueue() {
       toast.error(err instanceof Error ? err.message : "Cancel failed.");
     }
   };
+
+  const handleReleaseConfirm = async (
     row: ConsumableRequest,
     payload: ReleaseConsumableRequestPayload
   ) => {

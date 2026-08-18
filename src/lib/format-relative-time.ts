@@ -35,3 +35,13 @@ export function formatRelativeTime(
     day: "numeric",
   });
 }
+
+/** Whole calendar days from today until `dueDate` (YYYY-MM-DD). Negative if past. */
+export function calendarDaysUntil(
+  dueDate: string,
+  now: Date = new Date()
+): number {
+  const due = new Date(`${dueDate.slice(0, 10)}T00:00:00`);
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+}

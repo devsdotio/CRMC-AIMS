@@ -27,6 +27,7 @@ import {
 import { useDashboardSnapshotQuery } from "@/features/dashboard/client/use-dashboard";
 import { useMeQuery } from "@/features/users/client";
 import type { DashboardPendingRequest } from "@/server/modules/dashboard/dashboard.service";
+import { calendarDaysUntil } from "@/lib/format-relative-time";
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
 
@@ -97,10 +98,7 @@ function DashStatCard({ label, value, subtext, icon: Icon, tone = "default", isL
 function ActiveBorrowCard({ record }: { record: PortalBorrowLogRecord }) {
   const categoryMeta = getCategoryStyle(record.category);
   const isOverdue = record.status === "overdue";
-  const dueDate = record.dueDate ? new Date(record.dueDate) : null;
-  const daysLeft = dueDate
-    ? Math.ceil((dueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-    : null;
+  const daysLeft = record.dueDate ? calendarDaysUntil(record.dueDate) : null;
 
   return (
     <div

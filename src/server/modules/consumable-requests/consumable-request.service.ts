@@ -663,7 +663,7 @@ export class ConsumableRequestService {
           );
         }
 
-        let lotAllocations: LotCostAllocation[] = [];
+        const lotAllocations: LotCostAllocation[] = [];
         const allocations = releaseLine.allocations ?? [];
         const allocatedQty = allocations.reduce(
           (sum, a) => sum + a.quantity,
