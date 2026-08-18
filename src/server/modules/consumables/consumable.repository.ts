@@ -23,6 +23,7 @@ const consumableListColumns = {
   category: consumables.category,
   unit: consumables.unit,
   currentQty: consumables.currentQty,
+  reservedQty: consumables.reservedQty,
   minThreshold: consumables.minThreshold,
   location: consumables.location,
   supplier: consumables.supplier,

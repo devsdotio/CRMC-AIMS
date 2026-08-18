@@ -14,8 +14,8 @@ export function SupplierTable({
   suppliers: Supplier[];
   loading?: boolean;
   onSelect: (s: Supplier) => void;
-  onEdit: (s: Supplier) => void;
-  onDeactivate: (s: Supplier) => void;
+  onEdit?: (s: Supplier) => void;
+  onDeactivate?: (s: Supplier) => void;
 }) {
   if (loading) {
     return (
@@ -82,7 +82,9 @@ export function SupplierTable({
                 className="px-5 py-4 text-right"
                 onClick={(e) => e.stopPropagation()}
               >
+                {(onEdit || onDeactivate) && (
                 <div className="flex justify-end gap-1.5">
+                  {onEdit && (
                   <button
                     type="button"
                     onClick={() => onEdit(s)}
@@ -90,7 +92,8 @@ export function SupplierTable({
                   >
                     Edit
                   </button>
-                  {s.status === "active" && (
+                  )}
+                  {onDeactivate && s.status === "active" && (
                     <button
                       type="button"
                       onClick={() => onDeactivate(s)}
@@ -100,6 +103,7 @@ export function SupplierTable({
                     </button>
                   )}
                 </div>
+                )}
               </td>
             </tr>
           ))}

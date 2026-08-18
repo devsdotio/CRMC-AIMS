@@ -13,13 +13,27 @@ export const listPurchaseLotsQuerySchema = z.object({
 export const purchaseLotIdSchema = z.string().uuid("Invalid purchase lot id.");
 
 /** Staff scan: release qty from a supplier purchase lot. */
-export const scanReleaseLotSchema = z.object({
-  code: z.string().trim().min(1, "code (QR payload or lot code) is required."),
-  quantity: z.number().int().positive("quantity must be positive."),
-  reason: z.string().trim().max(500).optional(),
-  notes: z.string().trim().max(2000).optional(),
-  recipientName: z.string().trim().max(255).optional(),
-});
+export const scanReleaseLotSchema = z
+  .object({
+    code: z.string().trim().min(1, "code (QR payload or lot code) is required."),
+    quantity: z.number().int().positive("quantity must be positive."),
+    reason: z.string().trim().max(500).optional(),
+    notes: z.string().trim().max(2000).optional(),
+    recipientName: z.string().trim().max(255).optional(),
+    departmentId: z.string().uuid().optional(),
+    projectId: z.string().uuid().optional(),
+  })
+  .superRefine((data, ctx) => {
+    const hasDept = Boolean(data.departmentId);
+    const hasProject = Boolean(data.projectId);
+    if (hasDept === hasProject) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Specify exactly one destination: department or project.",
+        path: ["departmentId"],
+      });
+    }
+  });
 
 export type ListPurchaseLotsQuery = z.infer<typeof listPurchaseLotsQuerySchema>;
 export type ScanReleaseLotBody = z.infer<typeof scanReleaseLotSchema>;

@@ -4,8 +4,9 @@ import { headers } from "next/headers";
 
 import { createClient } from "@/lib/supabase/server";
 import { getDb } from "@/server/db";
-import { profiles, type ProfileRow } from "@/server/db/schema";
+import { departments, profiles, type ProfileRow } from "@/server/db/schema";
 import {
+  BadRequestError,
   ForbiddenError,
   UnauthorizedError,
 } from "@/server/shared/errors";
@@ -43,6 +44,8 @@ export interface ActorContext {
   email: string | null;
   displayName: string;
   role: AppRole;
+  departmentId: string | null;
+  departmentName: string | null;
 }
 
 export interface AppSession {
@@ -57,7 +60,46 @@ export function toActorContext(user: User, profile: ProfileRow): ActorContext {
     email: profile.email || user.email || null,
     displayName: profile.fullName || user.email || user.id,
     role: profile.role,
+    departmentId: profile.departmentId ?? null,
+    departmentName: profile.department ?? null,
   };
+}
+
+/**
+ * Resolve department from the departments table (source of truth).
+ * Portal accounts always use the session's department_id — never client text.
+ */
+export async function resolveDepartmentSnapshot(opts: {
+  actor: ActorContext;
+  submittedDepartmentId?: string | null;
+  requireDepartment?: boolean;
+}): Promise<{ departmentId: string | null; departmentName: string | null }> {
+  const departmentId =
+    opts.actor.role === "borrower"
+      ? opts.actor.departmentId
+      : (opts.submittedDepartmentId ?? null);
+
+  if (!departmentId) {
+    if (opts.requireDepartment || opts.actor.role === "borrower") {
+      throw new BadRequestError(
+        opts.actor.role === "borrower"
+          ? "This department account is not linked to a department. Ask an administrator to assign one."
+          : "A department is required."
+      );
+    }
+    return { departmentId: null, departmentName: null };
+  }
+
+  const db = getDb();
+  const [row] = await db
+    .select({ id: departments.id, name: departments.name })
+    .from(departments)
+    .where(eq(departments.id, departmentId))
+    .limit(1);
+  if (!row) {
+    throw new BadRequestError("Unknown department.");
+  }
+  return { departmentId: row.id, departmentName: row.name };
 }
 
 async function loadProfile(userId: string): Promise<ProfileRow | null> {
@@ -209,7 +251,7 @@ export async function requireAssetOperator(): Promise<AppSession> {
   const session = await requireSession();
   if (!isAssetOperatorRole(session.profile.role)) {
     throw new ForbiddenError(
-      "Only staff and administrators can manage coded assets."
+      "Only administrators can manage assets and inventory."
     );
   }
   return session;

@@ -19,13 +19,12 @@ import {
   LogOut,
   User,
   ChevronsUpDown,
-  ShoppingBag,
   History,
   PanelLeftClose,
   PanelLeftOpen,
-  FileText,
   FolderKanban,
   Truck,
+  Wrench,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -137,12 +136,16 @@ export default function Sidebar({
     {
       label: "Operations",
       items: [
-        { name: "Borrow Requests", href: "/borrow-requests", icon: ClipboardList, badge: pendingCount, badgeTone: "accent", roles: ["superadmin", "admin", "staff"] },
-        
         { name: "Assets", href: "/assets", icon: Package, roles: ["superadmin", "admin", "staff"] },
         { name: "Inventory", href: "/consumables", icon: Boxes, badge: lowStockCount, badgeTone: "warning", roles: ["superadmin", "admin", "staff"] },
+        { name: "Requests", href: "/borrow-requests", icon: ClipboardList, badge: pendingCount, badgeTone: "accent", roles: ["superadmin", "admin", "staff"] },
+        { name: "Borrow Log", href: "/borrow-log", icon: Repeat, badge: overdueCount, badgeTone: "warning", roles: ["superadmin", "admin", "staff"] },
+        { name: "Issue history", href: "/issue-history", icon: History, roles: ["superadmin", "admin", "staff"] },
         { name: "Suppliers", href: "/suppliers", icon: Truck, roles: ["superadmin", "admin", "staff"] },
         { name: "Projects", href: "/projects", icon: FolderKanban, roles: ["superadmin", "admin"] },
+        { name: "Maintenance Logs", href: "/maintenance-logs", icon: Wrench, roles: ["superadmin", "admin", "staff"] },
+        // TEMP: Audit Logs nav hidden while writes are disabled.
+        // { name: "Audit Logs", href: "/audit-logs", icon: FileText, roles: ["superadmin", "admin"] },
         { name: "My Requests", href: "/borrower-db/requests", icon: ClipboardList, badge: pendingCount, badgeTone: "accent", roles: ["borrower"] },
         { name: "Borrow History", href: "/borrower-db/history", icon: History, roles: ["borrower"] },
       ],
@@ -150,7 +153,7 @@ export default function Sidebar({
     {
       label: "Administration",
       items: [
-        { name: "Users & Roles", href: "/users", icon: Users, roles: ["superadmin", "admin"] },
+        { name: "Users & Departments", href: "/users", icon: Users, roles: ["superadmin", "admin"] },
         { name: "Settings", href: "/settings", icon: Settings, roles: ["superadmin", "admin"] },
       ],
     },

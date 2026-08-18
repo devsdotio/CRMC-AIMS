@@ -11,10 +11,6 @@ import { RecentActivityFeed } from "@/components/dashboard/recent-activity-feed"
 import { QueryErrorBanner } from "@/components/shared/query-error-banner";
 
 import { useDashboardSnapshotQuery } from "@/features/dashboard/client/use-dashboard";
-import {
-  useApproveBorrowRequestMutation,
-  useRejectBorrowRequestMutation,
-} from "@/features/borrow-requests/client/use-borrow-requests";
 
 export default function DashboardPage() {
   const {
@@ -24,8 +20,6 @@ export default function DashboardPage() {
     error,
     refetch,
   } = useDashboardSnapshotQuery();
-  const approveMutation = useApproveBorrowRequestMutation();
-  const rejectMutation = useRejectBorrowRequestMutation();
 
   // Only true while the first fetch is in flight — never `!snapshot` after error.
   const loading = isLoading && !snapshot;
@@ -86,10 +80,6 @@ export default function DashboardPage() {
         <PendingApprovalsWidget
           requests={snapshot?.pendingRequests || []}
           loading={loading}
-          onApprove={(id) => approveMutation.mutate({ id })}
-          onReject={(id) =>
-            rejectMutation.mutate({ id, reason: "Rejected from dashboard" })
-          }
         />
         <LowStockWidget
           items={snapshot?.lowStockItems || []}
@@ -101,7 +91,6 @@ export default function DashboardPage() {
         <OverdueAssetsWidget
           assets={snapshot?.overdueAssets || []}
           loading={loading}
-          onSendReminder={(id) => console.log("Remind", id)}
         />
         <AssetsByCategoryChart
           data={snapshot?.categoryDistribution ?? []}

@@ -6,13 +6,14 @@ import { purchaseLotController } from "@/server/modules/purchase-lots";
  *   post:
  *     summary: Release consumable quantity from a scanned supplier lot
  *     description: |
- *       Staff mobile flow:
+ *       Operator scan flow:
  *       1. Scan lot QR (`CRMC-AIMS-LOT:…`)
  *       2. Enter quantity
  *       3. System decreases stock + lot remaining
  *       4. History snapshots unit cost, supplier name, lot code (immutable for reports)
  *
  *       Prefer this over generic checkout when multi-supplier pricing matters.
+ *       Prefer `POST /api/consumables/{id}/issue` for walk-up issues with a destination.
  *     tags: [Consumables]
  *     requestBody:
  *       required: true

@@ -44,6 +44,17 @@ export type StockAdjustPayload = {
   quantityChange: number;
   reason: string;
   notes?: string;
+  useFifo?: boolean;
+  allocations?: Array<{
+    lotId?: string;
+    lotCode?: string;
+    quantity: number;
+  }>;
+  attachLotId?: string;
+  attachLotCode?: string;
+  createCorrectionLot?: boolean;
+  unitCost?: string | number;
+  supplierId?: string | null;
 };
 
 export const consumablesApi = {
@@ -99,17 +110,6 @@ export const consumablesApi = {
   ): Promise<ConsumableItem> {
     const res = await fetchJson<ApiResponse<ConsumableItem>>(
       `/api/consumables/${id}/restock`,
-      { method: "POST", body: JSON.stringify(payload) }
-    );
-    return res.data;
-  },
-
-  async checkout(
-    id: string,
-    payload: StockMovementPayload
-  ): Promise<ConsumableItem> {
-    const res = await fetchJson<ApiResponse<ConsumableItem>>(
-      `/api/consumables/${id}/checkout`,
       { method: "POST", body: JSON.stringify(payload) }
     );
     return res.data;

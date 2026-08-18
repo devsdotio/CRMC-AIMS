@@ -3,8 +3,12 @@ import type {
   BorrowRequestRow,
 } from "@/server/db/schema";
 import { formatRelativeTime } from "@/lib/format-relative-time";
-import { generateOperationalCode, isoNow } from "@/server/shared/codes";
+import {
+  generateOperationalCode,
+  isoNow,
+} from "@/server/shared/codes";
 import type { ActorContext } from "@/server/shared/auth";
+import { resolveDepartmentSnapshot } from "@/server/shared/auth";
 import { isAssetOperatorRole } from "@/server/shared/roles";
 import {
   BadRequestError,
@@ -22,10 +26,12 @@ import { AssetRepository } from "../assets/asset.repository";
 import { AuditLogRepository } from "../audit-logs/audit-logs.repository";
 import { BorrowLogService } from "../borrow-log/borrow-log.service";
 import { BorrowLogRepository } from "../borrow-log/borrow-log.repository";
+import { DepartmentRepository } from "../departments/department.repository";
 import { withTransaction } from "@/server/db/transaction";
 import {
   approveBorrowRequestSchema,
   borrowRequestIdSchema,
+  cancelBorrowRequestSchema,
   createBorrowRequestSchema,
   listBorrowRequestsQuerySchema,
   rejectBorrowRequestSchema,
@@ -43,10 +49,10 @@ function toDTO(row: BorrowRequestRow): BorrowRequestDTO {
     requesterEmail: row.requesterEmail,
     requesterPhone: row.requesterPhone,
     department: row.department,
-    itemDescription: row.itemDescription,
-    assetCode: row.assetCode ?? undefined,
-    category: row.category,
-    quantity: row.quantity,
+    departmentId: row.departmentId,
+    requestType: row.requestType ?? undefined,
+    requestedByName: row.requestedByName ?? undefined,
+    items: row.items,
     purpose: row.purpose,
     requestedAt:
       row.requestedAt instanceof Date
@@ -90,7 +96,8 @@ export class BorrowRequestService {
     private readonly auditLogs = new AuditLogRepository(),
     private readonly assetRepo = new AssetRepository(),
     private readonly borrowLogs = new BorrowLogService(),
-    private readonly borrowLogRepo = new BorrowLogRepository()
+    private readonly borrowLogRepo = new BorrowLogRepository(),
+    private readonly departments = new DepartmentRepository()
   ) {}
 
   async list(
@@ -102,7 +109,7 @@ export class BorrowRequestService {
       filters.requesterUserId = actor.userId;
     }
     
-    const { page, limit, ...countFilters } = filters;
+    const { page, limit, status, ...countFilters } = filters;
     const [rows, total, counts] = await Promise.all([
       this.repo.list(filters),
       this.repo.count(filters),
@@ -135,23 +142,64 @@ export class BorrowRequestService {
     const input = createBorrowRequestSchema.parse(rawInput);
     const requestCode = generateOperationalCode("REQ");
 
+    const requesterUserId = isAssetOperatorRole(actor.role)
+      ? (input.requesterUserId ?? actor.userId)
+      : actor.userId;
+
+    const dest = await resolveDepartmentSnapshot({
+      actor,
+      submittedDepartmentId: input.departmentId,
+      requireDepartment: true,
+    });
+
     const submitted = historyEntry("submitted", actor.displayName, "Request recorded");
+
+    const requestType = input.requestType ?? "borrowable";
+
+    for (const item of input.items) {
+      if (!item.assetId) continue;
+      const asset = await this.assetRepo.findById(item.assetId);
+      if (!asset) throw new NotFoundError("Asset", item.assetId);
+      if (asset.status !== "active") {
+        throw new ConflictError(
+          `Asset ${asset.assetCode} is not available (${asset.status.replace(/_/g, " ")}).`
+        );
+      }
+      if (asset.currentHolder) {
+        throw new ConflictError(
+          `Asset ${asset.assetCode} is currently in custody (${asset.currentHolder}).`
+        );
+      }
+      if (asset.reservedForRequestId) {
+        throw new ConflictError(
+          `Asset ${asset.assetCode} is already reserved for an approved request.`
+        );
+      }
+      if (requestType === "borrowable" && asset.assignmentType !== "borrowable") {
+        throw new ConflictError(`Asset ${asset.assetCode} is not borrowable.`);
+      }
+      if (requestType === "assignable" && asset.assignmentType !== "assignable") {
+        throw new ConflictError(`Asset ${asset.assetCode} is not assignable.`);
+      }
+    }
 
     const row = await withTransaction(async (tx) => {
       const created = await this.repo.create({
         requestCode,
-        requesterUserId: input.requesterUserId ?? null,
+        requesterUserId,
         requesterName: input.requesterName,
         requesterEmail: input.requesterEmail.toLowerCase(),
         requesterPhone: input.requesterPhone ?? "",
-        department: input.department,
-        itemDescription: input.itemDescription,
-        assetId: input.assetId ?? null,
-        assetCode: input.assetCode ?? null,
-        category: input.category,
-        quantity: input.quantity,
+        department: dest.departmentName!,
+        departmentId: dest.departmentId,
+        requestType,
+        requestedByName: input.requestedByName ?? null,
+        items: input.items,
         purpose: input.purpose,
-        expectedReturnDate: input.expectedReturnDate,
+        expectedReturnDate:
+          requestType === "borrowable"
+            ? (input.expectedReturnDate ?? new Date().toISOString().slice(0, 10))
+            : null,
         status: "pending",
         notes: input.notes ?? null,
         rejectionReason: null,
@@ -192,27 +240,48 @@ export class BorrowRequestService {
       historyEntry("approved", actor.displayName, input.note),
     ];
 
-    const assetToAssignId = input.assetId ?? existing.assetId;
-    if (assetToAssignId) {
-      const asset = await this.assetRepo.findById(assetToAssignId);
-      if (asset && asset.currentHolder) {
-        throw new ConflictError(`Cannot approve: Asset is currently borrowed by ${asset.currentHolder}. It will remain in pending status until available.`);
-      }
-      if (asset && asset.assignmentType === "assignable") {
-        throw new BadRequestError(
-          "This asset is project-assignable and cannot be approved for borrow checkout."
-        );
-      }
-    }
-
     const updated = await withTransaction(async (tx) => {
+      for (const item of existing.items) {
+        if (!item.assetId) continue;
+        const asset = await this.assetRepo.findByIdForUpdate(item.assetId, tx);
+        if (!asset) throw new NotFoundError("Asset", item.assetId);
+        if (asset.status !== "active") {
+          throw new ConflictError(
+            `Cannot approve: Asset ${asset.assetCode} is not available (${asset.status.replace(/_/g, " ")}).`
+          );
+        }
+        if (asset.currentHolder) {
+          throw new ConflictError(
+            `Cannot approve: Asset ${asset.assetCode} is currently in custody (${asset.currentHolder}).`
+          );
+        }
+        if (asset.reservedForRequestId) {
+          throw new ConflictError(
+            `Cannot approve: Asset ${asset.assetCode} is already reserved for another request.`
+          );
+        }
+        if (existing.requestType === "borrowable" && asset.assignmentType !== "borrowable") {
+          throw new ConflictError(`Asset ${asset.assetCode} is not borrowable.`);
+        }
+        if (existing.requestType === "assignable" && asset.assignmentType !== "assignable") {
+          throw new ConflictError(`Asset ${asset.assetCode} is not assignable.`);
+        }
+      }
+
       const up = await this.repo.update(id, {
         status: "approved",
-        assetId: input.assetId ?? existing.assetId,
-        assetCode: input.assetCode ?? existing.assetCode,
         history,
       }, tx);
       if (!up) throw new NotFoundError("Borrow request", id);
+
+      for (const item of existing.items) {
+        if (!item.assetId) continue;
+        await this.assetRepo.update(
+          item.assetId,
+          { reservedForRequestId: up.id, lastUpdated: new Date() },
+          tx
+        );
+      }
 
       await this.auditLogs.create({
         entityType: "borrow_request",
@@ -281,33 +350,61 @@ export class BorrowRequestService {
       throw new ConflictError("Only approved requests can be released.");
     }
 
+    const mixedSupply = existing.items.some(
+      (item) => item.itemType === "consumable" || Boolean(item.consumableId)
+    );
+    if (mixedSupply) {
+      throw new ConflictError(
+        "This request includes supplies. Release it from Supply requests — coded-asset requests cannot mix consumables."
+      );
+    }
+
     const noteWithPicker = input.note
       ? `Released to: ${input.pickedUpBy}. ${input.note}`
       : `Released to: ${input.pickedUpBy}`;
 
-    // Open accountable borrow log first while request is still approved.
-    if (existing.assetId) {
-      const asset = await this.assetRepo.findById(existing.assetId);
-      if (!asset) throw new NotFoundError("Asset", existing.assetId);
-      if (asset.assignmentType === "assignable") {
-        throw new BadRequestError(
-          "This asset is project-assignable and cannot be released as a borrow checkout."
+    const requestType = existing.requestType ?? "borrowable";
+    const custodyKind = requestType === "assignable" ? "assignment" : "borrow";
+
+    let departmentId = existing.departmentId ?? null;
+    if (!departmentId && existing.department.trim()) {
+      const dept = await this.departments.findByNameLower(
+        existing.department.trim()
+      );
+      departmentId = dept?.id ?? null;
+    }
+    if (!departmentId) {
+      throw new BadRequestError(
+        "This request is not linked to a department. Update the department record before releasing."
+      );
+    }
+
+    // Open accountable custody log for assets first while request is still approved.
+    for (const item of existing.items) {
+      if (item.assetId) {
+        const asset = await this.assetRepo.findById(item.assetId);
+        if (!asset) throw new NotFoundError("Asset", item.assetId);
+        await this.borrowLogs.release(
+          {
+            assetId: item.assetId,
+            requestId: existing.id,
+            custodyKind,
+            source: "portal",
+            departmentId,
+            borrowerName: input.pickedUpBy,
+            borrowerEmail: existing.requesterEmail,
+            borrowerPhone: existing.requesterPhone || "",
+            dueDate:
+              custodyKind === "borrow"
+                ? (existing.expectedReturnDate ?? this.borrowLogs.defaultDueDate())
+                : null,
+            requestedByName: existing.requestedByName ?? input.pickedUpBy,
+            notes: noteWithPicker,
+            borrowerUserId: existing.requesterUserId ?? undefined,
+          },
+          actor
         );
       }
-      await this.borrowLogs.release(
-        {
-          assetId: existing.assetId,
-          requestId: existing.id,
-          borrowerName: input.pickedUpBy,
-          borrowerEmail: existing.requesterEmail,
-          borrowerPhone: existing.requesterPhone || "",
-          department: existing.department,
-          dueDate: this.borrowLogs.defaultDueDate(),
-          notes: noteWithPicker,
-          borrowerUserId: existing.requesterUserId ?? undefined,
-        },
-        actor
-      );
     }
 
     const history = [
@@ -335,12 +432,67 @@ export class BorrowRequestService {
           actorName: actor.displayName,
           actorUserId: actor.userId,
           notes: noteWithPicker,
+          metadata: {
+            requestCode: existing.requestCode,
+            pickedUpBy: input.pickedUpBy,
+          },
         },
         tx
       );
 
       return up;
     });
+    return toDTO(updated);
+  }
+
+  async cancel(
+    rawId: string,
+    rawInput: unknown,
+    actor: ActorContext
+  ): Promise<BorrowRequestDTO> {
+    const id = borrowRequestIdSchema.parse(rawId);
+    const input = cancelBorrowRequestSchema.parse(rawInput ?? {});
+    const existing = await this.repo.findById(id);
+    if (!existing) throw new NotFoundError("Borrow request", id);
+    if (existing.status !== "pending") {
+      throw new ConflictError("Only pending requests can be cancelled.");
+    }
+
+    if (
+      !isAssetOperatorRole(actor.role) &&
+      existing.requesterUserId !== actor.userId
+    ) {
+      throw new ForbiddenError("You can only cancel your own requests.");
+    }
+
+    const history = [
+      ...(Array.isArray(existing.history) ? existing.history : []),
+      historyEntry("cancelled", actor.displayName, input.note),
+    ];
+
+    const updated = await withTransaction(async (tx) => {
+      const up = await this.repo.update(
+        id,
+        { status: "cancelled", history },
+        tx
+      );
+      if (!up) throw new NotFoundError("Borrow request", id);
+
+      await this.auditLogs.create(
+        {
+          entityType: "borrow_request",
+          entityId: up.id,
+          action: "cancelled",
+          actorName: actor.displayName,
+          actorUserId: actor.userId,
+          notes: input.note,
+        },
+        tx
+      );
+
+      return up;
+    });
+
     return toDTO(updated);
   }
 
@@ -369,8 +521,14 @@ export class BorrowRequestService {
       }, tx);
       if (!up) throw new NotFoundError("Borrow request", id);
 
-      if (up.assetId) {
-        await this.assetRepo.update(up.assetId, { currentHolder: null }, tx);
+      for (const item of up.items) {
+        if (item.assetId) {
+          await this.assetRepo.update(
+            item.assetId,
+            { currentHolder: null, reservedForRequestId: null, lastUpdated: new Date() },
+            tx
+          );
+        }
       }
 
       await this.auditLogs.create({
@@ -393,7 +551,16 @@ export class BorrowRequestService {
     const existing = await this.repo.findById(id);
     if (!existing) throw new NotFoundError("Borrow request", id);
     if (existing.status !== "released") {
-      throw new BadRequestError("Only released requests can be marked returned.");
+      throw new ConflictError("Only released requests can be marked returned.");
+    }
+
+    const hasReturnableAssets = existing.items.some(
+      (item) => item.itemType === "asset" || Boolean(item.assetId)
+    );
+    if (!hasReturnableAssets) {
+      throw new ConflictError(
+        "Consumable supply requests cannot be marked as returned because consumable items are consumed upon issuance."
+      );
     }
 
     const noteWithReturner = input.note
@@ -401,26 +568,28 @@ export class BorrowRequestService {
       : `Returned by: ${input.returnedBy}`;
 
     // Close active borrow log (clears holder + lifecycle) when this request released an asset.
-    if (existing.assetId) {
-      const open = await this.borrowLogRepo.findActiveByAssetId(existing.assetId);
-      if (open) {
-        await this.borrowLogs.returnLog(
-          open.id,
-          {
-            condition: "good",
-            conditionNotes: noteWithReturner,
-            flagMaintenance: false,
-          },
-          actor
-        );
-      } else {
-        // Legacy release without log — clear holder so registry is usable again.
-        const asset = await this.assetRepo.findById(existing.assetId);
-        if (asset?.currentHolder) {
-          await this.assetRepo.update(existing.assetId, {
-            currentHolder: null,
-            lastUpdated: new Date(),
-          });
+    for (const item of existing.items) {
+      if (item.assetId) {
+        const open = await this.borrowLogRepo.findActiveByAssetId(item.assetId);
+        if (open) {
+          await this.borrowLogs.returnLog(
+            open.id,
+            {
+              condition: "good",
+              conditionNotes: noteWithReturner,
+              flagMaintenance: false,
+            },
+            actor
+          );
+        } else {
+          // Legacy release without log — clear holder so registry is usable again.
+          const asset = await this.assetRepo.findById(item.assetId);
+          if (asset?.currentHolder) {
+            await this.assetRepo.update(item.assetId, {
+              currentHolder: null,
+              lastUpdated: new Date(),
+            });
+          }
         }
       }
     }

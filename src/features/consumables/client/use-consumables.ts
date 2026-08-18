@@ -14,15 +14,18 @@ import {
   type ConsumableItem,
   type RestockPayload,
   type StockAdjustPayload,
-  type StockMovementPayload,
   type UpdateConsumablePayload,
 } from "./consumables-api";
+
+export type { StockAdjustPayload };
 import { consumableQueryKeys } from "./query-keys";
 import { purchaseLotQueryKeys } from "@/features/purchase-lots/client/query-keys";
+import { stockMovementQueryKeys } from "@/features/stock-movements/client/query-keys";
 
 function invalidate(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: consumableQueryKeys.all });
   qc.invalidateQueries({ queryKey: purchaseLotQueryKeys.all });
+  qc.invalidateQueries({ queryKey: stockMovementQueryKeys.all });
 }
 
 export function useConsumablesQuery(filters?: {
@@ -85,18 +88,6 @@ export function useRestockConsumableMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, payload }) => consumablesApi.restock(id, payload),
-    onSuccess: () => invalidate(qc),
-  });
-}
-
-export function useCheckoutConsumableMutation(): UseMutationResult<
-  ConsumableItem,
-  Error,
-  { id: string; payload: StockMovementPayload }
-> {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, payload }) => consumablesApi.checkout(id, payload),
     onSuccess: () => invalidate(qc),
   });
 }

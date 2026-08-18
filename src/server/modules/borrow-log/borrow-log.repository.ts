@@ -1,4 +1,4 @@
-import { and, count, desc, eq, ilike, lt, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, ilike, isNotNull, lt, or, sql } from "drizzle-orm";
 
 import { getDb } from "@/server/db";
 import type { DbSession } from "@/server/db/transaction";
@@ -75,9 +75,15 @@ export class BorrowLogRepository implements IBorrowLogRepository {
       conditions.push(eq(borrowTransactions.status, "returned"));
     } else if (filters.status === "active") {
       conditions.push(eq(borrowTransactions.status, "active"));
-      conditions.push(sql`${borrowTransactions.dueDate} >= ${today}`);
+      conditions.push(
+        or(
+          sql`${borrowTransactions.dueDate} IS NULL`,
+          sql`${borrowTransactions.dueDate} >= ${today}`
+        )!
+      );
     } else if (filters.status === "overdue") {
       conditions.push(eq(borrowTransactions.status, "active"));
+      conditions.push(isNotNull(borrowTransactions.dueDate));
       conditions.push(lt(borrowTransactions.dueDate, today));
     }
 
@@ -125,7 +131,8 @@ export class BorrowLogRepository implements IBorrowLogRepository {
     const today = todayDateString();
     const conditions = [
       eq(borrowTransactions.status, "active"),
-      lt(borrowTransactions.dueDate, today)
+      isNotNull(borrowTransactions.dueDate),
+      lt(borrowTransactions.dueDate, today),
     ];
     if (userId) conditions.push(eq(borrowTransactions.borrowerUserId, userId));
     const [row] = await db

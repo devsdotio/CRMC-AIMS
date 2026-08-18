@@ -1,14 +1,10 @@
 "use client";
 
-/**
- * React Query hooks for borrow requests.
- * Ready for page integration — UI still uses mocks until wired.
- */
-
 import {
   useMutation,
   useQuery,
   useQueryClient,
+  keepPreviousData,
   type UseMutationResult,
   type UseQueryResult,
 } from "@tanstack/react-query";
@@ -21,6 +17,9 @@ import type {
 } from "./borrow-requests-api";
 import { borrowRequestsApi } from "./borrow-requests-api";
 import { borrowRequestQueryKeys } from "./query-keys";
+import { consumableQueryKeys } from "@/features/consumables/client/query-keys";
+import { purchaseLotQueryKeys } from "@/features/purchase-lots/client/query-keys";
+import { auditLogQueryKeys } from "@/features/audit-logs/client/query-keys";
 import { dashboardQueryKeys } from "@/features/dashboard/client/query-keys";
 import type { PaginatedResponse } from "@/features/shared/fetch-json";
 
@@ -32,10 +31,16 @@ export function useBorrowRequests(filters?: {
   limit?: number;
   startDate?: string;
   endDate?: string;
+  assetId?: string;
+  requestType?: "borrowable" | "assignable";
+  enabled?: boolean;
 }): UseQueryResult<PaginatedResponse<BorrowRequest[]>, Error> {
+  const { enabled = true, ...listFilters } = filters ?? {};
   return useQuery({
-    queryKey: borrowRequestQueryKeys.list(filters),
-    queryFn: () => borrowRequestsApi.list(filters),
+    queryKey: borrowRequestQueryKeys.list(listFilters),
+    queryFn: () => borrowRequestsApi.list(listFilters),
+    enabled,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -61,11 +66,23 @@ export function useCreateBorrowRequestMutation(): UseMutationResult<
     mutationFn: (payload) => borrowRequestsApi.create(payload),
     onSuccess: (newRequest) => {
       // 1. Optimistically add to lists
-      qc.setQueriesData<BorrowRequest[]>(
+      qc.setQueriesData<PaginatedResponse<BorrowRequest[]>>(
         { queryKey: borrowRequestQueryKeys.list() },
         (old) => {
-          if (!old) return [newRequest];
-          return [newRequest, ...old];
+          if (!old) {
+            return {
+              data: [newRequest],
+              meta: { total: 1, page: 1, limit: 10, totalPages: 1 },
+            };
+          }
+          return {
+            ...old,
+            data: [newRequest, ...old.data],
+            meta: {
+              ...old.meta,
+              total: old.meta.total + 1,
+            },
+          };
         }
       );
 
@@ -87,7 +104,7 @@ export function useCreateBorrowRequestMutation(): UseMutationResult<
                 id: newRequest.id,
                 requesterName: newRequest.requesterName,
                 department: newRequest.department,
-                itemDescription: newRequest.itemDescription,
+                items: newRequest.items,
                 requestedAt: newRequest.requestedAt,
                 relativeTime: newRequest.relativeTime,
               },
@@ -162,6 +179,34 @@ export function useRejectBorrowRequestMutation(): UseMutationResult<
   });
 }
 
+export function useCancelBorrowRequestMutation(): UseMutationResult<
+  BorrowRequest,
+  Error,
+  { id: string; note?: string }
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, note }) => borrowRequestsApi.cancel(id, note),
+    onSuccess: (_, { id }) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      qc.setQueriesData<any>({ queryKey: dashboardQueryKeys.snapshot() }, (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          summary: {
+            ...old.summary,
+            pendingApprovals: Math.max(0, (old.summary?.pendingApprovals || 1) - 1),
+          },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          pendingRequests: (old.pendingRequests || []).filter((r: any) => r.id !== id),
+        };
+      });
+      qc.invalidateQueries({ queryKey: borrowRequestQueryKeys.all });
+      qc.invalidateQueries({ queryKey: dashboardQueryKeys.all });
+    },
+  });
+}
+
 export function useReleaseBorrowRequestMutation(): UseMutationResult<
   BorrowRequest,
   Error,
@@ -172,9 +217,12 @@ export function useReleaseBorrowRequestMutation(): UseMutationResult<
     mutationFn: ({ id, payload }) => borrowRequestsApi.release(id, payload),
     onMutate: async ({ id }) => {
       await qc.cancelQueries({ queryKey: borrowRequestQueryKeys.all });
-      qc.setQueriesData<BorrowRequest[]>({ queryKey: borrowRequestQueryKeys.list() }, (old) => {
-        if (!old || !Array.isArray(old)) return old;
-        return old.map(req => req.id === id ? { ...req, status: "released" } : req);
+      qc.setQueriesData<PaginatedResponse<BorrowRequest[]>>({ queryKey: borrowRequestQueryKeys.list() }, (old) => {
+        if (!old || !Array.isArray(old.data)) return old;
+        return {
+          ...old,
+          data: old.data.map(req => req.id === id ? { ...req, status: "released" as const } : req),
+        };
       });
       qc.setQueriesData<BorrowRequest>({ queryKey: borrowRequestQueryKeys.detail(id) }, (old) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -184,6 +232,11 @@ export function useReleaseBorrowRequestMutation(): UseMutationResult<
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: borrowRequestQueryKeys.all });
+      qc.invalidateQueries({ queryKey: consumableQueryKeys.all });
+      qc.invalidateQueries({ queryKey: purchaseLotQueryKeys.all });
+      qc.invalidateQueries({ queryKey: auditLogQueryKeys.all });
+      qc.invalidateQueries({ queryKey: dashboardQueryKeys.all });
+      qc.invalidateQueries({ queryKey: ["audit-logs"] });
     },
   });
 }
@@ -212,9 +265,12 @@ export function useMarkReturnedBorrowRequestMutation(): UseMutationResult<
     mutationFn: ({ id, payload }) => borrowRequestsApi.markReturned(id, payload),
     onMutate: async ({ id }) => {
       await qc.cancelQueries({ queryKey: borrowRequestQueryKeys.all });
-      qc.setQueriesData<BorrowRequest[]>({ queryKey: borrowRequestQueryKeys.list() }, (old) => {
-        if (!old || !Array.isArray(old)) return old;
-        return old.map(req => req.id === id ? { ...req, status: "returned" } : req);
+      qc.setQueriesData<PaginatedResponse<BorrowRequest[]>>({ queryKey: borrowRequestQueryKeys.list() }, (old) => {
+        if (!old || !Array.isArray(old.data)) return old;
+        return {
+          ...old,
+          data: old.data.map(req => req.id === id ? { ...req, status: "returned" as const } : req),
+        };
       });
       qc.setQueriesData<BorrowRequest>({ queryKey: borrowRequestQueryKeys.detail(id) }, (old) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

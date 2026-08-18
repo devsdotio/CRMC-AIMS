@@ -31,6 +31,19 @@ export class PurchaseLotRepository implements IPurchaseLotRepository {
     return row ?? null;
   }
 
+  async findByIdForUpdate(
+    id: string,
+    session: DbSession
+  ): Promise<PurchaseLotRow | null> {
+    const [row] = await session
+      .select()
+      .from(purchaseLots)
+      .where(eq(purchaseLots.id, id))
+      .for("update")
+      .limit(1);
+    return row ?? null;
+  }
+
   async findByLotCode(
     lotCode: string,
     session?: DbSession
@@ -128,6 +141,22 @@ export class PurchaseLotRepository implements IPurchaseLotRepository {
     const [row] = await db
       .update(purchaseLots)
       .set({ quantityRemaining, updatedAt: new Date() })
+      .where(eq(purchaseLots.id, id))
+      .returning();
+    return row ?? null;
+  }
+
+  /** Bump original received qty + remaining (attach / found-stock correction). */
+  async updateQuantities(
+    id: string,
+    quantity: number,
+    quantityRemaining: number,
+    session?: DbSession
+  ): Promise<PurchaseLotRow | null> {
+    const db = this.db(session);
+    const [row] = await db
+      .update(purchaseLots)
+      .set({ quantity, quantityRemaining, updatedAt: new Date() })
       .where(eq(purchaseLots.id, id))
       .returning();
     return row ?? null;

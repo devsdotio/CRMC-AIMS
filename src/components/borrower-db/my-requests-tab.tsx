@@ -1,13 +1,17 @@
 "use client";
 
-import { ClipboardList } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { ClipboardList, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { MyRequestItem, MyRequestItemSkeleton } from "./my-request-item";
+import { MyRequestItem } from "./my-request-item";
 import { CancelRequestDialog } from "./cancel-request-dialog";
+import { RequestDetailSheet } from "./request-detail-sheet";
 import type { PortalBorrowRequest, RequestStatusFilter } from "./types";
-import { useState } from "react";
+import { LoadingState } from "@/components/providers/loading-context";
 
-import { useBorrowRequests, useRejectBorrowRequestMutation } from "@/features/borrow-requests/client/use-borrow-requests";
+import { useBorrowRequests, useCancelBorrowRequestMutation } from "@/features/borrow-requests/client/use-borrow-requests";
+import { useConsumableRequests, useCancelConsumableRequestMutation } from "@/features/consumable-requests/client";
+import { useToast } from "@/components/providers/toast-context";
 
 const STATUS_FILTERS: { key: RequestStatusFilter; label: string }[] = [
   { key: "all", label: "All" },
@@ -17,22 +21,110 @@ const STATUS_FILTERS: { key: RequestStatusFilter; label: string }[] = [
   { key: "returned", label: "Completed" },
 ];
 
+const REQUESTS_PAGE_SIZE = 5;
+
 export function MyRequestsTab() {
   const [statusFilter, setStatusFilter] = useState<RequestStatusFilter>("all");
   const [cancelTarget, setCancelTarget] = useState<PortalBorrowRequest | null>(null);
+  const [selectedRequest, setSelectedRequest] = useState<PortalBorrowRequest | null>(null);
+  const [page, setPage] = useState(1);
 
-  const { data: response, isLoading: loading } = useBorrowRequests();
-  const requests = response?.data ?? [];
-  const { mutate: cancelRequest } = useRejectBorrowRequestMutation();
+  const { data: response, isLoading: loadingAssets } = useBorrowRequests();
+  const { data: supplyResponse, isLoading: loadingSupplies } = useConsumableRequests();
+  const assetRequests = useMemo(() => response?.data ?? [], [response?.data]);
+  const supplyRequests = useMemo(
+    () => supplyResponse?.data ?? [],
+    [supplyResponse?.data]
+  );
+  const loading = loadingAssets || loadingSupplies;
+  const { mutate: cancelRequest } = useCancelBorrowRequestMutation();
+  const { mutate: cancelSupply } = useCancelConsumableRequestMutation();
+  const toast = useToast();
+
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter]);
+
+  const requests = useMemo<PortalBorrowRequest[]>(() => {
+    const mappedAssets: PortalBorrowRequest[] = assetRequests.map((row) => ({
+      ...row,
+      requestedDateFrom: row.requestedAt.slice(0, 10),
+      requestedDateTo: (row.expectedReturnDate ?? row.requestedAt).slice(0, 10),
+    }));
+    const mappedSupplies: PortalBorrowRequest[] = supplyRequests.map((row) => ({
+      id: row.id,
+      requestCode: row.requestCode,
+      requesterName: row.requesterName,
+      requesterEmail: row.requesterEmail,
+      requesterPhone: row.requesterPhone,
+      department: row.department,
+      items: row.lines.map((line) => ({
+        itemDescription: line.itemName,
+        consumableId: line.consumableId,
+        category: line.category,
+        quantity: line.quantityRequested,
+        itemType: "consumable" as const,
+      })),
+      purpose: row.purpose,
+      requestedAt: row.requestedAt,
+      expectedReturnDate: null,
+      status:
+        row.status === "released"
+          ? "released"
+          : row.status === "cancelled"
+            ? "cancelled"
+            : row.status,
+      notes: row.notes,
+      rejectionReason: row.rejectionReason,
+      history: row.history.map((h) => ({
+        id: h.id,
+        action: h.action as PortalBorrowRequest["history"][number]["action"],
+        actor: h.actor,
+        timestamp: h.timestamp,
+        note: h.note,
+      })),
+      requestedDateFrom: row.requestedAt.slice(0, 10),
+      requestedDateTo: row.requestedAt.slice(0, 10),
+    }));
+    return [...mappedSupplies, ...mappedAssets].sort((a, b) =>
+      b.requestedAt.localeCompare(a.requestedAt)
+    );
+  }, [assetRequests, supplyRequests]);
 
   const handleCancelConfirmed = (requestId: string) => {
-    cancelRequest({ id: requestId, reason: "Cancelled by borrower" });
+    const target = requests.find((r) => r.id === requestId);
+    const isSupply = Boolean(
+      target?.items.every((i) => i.itemType === "consumable")
+    );
+    const onDone = {
+      onSuccess: () => toast.success("Request cancelled."),
+      onError: (err: Error) =>
+        toast.error(err instanceof Error ? err.message : "Failed to cancel request."),
+    };
+    if (isSupply) {
+      cancelSupply({ id: requestId, note: "Cancelled by department" }, onDone);
+      return;
+    }
+    cancelRequest({ id: requestId, note: "Cancelled by borrower" }, onDone);
   };
 
-  const filtered =
-    statusFilter === "all"
-      ? requests
-      : requests.filter((r) => r.status === statusFilter);
+  const matchesFilter = (r: PortalBorrowRequest, key: RequestStatusFilter) => {
+    if (key === "all") return true;
+    if (key === "returned") {
+      return r.status === "returned" || r.status === "released";
+    }
+    return r.status === key;
+  };
+
+  const filtered = useMemo(() => {
+    return requests.filter((r) => matchesFilter(r, statusFilter));
+  }, [requests, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / REQUESTS_PAGE_SIZE));
+  const paginatedRequests = useMemo(() => {
+    const start = (page - 1) * REQUESTS_PAGE_SIZE;
+    return filtered.slice(start, start + REQUESTS_PAGE_SIZE);
+  }, [filtered, page]);
 
   return (
     <div className="space-y-4">
@@ -46,15 +138,15 @@ export function MyRequestsTab() {
           const count =
             f.key === "all"
               ? requests.length
-              : requests.filter((r) => r.status === f.key).length;
+              : requests.filter((r) => matchesFilter(r, f.key)).length;
 
           const isActive = statusFilter === f.key;
 
           const activeColors = {
-            all: "bg-text text-card border-text",
+            all: "bg-accent text-accent-foreground border-accent",
             pending: "bg-status-repair-bg/15 text-status-repair-text border-status-repair-bg/40",
             approved: "bg-status-active-bg/15 text-status-active-text border-status-active-bg/40",
-            rejected: "bg-status-outofservice-bg/10 text-status-outofservice-bg dark:text-status-outofservice-text border-status-outofservice-bg/40",
+            rejected: "bg-destructive text-white border-destructive",
             returned: "bg-bg-subtle text-text border-border",
           };
 
@@ -62,7 +154,7 @@ export function MyRequestsTab() {
             all: "bg-card/20 text-card",
             pending: "bg-status-repair-bg/20 text-status-repair-text",
             approved: "bg-status-active-bg/20 text-status-active-text",
-            rejected: "bg-status-outofservice-bg/20 text-status-outofservice-bg dark:text-status-outofservice-text",
+            rejected: "bg-destructive text-white",
             returned: "bg-border text-text",
           };
 
@@ -98,39 +190,92 @@ export function MyRequestsTab() {
       </div>
 
       {/* List */}
-      <div className="rounded-xl border border-border overflow-hidden">
+      <div className="rounded-xl border border-border overflow-hidden bg-card">
         {loading ? (
-          Array.from({ length: 3 }).map((_, i) => (
-            <MyRequestItemSkeleton key={i} />
-          ))
+          <LoadingState
+            variant="card"
+            icon="clipboard"
+            message="Loading your requests..."
+            subtitle="Fetching your borrow and requisition requests..."
+            className="border-none shadow-none py-12"
+          />
         ) : filtered.length === 0 ? (
-           <div className="flex flex-col items-center justify-center py-16 text-center">
-             <div className="h-12 w-12 rounded-full bg-bg-subtle flex items-center justify-center mb-4">
-               <ClipboardList className="h-5 w-5 text-text-secondary" aria-hidden />
-             </div>
-             <h3 className="text-sm font-semibold text-text">
-               {statusFilter === "all"
-                 ? "No requests yet"
-                 : `No ${STATUS_FILTERS.find((f) => f.key === statusFilter)?.label.toLowerCase()} requests`}
-             </h3>
-             <p className="text-xs text-text-secondary mt-1 max-w-xs">
-               {statusFilter === "all"
-                 ? "Browse the available assets and consumables to submit your first borrow request."
-                 : "No requests match this filter. Try selecting a different status."}
-             </p>
-           </div>
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="h-12 w-12 rounded-full bg-bg-subtle flex items-center justify-center mb-4">
+              <ClipboardList className="h-5 w-5 text-text-secondary" aria-hidden />
+            </div>
+            <h3 className="text-sm font-semibold text-text">
+              {statusFilter === "all"
+                ? "No requests yet"
+                : `No ${STATUS_FILTERS.find((f) => f.key === statusFilter)?.label.toLowerCase()} requests`}
+            </h3>
+            <p className="text-xs text-text-secondary mt-1 max-w-xs">
+              {statusFilter === "all"
+                ? "Browse the available assets and consumables to submit your first borrow or requisition request."
+                : "No requests match this filter. Try selecting a different status."}
+            </p>
+          </div>
         ) : (
-          filtered.map((request) => (
+          paginatedRequests.map((request) => (
             <MyRequestItem
               key={request.id}
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               request={request as any}
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              onViewDetails={(r) => setSelectedRequest(r as any)}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               onCancel={(r) => setCancelTarget(r as any)}
             />
           ))
         )}
       </div>
+
+      {/* Pagination Controls */}
+      {!loading && totalPages > 1 && (
+        <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-card">
+          <p className="text-xs text-text-secondary">
+            Page <span className="font-semibold text-text">{page}</span> of{" "}
+            <span className="font-semibold text-text">{totalPages}</span> (
+            {filtered.length} total request{filtered.length !== 1 ? "s" : ""})
+          </p>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-text disabled:opacity-40 disabled:cursor-not-allowed hover:bg-bg-subtle transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+              Previous
+            </button>
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-text disabled:opacity-40 disabled:cursor-not-allowed hover:bg-bg-subtle transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            >
+              Next
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Request Detail Sheet */}
+      {selectedRequest && (
+        <RequestDetailSheet
+          request={selectedRequest}
+          open={!!selectedRequest}
+          onOpenChange={(open) => {
+            if (!open) setSelectedRequest(null);
+          }}
+          onCancel={(r) => {
+            setSelectedRequest(null);
+            setCancelTarget(r);
+          }}
+        />
+      )}
 
       {/* Cancel confirmation dialog */}
       {cancelTarget && (

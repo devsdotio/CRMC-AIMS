@@ -81,6 +81,16 @@ export class ConsumableController {
     }
   }
 
+  async issue(request: NextRequest | Request, id: string) {
+    try {
+      const session = await requireAssetOperator();
+      const body = await request.json();
+      return ok(await this.service.issue(id, body, session.actor));
+    } catch (error) {
+      return handleError(error);
+    }
+  }
+
   async adjust(request: NextRequest | Request, id: string) {
     try {
       const session = await requireAssetOperator();

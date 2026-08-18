@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   assetAssignmentTypeSchema,
   categoryLabelSchema,
+  releaseAssetSchema,
 } from "./asset.validation";
 
 export const assetModelIdSchema = z
@@ -111,25 +112,15 @@ export const listAssetModelsQuerySchema = z.object({
   search: z.string().trim().max(200).optional(),
 });
 
-/** Mobile / scanner: release by QR payload or bare asset code. */
-export const scanReleaseAssetSchema = z.object({
-  code: z.string().trim().min(1, "code (QR payload or asset code) is required."),
-  borrowerName: z
-    .string()
-    .trim()
-    .min(1, "borrowerName is required for accountable release.")
-    .max(255),
-  borrowerDepartment: z.string().trim().min(1).max(120).optional(),
-  borrowerEmail: z.string().trim().email().max(320).optional(),
-  borrowerPhone: z.string().trim().max(40).optional(),
-  notes: z.string().trim().max(2000).optional(),
-  expectedReturnDate: z
-    .string()
-    .trim()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .optional(),
-  requestId: z.string().uuid().optional(),
-});
+/** Operator scanner: release by QR payload or bare asset code. */
+export const scanReleaseAssetSchema = z
+  .object({
+    code: z
+      .string()
+      .trim()
+      .min(1, "code (QR payload or asset code) is required."),
+  })
+  .and(releaseAssetSchema);
 
 export const scanReturnAssetSchema = z.object({
   code: z.string().trim().min(1, "code (QR payload or asset code) is required."),

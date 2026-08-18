@@ -8,6 +8,8 @@ export type ProfileDTO = {
   role: UserRole;
   status: UserStatus;
   department: string | null;
+  departmentId: string | null;
+  departmentCode: string | null;
   dateAdded: string;
   lastActive: string | null;
   lastActiveAt: string | null;
@@ -18,17 +20,26 @@ export type CreateUserPayload = {
   name: string;
   email: string;
   role: Exclude<UserRole, "superadmin">;
-  department?: string;
+  departmentId?: string;
   password: string;
 };
 
 export type UpdateUserPayload = {
   name?: string;
   role?: Exclude<UserRole, "superadmin">;
-  department?: string | null;
+  departmentId?: string | null;
   status?: UserStatus;
   /** Admin-set password replacement. Omit to leave password unchanged. */
   password?: string;
+};
+
+export type UpdateMePayload = {
+  name?: string;
+};
+
+export type ChangePasswordPayload = {
+  currentPassword: string;
+  newPassword: string;
 };
 
 export type MeProfile = ProfileDTO;
@@ -49,6 +60,8 @@ export function toUserAccount(profile: ProfileDTO): UserAccount {
     role: profile.role,
     status: profile.status,
     department: profile.department ?? "",
+    departmentId: profile.departmentId ?? null,
+    departmentCode: profile.departmentCode ?? null,
     dateAdded: profile.dateAdded,
     lastActive,
     activitySummary:
@@ -95,6 +108,21 @@ export const usersApi = {
       method: "GET",
     });
     return response.data;
+  },
+
+  async updateMe(payload: UpdateMePayload): Promise<ProfileDTO> {
+    const response = await fetchJson<ApiResponse<ProfileDTO>>("/api/me", {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+    return response.data;
+  },
+
+  async changePassword(payload: ChangePasswordPayload): Promise<void> {
+    await fetchJson<ApiResponse<{ updated: true }>>("/api/me/password", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
   },
 
   async listUsers(params?: {

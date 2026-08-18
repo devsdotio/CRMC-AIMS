@@ -64,6 +64,8 @@ export const consumables = pgTable(
     category: text("category").notNull(),
     unit: text("unit").notNull(),
     currentQty: integer("current_qty").notNull().default(0),
+    /** Qty promised to approved supply requests that have not been issued yet. */
+    reservedQty: integer("reserved_qty").notNull().default(0),
     minThreshold: integer("min_threshold").notNull().default(0),
     location: text("location").notNull(),
     supplier: text("supplier"),

@@ -50,6 +50,8 @@ export const purchaseLotsApi = {
     reason?: string;
     notes?: string;
     recipientName?: string;
+    departmentId?: string;
+    projectId?: string;
   }): Promise<LotReleaseResult> {
     const res = await fetchJson<ApiResponse<LotReleaseResult>>(
       "/api/purchase-lots/scan/release",

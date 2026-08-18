@@ -13,14 +13,26 @@ export const ROLE_DEFINITIONS: Record<UserRole, RoleDefinition> = {
   },
   staff: {
     title: "Staff",
-    description: "Day-to-day operations — approve/reject borrow requests, release/return assets, manage consumables, flag/resolve maintenance.",
+    description:
+      "Browse-only access to assets, inventory, and request queues. Property custodian actions are limited to administrators.",
     badgeStyle: "outlined",
   },
   borrower: {
-    title: "Borrower / Requester",
-    description: "Request access — submit borrow requests for equipment, request consumable stock, and track personal request status.",
+    title: "Department account",
+    description:
+      "Shared login for one department — request borrowable, assignable, and consumable items on behalf of that office.",
     badgeStyle: "muted",
   },
 };
 
 export const INVITABLE_ROLES: UserRole[] = ["admin", "staff", "borrower"];
+
+/** Roles that may approve, release, restock, and mutate assets/inventory (matches server). */
+export const ASSET_OPERATOR_ROLES: readonly UserRole[] = [
+  "superadmin",
+  "admin",
+] as const;
+
+export function isAssetOperatorRole(role: UserRole | undefined): boolean {
+  return role != null && (ASSET_OPERATOR_ROLES as readonly string[]).includes(role);
+}

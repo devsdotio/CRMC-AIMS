@@ -2,16 +2,17 @@
  
 import { getCategoryStyle } from "@/constants/categories";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, X, Calendar, User, Building2, Tag, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BorrowRequest,  RequestStatus } from "@/types/borrow-requests";
 
 export interface RequestListItemProps {
   request: BorrowRequest;
+  isHighlighted?: boolean;
   onSelect: (request: BorrowRequest) => void;
-  onApprove: (request: BorrowRequest) => void;
-  onReject: (request: BorrowRequest) => void;
+  onApprove?: (request: BorrowRequest) => void;
+  onReject?: (request: BorrowRequest) => void;
   onRelease?: (request: BorrowRequest) => void | Promise<void>;
   onReturn?: (request: BorrowRequest) => void | Promise<void>;
   onMarkUnreleased?: (request: BorrowRequest) => void | Promise<void>;
@@ -20,14 +21,16 @@ export interface RequestListItemProps {
 const STATUS_STYLES: Record<RequestStatus, { bg: string; text: string; label: string }> = {
   pending:    { bg: "bg-status-repair-bg/20",       text: "text-status-repair-text font-bold",      label: "Pending Review" },
   approved:   { bg: "bg-status-active-bg/20",       text: "text-status-active-text font-bold",      label: "Approved" },
-  rejected:   { bg: "bg-status-outofservice-bg/20", text: "text-status-outofservice-text font-bold", label: "Rejected" },
+  rejected:   { bg: "bg-destructive", text: "text-white font-bold", label: "Rejected" },
   released:   { bg: "bg-status-active-bg/20",       text: "text-status-active-text font-bold",      label: "Released" },
   unreleased: { bg: "bg-bg-subtle",                 text: "text-text-secondary font-bold",          label: "Unreleased" },
   returned:   { bg: "bg-status-active-bg/20",       text: "text-status-active-text font-bold",      label: "Returned" },
+  cancelled:  { bg: "bg-bg-subtle",                 text: "text-text-secondary font-bold",          label: "Cancelled" },
 };
 
 export function RequestListItem({
   request,
+  isHighlighted = false,
   onSelect,
   onApprove,
   onReject,
@@ -35,10 +38,20 @@ export function RequestListItem({
   onReturn,
   onMarkUnreleased,
 }: RequestListItemProps) {
+  const rowRef = useRef<HTMLDivElement>(null);
   const [isMarkingUnreleased, setIsMarkingUnreleased] = useState(false);
-  
-  const categoryMeta = getCategoryStyle(request.category);
+  const firstItem = request.items?.[0];
+  const categoryMeta = getCategoryStyle(firstItem?.category || "office");
   const statusMeta = STATUS_STYLES[request.status];
+  const hasReturnableAssets = request.items?.some(
+    (item) => item.itemType === "asset" || Boolean(item.assetId)
+  );
+
+  useEffect(() => {
+    if (isHighlighted && rowRef.current) {
+      rowRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [isHighlighted]);
 
   const handleMarkUnreleased = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -53,6 +66,7 @@ export function RequestListItem({
 
   return (
     <div
+      ref={rowRef}
       onClick={() => onSelect(request)}
       tabIndex={0}
       role="button"
@@ -63,8 +77,10 @@ export function RequestListItem({
         }
       }}
       className={cn(
-        "group relative flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 md:px-6 bg-bg border-b border-border transition-colors duration-150 cursor-pointer",
-        "hover:bg-bg-subtle/80 focus:outline-none focus-visible:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset"
+        "group relative flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 md:px-6 bg-bg border-b border-border transition-all duration-200 cursor-pointer",
+        isHighlighted
+          ? "bg-accent/10 border-l-4 border-l-accent ring-1 ring-accent/30 shadow-xs"
+          : "hover:bg-bg-subtle/80 focus:outline-none focus-visible:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset"
       )}
     >
       {/* Left Column: Requester & Item Info */}
@@ -89,10 +105,10 @@ export function RequestListItem({
 
         {/* Row 2: Item Description */}
         <h3 className="text-sm font-bold text-text truncate group-hover:text-accent transition-colors">
-          {request.itemDescription}
-          {request.quantity > 1 && (
+          {firstItem?.itemDescription} {request.items.length > 1 ? `(+${request.items.length - 1} more)` : ""}
+          {request.items.length === 1 && firstItem && firstItem.quantity > 1 && (
             <span className="ml-2 text-xs font-semibold text-text-secondary">
-              (Qty: {request.quantity})
+              (Qty: {firstItem.quantity})
             </span>
           )}
         </h3>
@@ -138,7 +154,7 @@ export function RequestListItem({
         </span>
 
         {/* Inline Actions (only for Pending requests) */}
-        {request.status === "pending" && (
+        {request.status === "pending" && onApprove && onReject && (
           <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
             <button
               type="button"
@@ -159,8 +175,8 @@ export function RequestListItem({
               aria-label={`Reject request ${request.requestCode} from ${request.requesterName}`}
               className={cn(
                 "inline-flex items-center gap-1 rounded-md border border-border bg-bg px-3 py-1.5 text-xs font-semibold text-text-secondary",
-                "transition-colors duration-150 hover:border-status-outofservice-bg hover:text-status-outofservice-text",
-                "focus:outline-none focus-visible:ring-2 focus-visible:ring-status-outofservice-bg focus-visible:ring-offset-1"
+                "transition-colors duration-150 hover:border-destructive hover:text-destructive hover:bg-destructive/10",
+                "focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-1"
               )}
             >
               <X className="h-3.5 w-3.5" />
@@ -191,8 +207,8 @@ export function RequestListItem({
           </div>
         )}
 
-        {/* Inline Actions (only for Released requests) */}
-        {request.status === "released" && onReturn && (
+        {/* Inline Actions (only for Released requests with returnable assets) */}
+        {request.status === "released" && onReturn && hasReturnableAssets && (
           <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
             <button
               type="button"

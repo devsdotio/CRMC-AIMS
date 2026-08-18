@@ -1,11 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus, Send, Loader2, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { RequisitionItemRow } from "./RequisitionItemRow";
 import { SignatureBlock } from "./SignatureBlock";
-import type { RequisitionItem, RequisitionSlipData } from "./types";
+import type { RequisitionItem } from "./types";
+import { useCreateConsumableRequestMutation } from "@/features/consumable-requests/client/use-consumable-requests";
+import { useConsumablesQuery } from "@/features/consumables/client/use-consumables";
+import { useMeQuery } from "@/features/users/client/use-users";
+import { useToast } from "@/components/providers/toast-context";
 
 function generateEmptyRow(): RequisitionItem {
   return {
@@ -35,11 +39,21 @@ export function RequisitionSlip({
   const [recommendingPerson, setRecommendingPerson] = useState("");
   const [budgetOfficer, setBudgetOfficer] = useState("");
   
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const { data: me } = useMeQuery();
+  const { data: catalogPage } = useConsumablesQuery({ limit: 100 });
+  const catalog = catalogPage?.data ?? [];
+  const { mutateAsync: createConsumableRequest, isPending: isSubmitting } =
+    useCreateConsumableRequestMutation();
+  const toast = useToast();
 
-  // Pre-filled from system config (mocked here per prompt)
+  useEffect(() => {
+    if (me?.name && !requisitionedBy) {
+      setRequisitionedBy(me.name);
+    }
+  }, [me?.name, requisitionedBy]);
+
   const approvedBy = { name: "Mr. Victor Elliot S. Lepiten, III", title: "President" };
 
   const addRow = () => {
@@ -80,28 +94,96 @@ export function RequisitionSlip({
       return;
     }
 
-    setIsSubmitting(true);
-    
-    // Fake async delay
-    await new Promise((r) => setTimeout(r, 1500));
+    if (!me?.id || !me.email) {
+      setError("Your profile could not be loaded. Sign in again and retry.");
+      return;
+    }
+    if (!me.departmentId) {
+      setError(
+        "This login is not linked to a department. Ask an administrator to assign one."
+      );
+      return;
+    }
 
-    const payload: RequisitionSlipData = {
-      date,
-      items: items.filter((item) => item.description.trim() || item.qty),
-      requisitionedBy,
-      recommendingOfficePerson: recommendingPerson,
-      budgetOfficer,
-      approvedBy,
-    };
+    const validItems = items.filter(
+      (item) => item.qty && item.qty > 0 && item.description.trim()
+    );
+    const unmatched: string[] = [];
+    const linesByConsumableId = new Map<string, { quantity: number; notes?: string }>();
 
-    console.log("Requisition Slip Submitted:", payload);
-    setIsSubmitting(false);
-    setSuccess(true);
-    setTimeout(() => {
-      onOpenChange(false);
-      setSuccess(false);
-      setItems(Array.from({ length: 4 }).map(() => generateEmptyRow()));
-    }, 1500);
+    for (const item of validItems) {
+      const needle = item.description.trim().toLowerCase();
+      const match = catalog.find(
+        (c) =>
+          c.name.toLowerCase() === needle ||
+          c.itemCode.toLowerCase() === needle
+      );
+      if (!match) {
+        unmatched.push(item.description.trim());
+        continue;
+      }
+      const extra = [
+        item.costCenterCode.trim()
+          ? `cost center ${item.costCenterCode.trim()}`
+          : null,
+        item.suggestedDealer.trim()
+          ? `dealer ${item.suggestedDealer.trim()}`
+          : null,
+        item.estimatedCost != null ? `est. ${item.estimatedCost}` : null,
+      ].filter(Boolean);
+      const existing = linesByConsumableId.get(match.id);
+      const quantity = (existing?.quantity ?? 0) + (item.qty ?? 1);
+      const notes = [...(existing?.notes ? [existing.notes] : []), ...extra].join(
+        "; "
+      );
+      linesByConsumableId.set(match.id, {
+        quantity,
+        notes: notes || undefined,
+      });
+    }
+
+    if (unmatched.length > 0) {
+      setError(
+        `Unknown catalog supply: ${unmatched.join(", ")}. Use the exact item name or code from Browse.`
+      );
+      return;
+    }
+
+    const purpose =
+      validItems.find((item) => item.purpose.trim())?.purpose.trim() ||
+      "Supplies requisition";
+    const notesParts = [
+      `Slip date: ${date}`,
+      recommendingPerson.trim()
+        ? `Recommending: ${recommendingPerson.trim()}`
+        : null,
+      budgetOfficer.trim() ? `Budget officer: ${budgetOfficer.trim()}` : null,
+    ].filter(Boolean);
+
+    try {
+      await createConsumableRequest({
+        requesterUserId: me.id,
+        requesterName: requisitionedBy.trim(),
+        requesterEmail: me.email,
+        departmentId: me.departmentId,
+        purpose,
+        notes: notesParts.join(" · ") || undefined,
+        lines: [...linesByConsumableId.entries()].map(([consumableId, line]) => ({
+          consumableId,
+          quantity: line.quantity,
+          notes: line.notes,
+        })),
+      });
+      toast.success("Requisition submitted.");
+      setSuccess(true);
+      setTimeout(() => {
+        onOpenChange(false);
+        setSuccess(false);
+        setItems(Array.from({ length: 4 }).map(() => generateEmptyRow()));
+      }, 1500);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to submit requisition.");
+    }
   };
 
   if (!open) return null;

@@ -8,9 +8,11 @@ export interface RequestListProps {
   requests: BorrowRequest[];
   activeTab: TabFilter;
   loading?: boolean;
+  transitioning?: boolean;
+  highlightedId?: string | null;
   onSelect: (request: BorrowRequest) => void;
-  onApprove: (request: BorrowRequest) => void;
-  onReject: (request: BorrowRequest) => void;
+  onApprove?: (request: BorrowRequest) => void;
+  onReject?: (request: BorrowRequest) => void;
   onRelease?: (request: BorrowRequest) => void;
   onReturn?: (request: BorrowRequest) => void;
   onMarkUnreleased?: (request: BorrowRequest) => void;
@@ -74,6 +76,8 @@ export function RequestList({
   requests,
   activeTab,
   loading = false,
+  transitioning = false,
+  highlightedId,
   onSelect,
   onApprove,
   onReject,
@@ -117,12 +121,13 @@ export function RequestList({
       role="tabpanel"
       id={`panel-${activeTab}`}
       aria-labelledby={`tab-${activeTab}`}
-      className="divide-y divide-border"
+      className={`divide-y divide-border transition-opacity duration-200 ${transitioning ? "opacity-40 pointer-events-none" : "opacity-100"}`}
     >
       {requests.map((request) => (
         <RequestListItem
           key={request.id}
           request={request}
+          isHighlighted={request.id === highlightedId}
           onSelect={onSelect}
           onApprove={onApprove}
           onReject={onReject}

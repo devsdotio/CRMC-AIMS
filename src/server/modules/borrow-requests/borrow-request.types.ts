@@ -10,15 +10,23 @@ export type BorrowRequestDTO = {
   requesterEmail: string;
   requesterPhone: string;
   department: string;
-  itemDescription: string;
-  assetCode?: string;
-  category: string;
-  quantity: number;
+  departmentId?: string | null;
+  requestType?: "borrowable" | "assignable" | null;
+  requestedByName?: string;
+  items: {
+    itemDescription: string;
+    assetId?: string;
+    assetCode?: string;
+    consumableId?: string;
+    category: string;
+    quantity: number;
+    itemType: "asset" | "consumable";
+  }[];
   purpose: string;
   requestedAt: string;
   relativeTime: string;
-  expectedReturnDate: string;
-  status: "pending" | "approved" | "rejected" | "released" | "unreleased" | "returned";
+  expectedReturnDate?: string | null;
+  status: "pending" | "approved" | "rejected" | "released" | "unreleased" | "returned" | "cancelled";
   notes?: string;
   rejectionReason?: string;
   pickedUpBy?: string;
@@ -30,10 +38,12 @@ export type ListBorrowRequestFilters = {
   department?: string;
   search?: string;
   requesterUserId?: string;
+  requestType?: "borrowable" | "assignable";
   page?: number;
   limit?: number;
   startDate?: string;
   endDate?: string;
+  assetId?: string;
 };
 
 export interface IBorrowRequestRepository {

@@ -1,5 +1,11 @@
 import type { AppRole, ProfileStatus } from "@/server/shared/roles";
 import type { ActorContext } from "@/server/shared/auth";
+import type { NewProfileRow, ProfileRow } from "@/server/db/schema";
+
+export type ProfileWithDepartment = ProfileRow & {
+  linkedDepartmentName: string | null;
+  linkedDepartmentCode: string | null;
+};
 
 export interface ProfileDTO {
   id: string;
@@ -8,6 +14,8 @@ export interface ProfileDTO {
   role: AppRole;
   status: ProfileStatus;
   department: string | null;
+  departmentId: string | null;
+  departmentCode: string | null;
   dateAdded: string;
   /** Human-relative display string ("Active now", "2 hours ago", …). */
   lastActive: string | null;
@@ -20,15 +28,14 @@ export interface CreateUserInput {
   name: string;
   email: string;
   role: AppRole;
-  department?: string;
-  /** Required initial password set by the admin at provision time. */
+  departmentId?: string | null;
   password: string;
 }
 
 export interface UpdateUserInput {
   name?: string;
   role?: AppRole;
-  department?: string | null;
+  departmentId?: string | null;
   status?: ProfileStatus;
   /** When set, replaces the auth password (admin-set). */
   password?: string;
@@ -41,18 +48,17 @@ export interface ListUsersFilters {
 }
 
 export interface IProfileRepository {
-  findByUserId(userId: string): Promise<import("@/server/db/schema").ProfileRow | null>;
-  findByEmail(email: string): Promise<import("@/server/db/schema").ProfileRow | null>;
-  list(filters?: ListUsersFilters): Promise<import("@/server/db/schema").ProfileRow[]>;
-  create(
-    data: import("@/server/db/schema").NewProfileRow
-  ): Promise<import("@/server/db/schema").ProfileRow>;
+  findByUserId(userId: string): Promise<ProfileWithDepartment | null>;
+  findByEmail(email: string): Promise<ProfileWithDepartment | null>;
+  findBorrowerByDepartmentId(
+    departmentId: string
+  ): Promise<ProfileRow | null>;
+  list(filters?: ListUsersFilters): Promise<ProfileWithDepartment[]>;
+  create(data: NewProfileRow): Promise<ProfileRow>;
   update(
     userId: string,
-    data: Partial<
-      Omit<import("@/server/db/schema").ProfileRow, "userId" | "createdAt">
-    >
-  ): Promise<import("@/server/db/schema").ProfileRow | null>;
+    data: Partial<Omit<ProfileRow, "userId" | "createdAt">>
+  ): Promise<ProfileRow | null>;
   touchLastActive(userId: string): Promise<void>;
 }
 

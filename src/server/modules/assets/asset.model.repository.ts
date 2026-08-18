@@ -163,7 +163,8 @@ export class AssetModelRepository {
         and(
           eq(assets.modelId, modelId),
           eq(assets.status, "active"),
-          sql`${assets.currentHolder} is null`
+          sql`${assets.currentHolder} is null`,
+          sql`${assets.reservedForRequestId} is null`
         )
       );
     return Number(row?.value ?? 0);

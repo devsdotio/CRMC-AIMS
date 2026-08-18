@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { Plus } from "lucide-react";
+import { Plus, QrCode } from "lucide-react";
 import { 
   useAssetsQuery, 
   useCreateAssetMutation, 
@@ -14,7 +14,12 @@ import { AssetGrid } from "@/components/assets/asset-grid";
 import { AssetTable } from "@/components/assets/asset-table";
 import { AssetDetailPanel } from "@/components/assets/asset-detail-panel";
 import { AddEditAssetDialog } from "@/components/assets/add-edit-asset-dialog";
+import { ScanAssetDialog } from "@/components/assets/scan-asset-dialog";
+import { IssueAssetDialog } from "@/components/assets/issue-asset-dialog";
 import { QueryErrorBanner } from "@/components/shared/query-error-banner";
+import { OperatorReadOnlyBanner } from "@/components/shared/operator-read-only-banner";
+import { useToast } from "@/components/providers/toast-context";
+import { useAssetOperator } from "@/hooks/use-asset-operator";
 
 export default function AssetsPage() {
   const {
@@ -26,6 +31,8 @@ export default function AssetsPage() {
   } = useAssetsQuery();
   const createMutation = useCreateAssetMutation();
   const updateMutation = useUpdateAssetMutation();
+  const toast = useToast();
+  const { canOperate } = useAssetOperator();
 
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
 
@@ -44,6 +51,8 @@ export default function AssetsPage() {
     isOpen: false,
     asset: null,
   });
+  const [scanOpen, setScanOpen] = useState(false);
+  const [issueAsset, setIssueAsset] = useState<Asset | null>(null);
 
   // Filter & Sort Assets
   const filteredAssets = useMemo(() => {
@@ -100,51 +109,58 @@ export default function AssetsPage() {
   };
 
   const handleSaveAsset = async (assetData: Partial<Asset>) => {
-    if (addEditState.asset) {
-      // Edit
-      await updateMutation.mutateAsync({
-        id: addEditState.asset.id,
-        payload: {
-          name: assetData.name,
-          category: assetData.category,
-          status: assetData.status,
-          assignmentType: assetData.assignmentType as
-            | "borrowable"
-            | "assignable"
-            | undefined,
+    try {
+      if (addEditState.asset) {
+        // Edit
+        await updateMutation.mutateAsync({
+          id: addEditState.asset.id,
+          payload: {
+            name: assetData.name,
+            category: assetData.category,
+            status: assetData.status,
+            assignmentType: assetData.assignmentType as
+              | "borrowable"
+              | "assignable"
+              | undefined,
+            serialNumber: assetData.serialNumber,
+            location: assetData.location,
+            department: assetData.department,
+            purchaseDate: assetData.purchaseDate,
+            value: assetData.value,
+            supplierId:
+              assetData.supplierId === undefined
+                ? undefined
+                : assetData.supplierId || null,
+            notes: assetData.notes,
+          },
+        });
+        if (selectedAsset?.id === addEditState.asset.id) {
+          setSelectedAsset(null);
+        }
+        toast.success("Asset updated successfully.");
+      } else {
+        // Create
+        await createMutation.mutateAsync({
+          assetCode: assetData.assetCode || `ASSET-${Date.now()}`,
+          name: assetData.name || "New Asset",
+          category: (assetData.category as string) || "",
+          status: (assetData.status as AssetStatus) || "active",
+          assignmentType:
+            (assetData.assignmentType as "borrowable" | "assignable") ||
+            "borrowable",
           serialNumber: assetData.serialNumber,
-          location: assetData.location,
+          location: assetData.location || "Central Storage",
           department: assetData.department,
           purchaseDate: assetData.purchaseDate,
           value: assetData.value,
-          supplierId:
-            assetData.supplierId === undefined
-              ? undefined
-              : assetData.supplierId || null,
+          supplierId: assetData.supplierId || undefined,
           notes: assetData.notes,
-        },
-      });
-      if (selectedAsset?.id === addEditState.asset.id) {
-        setSelectedAsset(null);
+        });
+        toast.success("Asset created successfully.");
       }
-    } else {
-      // Create
-      await createMutation.mutateAsync({
-        assetCode: assetData.assetCode || `ASSET-${Date.now()}`,
-        name: assetData.name || "New Asset",
-        category: (assetData.category as string) || "",
-        status: (assetData.status as AssetStatus) || "active",
-        assignmentType:
-          (assetData.assignmentType as "borrowable" | "assignable") ||
-          "borrowable",
-        serialNumber: assetData.serialNumber,
-        location: assetData.location || "Central Storage",
-        department: assetData.department,
-        purchaseDate: assetData.purchaseDate,
-        value: assetData.value,
-        supplierId: assetData.supplierId || undefined,
-        notes: assetData.notes,
-      });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save asset.");
+      throw err;
     }
   };
 
@@ -170,12 +186,22 @@ export default function AssetsPage() {
         <div className="flex items-center gap-2.5">
           <button
             type="button"
+            onClick={() => setScanOpen(true)}
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg border border-border bg-bg text-text hover:bg-bg-subtle transition-colors cursor-pointer shadow-xs"
+          >
+            <QrCode className="h-4 w-4" strokeWidth={2.5} />
+            Scan Code
+          </button>
+          {canOperate && (
+          <button
+            type="button"
             onClick={() => setAddEditState({ isOpen: true, asset: null })}
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-accent text-accent-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
           >
             <Plus className="h-4 w-4" strokeWidth={2.5} />
             Add Asset
           </button>
+          )}
 
           <AssetViewToggle viewMode={viewMode} onViewChange={setViewMode} />
         </div>
@@ -189,6 +215,8 @@ export default function AssetsPage() {
         totalAssetsCount={assets.length}
         filteredAssetsCount={filteredAssets.length}
       />
+
+      {!canOperate && <OperatorReadOnlyBanner />}
 
       {isError && (
         <QueryErrorBanner
@@ -219,18 +247,47 @@ export default function AssetsPage() {
         asset={selectedAsset}
         isOpen={Boolean(selectedAsset)}
         onClose={() => setSelectedAsset(null)}
-        onEdit={(asset) => {
-          setSelectedAsset(null);
-          setAddEditState({ isOpen: true, asset });
-        }}
+        onEdit={
+          canOperate
+            ? (asset) => {
+                setSelectedAsset(null);
+                setAddEditState({ isOpen: true, asset });
+              }
+            : undefined
+        }
+        onIssue={
+          canOperate
+            ? (asset) => {
+                setSelectedAsset(null);
+                setIssueAsset(asset);
+              }
+            : undefined
+        }
       />
 
+      <IssueAssetDialog
+        asset={issueAsset}
+        isOpen={Boolean(issueAsset)}
+        onClose={() => setIssueAsset(null)}
+        onSuccess={(message) => toast.success(message)}
+      />
+
+      {canOperate && (
+      <>
       {/* ── Add / Edit Asset Dialog ───────────────────────────────────── */}
       <AddEditAssetDialog
         isOpen={addEditState.isOpen}
         initialAsset={addEditState.asset}
         onClose={() => setAddEditState({ isOpen: false, asset: null })}
         onSave={handleSaveAsset}
+      />
+      </>
+      )}
+
+      <ScanAssetDialog
+        isOpen={scanOpen}
+        onClose={() => setScanOpen(false)}
+        onSuccess={(message) => toast.success(message)}
       />
     </div>
   );

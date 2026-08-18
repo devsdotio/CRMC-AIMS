@@ -11,6 +11,8 @@ export const borrowRequestQueryKeys = {
     limit?: number;
     startDate?: string;
     endDate?: string;
+    assetId?: string;
+    requestType?: BorrowRequest["requestType"];
   }) => [...borrowRequestQueryKeys.lists(), filters ?? {}] as const,
   detail: (id: string) => [...borrowRequestQueryKeys.all, "detail", id] as const,
 };

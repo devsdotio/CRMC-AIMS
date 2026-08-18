@@ -39,6 +39,16 @@ export class BorrowRequestRepository implements IBorrowRequestRepository {
     if (filters.requesterUserId) {
       conditions.push(eq(borrowRequests.requesterUserId, filters.requesterUserId));
     }
+    if (filters.requestType === "assignable") {
+      conditions.push(eq(borrowRequests.requestType, "assignable"));
+    } else if (filters.requestType === "borrowable") {
+      conditions.push(
+        or(
+          eq(borrowRequests.requestType, "borrowable"),
+          sql`${borrowRequests.requestType} is null`
+        )!
+      );
+    }
     if (filters.search?.trim()) {
       const q = `%${filters.search.trim()}%`;
       conditions.push(
@@ -46,8 +56,7 @@ export class BorrowRequestRepository implements IBorrowRequestRepository {
           ilike(borrowRequests.requesterName, q),
           ilike(borrowRequests.requesterEmail, q),
           ilike(borrowRequests.requestCode, q),
-          ilike(borrowRequests.itemDescription, q),
-          ilike(borrowRequests.assetCode, q)
+          sql`${borrowRequests.items}::text ILIKE ${q}`
         )!
       );
     }
@@ -56,6 +65,14 @@ export class BorrowRequestRepository implements IBorrowRequestRepository {
     }
     if (filters.endDate) {
       conditions.push(sql`date(${borrowRequests.requestedAt}) <= ${filters.endDate}`);
+    }
+    if (filters.assetId) {
+      conditions.push(
+        sql`EXISTS (
+          SELECT 1 FROM jsonb_array_elements(${borrowRequests.items}) AS item
+          WHERE item->>'assetId' = ${filters.assetId}
+        )`
+      );
     }
     return conditions;
   }

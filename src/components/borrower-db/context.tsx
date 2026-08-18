@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, ReactNode } from "react";
 import type { BrowseItem } from "./types";
 import { NewBorrowRequestWizard } from "./new-borrow-request-wizard";
+import { useToast } from "@/components/providers/toast-context";
 
 interface BorrowerPortalContextValue {
   cart: BrowseItem[];
@@ -19,6 +20,7 @@ export function BorrowerPortalProvider({ children }: { children: ReactNode }) {
   const [wizardItems, setWizardItems] = useState<BrowseItem[]>([]);
   const [wizardType, setWizardType] = useState<"borrow" | "requisition" | null>(null);
   const [cart, setCart] = useState<BrowseItem[]>([]);
+  const toast = useToast();
 
   const toggleCartItem = (item: BrowseItem) => {
     setCart((prev) => {
@@ -60,7 +62,7 @@ export function BorrowerPortalProvider({ children }: { children: ReactNode }) {
         initialType={wizardType}
         onSuccess={(req) => {
           clearCart();
-          console.log("Request created", req);
+          toast.success(`${req.requestCode} submitted.`);
         }}
       />
     </BorrowerPortalContext.Provider>

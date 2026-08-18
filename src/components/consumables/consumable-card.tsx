@@ -8,8 +8,8 @@ import { StockLevelBar } from "./stock-level-bar";
 export interface ConsumableCardProps {
   item: ConsumableItem;
   onSelect: (item: ConsumableItem) => void;
-  onRestock: (item: ConsumableItem) => void;
-  onAdjust: (item: ConsumableItem) => void;
+  onRestock?: (item: ConsumableItem) => void;
+  onAdjust?: (item: ConsumableItem) => void;
 }
 
 export function ConsumableCard({
@@ -58,11 +58,18 @@ export function ConsumableCard({
             minThreshold={item.minThreshold}
             unit={item.unit}
           />
+          {(item.reservedQty ?? 0) > 0 && (
+            <p className="mt-1.5 text-[11px] text-status-repair-text">
+              {item.reservedQty} reserved · {item.availableQty ?? item.currentQty - item.reservedQty} available
+            </p>
+          )}
         </div>
       </div>
 
       {/* Card Footer Actions */}
+      {(onAdjust || onRestock) && (
       <div className="px-4 py-2.5 bg-bg-subtle border-t border-border flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
+        {onAdjust ? (
         <button
           type="button"
           onClick={() => onAdjust(item)}
@@ -71,7 +78,11 @@ export function ConsumableCard({
           <SlidersHorizontal className="h-3 w-3" />
           Adjust
         </button>
+        ) : (
+          <span />
+        )}
 
+        {onRestock && (
         <button
           type="button"
           onClick={() => onRestock(item)}
@@ -80,7 +91,9 @@ export function ConsumableCard({
           <PlusCircle className="h-3.5 w-3.5" />
           Restock
         </button>
+        )}
       </div>
+      )}
     </div>
   );
 }

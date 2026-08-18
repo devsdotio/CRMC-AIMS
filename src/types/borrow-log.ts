@@ -23,7 +23,7 @@ export interface BorrowLogRecord {
   assetName: string;
   category: AssetCategory;
   releasedAt: string;
-  dueDate: string;
+  dueDate?: string | null;
   returnedAt?: string;
   daysOverdue?: number;
   status: LogStatus;

@@ -7,7 +7,7 @@ import { assetController } from "@/server/modules/assets";
  *     summary: Receive / return an asset after scanning its QR
  *     description: |
  *       Same custody rules as `POST /api/assets/{id}/return`, identified by
- *       QR payload / asset code for staff handheld scanners.
+ *       QR payload / asset code for operator scanners.
  *     tags: [Assets]
  *     requestBody:
  *       required: true

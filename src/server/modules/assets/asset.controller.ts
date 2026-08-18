@@ -91,7 +91,7 @@ export class AssetController {
           ? (body as { code: string }).code
           : new URL(request.url).searchParams.get("code") ?? "";
       const data = await this.assetService.resolveScan(code);
-      // session gate keeps resolve staff-only for custody privacy
+      // session gate keeps resolve limited to authenticated ops-shell users
       void session;
       return ok(data);
     } catch (error) {
@@ -191,7 +191,7 @@ export class AssetController {
 
   async listLifecycle(request: NextRequest | Request, id: string) {
     try {
-      await requireAssetOperator();
+      await requireActor();
       const url = new URL(request.url);
       const limitRaw = url.searchParams.get("limit");
       const limit = limitRaw ? Number(limitRaw) : undefined;

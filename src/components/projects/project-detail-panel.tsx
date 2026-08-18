@@ -20,6 +20,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { LoadingState } from "@/components/providers/loading-context";
 import type {
   Project,
   ProjectAssetAssignment,
@@ -57,6 +58,7 @@ import {
   ReportDamageDialog,
   type ReportDamageFormInput,
 } from "./report-damage-dialog";
+import { useToast } from "@/components/providers/toast-context";
 
 export interface ProjectDetailPanelProps {
   project: Project | null;
@@ -126,6 +128,7 @@ export function ProjectDetailPanel({
   const [damageTarget, setDamageTarget] =
     useState<ProjectAssetAssignment | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const toast = useToast();
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -168,45 +171,64 @@ export function ProjectDetailPanel({
       incurredOn: input.incurredOn || undefined,
       notes: input.notes || null,
     };
-    if (editExpense) {
-      await updateExpense.mutateAsync({
-        projectId: project.id,
-        expenseId: editExpense.id,
-        payload,
-      });
-    } else {
-      await createExpense.mutateAsync({
-        projectId: project.id,
-        payload,
-      });
+    try {
+      if (editExpense) {
+        await updateExpense.mutateAsync({
+          projectId: project.id,
+          expenseId: editExpense.id,
+          payload,
+        });
+        toast.success("Expense updated.");
+      } else {
+        await createExpense.mutateAsync({
+          projectId: project.id,
+          payload,
+        });
+        toast.success("Expense added.");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save expense.");
+      throw err;
     }
   };
 
   const handleMaterialSubmit = async (input: MaterialFormInput) => {
     setActionError(null);
-    await useMaterial.mutateAsync({
-      projectId: project.id,
-      payload: {
-        consumableId: input.consumableId,
-        quantity: input.quantity,
-        notes: input.notes || null,
-      },
-    });
+    try {
+      await useMaterial.mutateAsync({
+        projectId: project.id,
+        payload: {
+          consumableId: input.consumableId,
+          quantity: input.quantity,
+          notes: input.notes || null,
+        },
+      });
+      toast.success("Material usage recorded.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to record material.");
+      throw err;
+    }
   };
 
   const handleAssignAsset = async (input: AssignAssetFormInput) => {
     setActionError(null);
-    await assignAsset.mutateAsync({
-      projectId: project.id,
-      assetId: input.assetId,
-      notes: input.notes || null,
-    });
+    try {
+      await assignAsset.mutateAsync({
+        projectId: project.id,
+        assetId: input.assetId,
+        notes: input.notes || null,
+      });
+      toast.success("Asset assigned to project.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to assign asset.");
+      throw err;
+    }
   };
 
   const handleReturnAsset = async (row: ProjectAssetAssignment) => {
     if (
       !window.confirm(
-        `Return “${row.assetName}” (${row.assetCode}) from this project?`
+        `Return "${row.assetName}" (${row.assetCode}) from this project?`
       )
     )
       return;
@@ -216,28 +238,33 @@ export function ProjectDetailPanel({
         projectId: project.id,
         assignmentId: row.id,
       });
+      toast.success(`${row.assetName} returned from project.`);
     } catch (err) {
-      setActionError(
-        err instanceof Error ? err.message : "Failed to return asset."
-      );
+      toast.error(err instanceof Error ? err.message : "Failed to return asset.");
     }
   };
 
   const handleDamageSubmit = async (input: ReportDamageFormInput) => {
     if (!damageTarget) return;
     setActionError(null);
-    await reportDamage.mutateAsync({
-      projectId: project.id,
-      assignmentId: damageTarget.id,
-      mode: input.mode,
-      amount:
-        input.mode === "write_off" && input.amount
-          ? input.amount
-          : undefined,
-      assetStatus:
-        input.mode === "write_off" ? input.assetStatus : undefined,
-      notes: input.notes,
-    });
+    try {
+      await reportDamage.mutateAsync({
+        projectId: project.id,
+        assignmentId: damageTarget.id,
+        mode: input.mode,
+        amount:
+          input.mode === "write_off" && input.amount
+            ? input.amount
+            : undefined,
+        assetStatus:
+          input.mode === "write_off" ? input.assetStatus : undefined,
+        notes: input.notes,
+      });
+      toast.success("Damage report submitted.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to report damage.");
+      throw err;
+    }
   };
 
   const damageDefaultValue = (() => {
@@ -249,8 +276,8 @@ export function ProjectDetailPanel({
   const handleDeleteExpense = async (line: ProjectExpenseLine) => {
     const msg =
       line.lineType === "consumable"
-        ? `Remove material charge “${line.description}”? Stock and purchase lots will be restored.`
-        : `Delete expense “${line.description}”?`;
+        ? `Remove material charge "${line.description}"? Stock and purchase lots will be restored.`
+        : `Delete expense "${line.description}"?`;
     if (!window.confirm(msg)) return;
     setActionError(null);
     try {
@@ -258,10 +285,9 @@ export function ProjectDetailPanel({
         projectId: project.id,
         expenseId: line.id,
       });
+      toast.success("Expense deleted.");
     } catch (err) {
-      setActionError(
-        err instanceof Error ? err.message : "Failed to delete expense."
-      );
+      toast.error(err instanceof Error ? err.message : "Failed to delete expense.");
     }
   };
 
@@ -280,8 +306,14 @@ export function ProjectDetailPanel({
         )}
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-bg-subtle/50 shrink-0">
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
+          <div className="min-w-0 flex-1 pr-3">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h2
+                id="project-detail-heading"
+                className="font-mono text-lg font-bold tracking-tight text-text"
+              >
+                {project.projectCode}
+              </h2>
               <ProjectStatusBadge status={project.status} />
               {!project.isMutable && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-bg-subtle border border-border text-text-secondary">
@@ -290,14 +322,8 @@ export function ProjectDetailPanel({
                 </span>
               )}
             </div>
-            <h2
-              id="project-detail-heading"
-              className="text-base font-bold text-text mt-0.5 leading-tight"
-            >
-              {project.name}
-            </h2>
-            <p className="text-[11px] font-mono text-text-secondary mt-0.5">
-              {project.projectCode}
+            <p className="text-xs text-text-secondary font-medium mt-0.5 truncate">
+              Project Workspace • <strong className="text-text font-semibold">{project.name}</strong>
             </p>
           </div>
 
@@ -305,7 +331,7 @@ export function ProjectDetailPanel({
             type="button"
             onClick={onClose}
             aria-label="Close project detail"
-            className="p-1.5 rounded-lg text-text-secondary hover:text-text hover:bg-border transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg text-text-secondary hover:text-text hover:bg-border transition-colors cursor-pointer shrink-0"
           >
             <X className="h-5 w-5" />
           </button>
@@ -452,10 +478,12 @@ export function ProjectDetailPanel({
             )}
 
             {expensesLoading ? (
-              <div className="space-y-2 animate-pulse">
-                <div className="h-12 bg-border rounded-lg" />
-                <div className="h-12 bg-border rounded-lg" />
-              </div>
+              <LoadingState
+                variant="card"
+                icon="project"
+                message="Loading project expenses..."
+                subtitle="Retrieving material costs, item write-offs, and expenditures"
+              />
             ) : expenses.length === 0 ? (
               <p className="text-[11px] text-text-secondary border border-dashed border-border rounded-lg p-3">
                 No spend yet. Use <strong>Materials</strong> for inventory (stock
@@ -581,10 +609,12 @@ export function ProjectDetailPanel({
             </p>
 
             {assignmentsLoading ? (
-              <div className="space-y-2 animate-pulse">
-                <div className="h-12 bg-border rounded-lg" />
-                <div className="h-12 bg-border rounded-lg" />
-              </div>
+              <LoadingState
+                variant="card"
+                icon="package"
+                message="Loading assigned assets..."
+                subtitle="Retrieving hardware assignments and custody records"
+              />
             ) : assignments.length === 0 ? (
               <div className="rounded-lg border border-dashed border-border p-3 flex items-start gap-2.5">
                 <Package className="h-4 w-4 text-text-secondary shrink-0 mt-0.5" />

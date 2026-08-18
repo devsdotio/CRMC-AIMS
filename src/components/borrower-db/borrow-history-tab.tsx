@@ -1,10 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { Tag, Calendar, ChevronDown, ChevronUp, AlertTriangle, History, Wrench } from "lucide-react";
+import { Tag, Calendar, ChevronDown, ChevronUp, AlertTriangle, History, Wrench, FileText, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getCategoryStyle } from "@/constants/categories";
 import { OverdueBadge } from "@/components/ui/overdue-badge";
+import {
+  getActionStyle,
+  getActionIcon,
+  formatDateTime,
+  formatRelativeTime,
+  parseAuditNote,
+} from "@/components/audit-logs/audit-log-utils";
 import type { PortalBorrowLogRecord } from "./types";
 import { useBorrowLogQuery } from "@/features/borrow-log/client/use-borrow-log";
 
@@ -106,7 +113,7 @@ export function BorrowHistoryTab() {
                   aria-expanded={isExpanded}
                   aria-controls={`history-detail-${record.id}`}
                   className={cn(
-                    "w-full flex flex-col sm:flex-row sm:items-center gap-2.5 p-4 md:px-5 text-left",
+                    "w-full flex flex-col sm:flex-row sm:items-center gap-2.5 p-4 md:px-5 text-left cursor-pointer",
                     "focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset"
                   )}
                 >
@@ -192,21 +199,21 @@ export function BorrowHistoryTab() {
                 {isExpanded && (
                   <div
                     id={`history-detail-${record.id}`}
-                    className="px-4 md:px-5 pb-4 space-y-3 border-t border-border bg-bg-subtle/40"
+                    className="px-4 md:px-5 pb-4 space-y-4 border-t border-border bg-bg-subtle/30"
                   >
-                    <div className="grid grid-cols-2 gap-4 pt-3 text-xs">
-                      <div>
-                        <p className="text-text-secondary font-medium mb-0.5">Asset Code</p>
-                        <p className="font-mono font-semibold text-text">{record.assetCode}</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 text-xs">
+                      <div className="p-2.5 rounded-lg bg-card border border-border">
+                        <p className="text-[10px] text-text-secondary uppercase tracking-wider font-semibold mb-0.5">Asset Code</p>
+                        <p className="font-mono font-bold text-text">{record.assetCode}</p>
                       </div>
-                      <div>
-                        <p className="text-text-secondary font-medium mb-0.5">Released By</p>
-                        <p className="text-text">{record.releasedBy}</p>
+                      <div className="p-2.5 rounded-lg bg-card border border-border">
+                        <p className="text-[10px] text-text-secondary uppercase tracking-wider font-semibold mb-0.5">Released By</p>
+                        <p className="font-medium text-text">{record.releasedBy}</p>
                       </div>
                       {record.returnedAt && (
-                        <div>
-                          <p className="text-text-secondary font-medium mb-0.5">Returned On</p>
-                          <p className="text-text">
+                        <div className="p-2.5 rounded-lg bg-card border border-border">
+                          <p className="text-[10px] text-text-secondary uppercase tracking-wider font-semibold mb-0.5">Returned On</p>
+                          <p className="font-medium text-text">
                             {new Date(record.returnedAt).toLocaleDateString(
                               "en-PH",
                               { month: "short", day: "numeric", year: "numeric" }
@@ -215,9 +222,9 @@ export function BorrowHistoryTab() {
                         </div>
                       )}
                       {record.receivedBy && (
-                        <div>
-                          <p className="text-text-secondary font-medium mb-0.5">Received By</p>
-                          <p className="text-text">{record.receivedBy}</p>
+                        <div className="p-2.5 rounded-lg bg-card border border-border">
+                          <p className="text-[10px] text-text-secondary uppercase tracking-wider font-semibold mb-0.5">Received By</p>
+                          <p className="font-medium text-text">{record.receivedBy}</p>
                         </div>
                       )}
                     </div>
@@ -226,7 +233,7 @@ export function BorrowHistoryTab() {
                     {record.conditionNotes && (
                       <div
                         className={cn(
-                          "flex items-start gap-2 rounded-lg p-3 text-xs",
+                          "flex items-start gap-2 rounded-xl p-3 text-xs shadow-xs",
                           hasDamageNote
                             ? "bg-status-repair-bg/10 border border-status-repair-bg/30"
                             : "bg-status-active-bg/10 border border-status-active-bg/30"
@@ -239,41 +246,88 @@ export function BorrowHistoryTab() {
                           />
                         ) : null}
                         <div>
-                          <p className="font-semibold text-text mb-0.5">Condition Notes</p>
-                          <p className="text-text-secondary">{record.conditionNotes}</p>
+                          <p className="font-bold text-text mb-0.5">Condition Remarks</p>
+                          <p className="text-text-secondary leading-relaxed">{record.conditionNotes}</p>
                         </div>
                       </div>
                     )}
 
-                    {/* Audit history */}
-                    <div>
-                      <p className="text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
-                        Audit Trail
+                    {/* Accountability Audit History Timeline (Replicated Admin UI) */}
+                    <div className="space-y-2.5 pt-1">
+                      <p className="text-xs font-bold text-text-secondary uppercase tracking-wider flex items-center gap-1.5">
+                        <History className="h-3.5 w-3.5 text-accent" />
+                        Accountability Audit Trail ({record.history.length})
                       </p>
-                      <ol className="space-y-1.5" aria-label="Audit history">
-                        {record.history.map((entry) => (
-                          <li
-                            key={entry.id}
-                            className="flex items-start gap-2 text-xs"
-                          >
-                            <span className="mt-1 h-1.5 w-1.5 rounded-full bg-text-secondary/50 shrink-0" />
-                            <div>
-                              <span className="font-semibold text-text capitalize">
-                                {entry.action.replace(/_/g, " ")}
-                              </span>
-                              <span className="text-text-secondary">
-                                {" "}
-                                — {entry.actorName} · {new Date(entry.timestamp).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}
-                              </span>
-                              {entry.notes && (
-                                <p className="text-text-secondary/80 mt-0.5">
-                                  {entry.notes}
-                                </p>
-                              )}
-                            </div>
-                          </li>
-                        ))}
-                      </ol>
+
+                      <div className="p-4 rounded-xl border border-border bg-bg shadow-xs">
+                        <ol className="relative border-l-2 border-border/60 ml-3 space-y-6">
+                          {record.history.map((entry, idx) => {
+                            const style = getActionStyle(entry.action);
+                            const icon = getActionIcon(entry.action);
+                            const { picker, description } = parseAuditNote(entry.action, entry.notes);
+                            const timeStr = entry.timestamp instanceof Date ? entry.timestamp.toISOString() : String(entry.timestamp || "");
+
+                            return (
+                              <li key={entry.id || idx} className="pl-6 relative">
+                                {/* Timeline Circular Node */}
+                                <span
+                                  className={cn(
+                                    "absolute -left-3.25 top-1.5 h-6 w-6 rounded-full border-2 flex items-center justify-center bg-bg shadow-xs z-10",
+                                    style.bg,
+                                    (style as Record<string, string>).iconText || style.text
+                                  )}
+                                >
+                                  {icon}
+                                </span>
+
+                                <div className="flex flex-col gap-0.5 pt-1.5">
+                                  <div className="flex items-center justify-between text-xs flex-wrap gap-2">
+                                    <span className={cn("font-bold capitalize text-xs", style.text)}>
+                                      {style.label}
+                                    </span>
+                                    <div className="flex items-center gap-1.5 text-right">
+                                      <time className="text-[11px] text-text-secondary font-medium">
+                                        {formatDateTime(timeStr)}
+                                      </time>
+                                      <span className="text-[10px] text-text-secondary/80">
+                                        ({formatRelativeTime(timeStr)})
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  <p className="text-xs text-text-secondary font-medium">
+                                    By <span className="font-semibold text-text">{entry.actorName}</span>
+                                  </p>
+                                </div>
+
+                                {/* Chips */}
+                                {(picker || description) && (
+                                  <div className="mt-2 flex flex-wrap gap-2">
+                                    {picker && (
+                                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-bg-subtle text-text-secondary border border-border shadow-xs">
+                                        <User className="h-3 w-3" />
+                                        {entry.action === "returned" ? "Returned by: " : "Picked up by: "} {picker}
+                                      </span>
+                                    )}
+                                    {description && (
+                                      <span
+                                        className={cn(
+                                          "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border shadow-xs max-w-full",
+                                          style.bg,
+                                          style.text
+                                        )}
+                                      >
+                                        <FileText className="h-3 w-3 shrink-0" />
+                                        <span className="truncate whitespace-normal leading-tight">{description}</span>
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                              </li>
+                            );
+                          })}
+                        </ol>
+                      </div>
                     </div>
                   </div>
                 )}

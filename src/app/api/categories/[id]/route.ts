@@ -21,14 +21,16 @@ export async function PUT(
     const [updatedCategory] = await db
       .update(categories)
       .set({
-        name: body.name,
+        name: String(body.name).trim(),
         type: body.type,
+        ...(body.colorToken !== undefined ? { colorToken: body.colorToken || null } : {}),
         updatedAt: new Date(),
       })
-      .where(and(
-        eq(categories.id, id),
-        eq(categories.createdByUserId, actor.userId)
-      ))
+      .where(
+        actor.role === "admin"
+          ? eq(categories.id, id)
+          : and(eq(categories.id, id), eq(categories.createdByUserId, actor.userId))
+      )
       .returning();
       
     if (!updatedCategory) {
@@ -61,10 +63,11 @@ export async function DELETE(
     
     const [deletedCategory] = await db
       .delete(categories)
-      .where(and(
-        eq(categories.id, id),
-        eq(categories.createdByUserId, actor.userId)
-      ))
+      .where(
+        actor.role === "admin"
+          ? eq(categories.id, id)
+          : and(eq(categories.id, id), eq(categories.createdByUserId, actor.userId))
+      )
       .returning();
       
     if (!deletedCategory) {

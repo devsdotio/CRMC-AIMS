@@ -8,8 +8,8 @@ export interface ConsumableTableProps {
   items: ConsumableItem[];
   loading?: boolean;
   onSelect: (item: ConsumableItem) => void;
-  onRestock: (item: ConsumableItem) => void;
-  onAdjust: (item: ConsumableItem) => void;
+  onRestock?: (item: ConsumableItem) => void;
+  onAdjust?: (item: ConsumableItem) => void;
 }
 
 // ─── Matched Skeleton Row for Consumables Table ─────────────────────────────

@@ -7,14 +7,19 @@ export type CreateBorrowRequestPayload = {
   requesterName: string;
   requesterEmail: string;
   requesterPhone?: string;
-  department: string;
-  itemDescription: string;
-  assetId?: string;
-  assetCode?: string;
-  category: BorrowRequest["category"];
-  quantity?: number;
+  departmentId?: string;
+  requestType?: "borrowable" | "assignable";
+  requestedByName?: string;
+  items: {
+    itemDescription: string;
+    assetId?: string;
+    assetCode?: string;
+    category: BorrowRequest["items"][number]["category"];
+    quantity: number;
+    itemType: "asset";
+  }[];
   purpose: string;
-  expectedReturnDate: string;
+  expectedReturnDate?: string;
   notes?: string;
   requesterUserId?: string;
 };
@@ -39,6 +44,8 @@ export const borrowRequestsApi = {
     limit?: number;
     startDate?: string;
     endDate?: string;
+    assetId?: string;
+    requestType?: "borrowable" | "assignable";
   }): Promise<PaginatedResponse<BorrowRequest[]>> {
     const sp = new URLSearchParams();
     if (params?.status) sp.set("status", params.status);
@@ -48,23 +55,25 @@ export const borrowRequestsApi = {
     if (params?.endDate) sp.set("endDate", params.endDate);
     if (params?.page) sp.set("page", params.page.toString());
     if (params?.limit) sp.set("limit", params.limit.toString());
+    if (params?.assetId) sp.set("assetId", params.assetId);
+    if (params?.requestType) sp.set("requestType", params.requestType);
     const qs = sp.toString();
     const res = await fetchJson<ApiResponse<PaginatedResponse<BorrowRequest[]>>>(
-      qs ? `/api/borrow-requests?${qs}` : "/api/borrow-requests"
+      qs ? `/api/requests?${qs}` : "/api/requests"
     );
     return res.data;
   },
 
   async getById(id: string): Promise<BorrowRequest> {
     const res = await fetchJson<ApiResponse<BorrowRequest>>(
-      `/api/borrow-requests/${id}`
+      `/api/requests/${id}`
     );
     return res.data;
   },
 
   async create(payload: CreateBorrowRequestPayload): Promise<BorrowRequest> {
     const res = await fetchJson<ApiResponse<BorrowRequest>>(
-      "/api/borrow-requests",
+      "/api/requests",
       { method: "POST", body: JSON.stringify(payload) }
     );
     return res.data;
@@ -75,7 +84,7 @@ export const borrowRequestsApi = {
     payload?: ApproveBorrowRequestPayload
   ): Promise<BorrowRequest> {
     const res = await fetchJson<ApiResponse<BorrowRequest>>(
-      `/api/borrow-requests/${id}/approve`,
+      `/api/requests/${id}/approve`,
       { method: "POST", body: JSON.stringify(payload ?? {}) }
     );
     return res.data;
@@ -83,15 +92,23 @@ export const borrowRequestsApi = {
 
   async reject(id: string, reason: string): Promise<BorrowRequest> {
     const res = await fetchJson<ApiResponse<BorrowRequest>>(
-      `/api/borrow-requests/${id}/reject`,
+      `/api/requests/${id}/reject`,
       { method: "POST", body: JSON.stringify({ reason }) }
+    );
+    return res.data;
+  },
+
+  async cancel(id: string, note?: string): Promise<BorrowRequest> {
+    const res = await fetchJson<ApiResponse<BorrowRequest>>(
+      `/api/requests/${id}/cancel`,
+      { method: "POST", body: JSON.stringify(note ? { note } : {}) }
     );
     return res.data;
   },
 
   async release(id: string, payload: ReleaseBorrowRequestPayload): Promise<BorrowRequest> {
     const res = await fetchJson<ApiResponse<BorrowRequest>>(
-      `/api/borrow-requests/${id}/release`,
+      `/api/requests/${id}/release`,
       { method: "POST", body: JSON.stringify(payload ?? {}) }
     );
     return res.data;
@@ -99,7 +116,7 @@ export const borrowRequestsApi = {
 
   async markUnreleased(id: string, payload?: { note?: string }): Promise<BorrowRequest> {
     const res = await fetchJson<ApiResponse<BorrowRequest>>(
-      `/api/borrow-requests/${id}/unrelease`,
+      `/api/requests/${id}/unrelease`,
       { method: "POST", body: JSON.stringify(payload ?? {}) }
     );
     return res.data;
@@ -107,7 +124,7 @@ export const borrowRequestsApi = {
 
   async markReturned(id: string, payload: { returnedBy: string; note?: string }): Promise<BorrowRequest> {
     const res = await fetchJson<ApiResponse<BorrowRequest>>(
-      `/api/borrow-requests/${id}/return`,
+      `/api/requests/${id}/return`,
       { method: "POST", body: JSON.stringify(payload ?? {}) }
     );
     return res.data;

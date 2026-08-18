@@ -7,6 +7,7 @@ import type { Supplier } from "@/types/suppliers";
 import { SupplierStatusBadge } from "./supplier-status-badge";
 import { usePurchaseLotsQuery } from "@/features/purchase-lots/client";
 import { formatPhp } from "@/components/projects/format-money";
+import { LoadingState } from "@/components/providers/loading-context";
 
 export function SupplierDetailPanel({
   supplier,
@@ -17,10 +18,10 @@ export function SupplierDetailPanel({
   supplier: Supplier | null;
   isOpen: boolean;
   onClose: () => void;
-  onEdit: (s: Supplier) => void;
+  onEdit?: (s: Supplier) => void;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
-  const { data: lots = [] } = usePurchaseLotsQuery({
+  const { data: lots = [], isLoading: lotsLoading } = usePurchaseLotsQuery({
     supplierId: supplier?.id,
     enabled: isOpen && Boolean(supplier),
   });
@@ -48,17 +49,21 @@ export function SupplierDetailPanel({
         )}
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-bg-subtle/50 shrink-0">
-          <div>
-            <SupplierStatusBadge status={supplier.status} />
-            <h2 className="text-base font-bold text-text mt-0.5">{supplier.name}</h2>
-            <p className="text-[11px] font-mono text-text-secondary">
-              {supplier.supplierCode}
+          <div className="min-w-0 flex-1 pr-3">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h2 className="font-mono text-lg font-bold tracking-tight text-text">
+                {supplier.supplierCode}
+              </h2>
+              <SupplierStatusBadge status={supplier.status} />
+            </div>
+            <p className="text-xs text-text-secondary font-medium mt-0.5 truncate">
+              Supplier Record • <strong className="text-text font-semibold">{supplier.name}</strong>
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-text-secondary hover:text-text hover:bg-border cursor-pointer"
+            className="p-1.5 rounded-lg text-text-secondary hover:text-text hover:bg-border cursor-pointer shrink-0"
             aria-label="Close"
           >
             <X className="h-5 w-5" />
@@ -96,7 +101,14 @@ export function SupplierDetailPanel({
               <Truck className="h-3.5 w-3.5" />
               Purchase cost history
             </h3>
-            {lots.length === 0 ? (
+            {lotsLoading ? (
+              <LoadingState
+                variant="card"
+                icon="truck"
+                message="Loading purchase cost history…"
+                subtitle="Retrieving vendor intake records"
+              />
+            ) : lots.length === 0 ? (
               <p className="text-[11px] text-text-secondary border border-dashed border-border rounded-lg p-3">
                 No purchase lots yet. Restocks with unit cost will appear here.
               </p>
@@ -136,6 +148,7 @@ export function SupplierDetailPanel({
           >
             Close
           </button>
+          {onEdit && (
           <button
             type="button"
             onClick={() => onEdit(supplier)}
@@ -144,6 +157,7 @@ export function SupplierDetailPanel({
             <Pencil className="h-3.5 w-3.5" />
             Edit
           </button>
+          )}
         </div>
       </aside>
     </div>

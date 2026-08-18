@@ -33,7 +33,7 @@ export function UserFilters({
             type="text"
             value={filters.searchQuery}
             onChange={(e) => onFilterChange({ searchQuery: e.target.value })}
-            placeholder="Search staff by name or email address…"
+            placeholder="Search by name or email…"
             className={cn(
               "w-full h-9 pl-9 pr-3 text-xs bg-bg-subtle border border-border rounded-lg text-text placeholder:text-text-secondary/60",
               "focus:outline-none focus:ring-2 focus:ring-accent focus:bg-bg transition-colors"
@@ -57,7 +57,7 @@ export function UserFilters({
               <option value="all">All System Roles</option>
               <option value="admin">Admin</option>
               <option value="staff">Staff</option>
-              <option value="borrower">Borrower / Requester</option>
+              <option value="borrower">Department account</option>
             </select>
           </div>
 

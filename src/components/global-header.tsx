@@ -34,8 +34,8 @@ const ROUTE_MAP: Record<string, RouteMeta> = {
     category: "Overview",
   },
   "/borrow-requests": {
-    title: "Borrow Requests",
-    subtitle: "Review and approve pending asset borrowing requests",
+    title: "Requests",
+    subtitle: "Borrow, assignment, and supply request queues",
     category: "Operations",
   },
   "/assets": {
@@ -45,7 +45,22 @@ const ROUTE_MAP: Record<string, RouteMeta> = {
   },
   "/borrow-log": {
     title: "Borrow & Return Log",
-    subtitle: "Track active borrowings, returns, and overdue items",
+    subtitle: "Asset custody with LOG codes — borrowable and assignable",
+    category: "Operations",
+  },
+  "/issue-history": {
+    title: "Issue history",
+    subtitle: "Asset LOG and supply MOV transaction codes",
+    category: "Operations",
+  },
+  "/consumable-requests": {
+    title: "Requests",
+    subtitle: "Borrow, assignment, and supply request queues",
+    category: "Operations",
+  },
+  "/maintenance-logs": {
+    title: "Maintenance Logs",
+    subtitle: "Condition flags, inspections, and repair resolutions",
     category: "Operations",
   },
   "/consumables": {
@@ -213,7 +228,7 @@ export default function GlobalHeader({
         </div> */}
 
         {/* Vertical Divider */}
-        <div className="h-6 w-px bg-[#E3E5EC] mx-0.5 hidden sm:block" />
+        {/* <div className="h-6 w-px bg-[#E3E5EC] mx-0.5 hidden sm:block" /> */}
 
         {/* Signed-in user identity */}
         <div

@@ -16,6 +16,9 @@ import {
   useSuppliersQuery,
   useUpdateSupplierMutation,
 } from "@/features/suppliers/client";
+import { useToast } from "@/components/providers/toast-context";
+import { OperatorReadOnlyBanner } from "@/components/shared/operator-read-only-banner";
+import { useAssetOperator } from "@/hooks/use-asset-operator";
 
 export default function SuppliersPage() {
   const {
@@ -27,6 +30,8 @@ export default function SuppliersPage() {
   const createSupplier = useCreateSupplierMutation();
   const updateSupplier = useUpdateSupplierMutation();
   const deactivateSupplier = useDeactivateSupplierMutation();
+  const toast = useToast();
+  const { canOperate } = useAssetOperator();
 
   const [filters, setFilters] = useState<SupplierFilterState>({
     searchQuery: "",
@@ -73,27 +78,33 @@ export default function SuppliersPage() {
       notes: input.notes || null,
       status: input.status,
     };
-    if (editTarget) {
-      const saved = await updateSupplier.mutateAsync({
-        id: editTarget.id,
-        payload,
-      });
-      setSelected((prev) => (prev?.id === saved.id ? saved : prev));
-    } else {
-      await createSupplier.mutateAsync(payload);
+    try {
+      if (editTarget) {
+        const saved = await updateSupplier.mutateAsync({
+          id: editTarget.id,
+          payload,
+        });
+        setSelected((prev) => (prev?.id === saved.id ? saved : prev));
+        toast.success("Supplier updated.");
+      } else {
+        await createSupplier.mutateAsync(payload);
+        toast.success("Supplier created.");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save supplier.");
+      throw err;
     }
   };
 
   const handleDeactivate = async (s: Supplier) => {
-    if (!window.confirm(`Deactivate “${s.name}”? History is kept.`)) return;
+    if (!window.confirm(`Deactivate "${s.name}"? History is kept.`)) return;
     setPageError(null);
     try {
       const saved = await deactivateSupplier.mutateAsync(s.id);
       setSelected((prev) => (prev?.id === saved.id ? saved : prev));
+      toast.success(`${s.name} deactivated.`);
     } catch (err) {
-      setPageError(
-        err instanceof Error ? err.message : "Failed to deactivate supplier."
-      );
+      toast.error(err instanceof Error ? err.message : "Failed to deactivate supplier.");
     }
   };
 
@@ -117,6 +128,7 @@ export default function SuppliersPage() {
             history.
           </p>
         </div>
+        {canOperate && (
         <button
           type="button"
           onClick={() => setEditTarget(null)}
@@ -125,7 +137,10 @@ export default function SuppliersPage() {
           <Truck className="h-4 w-4" strokeWidth={2.5} />
           Add Supplier
         </button>
+        )}
       </div>
+
+      {!canOperate && <OperatorReadOnlyBanner />}
 
       {loadError && (
         <div className="mx-4 md:mx-6 mt-3 flex items-start gap-2 rounded-lg border border-status-outofservice-bg/40 bg-status-outofservice-bg/10 px-3 py-2 text-xs text-status-outofservice-text">
@@ -145,10 +160,14 @@ export default function SuppliersPage() {
           suppliers={filtered}
           loading={isLoading && !error}
           onSelect={setSelected}
-          onEdit={(s) => setEditTarget(s)}
-          onDeactivate={(s) => {
-            void handleDeactivate(s);
-          }}
+          onEdit={canOperate ? (s) => setEditTarget(s) : undefined}
+          onDeactivate={
+            canOperate
+              ? (s) => {
+                  void handleDeactivate(s);
+                }
+              : undefined
+          }
         />
       </main>
 
@@ -156,18 +175,24 @@ export default function SuppliersPage() {
         supplier={selectedSynced}
         isOpen={Boolean(selectedSynced)}
         onClose={() => setSelected(null)}
-        onEdit={(s) => {
-          setSelected(null);
-          setEditTarget(s);
-        }}
+        onEdit={
+          canOperate
+            ? (s) => {
+                setSelected(null);
+                setEditTarget(s);
+              }
+            : undefined
+        }
       />
 
+      {canOperate && (
       <AddEditSupplierDialog
         isOpen={editTarget !== undefined}
         supplier={editTarget ?? null}
         onClose={() => setEditTarget(undefined)}
         onSubmit={handleSubmit}
       />
+      )}
     </div>
   );
 }

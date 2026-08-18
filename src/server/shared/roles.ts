@@ -35,11 +35,13 @@ export const USER_MANAGER_ROLES: readonly AppRole[] = [
   "admin",
 ] as const;
 
-/** Roles that may mutate inventory/assets. */
+/**
+ * Roles that may approve, release, restock, and otherwise mutate assets/inventory.
+ * Staff may browse operator pages read-only this phase; they are not operators.
+ */
 export const ASSET_OPERATOR_ROLES: readonly AppRole[] = [
   "superadmin",
   "admin",
-  "staff",
 ] as const;
 
 /**

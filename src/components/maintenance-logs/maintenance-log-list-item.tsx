@@ -11,7 +11,7 @@ import { ConditionTag } from "./condition-tag";
 export interface MaintenanceLogListItemProps {
   record: MaintenanceLogRecord;
   onSelect: (record: MaintenanceLogRecord) => void;
-  onResolve: (record: MaintenanceLogRecord) => void;
+  onResolve?: (record: MaintenanceLogRecord) => void;
 }
 
 export function MaintenanceLogListItem({
@@ -96,7 +96,7 @@ export function MaintenanceLogListItem({
         <ConditionTag condition={record.isResolved ? "resolved" : record.condition} />
 
         {/* Inline Resolve Action for Open Items */}
-        {!record.isResolved ? (
+        {!record.isResolved && onResolve ? (
           <button
             type="button"
             onClick={(e) => {
@@ -108,7 +108,7 @@ export function MaintenanceLogListItem({
             <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={2.5} />
             Resolve
           </button>
-        ) : (
+        ) : !record.isResolved ? null : (
           <button
             type="button"
             onClick={() => onSelect(record)}

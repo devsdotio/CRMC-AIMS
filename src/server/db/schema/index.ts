@@ -8,6 +8,8 @@ export * from "./locations";
 export * from "./borrow-requests";
 export * from "./borrow-transactions";
 export * from "./consumables";
+export * from "./consumable-requests";
+export * from "./stock-movements";
 export * from "./maintenance-logs";
 export * from "./projects";
 export * from "./project-expense-lines";

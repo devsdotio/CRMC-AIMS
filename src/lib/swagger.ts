@@ -27,8 +27,8 @@ export function getApiDocs() {
           "### Roles",
           "- `superadmin` — bootstrap / platform",
           "- `admin` — user management + operations",
-          "- `staff` — property custodian operations",
-          "- `borrower` — request / borrow portal only",
+          "- `staff` — browse-only in the ops shell (no asset/inventory mutations this phase)",
+          "- `borrower` — department portal login (one account per department)",
         ].join("\n"),
       },
       tags: [
@@ -40,9 +40,23 @@ export function getApiDocs() {
         { name: "System", description: "System and health endpoints" },
         { name: "Assets", description: "Coded assets, bulk models, QR scan custody" },
         { name: "Consumables", description: "Consumable stock + supplier lot QR release" },
-        { name: "Requests", description: "Borrow and release requests" },
+        {
+          name: "ConsumableRequests",
+          description:
+            "Multi-product consumable issue queue (request → approve → lot-aware release)",
+        },
+        {
+          name: "BorrowRequests",
+          description: "Short-term borrow request queue (borrowable assets)",
+        },
+        {
+          name: "BorrowLog",
+          description: "Active borrow custody transactions (release / return / overdue)",
+        },
+        { name: "Requests", description: "Borrow and release requests (legacy tag)" },
         { name: "Dashboard", description: "Admin dashboard data" },
         { name: "Users", description: "User account administration" },
+        { name: "Departments", description: "Department master data and department logins" },
         { name: "Projects", description: "Projects, expenses, and assignments" },
       ],
       // Default: require JWT (OAuth2 password *or* raw Bearer JWT).

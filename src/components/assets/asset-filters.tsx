@@ -5,7 +5,7 @@ import { Search, FilterX, ArrowUpDown, Tag, AlertCircle, ChevronDown, Check } fr
 import { cn } from "@/lib/utils";
 import type { AssetFilterState, AssetStatus } from "@/types/assets";
 import { useCategoriesQuery } from "@/features/categories/client/use-categories";
-import { getSwatchForName } from "@/components/settings/category-list-item";
+import { getCategoryStyle } from "@/constants/categories";
 
 export interface AssetFiltersProps {
   filters: AssetFilterState;
@@ -173,12 +173,12 @@ export function AssetFilters({
               label="Categories"
               icon={Tag}
               options={assetCategories.map((c) => {
-                const swatch = getSwatchForName(c.name);
+                const categoryStyle = getCategoryStyle(c.name, c.name, c.colorToken);
                 return {
                   id: c.name,
                   label: c.name,
                   renderDot: () => (
-                    <span className={cn("h-2.5 w-2.5 rounded-full bg-current", swatch.text)} />
+                    <span className={cn("h-2.5 w-2.5 rounded-full", categoryStyle.bg)} />
                   ),
                 };
               })}

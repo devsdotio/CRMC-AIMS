@@ -7,6 +7,29 @@ import type {
 } from "@/types/assets";
 import { fetchJson, type ApiResponse } from "@/features/shared/fetch-json";
 
+export interface AssetFieldChange<T = unknown> {
+  from: T;
+  to: T;
+}
+
+export type AssetChangesMap = Record<string, AssetFieldChange>;
+
+export interface AssetLifecycleEventPayload {
+  changes?: AssetChangesMap;
+  requestId?: string;
+  expectedReturnDate?: string;
+  borrowerDepartment?: string;
+  borrowerEmail?: string;
+  borrowerPhone?: string;
+  condition?: string;
+  description?: string;
+  notes?: string;
+  via?: string;
+  reason?: string;
+  snapshot?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
 export type AssetLifecycleEvent = {
   id: string;
   assetId: string | null;
@@ -28,24 +51,36 @@ export type AssetLifecycleEvent = {
   toStatus: string | null;
   fromHolder: string | null;
   toHolder: string | null;
-  payload: Record<string, unknown>;
+  payload: AssetLifecycleEventPayload;
   createdAt: string;
 };
 
 export type ReleaseAssetInput = {
-  /** Required — anonymous checkout is not allowed for accountability. */
-  borrowerName: string;
+  custodyKind?: "borrow" | "assignment";
+  departmentId?: string;
+  projectId?: string;
+  borrowerName?: string;
   borrowerDepartment?: string;
   borrowerEmail?: string;
   borrowerPhone?: string;
   notes?: string;
-  expectedReturnDate?: string;
+  expectedReturnDate?: string | null;
+  requestedByName?: string;
   requestId?: string;
 };
 
 export type FlagMaintenanceInput = {
   description?: string;
   notes?: string;
+};
+
+export type ScanResolveResult = {
+  kind: "asset";
+  code: string;
+  qrPayload: string;
+  asset: Asset;
+  suggestedAction: "release" | "return" | "project" | "blocked";
+  reason?: string;
 };
 
 export const assetsApi = {
@@ -115,20 +150,14 @@ export const assetsApi = {
     return response.data;
   },
 
-  async resolveScan(code: string) {
-    const response = await fetchJson<
-      ApiResponse<{
-        kind: "asset";
-        code: string;
-        qrPayload: string;
-        asset: Asset;
-        suggestedAction: "release" | "return" | "project" | "blocked";
-        reason?: string;
-      }>
-    >("/api/assets/scan/resolve", {
-      method: "POST",
-      body: JSON.stringify({ code }),
-    });
+  async resolveScan(code: string): Promise<ScanResolveResult> {
+    const response = await fetchJson<ApiResponse<ScanResolveResult>>(
+      "/api/assets/scan/resolve",
+      {
+        method: "POST",
+        body: JSON.stringify({ code }),
+      }
+    );
     return response.data;
   },
 
@@ -220,6 +249,7 @@ export const assetsApi = {
         : `/api/assets/${id}/lifecycle`;
     const response = await fetchJson<ApiResponse<AssetLifecycleEvent[]>>(path, {
       method: "GET",
+      timeoutMs: 15_000,
     });
     return response.data;
   },

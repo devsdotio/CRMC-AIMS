@@ -104,6 +104,7 @@ export function toAssetDTO(row: AssetRow): AssetDTOWithMeta {
     serialNumber: row.serialNumber ?? undefined,
     location: row.location,
     currentHolder: row.currentHolder ?? undefined,
+    reservedForRequestId: row.reservedForRequestId ?? null,
     department: row.department ?? undefined,
     purchaseDate: row.purchaseDate ?? undefined,
     value: parseValue(row.value),
@@ -231,6 +232,18 @@ export class AssetService {
         reason: asset.currentHolder
           ? `Currently held by ${asset.currentHolder}.`
           : "Open borrow log found.",
+      };
+    }
+
+    if (asset.reservedForRequestId) {
+      return {
+        kind: "asset",
+        code: asset.assetCode,
+        qrPayload: asset.qrPayload,
+        asset,
+        suggestedAction: "blocked",
+        reason:
+          "Asset is reserved for an approved request. Issue that request from the queue.",
       };
     }
 
@@ -717,9 +730,9 @@ export class AssetService {
 
     const open = await this.borrowLogRepo.findActiveByAssetId(id);
     const openProject = await this.projectAssignments.findOpenByAssetId(id);
-    if (open || openProject || existing.currentHolder) {
+    if (open || openProject || existing.currentHolder || existing.reservedForRequestId) {
       throw new ConflictError(
-        "Cannot delete an asset that is currently checked out or assigned to a project. Return it first."
+        "Cannot delete an asset that is currently checked out, reserved, or assigned to a project. Return or unrelease it first."
       );
     }
 
@@ -764,23 +777,36 @@ export class AssetService {
       throw new NotFoundError("Asset", id);
     }
 
-    if (existing.assignmentType === "assignable") {
+    const custodyKind =
+      input.custodyKind ??
+      (existing.assignmentType === "assignable" ? "assignment" : "borrow");
+
+    if (custodyKind === "borrow" && existing.assignmentType !== "borrowable") {
       throw new BadRequestError(
-        "This asset is assignable (project custody). Assign it from a project, not via borrow release."
+        "This asset is assignable. Use assignment custody with a department or project destination."
+      );
+    }
+    if (custodyKind === "assignment" && existing.assignmentType !== "assignable") {
+      throw new BadRequestError(
+        "This asset is borrowable. Use a due-dated borrow release instead."
       );
     }
 
     await this.borrowLogs.release(
       {
         assetId: id,
+        custodyKind,
+        source: "admin_manual",
+        departmentId: input.departmentId,
+        projectId: input.projectId,
         borrowerName: input.borrowerName,
         borrowerEmail: input.borrowerEmail ?? "",
         borrowerPhone: input.borrowerPhone ?? "",
-        department:
-          input.borrowerDepartment?.trim() ||
-          existing.department?.trim() ||
-          "Unassigned",
-        dueDate: input.expectedReturnDate ?? this.borrowLogs.defaultDueDate(),
+        dueDate:
+          custodyKind === "borrow"
+            ? (input.expectedReturnDate ?? this.borrowLogs.defaultDueDate())
+            : null,
+        requestedByName: input.requestedByName,
         notes: input.notes,
         requestId: input.requestId,
       },
@@ -790,7 +816,7 @@ export class AssetService {
     return this.getAssetById(id);
   }
 
-  /** Staff mobile scan → release (QR payload or bare asset code). */
+  /** Operator scan → release (QR payload or bare asset code). */
   async scanRelease(
     rawInput: unknown,
     actor: ActorContext
@@ -883,7 +909,7 @@ export class AssetService {
     return this.getAssetById(id);
   }
 
-  /** Staff mobile scan → receive/return (QR payload or bare asset code). */
+  /** Operator scan → receive/return (QR payload or bare asset code). */
   async scanReturn(
     rawInput: unknown,
     actor: ActorContext

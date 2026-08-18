@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 
-import { requireAssetOperator } from "@/server/shared/auth";
+import { requireActor, requireAssetOperator } from "@/server/shared/auth";
 import { handleError, ok } from "@/server/shared/http";
 import { ConsumableService } from "@/server/modules/consumables/consumable.service";
 
@@ -14,7 +14,7 @@ export class PurchaseLotController {
 
   async list(request: NextRequest | Request) {
     try {
-      await requireAssetOperator();
+      await requireActor();
       const url = new URL(request.url);
       return ok(
         await this.service.list({
@@ -32,7 +32,7 @@ export class PurchaseLotController {
 
   async get(id: string) {
     try {
-      await requireAssetOperator();
+      await requireActor();
       return ok(await this.service.getById(id));
     } catch (error) {
       return handleError(error);
@@ -41,7 +41,7 @@ export class PurchaseLotController {
 
   async getByCode(request: NextRequest | Request) {
     try {
-      await requireAssetOperator();
+      await requireActor();
       const url = new URL(request.url);
       const code = url.searchParams.get("code") ?? "";
       return ok(await this.service.getByCode(code));

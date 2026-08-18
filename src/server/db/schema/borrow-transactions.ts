@@ -12,11 +12,21 @@ import {
 
 import { assets } from "./assets";
 import { borrowRequests } from "./borrow-requests";
+import { departments } from "./departments";
+import { projects } from "./projects";
 
 /**
  * Borrow & return custody ledger (the operational "log").
  * Stored status is active | returned; "overdue" is derived in DTOs when due.
+ * Unified custody: borrow (due-dated) or assignment (open-ended) to department XOR project.
  */
+export const custodyKindEnum = pgEnum("custody_kind", ["borrow", "assignment"]);
+
+export const custodySourceEnum = pgEnum("custody_source", [
+  "portal",
+  "admin_manual",
+  "project_legacy",
+]);
 export const borrowTransactionStatusEnum = pgEnum("borrow_transaction_status", [
   "active",
   "returned",
@@ -53,10 +63,21 @@ export const borrowTransactions = pgTable(
     borrowerPhone: text("borrower_phone").notNull().default(""),
     department: text("department").notNull(),
 
+    /** Unified custody destination — exactly one should be set for new releases. */
+    custodyKind: custodyKindEnum("custody_kind").notNull().default("borrow"),
+    departmentId: uuid("department_id").references(() => departments.id, {
+      onDelete: "restrict",
+    }),
+    projectId: uuid("project_id").references(() => projects.id, {
+      onDelete: "restrict",
+    }),
+    source: custodySourceEnum("source").notNull().default("portal"),
+    requestedByName: text("requested_by_name"),
+
     releasedAt: timestamp("released_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
-    dueDate: date("due_date", { mode: "string" }).notNull(),
+    dueDate: date("due_date", { mode: "string" }),
     returnedAt: timestamp("returned_at", { withTimezone: true }),
 
     status: borrowTransactionStatusEnum("status").notNull().default("active"),
@@ -82,6 +103,8 @@ export const borrowTransactions = pgTable(
     index("borrow_transactions_asset_id_idx").on(table.assetId),
     index("borrow_transactions_released_at_idx").on(table.releasedAt),
     index("borrow_transactions_department_idx").on(table.department),
+    index("borrow_transactions_department_id_idx").on(table.departmentId),
+    index("borrow_transactions_project_id_idx").on(table.projectId),
   ]
 );
 

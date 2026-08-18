@@ -12,11 +12,17 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { assets } from "./assets";
+import { departments } from "./departments";
 
 /**
  * Staff-facing borrow request queue (approve / reject).
  * Actual custody transfer lives on borrow_transactions + assets.current_holder.
  */
+export const assetRequestTypeEnum = pgEnum("asset_request_type", [
+  "borrowable",
+  "assignable",
+]);
+
 export const borrowRequestStatusEnum = pgEnum("borrow_request_status", [
   "pending",
   "approved",
@@ -24,18 +30,26 @@ export const borrowRequestStatusEnum = pgEnum("borrow_request_status", [
   "released",
   "unreleased",
   "returned",
+  "cancelled",
 ]);
 
 export type BorrowRequestHistoryEntry = {
   id: string;
-  action: "submitted" | "approved" | "rejected" | "released" | "unreleased" | "returned";
+  action:
+    | "submitted"
+    | "approved"
+    | "rejected"
+    | "released"
+    | "unreleased"
+    | "returned"
+    | "cancelled";
   actor: string;
   timestamp: string;
   note?: string;
 };
 
 export const borrowRequests = pgTable(
-  "borrow_requests",
+  "requests",
   {
     id: uuid("id").primaryKey().defaultRandom(),
 
@@ -48,17 +62,29 @@ export const borrowRequests = pgTable(
     requesterEmail: text("requester_email").notNull(),
     requesterPhone: text("requester_phone").notNull().default(""),
     department: text("department").notNull(),
-
-    itemDescription: text("item_description").notNull(),
-    assetId: uuid("asset_id").references(() => assets.id, {
-      onDelete: "set null",
+    departmentId: uuid("department_id").references(() => departments.id, {
+      onDelete: "restrict",
     }),
-    assetCode: text("asset_code"),
-    category: text("category").notNull(),
-    quantity: integer("quantity").notNull().default(1),
+
+    /** borrowable = due-dated loan; assignable = open-ended department assignment. */
+    requestType: assetRequestTypeEnum("request_type"),
+    requestedByName: text("requested_by_name"),
+
+    items: jsonb("items")
+      .$type<{
+        itemDescription: string;
+        assetId?: string;
+        assetCode?: string;
+        consumableId?: string;
+        category: string;
+        quantity: number;
+        itemType: "asset" | "consumable";
+      }[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
     purpose: text("purpose").notNull(),
 
-    expectedReturnDate: date("expected_return_date", { mode: "string" }).notNull(),
+    expectedReturnDate: date("expected_return_date", { mode: "string" }),
     status: borrowRequestStatusEnum("status").notNull().default("pending"),
 
     notes: text("notes"),
@@ -81,10 +107,11 @@ export const borrowRequests = pgTable(
       .defaultNow(),
   },
   (table) => [
-    index("borrow_requests_status_idx").on(table.status),
-    index("borrow_requests_department_idx").on(table.department),
-    index("borrow_requests_requested_at_idx").on(table.requestedAt),
-    index("borrow_requests_asset_id_idx").on(table.assetId),
+    index("requests_status_idx").on(table.status),
+    index("requests_department_idx").on(table.department),
+    index("requests_department_id_idx").on(table.departmentId),
+    index("requests_request_type_idx").on(table.requestType),
+    index("requests_requested_at_idx").on(table.requestedAt),
   ]
 );
 

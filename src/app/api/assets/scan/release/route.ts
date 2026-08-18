@@ -7,7 +7,7 @@ import { assetController } from "@/server/modules/assets";
  *     summary: Release an asset after scanning its QR
  *     description: |
  *       Same custody rules as `POST /api/assets/{id}/release`, but the unit is
- *       identified by QR payload / asset code (for staff handheld scanners).
+ *       identified by QR payload / asset code (for operator scanners).
  *     tags: [Assets]
  *     requestBody:
  *       required: true
@@ -15,18 +15,21 @@ import { assetController } from "@/server/modules/assets";
  *         application/json:
  *           schema:
  *             type: object
- *             required: [code, borrowerName]
+ *             required: [code]
  *             properties:
  *               code:
  *                 type: string
  *                 example: "CRMC-AIMS:PRT-310-001"
+ *               custodyKind:
+ *                 type: string
+ *                 enum: [borrow, assignment]
+ *               departmentId:
+ *                 type: string
+ *                 format: uuid
+ *               projectId:
+ *                 type: string
+ *                 format: uuid
  *               borrowerName:
- *                 type: string
- *               borrowerDepartment:
- *                 type: string
- *               borrowerEmail:
- *                 type: string
- *               borrowerPhone:
  *                 type: string
  *               notes:
  *                 type: string

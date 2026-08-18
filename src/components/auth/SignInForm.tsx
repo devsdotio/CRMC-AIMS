@@ -23,7 +23,7 @@ const REDIRECT_ERROR_MESSAGES: Record<string, string> = {
     'This account has no application profile. Contact a system administrator.',
   deactivated: 'This account has been deactivated.',
   borrower_portal:
-    'Borrower accounts cannot access the staff workspace yet. Contact Property Custodian for updates.',
+    'Department accounts use the requester portal, not the staff workspace.',
 };
 
 const STAY_ON_SIGN_IN_ERRORS = new Set([

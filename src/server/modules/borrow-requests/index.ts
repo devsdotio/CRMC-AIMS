@@ -20,6 +20,8 @@ export class BorrowRequestController {
         search: url.searchParams.get("search") ?? undefined,
         startDate: url.searchParams.get("startDate") ?? undefined,
         endDate: url.searchParams.get("endDate") ?? undefined,
+        requestType: url.searchParams.get("requestType") ?? undefined,
+        assetId: url.searchParams.get("assetId") ?? undefined,
         page: url.searchParams.has("page") ? Number(url.searchParams.get("page")) : undefined,
         limit: url.searchParams.has("limit") ? Number(url.searchParams.get("limit")) : undefined,
       }, session);
@@ -72,6 +74,22 @@ export class BorrowRequestController {
       return handleError(error);
     }
   }
+
+  async cancel(request: NextRequest | Request, id: string) {
+    try {
+      const session = await requireActor();
+      let body: unknown = {};
+      try {
+        body = await request.json();
+      } catch {
+        body = {};
+      }
+      return ok(await this.service.cancel(id, body, session));
+    } catch (error) {
+      return handleError(error);
+    }
+  }
+
   async release(request: NextRequest | Request, id: string) {
     try {
       const session = await requireAssetOperator();

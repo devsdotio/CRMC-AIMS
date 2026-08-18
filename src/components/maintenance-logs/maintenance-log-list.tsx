@@ -8,7 +8,7 @@ export interface MaintenanceLogListProps {
   records: MaintenanceLogRecord[];
   loading?: boolean;
   onSelect: (record: MaintenanceLogRecord) => void;
-  onResolve: (record: MaintenanceLogRecord) => void;
+  onResolve?: (record: MaintenanceLogRecord) => void;
 }
 
 // ─── Matched Skeleton Row for Maintenance Log List ────────────────────────────

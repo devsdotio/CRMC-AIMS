@@ -17,6 +17,7 @@ import {
   useProjectsQuery,
   useUpdateProjectMutation,
 } from "@/features/projects/client";
+import { useToast } from "@/components/providers/toast-context";
 
 export default function ProjectsPage() {
   const { data: me, error: meError } = useMeQuery();
@@ -30,6 +31,7 @@ export default function ProjectsPage() {
   const createProject = useCreateProjectMutation();
   const updateProject = useUpdateProjectMutation();
   const deleteProject = useDeleteProjectMutation();
+  const toast = useToast();
 
   const isManager = me?.role === "superadmin" || me?.role === "admin";
   // Don't hold the table on me — table only needs projects list.
@@ -105,21 +107,28 @@ export default function ProjectsPage() {
       notes: input.notes || null,
     };
 
-    if (dialogProject) {
-      const saved = await updateProject.mutateAsync({
-        id: dialogProject.id,
-        payload,
-      });
-      setSelected((prev) => (prev?.id === saved.id ? saved : prev));
-    } else {
-      await createProject.mutateAsync(payload);
+    try {
+      if (dialogProject) {
+        const saved = await updateProject.mutateAsync({
+          id: dialogProject.id,
+          payload,
+        });
+        setSelected((prev) => (prev?.id === saved.id ? saved : prev));
+        toast.success("Project updated successfully.");
+      } else {
+        await createProject.mutateAsync(payload);
+        toast.success("Project created successfully.");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save project.");
+      throw err;
     }
   };
 
   const handleDelete = async (project: Project) => {
     if (
       !window.confirm(
-        `Delete project “${project.name}” (${project.projectCode})? This cannot be undone.`
+        `Delete project "${project.name}" (${project.projectCode})? This cannot be undone.`
       )
     ) {
       return;
@@ -128,10 +137,9 @@ export default function ProjectsPage() {
     try {
       await deleteProject.mutateAsync(project.id);
       setSelected((prev) => (prev?.id === project.id ? null : prev));
+      toast.success("Project deleted.");
     } catch (err) {
-      setPageError(
-        err instanceof Error ? err.message : "Failed to delete project."
-      );
+      toast.error(err instanceof Error ? err.message : "Failed to delete project.");
     }
   };
 

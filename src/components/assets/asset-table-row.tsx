@@ -18,23 +18,23 @@ const STATUS_STYLES: Record<
   { bg: string; text: string; label: string }
 > = {
   active: {
-    bg: "bg-status-active-bg/20",
-    text: "text-status-active-text font-bold",
+    bg: "bg-status-active-bg",
+    text: "text-white font-bold",
     label: "Active",
   },
   needs_repair: {
-    bg: "bg-status-repair-bg/20",
-    text: "text-status-repair-text font-bold",
+    bg: "bg-status-repair-bg",
+    text: "text-white font-bold",
     label: "Needs Repair",
   },
   out_of_service: {
-    bg: "bg-status-outofservice-bg/20",
-    text: "text-status-outofservice-text font-bold",
+    bg: "bg-status-outofservice-bg",
+    text: "text-white font-bold",
     label: "Out of Service",
   },
   retired: {
-    bg: "bg-status-retired-bg/20",
-    text: "text-status-retired-text font-bold",
+    bg: "bg-status-retired-bg",
+    text: "text-white font-bold",
     label: "Retired",
   },
 };
@@ -94,8 +94,13 @@ export function AssetTableRow({ asset, onSelect }: AssetTableRowProps) {
       <td className="px-3 py-3.5 whitespace-nowrap">
         <div className="flex items-center gap-2">
           {asset.currentHolder && (
-            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-accent/20 text-accent">
+            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-primary text-white">
               {custodyBadgeLabel(asset.currentHolder)}
+            </span>
+          )}
+          {!asset.currentHolder && asset.reservedForRequestId && (
+            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-status-repair-bg/20 text-status-repair-text border border-status-repair-bg/30">
+              Reserved
             </span>
           )}
           <span
@@ -119,6 +124,10 @@ export function AssetTableRow({ asset, onSelect }: AssetTableRowProps) {
           >
             {custodyDetailLabel(asset.currentHolder)}
             {asset.department ? ` (${asset.department})` : ""}
+          </span>
+        ) : asset.reservedForRequestId ? (
+          <span className="font-semibold text-status-repair-text block">
+            Reserved for approved request
           </span>
         ) : (
           <span className="font-semibold text-status-active-text block">

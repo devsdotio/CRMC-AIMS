@@ -125,25 +125,25 @@
   --color-text: #1B2140;
   --color-text-secondary: #5A5F73;
 
-  /* Status tags */
-  --status-active-bg: #2ECC71;
-  --status-active-text: #0B3D20;
-  --status-repair-bg: #FFB020;
-  --status-repair-text: #4A2E00;
-  --status-outofservice-bg: #FF4E45;
-  --status-outofservice-text: #FFFFFF;
-  --status-retired-bg: #9AA0AC;
-  --status-retired-text: #FFFFFF;
+  /* Status tags - Solid vibrant background with high-contrast text */
+  --status-active-bg: #16A34A;
+  --status-active-text: #15803D;
+  --status-repair-bg: #D97706;
+  --status-repair-text: #B45309;
+  --status-outofservice-bg: #DC2626;
+  --status-outofservice-text: #B91C1C;
+  --status-retired-bg: #64748B;
+  --status-retired-text: #475569;
 
-  /* Category tags */
-  --category-transport-bg: #E9EAF3;
-  --category-transport-text: #1B2140;
-  --category-computing-bg: #E6F1FB;
-  --category-computing-text: #0C447C;
-  --category-av-bg: #FFEDEB;
-  --category-av-text: #B23A32;
-  --category-furniture-bg: #FBEAF0;
-  --category-furniture-text: #72243E;
+  /* Category tags - Solid distinct non-pink colors with white text */
+  --category-transport-bg: #2563EB;
+  --category-transport-text: #FFFFFF;
+  --category-computing-bg: #0284C7;
+  --category-computing-text: #FFFFFF;
+  --category-av-bg: #7C3AED;
+  --category-av-text: #FFFFFF;
+  --category-furniture-bg: #059669;
+  --category-furniture-text: #FFFFFF;
 }
 
 .dark, [data-theme="dark"] {
@@ -242,25 +242,25 @@
   --color-text: #1B2140;
   --color-text-secondary: #5A5F73;
 
-  /* Status tags */
-  --status-active-bg: #2ECC71;
-  --status-active-text: #0B3D20;
-  --status-repair-bg: #FFB020;
-  --status-repair-text: #4A2E00;
-  --status-outofservice-bg: #FF4E45;
-  --status-outofservice-text: #FFFFFF;
-  --status-retired-bg: #9AA0AC;
-  --status-retired-text: #FFFFFF;
+  /* Status tags - Solid vibrant background with high-contrast text */
+  --status-active-bg: #16A34A;
+  --status-active-text: #15803D;
+  --status-repair-bg: #D97706;
+  --status-repair-text: #B45309;
+  --status-outofservice-bg: #DC2626;
+  --status-outofservice-text: #B91C1C;
+  --status-retired-bg: #64748B;
+  --status-retired-text: #475569;
 
-  /* Category tags */
-  --category-transport-bg: #E9EAF3;
-  --category-transport-text: #1B2140;
-  --category-computing-bg: #E6F1FB;
-  --category-computing-text: #0C447C;
-  --category-av-bg: #FFEDEB;
-  --category-av-text: #B23A32;
-  --category-furniture-bg: #FBEAF0;
-  --category-furniture-text: #72243E;
+  /* Category tags - Solid distinct non-pink colors with white text */
+  --category-transport-bg: #2563EB;
+  --category-transport-text: #FFFFFF;
+  --category-computing-bg: #0284C7;
+  --category-computing-text: #FFFFFF;
+  --category-av-bg: #7C3AED;
+  --category-av-text: #FFFFFF;
+  --category-furniture-bg: #059669;
+  --category-furniture-text: #FFFFFF;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -277,24 +277,24 @@
     --color-text-secondary: #A9AEC2;
 
     /* Status tags */
-    --status-active-bg: #1F7A4C;
-    --status-active-text: #C8F5DC;
-    --status-repair-bg: #8A5A0C;
-    --status-repair-text: #FFE1A8;
-    --status-outofservice-bg: #B23A32;
-    --status-outofservice-text: #FFD9D6;
-    --status-retired-bg: #4A4F5C;
-    --status-retired-text: #E2E4EA;
+    --status-active-bg: #16A34A;
+    --status-active-text: #4ADE80;
+    --status-repair-bg: #D97706;
+    --status-repair-text: #FBBF24;
+    --status-outofservice-bg: #DC2626;
+    --status-outofservice-text: #F87171;
+    --status-retired-bg: #64748B;
+    --status-retired-text: #94A3B8;
 
     /* Category tags */
-    --category-transport-bg: #2A3260;
-    --category-transport-text: #C7CBE8;
-    --category-computing-bg: #123A5C;
-    --category-computing-text: #9CC7EE;
-    --category-av-bg: #4A241F;
-    --category-av-text: #FFB4AB;
-    --category-furniture-bg: #3E1B29;
-    --category-furniture-text: #F0A8C4;
+    --category-transport-bg: #2563EB;
+    --category-transport-text: #FFFFFF;
+    --category-computing-bg: #0284C7;
+    --category-computing-text: #FFFFFF;
+    --category-av-bg: #7C3AED;
+    --category-av-text: #FFFFFF;
+    --category-furniture-bg: #059669;
+    --category-furniture-text: #FFFFFF;
   }
 }
 

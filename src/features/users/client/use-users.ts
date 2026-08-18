@@ -12,8 +12,10 @@ import type { UserAccount } from "@/types/users";
 import {
   toUserAccount,
   usersApi,
+  type ChangePasswordPayload,
   type CreateUserPayload,
   type MeProfile,
+  type UpdateMePayload,
   type UpdateUserPayload,
 } from "@/features/users/client/users-api";
 import { userQueryKeys } from "@/features/users/client/query-keys";
@@ -26,6 +28,32 @@ export function useMeQuery(options?: {
     queryFn: () => usersApi.getMe(),
     staleTime: 5 * 60 * 1000,
     enabled: options?.enabled ?? true,
+  });
+}
+
+export function useUpdateMeMutation(): UseMutationResult<
+  MeProfile,
+  Error,
+  UpdateMePayload
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload) => usersApi.updateMe(payload),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(userQueryKeys.me(), updated);
+      queryClient.invalidateQueries({ queryKey: userQueryKeys.all });
+    },
+  });
+}
+
+export function useChangePasswordMutation(): UseMutationResult<
+  void,
+  Error,
+  ChangePasswordPayload
+> {
+  return useMutation({
+    mutationFn: (payload) => usersApi.changePassword(payload),
   });
 }
 

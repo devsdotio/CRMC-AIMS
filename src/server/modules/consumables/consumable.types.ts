@@ -7,6 +7,8 @@ export type ConsumableDTO = {
   category: string;
   unit: string;
   currentQty: number;
+  reservedQty: number;
+  availableQty: number;
   minThreshold: number;
   location: string;
   supplier?: string;

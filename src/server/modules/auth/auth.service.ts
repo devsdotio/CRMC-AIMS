@@ -7,7 +7,7 @@ import {
 } from "@/server/shared/errors";
 import { ProfileRepository } from "@/server/modules/users/user.repository";
 import type { IProfileRepository } from "@/server/modules/users/user.types";
-import type { ProfileRow } from "@/server/db/schema";
+import type { ProfileWithDepartment } from "@/server/modules/users/user.types";
 
 import type {
   AuthProfileDTO,
@@ -18,14 +18,15 @@ import type {
 } from "./auth.types";
 import { signInSchema, tokenPasswordSchema } from "./auth.validation";
 
-function toAuthProfile(row: ProfileRow): AuthProfileDTO {
+function toAuthProfile(row: ProfileWithDepartment): AuthProfileDTO {
   return {
     id: row.userId,
     email: row.email,
     name: row.fullName,
     role: row.role,
     status: row.status,
-    department: row.department,
+    department: row.linkedDepartmentName ?? row.department,
+    departmentId: row.departmentId ?? null,
   };
 }
 
@@ -136,7 +137,7 @@ export class AuthService {
     }
   }
 
-  private async assertActiveProfile(user: User): Promise<ProfileRow> {
+  private async assertActiveProfile(user: User): Promise<ProfileWithDepartment> {
     const profile = await this.profileRepository.findByUserId(user.id);
 
     if (!profile) {

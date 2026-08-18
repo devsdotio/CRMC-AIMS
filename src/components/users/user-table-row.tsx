@@ -53,7 +53,7 @@ export function UserTableRow({
           )}
         </div>
         <span className="text-xs text-text-secondary block">
-          {user.department}
+          {user.department || (user.role === "borrower" ? "No department linked" : "—")}
         </span>
       </td>
 

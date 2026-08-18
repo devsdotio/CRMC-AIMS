@@ -39,6 +39,10 @@ export interface ConsumableItem {
   category: ConsumableCategory;
   unit: string;
   currentQty: number;
+  /** Qty promised to approved supply requests not yet issued. */
+  reservedQty: number;
+  /** currentQty minus reservedQty — what can still be requested or walk-up issued. */
+  availableQty: number;
   minThreshold: number;
   location: string;
   /** Preferred supplier display name from registry (denormalized). */

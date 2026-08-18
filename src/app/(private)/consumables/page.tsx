@@ -8,13 +8,9 @@ import {
   useUpdateConsumableMutation,
   useRestockConsumableMutation,
   useAdjustConsumableMutation,
+  type StockAdjustPayload,
 } from "@/features/consumables/client/use-consumables";
-import {
-  usePurchaseLotsQuery,
-  useReleaseFromLotMutation,
-} from "@/features/purchase-lots/client";
 import type { ConsumableItem, ConsumableFilterState } from "@/types/inventory";
-import type { PurchaseLot } from "@/types/purchase-lots";
 import { getStockSeverity } from "@/components/consumables/utils";
 import { ConsumableFilters } from "@/components/consumables/consumable-filters";
 import { AssetViewToggle } from "@/components/assets/asset-view-toggle";
@@ -24,12 +20,12 @@ import { ConsumableDetailPanel } from "@/components/consumables/consumable-detai
 import { AddEditConsumableDialog } from "@/components/consumables/add-edit-consumable-dialog";
 import { RestockDialog } from "@/components/consumables/restock-dialog";
 import { AdjustStockDialog } from "@/components/consumables/adjust-stock-dialog";
-import {
-  ReleaseFromLotDialog,
-  type ReleaseFromLotInput,
-} from "@/components/consumables/release-from-lot-dialog";
+import { IssueConsumableDialog } from "@/components/consumables/issue-consumable-dialog";
 import { useSuppliersQuery } from "@/features/suppliers/client";
 import { QueryErrorBanner } from "@/components/shared/query-error-banner";
+import { OperatorReadOnlyBanner } from "@/components/shared/operator-read-only-banner";
+import { useToast } from "@/components/providers/toast-context";
+import { useAssetOperator } from "@/hooks/use-asset-operator";
 
 export default function ConsumablesPage() {
   const { data: paginatedData, isLoading: isConsumablesLoading, isError, error, refetch } =
@@ -43,7 +39,8 @@ export default function ConsumablesPage() {
   const updateMutation = useUpdateConsumableMutation();
   const restockMutation = useRestockConsumableMutation();
   const adjustMutation = useAdjustConsumableMutation();
-  const releaseMutation = useReleaseFromLotMutation();
+  const toast = useToast();
+  const { canOperate } = useAssetOperator();
 
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
 
@@ -75,23 +72,13 @@ export default function ConsumablesPage() {
     isOpen: boolean;
     item: ConsumableItem | null;
   }>({ isOpen: false, item: null });
-  const [releaseState, setReleaseState] = useState<{
-    isOpen: boolean;
-    item: ConsumableItem | null;
-    lot: PurchaseLot | null;
-  }>({ isOpen: false, item: null, lot: null });
+  const [issueItem, setIssueItem] = useState<ConsumableItem | null>(null);
+  const [issueLotId, setIssueLotId] = useState<string | undefined>(undefined);
 
   // Suppliers only matter for Restock dialog (add/edit loads its own registry list).
   const { data: suppliers = [] } = useSuppliersQuery({
     activeOnly: true,
     enabled: restockState.isOpen,
-  });
-
-  const releaseItemId = releaseState.item?.id;
-  const { data: releaseLots = [] } = usePurchaseLotsQuery({
-    consumableId: releaseItemId,
-    itemType: "consumable",
-    enabled: Boolean(releaseState.isOpen && releaseItemId),
   });
 
   const [actionError, setActionError] = useState<string | null>(null);
@@ -163,13 +150,7 @@ export default function ConsumablesPage() {
     });
   };
 
-  const openRelease = (item: ConsumableItem, lot?: PurchaseLot | null) => {
-    setActionError(null);
-    setReleaseState({ isOpen: true, item, lot: lot ?? null });
-  };
-
   const handleSaveConsumable = async (itemData: Partial<ConsumableItem>) => {
-    setActionError(null);
     try {
       if (addEditState.item) {
         await updateMutation.mutateAsync({
@@ -187,6 +168,7 @@ export default function ConsumablesPage() {
             notes: itemData.notes,
           },
         });
+        toast.success("Item updated successfully.");
       } else {
         const created = await createMutation.mutateAsync({
           itemCode: itemData.itemCode,
@@ -200,11 +182,10 @@ export default function ConsumablesPage() {
           notes: itemData.notes,
         });
         setSelectedId(created.id);
+        toast.success("Item created successfully.");
       }
     } catch (err) {
-      setActionError(
-        err instanceof Error ? err.message : "Failed to save consumable."
-      );
+      toast.error(err instanceof Error ? err.message : "Failed to save item.");
       throw err;
     }
   };
@@ -216,7 +197,6 @@ export default function ConsumablesPage() {
     supplierId?: string | null;
     notes?: string;
   }) => {
-    setActionError(null);
     try {
       await restockMutation.mutateAsync({
         id: input.itemId,
@@ -227,45 +207,26 @@ export default function ConsumablesPage() {
           notes: input.notes,
         },
       });
-      setSelectedId(input.itemId);
+      toast.success("Stock restocked successfully.");
     } catch (err) {
-      setActionError(
-        err instanceof Error ? err.message : "Restock failed."
-      );
+      toast.error(err instanceof Error ? err.message : "Restock failed.");
       throw err;
     }
   };
 
   const handleConfirmAdjust = async (
     itemId: string,
-    adjustmentDelta: number,
-    reason: string,
-    notes?: string
+    payload: StockAdjustPayload
   ) => {
-    setActionError(null);
     try {
       await adjustMutation.mutateAsync({
         id: itemId,
-        payload: {
-          quantityChange: adjustmentDelta,
-          reason,
-          notes,
-        },
+        payload,
       });
-      setSelectedId(itemId);
+      toast.success("Stock adjusted successfully.");
     } catch (err) {
-      setActionError(
-        err instanceof Error ? err.message : "Adjustment failed."
-      );
+      toast.error(err instanceof Error ? err.message : "Adjustment failed.");
       throw err;
-    }
-  };
-
-  const handleConfirmRelease = async (input: ReleaseFromLotInput) => {
-    setActionError(null);
-    await releaseMutation.mutateAsync(input);
-    if (releaseState.item) {
-      setSelectedId(releaseState.item.id);
     }
   };
 
@@ -285,22 +246,25 @@ export default function ConsumablesPage() {
             </span>
           </div>
           <p className="text-xs text-text-secondary mt-0.5 max-w-xl">
-            Non-serialized stock (paper, ink, cleaning). Multi-supplier lots
-            hold unit cost; release via lot QR for accountable issue logs.
+            Non-serialized stock (paper, ink, cleaning). Issue from a specific
+            purchase lot so cost stays on the movement.
           </p>
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
+          {canOperate && (
+          <>
           <button
             type="button"
             onClick={() => {
-              if (selectedItem) openRelease(selectedItem);
-              else if (filteredItems[0]) openRelease(filteredItems[0]);
+              setIssueLotId(undefined);
+              if (selectedItem) setIssueItem(selectedItem);
+              else if (filteredItems[0]) setIssueItem(filteredItems[0]);
             }}
             className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-border bg-bg text-text hover:border-primary transition-colors cursor-pointer"
           >
             <PackageMinus className="h-4 w-4 text-primary" />
-            <span>Release from lot</span>
+            <span>Issue</span>
           </button>
 
           <button
@@ -320,10 +284,14 @@ export default function ConsumablesPage() {
             <Plus className="h-4 w-4" strokeWidth={2.5} />
             Add supply item
           </button>
+          </>
+          )}
 
           <AssetViewToggle viewMode={viewMode} onViewChange={setViewMode} />
         </div>
       </div>
+
+      {!canOperate && <OperatorReadOnlyBanner />}
 
       {actionError && (
         <div className="px-4 md:px-6 py-2 bg-destructive/10 border-b border-destructive/20 text-xs text-destructive shrink-0">
@@ -352,16 +320,32 @@ export default function ConsumablesPage() {
             items={filteredItems}
             loading={isLoading && !isError}
             onSelect={(item) => setSelectedId(item.id)}
-            onRestock={(item) => setRestockState({ isOpen: true, item })}
-            onAdjust={(item) => setAdjustState({ isOpen: true, item })}
+            onRestock={
+              canOperate
+                ? (item) => setRestockState({ isOpen: true, item })
+                : undefined
+            }
+            onAdjust={
+              canOperate
+                ? (item) => setAdjustState({ isOpen: true, item })
+                : undefined
+            }
           />
         ) : (
           <ConsumableTable
             items={filteredItems}
             loading={isLoading && !isError}
             onSelect={(item) => setSelectedId(item.id)}
-            onRestock={(item) => setRestockState({ isOpen: true, item })}
-            onAdjust={(item) => setAdjustState({ isOpen: true, item })}
+            onRestock={
+              canOperate
+                ? (item) => setRestockState({ isOpen: true, item })
+                : undefined
+            }
+            onAdjust={
+              canOperate
+                ? (item) => setAdjustState({ isOpen: true, item })
+                : undefined
+            }
           />
         )}
       </main>
@@ -370,12 +354,33 @@ export default function ConsumablesPage() {
         item={selectedItem}
         isOpen={Boolean(selectedItem)}
         onClose={() => setSelectedId(null)}
-        onRestock={(item) => setRestockState({ isOpen: true, item })}
-        onAdjust={(item) => setAdjustState({ isOpen: true, item })}
-        onRelease={(item, lot) => openRelease(item, lot)}
-        onEdit={(item) => setAddEditState({ isOpen: true, item })}
+        onRestock={
+          canOperate
+            ? (item) => setRestockState({ isOpen: true, item })
+            : undefined
+        }
+        onAdjust={
+          canOperate
+            ? (item) => setAdjustState({ isOpen: true, item })
+            : undefined
+        }
+        onRelease={
+          canOperate
+            ? (item, lot) => {
+                setIssueLotId(lot?.id);
+                setIssueItem(item);
+              }
+            : undefined
+        }
+        onEdit={
+          canOperate
+            ? (item) => setAddEditState({ isOpen: true, item })
+            : undefined
+        }
       />
 
+      {canOperate && (
+      <>
       <AddEditConsumableDialog
         isOpen={addEditState.isOpen}
         initialItem={addEditState.item}
@@ -399,17 +404,18 @@ export default function ConsumablesPage() {
         onConfirmAdjust={handleConfirmAdjust}
       />
 
-      <ReleaseFromLotDialog
-        isOpen={releaseState.isOpen}
-        item={releaseState.item}
-        lots={releaseLots}
-        initialLot={releaseState.lot}
-        isSubmitting={releaseMutation.isPending}
-        onClose={() =>
-          setReleaseState({ isOpen: false, item: null, lot: null })
-        }
-        onConfirm={handleConfirmRelease}
+      <IssueConsumableDialog
+        item={issueItem}
+        isOpen={Boolean(issueItem)}
+        initialLotId={issueLotId}
+        onClose={() => {
+          setIssueItem(null);
+          setIssueLotId(undefined);
+        }}
+        onSuccess={(message) => toast.success(message)}
       />
+      </>
+      )}
     </div>
   );
 }

@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, UserPlus,  Send, EyeOff, Eye, Check } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { X, UserPlus, EyeOff, Eye, Check } from "lucide-react";
 import type { UserRole } from "@/types/users";
-import { ROLE_DEFINITIONS, INVITABLE_ROLES } from "@/constants/roles";
+import type { DepartmentDTO } from "@/features/departments/client";
 
 export interface CreateUserDialogProps {
   isOpen: boolean;
@@ -13,11 +12,10 @@ export interface CreateUserDialogProps {
     name: string;
     email: string;
     role: UserRole;
-    department: string;
+    departmentId?: string;
     password: string;
   }) => void | Promise<void>;
-  /** When true, admin role is offered (superadmin only). */
-  canInviteAdmin?: boolean;
+  departments?: DepartmentDTO[];
 }
 
 /** @deprecated Use CreateUserDialogProps */
@@ -26,18 +24,18 @@ export type InviteUserDialogProps = CreateUserDialogProps;
 interface CreateUserDialogFormProps {
   onClose: () => void;
   onCreateUser: CreateUserDialogProps["onCreateUser"];
-  canInviteAdmin: boolean;
+  departments: DepartmentDTO[];
 }
 
 function CreateUserDialogForm({
   onClose,
   onCreateUser,
-  canInviteAdmin,
+  departments,
 }: CreateUserDialogFormProps) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<UserRole>("staff");
-  const [department, setDepartment] = useState("Property Custodian Office");
+  const [role] = useState<UserRole>("borrower");
+  const [departmentId, setDepartmentId] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -55,10 +53,16 @@ function CreateUserDialogForm({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose, isSubmitting]);
 
+  const availableDepartments = departments.filter((d) => !d.accountUserId);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!departmentId) {
+      setError("Select a department for this login.");
+      return;
+    }
     if (!name.trim()) {
-      setError("Please enter the staff member's full name.");
+      setError("Please enter the department account display name.");
       return;
     }
     if (!email.trim() || !email.includes("@")) {
@@ -81,7 +85,7 @@ function CreateUserDialogForm({
         name: name.trim(),
         email: email.trim(),
         role,
-        department: department.trim(),
+        departmentId,
         password,
       });
       setSuccessMessage(`Account created for ${email.trim()}`);
@@ -111,10 +115,10 @@ function CreateUserDialogForm({
             </div>
             <div>
               <h3 id="create-user-dialog-title" className="text-base font-bold text-text leading-tight">
-                Create User Account
+                Create Account
               </h3>
               <p className="text-xs text-text-secondary mt-0.5">
-                Set email, role, and initial password — no self-signup / invite email
+                Department login (email + password) for one office
               </p>
             </div>
           </div>
@@ -144,7 +148,7 @@ function CreateUserDialogForm({
                   setName(e.target.value);
                   if (error) setError("");
                 }}
-                placeholder="e.g. Maria Santos"
+                placeholder="Defaults to the department name"
                 className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent"
               />
             </div>
@@ -168,17 +172,34 @@ function CreateUserDialogForm({
           </div>
 
           <div className="space-y-1">
-            <label htmlFor="create-dept-input" className="block text-xs font-semibold text-text">
-              Department
+            <label htmlFor="create-dept-select" className="block text-xs font-semibold text-text">
+              Department <span className="text-accent">*</span>
             </label>
-            <input
-              id="create-dept-input"
-              type="text"
-              value={department}
-              onChange={(e) => setDepartment(e.target.value)}
-              placeholder="e.g. Property Custodian Office, IT, Finance"
+            <select
+              id="create-dept-select"
+              value={departmentId}
+              onChange={(e) => {
+                const nextId = e.target.value;
+                setDepartmentId(nextId);
+                const next = departments.find((d) => d.id === nextId);
+                if (next) setName(next.name);
+                if (error) setError("");
+              }}
               className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent"
-            />
+            >
+              <option value="">Select a department…</option>
+              {availableDepartments.map((dept) => (
+                <option key={dept.id} value={dept.id}>
+                  {dept.name} ({dept.code})
+                </option>
+              ))}
+            </select>
+            {availableDepartments.length === 0 && (
+              <p className="text-[11px] text-text-secondary">
+                Every department already has a login, or none exist yet. Add
+                a department in Settings first.
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -229,57 +250,6 @@ function CreateUserDialogForm({
             </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="block text-xs font-bold uppercase tracking-wider text-text-secondary">
-              System Role <span className="text-accent">*</span>
-            </label>
-
-            <div className="space-y-2" role="radiogroup" aria-label="System role selection">
-              {(INVITABLE_ROLES.filter(
-                (rKey) => rKey !== "admin" || canInviteAdmin
-              ) as UserRole[]).map((rKey) => {
-                const rDef = ROLE_DEFINITIONS[rKey];
-                const isSelected = role === rKey;
-                return (
-                  <button
-                    key={rKey}
-                    type="button"
-                    role="radio"
-                    aria-checked={isSelected}
-                    onClick={() => setRole(rKey)}
-                    className={cn(
-                      "flex items-start gap-3 p-3 rounded-xl border text-left transition-all duration-150 cursor-pointer outline-none w-full",
-                      "focus-visible:ring-2 focus-visible:ring-accent",
-                      isSelected
-                        ? "bg-bg-subtle border-primary ring-1 ring-primary shadow-2xs"
-                        : "bg-bg border-border hover:bg-bg-subtle/60"
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        "mt-0.5 flex h-4 w-4 items-center justify-center rounded-full border shrink-0",
-                        isSelected
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-border"
-                      )}
-                    >
-                      {isSelected && (
-                        <div className="h-1.5 w-1.5 rounded-full bg-primary-foreground" />
-                      )}
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <span className="text-xs font-bold text-text">{rDef.title} Role</span>
-                      <p className="text-[11px] text-text-secondary mt-0.5 leading-snug">
-                        {rDef.description}
-                      </p>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
           {error && <p className="text-xs font-bold text-status-outofservice-text">{error}</p>}
           {successMessage && (
             <div className="p-2.5 rounded bg-status-active-bg/20 border border-status-active-bg/30 text-status-active-text font-bold text-xs flex items-center gap-1.5">
@@ -316,7 +286,7 @@ export function CreateUserDialog({
   isOpen,
   onClose,
   onCreateUser,
-  canInviteAdmin = false,
+  departments = [],
 }: CreateUserDialogProps) {
   if (!isOpen) return null;
 
@@ -325,7 +295,7 @@ export function CreateUserDialog({
       key="create-user"
       onClose={onClose}
       onCreateUser={onCreateUser}
-      canInviteAdmin={canInviteAdmin}
+      departments={departments}
     />
   );
 }
