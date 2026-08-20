@@ -104,9 +104,10 @@ export function ConsumableFilters({
               }
               className="h-9 px-2.5 text-xs bg-bg-subtle border border-border rounded-lg text-text font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent"
             >
+              <option value="qty">Sort: Stock (Lowest to Highest)</option>
+              <option value="qty_desc">Sort: Stock (Highest to Lowest)</option>
               <option value="critical">Sort: Most Critical First</option>
               <option value="name">Sort: Name (A-Z)</option>
-              <option value="qty">Sort: Current Qty</option>
               <option value="updated">Sort: Recently Restocked</option>
             </select>
           </div>

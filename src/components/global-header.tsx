@@ -46,12 +46,12 @@ const ROUTE_MAP: Record<string, RouteMeta> = {
   "/borrow-log": {
     title: "Borrow & Return Log",
     subtitle: "Asset custody with LOG codes — borrowable and assignable",
-    category: "Operations",
+    category: "Logs & History",
   },
   "/issue-history": {
     title: "Issue history",
     subtitle: "Asset LOG and supply MOV transaction codes",
-    category: "Operations",
+    category: "Logs & History",
   },
   "/consumable-requests": {
     title: "Requests",
@@ -61,6 +61,11 @@ const ROUTE_MAP: Record<string, RouteMeta> = {
   "/maintenance-logs": {
     title: "Maintenance Logs",
     subtitle: "Condition flags, inspections, and repair resolutions",
+    category: "Operations",
+  },
+  "/purchase-orders": {
+    title: "Purchase Orders",
+    subtitle: "Intake lot batches, supplier invoices, and cost ledger",
     category: "Operations",
   },
   "/consumables": {
@@ -77,6 +82,31 @@ const ROUTE_MAP: Record<string, RouteMeta> = {
     title: "System Settings",
     subtitle: "Configure custodian rules, categories, and system defaults",
     category: "Administration",
+  },
+  "/borrower-db": {
+    title: "Borrower Portal",
+    subtitle: "Department equipment & supplies portal",
+    category: "Borrower",
+  },
+  "/borrower-db/dashboard": {
+    title: "My Dashboard",
+    subtitle: "Active borrowings, custody overview, and department requests",
+    category: "Overview",
+  },
+  "/borrower-db/requests": {
+    title: "My Requests",
+    subtitle: "Track status of borrow and supply requisition requests",
+    category: "Operations",
+  },
+  "/borrower-db/history": {
+    title: "Borrow History",
+    subtitle: "Asset custody logs, active loans, and return audit trails",
+    category: "Logs & History",
+  },
+  "/borrower-db/requisition": {
+    title: "Requisition Slip",
+    subtitle: "Submit a new supply or asset requisition request",
+    category: "Operations",
   },
 };
 

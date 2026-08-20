@@ -18,6 +18,7 @@ import {
 } from "./audit-log-utils";
 import type { BorrowRequest } from "@/types/borrow-requests";
 import { cn } from "@/lib/utils";
+import { formatItemDescription } from "@/lib/sanitize-display";
 import { useToast } from "@/components/providers/toast-context";
 import { LoadingState } from "@/components/providers/loading-context";
 
@@ -266,7 +267,7 @@ export function BorrowRequestsList() {
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border shadow-xs max-w-full bg-bg-subtle text-text border-border">
                             <FileText className="h-3 w-3 shrink-0 text-text-secondary" />
                             <span className="truncate whitespace-normal leading-tight">
-                              {req.purpose || req.items.map((i) => `${i.quantity}x ${i.itemDescription}`).join(", ")}
+                              {req.purpose || req.items.map((i) => `${i.quantity}x ${formatItemDescription(i.itemDescription, i.category, i.itemType)}`).join(", ")}
                             </span>
                           </span>
                         </div>

@@ -21,12 +21,14 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getCategoryStyle } from "@/constants/categories";
+import { formatItemDescription, formatAssetCodeDisplay } from "@/lib/sanitize-display";
 import {
   getActionStyle,
   getActionIcon,
   formatDateTime,
   formatRelativeTime,
   parseAuditNote,
+  AuditNoteDisplay,
 } from "@/components/audit-logs/audit-log-utils";
 import type { PortalBorrowRequest } from "./types";
 
@@ -332,15 +334,17 @@ export function RequestDetailSheet({
               {request.items?.map((item, idx) => {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const catMeta = getCategoryStyle(item.category as any);
+                const desc = formatItemDescription(item.itemDescription, catMeta.label, item.itemType);
+                const displayCode = formatAssetCodeDisplay(item.assetCode);
                 return (
                   <div key={idx} className="p-3.5 flex items-center gap-3.5 bg-card hover:bg-bg-subtle/40 transition-colors">
                     <div className={cn("h-9 w-9 shrink-0 rounded-lg flex items-center justify-center border", catMeta.bg, "border-transparent")}>
                       <Tag className={cn("h-4 w-4", catMeta.text)} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-text truncate">{item.itemDescription}</p>
+                      <p className="text-sm font-bold text-text truncate">{desc}</p>
                       <p className="text-xs text-text-secondary font-mono mt-0.5">
-                        {item.assetCode || "CONS-ITEM"} · <span className="capitalize">{catMeta.label}</span>
+                        {displayCode ? `${displayCode} · ` : ""}<span className="capitalize">{catMeta.label}</span>
                       </p>
                     </div>
                     <div className="text-right shrink-0 bg-bg-subtle px-2.5 py-1 rounded-md border border-border">
@@ -471,28 +475,7 @@ export function RequestDetailSheet({
                       </div>
 
                       {/* Action Chips: Picked up / Returned by & Notes */}
-                      {(picker || description) && (
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {picker && (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-bg-subtle text-text-secondary border border-border shadow-xs">
-                              <User className="h-3 w-3" />
-                              {h.action === "returned" ? "Returned by: " : "Picked up by: "} {picker}
-                            </span>
-                          )}
-                          {description && (
-                            <span
-                              className={cn(
-                                "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border shadow-xs max-w-full",
-                                style.bg,
-                                isRejected ? "text-white" : "text-text"
-                              )}
-                            >
-                              <FileText className="h-3 w-3 shrink-0" />
-                              <span className="truncate whitespace-normal leading-tight">{description}</span>
-                            </span>
-                          )}
-                        </div>
-                      )}
+                      <AuditNoteDisplay action={h.action} note={h.note} className="mt-2" />
                     </li>
                   );
                 })}

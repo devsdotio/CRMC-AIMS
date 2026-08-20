@@ -2,6 +2,7 @@
 
 import { ClipboardCheck, Inbox } from "lucide-react";
 import type { BorrowRequest, TabFilter } from "@/types/borrow-requests";
+import { cn } from "@/lib/utils";
 import { RequestListItem } from "./request-list-item";
 
 export interface RequestListProps {
@@ -99,16 +100,23 @@ export function RequestList({
     const emptyMeta = EMPTY_MESSAGES[activeTab];
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-16 px-6 text-center">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-bg-subtle text-text-secondary border border-border">
-          {activeTab === "pending" ? (
-            <ClipboardCheck className="h-6 w-6 text-status-active-text" />
-          ) : (
-            <Inbox className="h-6 w-6 text-text-secondary" />
+        <span
+          className={cn(
+            "flex h-14 w-14 items-center justify-center rounded-2xl border shadow-xs",
+            activeTab === "pending"
+              ? "bg-status-active-bg/15 border-status-active-bg/30 text-status-active-text"
+              : "bg-bg-subtle border-border text-text-secondary"
           )}
-        </div>
+        >
+          {activeTab === "pending" ? (
+            <ClipboardCheck className="h-7 w-7" strokeWidth={2} />
+          ) : (
+            <Inbox className="h-7 w-7" strokeWidth={1.8} />
+          )}
+        </span>
         <div>
           <h3 className="text-base font-bold text-text">{emptyMeta.title}</h3>
-          <p className="text-xs text-text-secondary mt-1 max-w-sm">
+          <p className="text-xs text-text-secondary mt-1 max-w-sm leading-relaxed">
             {emptyMeta.subtitle}
           </p>
         </div>

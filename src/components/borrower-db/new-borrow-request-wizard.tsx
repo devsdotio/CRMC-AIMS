@@ -20,19 +20,25 @@ import {
   StickyNote,
   Minus,
   Plus,
+  Laptop,
+  Video,
+  Truck,
+  Armchair,
+  HeartPulse,
+  Printer,
+  FlaskConical,
+  Wrench,
+  Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getCategoryStyle } from "@/constants/categories";
 import type { BrowseItem, WizardFormValues, RequestWizardStep, PortalBorrowRequest } from "./types";
+import { useCategoriesQuery } from "@/features/categories/client/use-categories";
 import { useCreateBorrowRequestMutation } from "@/features/borrow-requests/client/use-borrow-requests";
 import { useCreateConsumableRequestMutation } from "@/features/consumable-requests/client";
-import { useAssetsQuery } from "@/features/assets/client/use-assets";
-import { useConsumablesQuery } from "@/features/consumables/client/use-consumables";
 import { useMeQuery } from "@/features/users/client/use-users";
 import type { MeProfile } from "@/features/users/client/users-api";
 import { LoadingState } from "@/components/providers/loading-context";
-import { isAssetAvailableForRequest } from "@/lib/assets-custody";
-import { availableQty } from "@/components/consumables/utils";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -46,11 +52,34 @@ function nextWeek() {
   return d.toISOString().split("T")[0];
 }
 
+function formatFriendlyErrorMessage(rawMessage?: string): string {
+  if (!rawMessage) return "Failed to submit request. Please check your form and try again.";
+  const lower = rawMessage.toLowerCase();
+
+  if (lower.includes("invalid uuid") || lower.includes("uuid")) {
+    return "An item or department reference is invalid. Please select your categories again.";
+  }
+  if (lower.includes("department") && (lower.includes("link") || lower.includes("not found"))) {
+    return "Your account is not linked to a department. Please ask an administrator to assign your department.";
+  }
+  if (lower.includes("expectedreturndate") || (lower.includes("return date") && lower.includes("required"))) {
+    return "Please specify an expected return date for this borrow request.";
+  }
+  if (lower.includes("failed to fetch") || lower.includes("network")) {
+    return "Connection error. Please verify your network and try again.";
+  }
+  if (lower.includes("invalid input") || lower.includes("invalid literal") || lower.includes("expected string")) {
+    return "Some details were formatted incorrectly. Please review your request form.";
+  }
+
+  return rawMessage;
+}
+
 // ─── Step Indicators ─────────────────────────────────────────────────────────
 
 const STEPS: { key: RequestWizardStep; label: string; stepNumber: number }[] = [
   { key: "type", label: "Request Type", stepNumber: 1 },
-  { key: "select", label: "Select Items", stepNumber: 2 },
+  { key: "select", label: "Select Category", stepNumber: 2 },
   { key: "details", label: "Request Details", stepNumber: 3 },
   { key: "review", label: "Review & Submit", stepNumber: 4 },
 ];
@@ -347,14 +376,109 @@ function StepType({
   );
 }
 
-// ─── Step 1: Select Item (with LoadingState & Pagination) ────────────────────
+// ─── Step 2: Select Asset Category (Color Coded Cards View) ──────────────────
 
-const SELECT_PAGE_SIZE = 6;
+interface AssetCategoryCardMeta {
+  id: string;
+  title: string;
+  subtitle: string;
+  description: string;
+  icon: React.ElementType;
+  style: ReturnType<typeof getCategoryStyle>;
+}
+
+const ASSET_CATEGORIES: AssetCategoryCardMeta[] = [
+  {
+    id: "computing",
+    title: "Computing & IT",
+    subtitle: "Laptops, Desktops & Displays",
+    description: "Laptops, workstations, monitors, keyboards, network units & IT peripherals.",
+    icon: Laptop,
+    style: getCategoryStyle("computing"),
+  },
+  {
+    id: "av",
+    title: "Audio & Visual (AV)",
+    subtitle: "Cameras, Projectors & Sound",
+    description: "DSLR cameras, video camcorders, multimedia projectors, microphones & speakers.",
+    icon: Video,
+    style: getCategoryStyle("av"),
+  },
+  {
+    id: "transport",
+    title: "Transport & Mobility",
+    subtitle: "Service Vehicles & Carts",
+    description: "Official service vans, electric utility carts, transport vehicles & mobility units.",
+    icon: Truck,
+    style: getCategoryStyle("transport"),
+  },
+  {
+    id: "furniture",
+    title: "Furniture & Fixtures",
+    subtitle: "Chairs, Tables & Desks",
+    description: "Office chairs, conference tables, executive desks, podiums & filing cabinets.",
+    icon: Armchair,
+    style: getCategoryStyle("furniture"),
+  },
+  {
+    id: "medical",
+    title: "Medical & Diagnostic",
+    subtitle: "Clinical & Diagnostic Units",
+    description: "Patient monitors, diagnostic sets, clinical scales, examination devices & therapy units.",
+    icon: HeartPulse,
+    style: getCategoryStyle("medical"),
+  },
+  {
+    id: "office",
+    title: "Office Equipment",
+    subtitle: "Printers, Scanners & Copiers",
+    description: "Heavy-duty laser printers, photocopiers, document scanners & paper shredders.",
+    icon: Printer,
+    style: getCategoryStyle("office"),
+  },
+  {
+    id: "electronics",
+    title: "Electronics & Power",
+    subtitle: "UPS, Power & Instrumentation",
+    description: "Uninterruptible power supplies, voltage regulators, generators & electronic analyzers.",
+    icon: Zap,
+    style: getCategoryStyle("electronics"),
+  },
+  {
+    id: "laboratory",
+    title: "Laboratory & Science",
+    subtitle: "Lab & Research Equipment",
+    description: "Microscopes, laboratory centrifuges, incubators, hotplates & testing instruments.",
+    icon: FlaskConical,
+    style: getCategoryStyle("laboratory"),
+  },
+  {
+    id: "tools",
+    title: "Tools & Maintenance",
+    subtitle: "Power Tools & Service Kits",
+    description: "Power drills, toolkit cases, multi-meters, safety gear & maintenance equipment.",
+    icon: Wrench,
+    style: getCategoryStyle("tools"),
+  },
+];
+
+function getCategoryIcon(catKeyOrName: string): React.ElementType {
+  const norm = (catKeyOrName || "").toLowerCase();
+  if (norm.includes("comput") || norm.includes("it") || norm.includes("tech") || norm.includes("laptop")) return Laptop;
+  if (norm.includes("av") || norm.includes("audio") || norm.includes("video") || norm.includes("camera") || norm.includes("projector")) return Video;
+  if (norm.includes("transport") || norm.includes("vehicle") || norm.includes("mobility") || norm.includes("car") || norm.includes("truck")) return Truck;
+  if (norm.includes("furnit") || norm.includes("chair") || norm.includes("table") || norm.includes("desk")) return Armchair;
+  if (norm.includes("medic") || norm.includes("clinic") || norm.includes("health") || norm.includes("care") || norm.includes("pharma")) return HeartPulse;
+  if (norm.includes("print") || norm.includes("office") || norm.includes("scan") || norm.includes("copi")) return Printer;
+  if (norm.includes("electr") || norm.includes("power") || norm.includes("ups") || norm.includes("generat")) return Zap;
+  if (norm.includes("lab") || norm.includes("scien") || norm.includes("research") || norm.includes("chem")) return FlaskConical;
+  if (norm.includes("tool") || norm.includes("maint") || norm.includes("machin") || norm.includes("repair")) return Wrench;
+  return Tag;
+}
 
 function StepSelect({
   value,
   onChange,
-  initialType,
   requestType,
 }: {
   value: BrowseItem[];
@@ -363,209 +487,170 @@ function StepSelect({
   requestType?: "borrowable" | "assignable" | "consumable" | null;
 }) {
   const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
+  const { data: dbCategories = [], isLoading } = useCategoriesQuery();
 
-  const { data: assets = [], isLoading: assetsLoading } = useAssetsQuery();
-  const { data: paginatedData, isLoading: consumablesLoading } = useConsumablesQuery();
-  const consumables = useMemo(() => paginatedData?.data ?? [], [paginatedData?.data]);
-  const loading = assetsLoading || consumablesLoading;
-
-  // Reset page when search or request type changes
-  useEffect(() => {
-    setPage(1);
-  }, [search, requestType]);
-
-  const BROWSE_ITEMS = useMemo(() => {
-    return [
-      ...assets.map(a => ({
-        id: a.id,
-        name: a.name,
-        category: a.category,
-        type: "asset" as const,
-        status: a.status,
-        assignmentType: a.assignmentType,
-        assetCode: a.assetCode,
-        location: a.location,
-        reservedForRequestId: a.reservedForRequestId,
-        currentHolder: a.currentHolder,
-      })),
-      ...consumables.map(c => {
-        const free = c.availableQty ?? availableQty(c);
+  // Build category cards dynamically from the Admin Categories
+  const categoryCards = useMemo<AssetCategoryCardMeta[]>(() => {
+    const adminAssetCats = dbCategories.filter((c) => c.type === "asset" || !c.type);
+    if (adminAssetCats.length > 0) {
+      return adminAssetCats.map((c) => {
+        const style = getCategoryStyle(c.id, c.name, c.colorToken);
+        const Icon = getCategoryIcon(c.id || c.name);
         return {
-        id: c.id,
-        name: c.name,
-        category: c.category,
-        type: "consumable" as const,
-        status: free <= 0 ? "out_of_stock" : free <= c.minThreshold ? "low_stock" : "available",
-        itemCode: c.itemCode,
-        currentQty: free,
-        unit: c.unit,
-        location: c.location,
-      };
-      })
-    ] as BrowseItem[];
-  }, [assets, consumables]);
+          id: c.id,
+          title: c.name,
+          subtitle: `${c.name} Category`,
+          description: `Equipment and units registered under ${c.name}.`,
+          icon: Icon,
+          style,
+        };
+      });
+    }
+    return ASSET_CATEGORIES;
+  }, [dbCategories]);
 
-  const items = useMemo(() => {
-    return BROWSE_ITEMS.filter((item) => {
-      // 0. Filter by explicit requestType
-      if (requestType === "borrowable") {
-        if (item.type !== "asset") return false;
-        if (item.assignmentType !== "borrowable") return false;
-      }
-      if (requestType === "assignable") {
-        if (item.type !== "asset") return false;
-        if (item.assignmentType !== "assignable") return false;
-      }
-      if (requestType === "consumable" && item.type !== "consumable") return false;
-
-      // 1. Filter by requested type (legacy initialType fallback)
-      if (!requestType) {
-        if (initialType === "borrow" && item.type !== "asset") return false;
-        if (initialType === "requisition" && item.type !== "consumable") return false;
-      }
-
-      // 2. Filter by status (available for assets, not out_of_stock for consumables)
-      const isAvailable =
-        item.type === "asset"
-          ? isAssetAvailableForRequest(item)
-          : item.status !== "out_of_stock";
-      if (!isAvailable) return false;
-
-      // 3. Filter by search term
-      return item.name.toLowerCase().includes(search.toLowerCase()) ||
-        (item.type === "asset" ? item.assetCode : item.itemCode).toLowerCase().includes(search.toLowerCase());
-    });
-  }, [BROWSE_ITEMS, requestType, initialType, search]);
-
-  const totalPages = Math.max(1, Math.ceil(items.length / SELECT_PAGE_SIZE));
-  const paginatedItems = useMemo(() => {
-    const start = (page - 1) * SELECT_PAGE_SIZE;
-    return items.slice(start, start + SELECT_PAGE_SIZE);
-  }, [items, page]);
-
-  const renderItem = (item: BrowseItem) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const categoryMeta = getCategoryStyle(item.category as any);
-    const code = item.type === "asset" ? item.assetCode : item.itemCode;
-    const isSelected = value.some(v => v.id === item.id);
-    return (
-      <button
-        key={item.id}
-        type="button"
-        onClick={() => {
-          if (isSelected) {
-            onChange(value.filter(v => v.id !== item.id));
-          } else {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            onChange([...value, item as any]);
-          }
-        }}
-        className={cn(
-          "w-full flex items-center gap-3 px-3.5 py-2.5 text-left transition-colors",
-          "focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset",
-          isSelected ? "bg-accent/10" : "hover:bg-bg-subtle"
-        )}
-        aria-pressed={isSelected}
-      >
-        <div
-          className={cn(
-            "flex items-center justify-center w-4.5 h-4.5 rounded-md border transition-all shrink-0",
-            isSelected
-              ? "bg-accent border-accent text-accent-foreground"
-              : "border-border bg-card"
-          )}
-        >
-          {isSelected && <Check className="h-3 w-3 stroke-3" />}
-        </div>
-        <div
-          className={cn("h-8 w-8 shrink-0 rounded-lg flex items-center justify-center border", categoryMeta.bg, "border-transparent")}
-        >
-          <Tag className={cn("h-3.5 w-3.5", categoryMeta.text)} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-text truncate">{item.name}</p>
-          <p className="text-xs text-text-secondary font-mono">
-            {code} · <span className="capitalize">{categoryMeta.label}</span>
-          </p>
-        </div>
-      </button>
+  const filteredCategories = useMemo(() => {
+    if (!search.trim()) return categoryCards;
+    const q = search.toLowerCase();
+    return categoryCards.filter(
+      (c) =>
+        c.title.toLowerCase().includes(q) ||
+        c.subtitle.toLowerCase().includes(q) ||
+        c.description.toLowerCase().includes(q) ||
+        c.id.toLowerCase().includes(q)
     );
+  }, [categoryCards, search]);
+
+  const toggleCategory = (cat: AssetCategoryCardMeta) => {
+    const isSelected = value.some((v) => v.category === cat.id);
+    if (isSelected) {
+      onChange(value.filter((v) => v.category !== cat.id));
+    } else {
+      const categoryItem: BrowseItem = {
+        id: `cat-${cat.id}`,
+        name: `${cat.title} Equipment`,
+        category: cat.id,
+        type: "asset",
+        status: "active",
+        assignmentType: requestType === "assignable" ? "assignable" : "borrowable",
+        assetCode: `CAT-${cat.id.toUpperCase()}`,
+        location: "Central Storage",
+      };
+      onChange([...value, categoryItem]);
+    }
   };
 
   return (
-    <div className="space-y-3 h-full flex flex-col">
-      {/* Search Bar */}
-      <div className="relative shrink-0">
-        <label htmlFor="search-items" className="sr-only">Search items</label>
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary" aria-hidden />
-        <input
-          id="search-items"
-          type="search"
-          placeholder="Search items by name or code…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full h-9 rounded-lg border border-border bg-card pl-9 pr-3 text-sm text-text placeholder:text-text-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-        />
+    <div className="space-y-3.5 h-full flex flex-col min-h-0">
+      {/* Search Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shrink-0">
+        <div>
+          <p className="text-xs font-semibold text-text">
+            Choose one or more asset categories for this request:
+          </p>
+        </div>
+        <div className="relative w-full sm:w-64">
+          <label htmlFor="search-categories" className="sr-only">
+            Search asset categories
+          </label>
+          <Search
+            className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-secondary"
+            aria-hidden
+          />
+          <input
+            id="search-categories"
+            type="search"
+            placeholder="Filter categories…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full h-8.5 rounded-lg border border-border bg-card pl-8.5 pr-3 text-xs text-text placeholder:text-text-secondary/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          />
+        </div>
       </div>
 
-      {/* Item List Container */}
-      <div className="flex-1 min-h-65 overflow-y-auto rounded-xl border border-border bg-card flex flex-col justify-between">
-        {loading ? (
+      {/* Category Cards Grid */}
+      <div className="flex-1 min-h-60 overflow-y-auto pr-1">
+        {isLoading ? (
           <LoadingState
             variant="inline"
             icon="package"
-            message="Loading available items..."
-            subtitle="Fetching latest inventory records..."
+            message="Loading asset categories..."
+            subtitle="Fetching latest inventory data..."
             className="py-12"
           />
-        ) : items.length === 0 ? (
-          <div className="p-8 text-center my-auto">
+        ) : filteredCategories.length === 0 ? (
+          <div className="p-8 text-center my-auto rounded-xl border border-border bg-card">
             <Package className="h-8 w-8 text-text-secondary/50 mx-auto mb-2" />
-            <p className="text-sm font-semibold text-text">No items found</p>
-            <p className="text-xs text-text-secondary mt-0.5">Try searching with a different term or change request type.</p>
+            <p className="text-sm font-semibold text-text">No matching category</p>
+            <p className="text-xs text-text-secondary mt-0.5">
+              Try searching with a different term like &quot;Computing&quot; or &quot;AV&quot;.
+            </p>
           </div>
         ) : (
-          <div className="divide-y divide-border">
-            {paginatedItems.map(renderItem)}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {filteredCategories.map((cat) => {
+              const isSelected = value.some((v) => v.category === cat.id);
+              const Icon = cat.icon;
+              const style = cat.style;
+
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => toggleCategory(cat)}
+                  className={cn(
+                    "flex flex-col text-left p-4 rounded-xl border transition-all duration-150 relative cursor-pointer group select-none",
+                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+                    isSelected
+                      ? "border-accent bg-accent/5 ring-1 ring-accent/30 shadow-2xs"
+                      : "border-border bg-card hover:bg-bg-subtle/70 hover:border-border"
+                  )}
+                  aria-pressed={isSelected}
+                >
+                  {/* Card Header: Icon + Category Tag + Selected Radio */}
+                  <div className="flex items-start justify-between gap-2.5 w-full mb-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div
+                        className={cn(
+                          "h-10 w-10 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-150 group-hover:scale-105",
+                          style.bg,
+                          "text-white"
+                        )}
+                      >
+                        <Icon className="h-5 w-5 text-white" />
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="text-sm font-bold text-text truncate group-hover:text-accent transition-colors">
+                          {cat.title}
+                        </h4>
+                        <p className="text-[11px] font-medium text-text-secondary truncate mt-0.5">
+                          {cat.subtitle}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div
+                      className={cn(
+                        "h-5 w-5 rounded-full flex items-center justify-center shrink-0 border transition-all duration-150 mt-0.5",
+                        isSelected
+                          ? "bg-accent border-accent text-accent-foreground shadow-2xs"
+                          : "border-border bg-bg-subtle/80 group-hover:border-text-secondary/50"
+                      )}
+                    >
+                      {isSelected && <Check className="h-3 w-3 stroke-3" />}
+                    </div>
+                  </div>
+
+                  {/* Description */}
+                  <p className="text-xs text-text-secondary/80 leading-relaxed line-clamp-2 flex-1">
+                    {cat.description}
+                  </p>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
-
-      {/* Pagination Footer */}
-      {!loading && items.length > 0 && (
-        <div className="flex items-center justify-between px-1 shrink-0 text-xs text-text-secondary">
-          <p>
-            Showing <span className="font-semibold text-text">{(page - 1) * SELECT_PAGE_SIZE + 1}</span> to{" "}
-            <span className="font-semibold text-text">{Math.min(page * SELECT_PAGE_SIZE, items.length)}</span> of{" "}
-            <span className="font-semibold text-text">{items.length}</span> items
-          </p>
-
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page <= 1}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-border text-xs font-semibold text-text disabled:opacity-40 disabled:cursor-not-allowed hover:bg-bg-subtle transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />
-              Prev
-            </button>
-            <span className="px-2 font-medium">
-              {page} / {totalPages}
-            </span>
-            <button
-              type="button"
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page >= totalPages}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-border text-xs font-semibold text-text disabled:opacity-40 disabled:cursor-not-allowed hover:bg-bg-subtle transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-            >
-              Next
-              <ChevronRight className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -1103,16 +1188,23 @@ export function NewBorrowRequestWizard({
     setErrorMessage("");
 
     try {
-      const items = values.selectedItems.map(item => ({
-        itemDescription: item.name,
-        assetId: item.type === "asset" ? item.id : undefined,
-        assetCode: item.type === "asset" ? item.assetCode : undefined,
-        consumableId: item.type === "consumable" ? item.id : undefined,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        category: item.category as any,
-        quantity: values.quantities[item.id] || 1,
-        itemType: item.type,
-      }));
+      const isValidUuid = (str?: string | null) =>
+        Boolean(str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str));
+
+      const items = values.selectedItems.map((item) => {
+        const isRealAssetUuid = item.type === "asset" && isValidUuid(item.id);
+        const isRealConsumableUuid = item.type === "consumable" && isValidUuid(item.id);
+        return {
+          itemDescription: item.name,
+          assetId: isRealAssetUuid ? item.id : undefined,
+          assetCode: isRealAssetUuid ? item.assetCode : undefined,
+          consumableId: isRealConsumableUuid ? item.id : undefined,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          category: item.category as any,
+          quantity: values.quantities[item.id] || 1,
+          itemType: item.type,
+        };
+      });
 
       if (!me?.id || !me.email) {
         setErrorMessage("Your profile could not be loaded. Sign in again and retry.");
@@ -1129,7 +1221,7 @@ export function NewBorrowRequestWizard({
 
       if (values.requestType === "consumable") {
         const created = await createConsumableRequest({
-          requesterUserId: me.id,
+          requesterUserId: isValidUuid(me.id) ? me.id : undefined,
           requesterName: me.name,
           requesterEmail: me.email,
           departmentId: me.departmentId,
@@ -1176,16 +1268,14 @@ export function NewBorrowRequestWizard({
       }
 
       const createdRequest = await createRequest({
-        requesterUserId: me.id,
+        requesterUserId: isValidUuid(me.id) ? me.id : undefined,
         requesterName: me.name,
         requesterEmail: me.email,
-        departmentId: me.departmentId,
+        departmentId: isValidUuid(me.departmentId) ? me.departmentId : undefined,
         requestType:
           values.requestType === "assignable"
             ? "assignable"
-            : values.requestType === "borrowable"
-              ? "borrowable"
-              : undefined,
+            : "borrowable",
         items: items
           .filter((item) => item.itemType === "asset")
           .map((item) => ({
@@ -1209,7 +1299,7 @@ export function NewBorrowRequestWizard({
       onOpenChange(false);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
-      setErrorMessage(e.message || "Failed to submit request.");
+      setErrorMessage(formatFriendlyErrorMessage(e.message));
     }
   }
 

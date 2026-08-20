@@ -7,7 +7,6 @@ import {
   Clock,
   AlertTriangle,
   CheckCircle2,
-  ShoppingBag,
   ArrowRight,
   Calendar,
   Tag,
@@ -360,11 +359,11 @@ export function BorrowerDashboard() {
             )}.
           </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={() => openWizard(null)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-accent text-accent-foreground text-sm font-semibold hover:opacity-90 active:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-accent shadow-xs"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-accent text-accent-foreground text-sm font-semibold hover:opacity-90 active:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-accent shadow-xs cursor-pointer"
           >
             <Package className="h-4 w-4" aria-hidden />
             New Request
@@ -414,11 +413,11 @@ export function BorrowerDashboard() {
               </div>
             ) : activeItemsMapped.length === 0 ? (
               <div className="flex flex-col items-center justify-center flex-1 py-12 text-center px-6">
-                <div className="h-12 w-12 rounded-full bg-bg-subtle flex items-center justify-center mb-3">
-                  <CheckCircle2 className="h-5 w-5 text-status-active-text" aria-hidden />
-                </div>
-                <p className="text-sm font-semibold text-text">All caught up!</p>
-                <p className="text-xs text-text-secondary mt-1 max-w-xs">
+                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-status-active-bg/15 border border-status-active-bg/30 text-status-active-text shadow-xs mb-3">
+                  <CheckCircle2 className="h-6 w-6" strokeWidth={2.2} aria-hidden />
+                </span>
+                <p className="text-sm font-bold text-text">All caught up!</p>
+                <p className="text-xs text-text-secondary mt-1 max-w-xs leading-relaxed">
                   You have no overdue items. Check your history for all active borrowings.
                 </p>
               </div>
@@ -456,11 +455,11 @@ export function BorrowerDashboard() {
               </div>
             ) : pendingRequestsMapped.length === 0 ? (
               <div className="flex flex-col items-center justify-center flex-1 py-12 text-center px-6">
-                <div className="h-12 w-12 rounded-full bg-bg-subtle flex items-center justify-center mb-3">
-                  <Package className="h-5 w-5 text-text-secondary" aria-hidden />
-                </div>
-                <p className="text-sm font-semibold text-text">No pending requests</p>
-                <p className="text-xs text-text-secondary mt-1 max-w-xs">
+                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-bg-subtle border border-border text-text-secondary shadow-xs mb-3">
+                  <Package className="h-6 w-6" strokeWidth={1.8} aria-hidden />
+                </span>
+                <p className="text-sm font-bold text-text">No pending requests</p>
+                <p className="text-xs text-text-secondary mt-1 max-w-xs leading-relaxed">
                   You don&apos;t have any requests waiting for approval.
                 </p>
               </div>

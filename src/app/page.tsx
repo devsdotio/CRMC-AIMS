@@ -6,9 +6,10 @@ import { eq } from "drizzle-orm";
 
 export default async function Home() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const userId = claimsData?.claims?.sub;
 
-  if (!user) {
+  if (!userId) {
     redirect("/sign-in");
   }
 
@@ -16,7 +17,7 @@ export default async function Home() {
   const [profile] = await db
     .select()
     .from(profiles)
-    .where(eq(profiles.userId, user.id))
+    .where(eq(profiles.userId, userId))
     .limit(1);
 
   if (profile?.role === "borrower") {
@@ -25,3 +26,4 @@ export default async function Home() {
 
   redirect("/dashboard");
 }
+

@@ -105,7 +105,11 @@ export function RequestListItem({
 
         {/* Row 2: Item Description */}
         <h3 className="text-sm font-bold text-text truncate group-hover:text-accent transition-colors">
-          {firstItem?.itemDescription} {request.items.length > 1 ? `(+${request.items.length - 1} more)` : ""}
+          {firstItem?.itemDescription &&
+          !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(firstItem.itemDescription)
+            ? firstItem.itemDescription
+            : `${categoryMeta.label} Equipment`}{" "}
+          {request.items.length > 1 ? `(+${request.items.length - 1} more)` : ""}
           {request.items.length === 1 && firstItem && firstItem.quantity > 1 && (
             <span className="ml-2 text-xs font-semibold text-text-secondary">
               (Qty: {firstItem.quantity})

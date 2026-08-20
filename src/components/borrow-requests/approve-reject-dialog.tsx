@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { X, AlertCircle, CheckCircle2, Loader2, User, Building2, FileText, CalendarClock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getCategoryStyle } from "@/constants/categories";
+import { formatItemDescription } from "@/lib/sanitize-display";
 import type { BorrowRequest } from "@/types/borrow-requests";
 
 export interface ApproveRejectDialogProps {
@@ -134,12 +135,13 @@ function ApproveRejectDialogForm({
             <div className="divide-y divide-border">
               {request.items.map((item, idx) => {
                 const catStyle = getCategoryStyle(item.category);
+                const desc = formatItemDescription(item.itemDescription, catStyle.label, item.itemType);
                 return (
                   <div key={idx} className={cn("flex items-center gap-2.5 px-3.5 py-2", idx % 2 === 1 && "bg-bg-subtle/60")}>
                     <span className="flex items-center justify-center h-5 min-w-5 px-1 rounded bg-bg border border-border text-[10px] font-bold text-text shrink-0">
                       &times;{item.quantity}
                     </span>
-                    <span className="text-text font-medium truncate flex-1 min-w-0">{item.itemDescription}</span>
+                    <span className="text-text font-medium truncate flex-1 min-w-0">{desc}</span>
                     <span className={cn("rounded px-1.5 py-px text-[9px] font-bold uppercase shrink-0", catStyle.bg, catStyle.text)}>
                       {catStyle.label}
                     </span>

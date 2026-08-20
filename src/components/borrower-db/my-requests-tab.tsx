@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { ClipboardList, ChevronLeft, ChevronRight } from "lucide-react";
+import { motion } from "framer-motion";
+import { Search, ChevronLeft, ChevronRight, ClipboardCheck, Inbox } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MyRequestItem } from "./my-request-item";
 import { CancelRequestDialog } from "./cancel-request-dialog";
@@ -13,18 +14,55 @@ import { useBorrowRequests, useCancelBorrowRequestMutation } from "@/features/bo
 import { useConsumableRequests, useCancelConsumableRequestMutation } from "@/features/consumable-requests/client";
 import { useToast } from "@/components/providers/toast-context";
 
-const STATUS_FILTERS: { key: RequestStatusFilter; label: string }[] = [
-  { key: "all", label: "All" },
-  { key: "pending", label: "Pending" },
-  { key: "approved", label: "Approved" },
-  { key: "rejected", label: "Rejected" },
-  { key: "returned", label: "Completed" },
+const STATUS_FILTERS: {
+  key: RequestStatusFilter;
+  label: string;
+  dot: string;
+  badge: string;
+  activeBadge: string;
+}[] = [
+  {
+    key: "all",
+    label: "All Requests",
+    dot: "bg-text-secondary/70",
+    badge: "bg-bg-subtle text-text-secondary border border-border",
+    activeBadge: "bg-bg-subtle text-text font-bold border border-border/80",
+  },
+  {
+    key: "pending",
+    label: "Pending",
+    dot: "bg-amber-500",
+    badge: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20",
+    activeBadge: "bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold border border-amber-500/30",
+  },
+  {
+    key: "approved",
+    label: "Approved",
+    dot: "bg-blue-500",
+    badge: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20",
+    activeBadge: "bg-blue-500/20 text-blue-700 dark:text-blue-300 font-bold border border-blue-500/30",
+  },
+  {
+    key: "returned",
+    label: "Issued / Completed",
+    dot: "bg-emerald-500",
+    badge: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20",
+    activeBadge: "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-500/30",
+  },
+  {
+    key: "rejected",
+    label: "Rejected",
+    dot: "bg-destructive",
+    badge: "bg-destructive/10 text-destructive border border-destructive/20",
+    activeBadge: "bg-destructive/20 text-destructive font-bold border border-destructive/30",
+  },
 ];
 
-const REQUESTS_PAGE_SIZE = 5;
+const REQUESTS_PAGE_SIZE = 10;
 
 export function MyRequestsTab() {
   const [statusFilter, setStatusFilter] = useState<RequestStatusFilter>("all");
+  const [search, setSearch] = useState("");
   const [cancelTarget, setCancelTarget] = useState<PortalBorrowRequest | null>(null);
   const [selectedRequest, setSelectedRequest] = useState<PortalBorrowRequest | null>(null);
   const [page, setPage] = useState(1);
@@ -43,7 +81,7 @@ export function MyRequestsTab() {
 
   useEffect(() => {
     setPage(1);
-  }, [statusFilter]);
+  }, [statusFilter, search]);
 
   const requests = useMemo<PortalBorrowRequest[]>(() => {
     const mappedAssets: PortalBorrowRequest[] = assetRequests.map((row) => ({
@@ -117,8 +155,17 @@ export function MyRequestsTab() {
   };
 
   const filtered = useMemo(() => {
-    return requests.filter((r) => matchesFilter(r, statusFilter));
-  }, [requests, statusFilter]);
+    return requests
+      .filter((r) => matchesFilter(r, statusFilter))
+      .filter((r) => {
+        if (!search.trim()) return true;
+        const q = search.toLowerCase();
+        const code = (r.requestCode || "").toLowerCase();
+        const purpose = (r.purpose || "").toLowerCase();
+        const items = r.items?.map((it) => it.itemDescription.toLowerCase()).join(" ") || "";
+        return code.includes(q) || purpose.includes(q) || items.includes(q);
+      });
+  }, [requests, statusFilter, search]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / REQUESTS_PAGE_SIZE));
   const paginatedRequests = useMemo(() => {
@@ -127,92 +174,118 @@ export function MyRequestsTab() {
   }, [filtered, page]);
 
   return (
-    <div className="space-y-4">
-      {/* Filter chips */}
-      <div
-        className="flex flex-wrap gap-2"
-        role="group"
-        aria-label="Filter requests by status"
-      >
-        {STATUS_FILTERS.map((f) => {
-          const count =
-            f.key === "all"
-              ? requests.length
-              : requests.filter((r) => matchesFilter(r, f.key)).length;
+    <div className="rounded-xl border border-border overflow-hidden bg-bg shadow-xs flex flex-col min-h-0">
+      {/* Toolbar: Segmented Tabs on Left, Search on Right */}
+      <div className="px-4 md:px-6 py-3 bg-bg border-b border-border flex flex-wrap items-center justify-between gap-3 shrink-0">
+        {/* Status Tabs */}
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-xs font-bold text-text-secondary uppercase tracking-wider shrink-0">
+            Status:
+          </span>
+          <div className="flex gap-1 rounded-xl border border-border p-1 bg-bg-subtle shrink-0 overflow-x-auto scrollbar-none relative">
+            {STATUS_FILTERS.map((f) => {
+              const count =
+                f.key === "all"
+                  ? requests.length
+                  : requests.filter((r) => matchesFilter(r, f.key)).length;
 
-          const isActive = statusFilter === f.key;
+              const isSelected = statusFilter === f.key;
 
-          const activeColors = {
-            all: "bg-accent text-accent-foreground border-accent",
-            pending: "bg-status-repair-bg/15 text-status-repair-text border-status-repair-bg/40",
-            approved: "bg-status-active-bg/15 text-status-active-text border-status-active-bg/40",
-            rejected: "bg-destructive text-white border-destructive",
-            returned: "bg-bg-subtle text-text border-border",
-          };
-
-          const badgeColors = {
-            all: "bg-card/20 text-card",
-            pending: "bg-status-repair-bg/20 text-status-repair-text",
-            approved: "bg-status-active-bg/20 text-status-active-text",
-            rejected: "bg-destructive text-white",
-            returned: "bg-border text-text",
-          };
-
-          return (
-            <button
-              key={f.key}
-              type="button"
-              onClick={() => setStatusFilter(f.key)}
-              aria-pressed={isActive}
-              className={cn(
-                "inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
-                isActive
-                  ? activeColors[f.key]
-                  : "bg-card border-border text-text-secondary hover:border-text-secondary/50 hover:text-text"
-              )}
-            >
-              {f.label}
-              {count > 0 && (
-                <span
+              return (
+                <button
+                  key={f.key}
+                  type="button"
+                  onClick={() => setStatusFilter(f.key)}
                   className={cn(
-                    "px-2 py-0.5 rounded-full text-[11px] font-bold",
-                    isActive
-                      ? badgeColors[f.key]
-                      : "bg-bg-subtle text-text-secondary"
+                    "relative inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors duration-150 cursor-pointer whitespace-nowrap select-none",
+                    isSelected
+                      ? "text-text"
+                      : "text-text-secondary hover:text-text"
                   )}
                 >
-                  {count}
-                </span>
-              )}
-            </button>
-          );
-        })}
+                  {isSelected && (
+                    <motion.span
+                      layoutId="borrower-my-requests-active-tab"
+                      className="absolute inset-0 rounded-lg bg-bg shadow-xs border border-border/80"
+                      transition={{ type: "spring", stiffness: 500, damping: 38 }}
+                    />
+                  )}
+                  <span
+                    className={cn("h-1.5 w-1.5 rounded-full relative z-10 shrink-0", f.dot)}
+                    aria-hidden="true"
+                  />
+                  <span className="relative z-10">{f.label}</span>
+                  <span
+                    className={cn(
+                      "relative z-10 px-1.5 py-0.2 rounded-full text-[10px] font-mono font-semibold transition-colors duration-150",
+                      isSelected ? f.activeBadge : f.badge
+                    )}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Search Field */}
+        <div className="relative flex-1 min-w-48 max-w-sm">
+          <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-text-secondary">
+            <Search className="h-3.5 w-3.5" />
+          </span>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search request code, item, or purpose…"
+            className={cn(
+              "w-full h-9 pl-8.5 pr-3 text-xs bg-bg border border-border rounded-lg text-text placeholder:text-text-secondary/60",
+              "focus:outline-none focus:ring-2 focus:ring-accent transition-colors"
+            )}
+          />
+        </div>
       </div>
 
       {/* List */}
-      <div className="rounded-xl border border-border overflow-hidden bg-card">
+      <div className="flex-1 overflow-y-auto min-h-0 bg-bg divide-y divide-border">
         {loading ? (
-          <LoadingState
-            variant="card"
-            icon="clipboard"
-            message="Loading your requests..."
-            subtitle="Fetching your borrow and requisition requests..."
-            className="border-none shadow-none py-12"
-          />
+          <div className="p-6">
+            <LoadingState
+              variant="card"
+              icon="clipboard"
+              message="Loading your requests..."
+              subtitle="Fetching your borrow and requisition requests..."
+              className="border-none shadow-none py-12"
+            />
+          </div>
         ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="h-12 w-12 rounded-full bg-bg-subtle flex items-center justify-center mb-4">
-              <ClipboardList className="h-5 w-5 text-text-secondary" aria-hidden />
-            </div>
-            <h3 className="text-sm font-semibold text-text">
+          <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+            <span
+              className={cn(
+                "flex h-14 w-14 items-center justify-center rounded-2xl border shadow-xs mb-3",
+                statusFilter === "pending"
+                  ? "bg-status-active-bg/15 border-status-active-bg/30 text-status-active-text"
+                  : statusFilter === "approved"
+                    ? "bg-blue-500/10 border-blue-500/25 text-blue-600 dark:text-blue-400"
+                    : "bg-bg-subtle border-border text-text-secondary"
+              )}
+            >
+              {statusFilter === "pending" ? (
+                <ClipboardCheck className="h-7 w-7" strokeWidth={2} />
+              ) : (
+                <Inbox className="h-7 w-7" strokeWidth={1.8} />
+              )}
+            </span>
+            <h3 className="text-base font-bold text-text">
               {statusFilter === "all"
-                ? "No requests yet"
+                ? "No requests found"
                 : `No ${STATUS_FILTERS.find((f) => f.key === statusFilter)?.label.toLowerCase()} requests`}
             </h3>
-            <p className="text-xs text-text-secondary mt-1 max-w-xs">
+            <p className="text-xs text-text-secondary mt-1 max-w-sm leading-relaxed">
               {statusFilter === "all"
-                ? "Browse the available assets and consumables to submit your first borrow or requisition request."
-                : "No requests match this filter. Try selecting a different status."}
+                ? "You haven't submitted any borrow or consumable requisition requests yet."
+                : "No requests match the selected status filter."}
             </p>
           </div>
         ) : (
@@ -232,7 +305,7 @@ export function MyRequestsTab() {
 
       {/* Pagination Controls */}
       {!loading && totalPages > 1 && (
-        <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-card">
+        <div className="flex items-center justify-between px-6 py-3.5 border-t border-border bg-bg shrink-0">
           <p className="text-xs text-text-secondary">
             Page <span className="font-semibold text-text">{page}</span> of{" "}
             <span className="font-semibold text-text">{totalPages}</span> (
@@ -244,7 +317,7 @@ export function MyRequestsTab() {
               type="button"
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page <= 1}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-text disabled:opacity-40 disabled:cursor-not-allowed hover:bg-bg-subtle transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-text disabled:opacity-40 disabled:cursor-not-allowed hover:bg-bg-subtle transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent cursor-pointer"
             >
               <ChevronLeft className="h-3.5 w-3.5" />
               Previous
@@ -253,7 +326,7 @@ export function MyRequestsTab() {
               type="button"
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page >= totalPages}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-text disabled:opacity-40 disabled:cursor-not-allowed hover:bg-bg-subtle transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-text disabled:opacity-40 disabled:cursor-not-allowed hover:bg-bg-subtle transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent cursor-pointer"
             >
               Next
               <ChevronRight className="h-3.5 w-3.5" />
@@ -262,32 +335,32 @@ export function MyRequestsTab() {
         </div>
       )}
 
-      {/* Request Detail Sheet */}
-      {selectedRequest && (
-        <RequestDetailSheet
-          request={selectedRequest}
-          open={!!selectedRequest}
-          onOpenChange={(open) => {
-            if (!open) setSelectedRequest(null);
-          }}
-          onCancel={(r) => {
-            setSelectedRequest(null);
-            setCancelTarget(r);
-          }}
-        />
-      )}
-
-      {/* Cancel confirmation dialog */}
+      {/* Cancel Confirmation Dialog */}
       {cancelTarget && (
         <CancelRequestDialog
           request={cancelTarget}
-          open={!!cancelTarget}
+          open={Boolean(cancelTarget)}
           onOpenChange={(open) => {
             if (!open) setCancelTarget(null);
           }}
           onConfirm={() => {
             handleCancelConfirmed(cancelTarget.id);
             setCancelTarget(null);
+          }}
+        />
+      )}
+
+      {/* Request Detail Sheet */}
+      {selectedRequest && (
+        <RequestDetailSheet
+          request={selectedRequest}
+          open={Boolean(selectedRequest)}
+          onOpenChange={(open) => {
+            if (!open) setSelectedRequest(null);
+          }}
+          onCancel={(req) => {
+            setSelectedRequest(null);
+            setCancelTarget(req);
           }}
         />
       )}

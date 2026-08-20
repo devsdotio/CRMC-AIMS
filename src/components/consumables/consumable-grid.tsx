@@ -59,13 +59,13 @@ export function ConsumableGrid({
   if (items.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-16 px-6 text-center">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-bg-subtle text-text-secondary border border-border">
-          <PackageSearch className="h-6 w-6" />
-        </div>
+        <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/10 border border-amber-500/25 text-status-repair-text shadow-xs">
+          <PackageSearch className="h-7 w-7" strokeWidth={1.8} />
+        </span>
         <div>
           <h3 className="text-base font-bold text-text">No consumable supplies found</h3>
-          <p className="text-xs text-text-secondary mt-1 max-w-sm">
-            No stock items match your current search, category, or stock-level filters.
+          <p className="text-xs text-text-secondary mt-1 max-w-sm leading-relaxed">
+            No inventory stock items match your current search query, category, or stock-level filters.
           </p>
         </div>
       </div>

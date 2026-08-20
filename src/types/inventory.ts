@@ -55,5 +55,5 @@ export interface ConsumableItem {
 export interface ConsumableFilterState extends BaseFilterState {
   category: string;
   stockLevel: "all" | "healthy" | "low" | "critical";
-  sortBy: "critical" | "name" | "qty" | "updated";
+  sortBy: "qty" | "qty_desc" | "critical" | "name" | "updated";
 }

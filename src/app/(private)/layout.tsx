@@ -68,16 +68,18 @@ export default async function PrivateLayout({
     pathname === "/borrower-db" || pathname.startsWith("/borrower-db/");
 
   if (role === "borrower") {
-    // Keep borrowers out of staff routes without a sign-in error bounce loop.
-    // Empty pathname = header missing; do not self-redirect in that case.
+    // Keep borrowers inside the borrower portal; redirect if accessing staff routes
     if (pathname && !onBorrowerPortal) {
       redirect("/borrower-db/dashboard");
     }
-  } else if (!isStaffShellRole(role)) {
+  } else if (isStaffShellRole(role)) {
+    // Keep staff inside staff routes; redirect if accessing borrower routes
+    if (pathname && onBorrowerPortal) {
+      redirect("/dashboard");
+    }
+  } else {
+    // Only genuine unknown or unassigned roles bounce with error
     redirect("/sign-in?error=no_profile");
-  } else if (pathname && onBorrowerPortal) {
-    // Staff accidentally at borrower URLs → staff home (RouteGuard does the same).
-    redirect("/dashboard");
   }
 
   // Best-effort presence (never block entry)

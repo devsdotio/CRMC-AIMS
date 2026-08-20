@@ -24,9 +24,9 @@ import {
   PanelLeftOpen,
   FolderKanban,
   Truck,
-  Wrench,
+  ShoppingCart,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { performSignOut } from "@/lib/auth/sign-out-client";
 import { cn } from "@/lib/utils";
 
 interface NavItem {
@@ -86,16 +86,13 @@ export default function Sidebar({
 
     setIsLoggingOut(true);
     try {
-      const supabase = createClient();
-      await supabase.auth.signOut();
       queryClient.clear();
-      router.push("/sign-in");
-      router.refresh();
+      await performSignOut();
     } catch {
-      // Still leave the app shell if network sign-out fails; proxy will recheck session.
       queryClient.clear();
-      router.push("/sign-in");
-      router.refresh();
+      if (typeof window !== "undefined") {
+        window.location.replace("/sign-in");
+      }
     } finally {
       setIsLoggingOut(false);
     }
@@ -139,14 +136,18 @@ export default function Sidebar({
         { name: "Assets", href: "/assets", icon: Package, roles: ["superadmin", "admin", "staff"] },
         { name: "Inventory", href: "/consumables", icon: Boxes, badge: lowStockCount, badgeTone: "warning", roles: ["superadmin", "admin", "staff"] },
         { name: "Requests", href: "/borrow-requests", icon: ClipboardList, badge: pendingCount, badgeTone: "accent", roles: ["superadmin", "admin", "staff"] },
-        { name: "Borrow Log", href: "/borrow-log", icon: Repeat, badge: overdueCount, badgeTone: "warning", roles: ["superadmin", "admin", "staff"] },
-        { name: "Issue history", href: "/issue-history", icon: History, roles: ["superadmin", "admin", "staff"] },
+        { name: "Purchase Orders", href: "/purchase-orders", icon: ShoppingCart, roles: ["superadmin", "admin", "staff"] },
         { name: "Suppliers", href: "/suppliers", icon: Truck, roles: ["superadmin", "admin", "staff"] },
         { name: "Projects", href: "/projects", icon: FolderKanban, roles: ["superadmin", "admin"] },
-        { name: "Maintenance Logs", href: "/maintenance-logs", icon: Wrench, roles: ["superadmin", "admin", "staff"] },
-        // TEMP: Audit Logs nav hidden while writes are disabled.
-        // { name: "Audit Logs", href: "/audit-logs", icon: FileText, roles: ["superadmin", "admin"] },
+        
         { name: "My Requests", href: "/borrower-db/requests", icon: ClipboardList, badge: pendingCount, badgeTone: "accent", roles: ["borrower"] },
+      ],
+    },
+    {
+      label: "Logs & History",
+      items: [
+        { name: "Borrow Log", href: "/borrow-log", icon: Repeat, badge: overdueCount, badgeTone: "warning", roles: ["superadmin", "admin", "staff"] },
+        { name: "Issue History", href: "/issue-history", icon: History, roles: ["superadmin", "admin", "staff"] },
         { name: "Borrow History", href: "/borrower-db/history", icon: History, roles: ["borrower"] },
       ],
     },

@@ -51,7 +51,7 @@ export default function ConsumablesPage() {
     searchQuery: "",
     category: "all",
     stockLevel: "all",
-    sortBy: "critical",
+    sortBy: "qty",
   });
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -116,6 +116,14 @@ export default function ConsumablesPage() {
     });
 
     result.sort((a, b) => {
+      if (filters.sortBy === "qty") {
+        if (a.currentQty !== b.currentQty) return a.currentQty - b.currentQty;
+        return a.name.localeCompare(b.name);
+      }
+      if (filters.sortBy === "qty_desc") {
+        if (b.currentQty !== a.currentQty) return b.currentQty - a.currentQty;
+        return a.name.localeCompare(b.name);
+      }
       if (filters.sortBy === "critical") {
         const sevOrder = { critical: 0, low: 1, healthy: 2 };
         const sevA = sevOrder[getStockSeverity(a.currentQty, a.minThreshold)];
@@ -124,9 +132,6 @@ export default function ConsumablesPage() {
         const thrA = a.minThreshold || 1;
         const thrB = b.minThreshold || 1;
         return a.currentQty / thrA - b.currentQty / thrB;
-      }
-      if (filters.sortBy === "qty") {
-        return a.currentQty - b.currentQty;
       }
       if (filters.sortBy === "updated") {
         return b.lastRestocked.localeCompare(a.lastRestocked);
@@ -146,7 +151,7 @@ export default function ConsumablesPage() {
       searchQuery: "",
       category: "all",
       stockLevel: "all",
-      sortBy: "critical",
+      sortBy: "qty",
     });
   };
 

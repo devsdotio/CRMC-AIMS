@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { X, Check, Mail, Phone, Building2, Tag, History, FileText, User, Loader2, Send, CheckCircle, XCircle, PackageCheck, PackageMinus, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BorrowRequest,  RequestStatus } from "@/types/borrow-requests";
+import { AuditNoteDisplay } from "@/components/audit-logs/audit-log-utils";
 
 /** Deterministic color from a string — same code always gets the same hue. */
 function getAssetCodeColor(code: string) {
@@ -223,11 +224,21 @@ export function RequestDetailPanel({
             <div className="rounded-lg border border-border bg-bg overflow-hidden divide-y divide-border">
               {request.items.map((item, idx) => {
                 const itemCategoryMeta = getCategoryStyle(item.category);
+                const isUuidStr = (s?: string | null) =>
+                  Boolean(s && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s.trim()));
+                const displayDesc = isUuidStr(item.itemDescription)
+                  ? `${itemCategoryMeta.label} Equipment`
+                  : item.itemDescription;
+                const shouldShowAssetCode =
+                  Boolean(item.assetCode) &&
+                  !isUuidStr(item.assetCode) &&
+                  !item.assetCode?.toLowerCase().startsWith("cat-");
+
                 return (
                   <div key={idx} className={cn("px-3.5 py-2.5 flex items-center gap-3", idx % 2 === 1 && "bg-bg-subtle/50")}>
                     {/* Description + tags */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-text truncate">{item.itemDescription}</p>
+                      <p className="text-xs font-semibold text-text truncate">{displayDesc}</p>
                       <div className="flex flex-wrap items-center gap-1 mt-0.5">
                         <span className={cn("rounded-full px-1.5 py-px text-[9px] font-bold uppercase", itemCategoryMeta.bg, itemCategoryMeta.text)}>
                           {itemCategoryMeta.label}
@@ -238,7 +249,7 @@ export function RequestDetailPanel({
                         )}>
                           {item.itemType === "asset" ? "Asset" : "Consumable"}
                         </span>
-                        {item.assetCode && (() => {
+                        {shouldShowAssetCode && item.assetCode && (() => {
                           const acColor = getAssetCodeColor(item.assetCode);
                           return (
                             <span
@@ -376,44 +387,7 @@ export function RequestDetailPanel({
                       </div>
                       
                       {h.note && (
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {(() => {
-                            let picker = null;
-                            let restOfNote = h.note;
-                            
-                            // Extract picker from released note if present
-                            if (h.action === "released" && h.note.startsWith("Released to: ")) {
-                              const parts = h.note.split(". ");
-                              picker = parts[0].replace("Released to: ", "");
-                              restOfNote = parts.slice(1).join(". ");
-                            } else if (h.action === "returned" && h.note.startsWith("Returned by: ")) {
-                              const parts = h.note.split(". ");
-                              picker = parts[0].replace("Returned by: ", "");
-                              restOfNote = parts.slice(1).join(". ");
-                            }
-                            
-                            return (
-                              <>
-                                {picker && (
-                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-bg-subtle text-text-secondary border border-border shadow-xs">
-                                    <User className="h-3 w-3" />
-                                    {h.action === "returned" ? "Returned by: " : "Picked up by: "} {picker}
-                                  </span>
-                                )}
-                                {restOfNote && (
-                                  <span className={cn(
-                                    "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border shadow-xs max-w-full",
-                                    style.bg,
-                                    h.action === "rejected" ? "text-white" : "text-text"
-                                  )}>
-                                    <FileText className="h-3 w-3 shrink-0" />
-                                    <span className="truncate whitespace-normal leading-tight">{restOfNote}</span>
-                                  </span>
-                                )}
-                              </>
-                            );
-                          })()}
-                        </div>
+                        <AuditNoteDisplay action={h.action} note={h.note} className="mt-2" />
                       )}
                     </li>
                   );

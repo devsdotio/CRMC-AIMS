@@ -477,19 +477,25 @@ function AddEditAssetDialogForm({
 
             <div className="space-y-3">
               <div className="space-y-1">
-                <label
-                  htmlFor="asset-code"
-                  className="block text-xs font-semibold text-text"
-                >
-                  Asset Code
-                </label>
+                <div className="flex items-center justify-between">
+                  <label
+                    htmlFor="asset-code"
+                    className="block text-xs font-semibold text-text"
+                  >
+                    Asset Code
+                  </label>
+                  <span className="text-[10px] font-medium text-text-secondary">
+                    {isEditing ? "Fixed identifier" : "Auto-generated"}
+                  </span>
+                </div>
                 <input
                   id="asset-code"
                   type="text"
-                  value={assetCode}
-                  onChange={(e) => setAssetCode(e.target.value.toUpperCase())}
-                  disabled={isEditing || isSubmitting}
-                  className="w-full h-9 px-3 text-xs bg-bg-subtle border border-border rounded-lg font-mono text-text focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-70"
+                  value={assetCode || (category ? generateAssetCode(category) : "")}
+                  readOnly
+                  tabIndex={-1}
+                  disabled
+                  className="w-full h-9 px-3 text-xs bg-bg-subtle border border-border rounded-lg font-mono font-semibold text-text-secondary cursor-not-allowed select-none"
                 />
               </div>
               {assetCode ? (

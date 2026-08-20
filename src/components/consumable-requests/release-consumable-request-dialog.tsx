@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, Layers, Loader2, User } from "lucide-react";
 
 import { formatPhp } from "@/components/projects/format-money";
+import { formatItemDescription, formatAssetCodeDisplay } from "@/lib/sanitize-display";
 import { usePurchaseLotsQuery } from "@/features/purchase-lots/client/use-purchase-lots";
 import type { ConsumableRequest } from "@/features/consumable-requests/client";
 import type { ReleaseConsumableRequestPayload } from "@/features/consumable-requests/client/consumable-requests-api";
@@ -42,12 +43,15 @@ function ReleaseLineLotRow({
   const isShortfall =
     selectedLot && selectedLot.quantityRemaining < line.quantityRequested;
 
+  const displayItemName = formatItemDescription(line.itemName, line.category, "consumable");
+  const displayItemCode = formatAssetCodeDisplay(line.itemCode);
+
   return (
     <div className="rounded-lg border border-border bg-bg-subtle/40 p-3.5 space-y-2.5">
       <div className="min-w-0">
-        <p className="text-xs font-bold text-text truncate">{line.itemName}</p>
+        <p className="text-xs font-bold text-text truncate">{displayItemName}</p>
         <p className="text-[11px] text-text-secondary font-mono">
-          {line.itemCode} · qty {line.quantityRequested} {line.unit}
+          {displayItemCode ? `${displayItemCode} · ` : ""}qty {line.quantityRequested} {line.unit || "units"}
         </p>
       </div>
 

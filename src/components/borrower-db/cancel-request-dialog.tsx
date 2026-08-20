@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { formatItemDescription } from "@/lib/sanitize-display";
 import type { PortalBorrowRequest } from "./types";
 
 interface CancelRequestDialogProps {
@@ -59,7 +60,7 @@ export function CancelRequestDialog({
           <div className="space-y-1">
             {request.items?.map((item, idx) => (
               <p key={idx} className="font-semibold text-text">
-                {item.itemDescription}
+                {formatItemDescription(item.itemDescription, item.category, item.itemType)}
                 <span className="ml-2 text-xs font-normal text-text-secondary">
                   × {item.quantity}{" "}
                   {item.itemType === "consumable" ? "unit(s)" : "item(s)"}

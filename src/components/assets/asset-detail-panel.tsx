@@ -43,6 +43,7 @@ import {
 import { QRCodeDisplay } from "./qr-code-display";
 import { getCategoryStyle } from "@/constants/categories";
 import { useBorrowRequests } from "@/features/borrow-requests/client";
+import { AuditNoteDisplay } from "@/components/audit-logs/audit-log-utils";
 
 function getTimelineIcon(status: string) {
   switch (status.toLowerCase()) {
@@ -322,9 +323,7 @@ function RequestDetailsSection({ request }: { request: BorrowRequest }) {
                     )}
                   </div>
                   {log.note && (
-                    <p className="mt-1 text-[11px] text-text bg-bg/80 border border-border/50 rounded px-2 py-1 leading-snug">
-                      {log.note}
-                    </p>
+                    <AuditNoteDisplay action={log.action} note={log.note} />
                   )}
                 </div>
               );
@@ -454,9 +453,9 @@ function LifecycleDetailsSection({ item }: { item: Extract<UnifiedTimelineItem, 
             </p>
           )}
           {event.payload.notes && (
-            <p className="text-text-secondary leading-relaxed italic">
-              &quot;{String(event.payload.notes)}&quot;
-            </p>
+            <div className="pt-1">
+              <AuditNoteDisplay action={event.eventType} note={String(event.payload.notes)} />
+            </div>
           )}
         </div>
       )}
@@ -982,34 +981,30 @@ export function AssetDetailPanel({
 
           <div className="flex items-center gap-2 shrink-0">
             {onIssue && !asset.currentHolder && !asset.reservedForRequestId && asset.status === "active" && (
-            <button
-              type="button"
-              onClick={() => onIssue(asset)}
-              aria-label="Issue asset to department or project"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary text-primary-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
-            >
-              Issue
-            </button>
+              <button
+                type="button"
+                onClick={() => onIssue(asset)}
+                aria-label="Issue asset to department or project"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary text-primary-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+              >
+                <PackageMinus className="h-3.5 w-3.5" />
+                <span>Issue</span>
+              </button>
+            )}
+            {onIssue && !asset.currentHolder && !asset.reservedForRequestId && asset.status === "active" && onEdit && (
+              <div className="h-4 w-px bg-border mx-0.5" aria-hidden="true" />
             )}
             {onEdit && (
-            <button
-              type="button"
-              onClick={() => onEdit(asset)}
-              aria-label="Edit asset details"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-bg text-text-secondary hover:text-text border border-border hover:border-primary transition-colors cursor-pointer shadow-xs"
-            >
-              <Edit3 className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Edit</span>
-            </button>
+              <button
+                type="button"
+                onClick={() => onEdit(asset)}
+                aria-label="Edit asset details"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-bg text-text-secondary hover:text-text border border-border hover:border-primary transition-colors cursor-pointer shadow-xs"
+              >
+                <Edit3 className="h-3.5 w-3.5" />
+                <span>Edit</span>
+              </button>
             )}
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close asset detail panel"
-              className="p-1.5 rounded-lg text-text-secondary hover:text-text hover:bg-border transition-colors cursor-pointer"
-            >
-              <X className="h-5 w-5" />
-            </button>
           </div>
         </div>
 
@@ -1158,9 +1153,7 @@ export function AssetDetailPanel({
                   <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-2">
                     Custody Notes / Details
                   </p>
-                  <p className="text-xs text-text leading-relaxed whitespace-pre-wrap">
-                    {asset.notes}
-                  </p>
+                  <AuditNoteDisplay note={asset.notes} className="mt-0" />
                 </div>
               )}
             </div>

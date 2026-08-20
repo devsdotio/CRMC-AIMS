@@ -29,6 +29,7 @@ import type { StockMovement } from "@/features/stock-movements/client";
 import { formatPhp } from "@/components/projects/format-money";
 import { StockLevelBar } from "./stock-level-bar";
 import { LotQrCodeDisplay } from "./lot-qr-code-display";
+import { AuditNoteDisplay } from "@/components/audit-logs/audit-log-utils";
 
 export interface ConsumableDetailPanelProps {
   item: ConsumableItem | null;
@@ -550,9 +551,7 @@ export function ConsumableDetailPanel({
                               </div>
                             )}
                             {m.notes && (
-                              <p className="text-xs text-text bg-bg-subtle p-2 rounded mt-1.5 border border-border">
-                                {m.notes}
-                              </p>
+                              <AuditNoteDisplay action={m.reason} note={m.notes} />
                             )}
                           </li>
                         );

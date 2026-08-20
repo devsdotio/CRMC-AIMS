@@ -93,13 +93,12 @@ export function ProjectTable({
   if (projects.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-bg-subtle border border-border mb-3">
-          <FolderKanban className="h-6 w-6 text-text-secondary" />
-        </div>
-        <p className="text-sm font-bold text-text">No projects found</p>
-        <p className="text-xs text-text-secondary mt-1 max-w-sm">
-          Create a project for renovations, construction, or other custodian-managed
-          work. Materials and expenses will attach in later phases.
+        <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-500/10 border border-purple-500/25 text-purple-600 dark:text-purple-400 shadow-xs mb-3">
+          <FolderKanban className="h-7 w-7" strokeWidth={1.8} />
+        </span>
+        <p className="text-base font-bold text-text">No projects found</p>
+        <p className="text-xs text-text-secondary mt-1 max-w-sm leading-relaxed">
+          Create a project to allocate dedicated fixed assets, materials, and track custodian project budgets.
         </p>
       </div>
     );

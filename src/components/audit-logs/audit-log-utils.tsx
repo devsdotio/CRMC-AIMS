@@ -1,4 +1,5 @@
 import React from "react";
+import { cn } from "@/lib/utils";
 import {
   Send,
   Check,
@@ -243,26 +244,114 @@ export function formatRelativeTime(isoString?: string | null): string {
   }
 }
 
-export function parseAuditNote(action: string, note?: string | null): {
+export function stripAnsiArtifacts(str: string): string {
+  if (!str) return "";
+  return str
+    .replace(/\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g, "") // ANSI escape sequences
+    .replace(/\[[0-9;]*m/g, "") // Orphaned bracket codes like "[m", "[0m", "[32m"
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export function parseAuditNote(action?: string | null, note?: string | null): {
   picker: string | null;
   description: string | null;
+  actionType: "released" | "returned" | null;
 } {
-  if (!note) return { picker: null, description: null };
+  if (!note) return { picker: null, description: null, actionType: null };
+
+  const cleanedNote = stripAnsiArtifacts(note);
+  if (!cleanedNote) return { picker: null, description: null, actionType: null };
 
   let picker: string | null = null;
-  let description: string | null = note;
+  let description: string | null = cleanedNote;
+  let actionType: "released" | "returned" | null = null;
 
-  if (action === "released" && note.startsWith("Released to: ")) {
-    const parts = note.split(". ");
-    picker = parts[0].replace("Released to: ", "");
-    description = parts.slice(1).join(". ") || null;
-  } else if (action === "returned" && note.startsWith("Returned by: ")) {
-    const parts = note.split(". ");
-    picker = parts[0].replace("Returned by: ", "");
-    description = parts.slice(1).join(". ") || null;
+  const act = (action || "").toLowerCase().trim();
+
+  if (
+    cleanedNote.toLowerCase().startsWith("released to:") ||
+    act === "released" ||
+    act === "checkout" ||
+    act === "issue"
+  ) {
+    actionType = "released";
+    if (/^released to:\s*/i.test(cleanedNote)) {
+      const parts = cleanedNote.split(". ");
+      picker = parts[0].replace(/^released to:\s*/i, "").trim();
+      const rest = parts.slice(1).join(". ").trim();
+      description = stripAnsiArtifacts(rest) || null;
+    }
+  } else if (
+    cleanedNote.toLowerCase().startsWith("returned by:") ||
+    act === "returned" ||
+    act === "checkin"
+  ) {
+    actionType = "returned";
+    if (/^returned by:\s*/i.test(cleanedNote)) {
+      const parts = cleanedNote.split(". ");
+      picker = parts[0].replace(/^returned by:\s*/i, "").trim();
+      const rest = parts.slice(1).join(". ").trim();
+      description = stripAnsiArtifacts(rest) || null;
+    }
   }
 
-  return { picker, description };
+  // Fallback pattern detection if action wasn't matched above
+  if (!actionType) {
+    if (/^released to:\s*/i.test(cleanedNote)) {
+      actionType = "released";
+      const parts = cleanedNote.split(". ");
+      picker = parts[0].replace(/^released to:\s*/i, "").trim();
+      const rest = parts.slice(1).join(". ").trim();
+      description = stripAnsiArtifacts(rest) || null;
+    } else if (/^returned by:\s*/i.test(cleanedNote)) {
+      actionType = "returned";
+      const parts = cleanedNote.split(". ");
+      picker = parts[0].replace(/^returned by:\s*/i, "").trim();
+      const rest = parts.slice(1).join(". ").trim();
+      description = stripAnsiArtifacts(rest) || null;
+    }
+  }
+
+  return { picker, description, actionType };
+}
+
+export function AuditNoteDisplay({
+  action,
+  note,
+  className,
+}: {
+  action?: string | null;
+  note?: string | null;
+  className?: string;
+}) {
+  if (!note) return null;
+
+  const { picker, description, actionType } = parseAuditNote(action, note);
+
+  if (!picker && !description) return null;
+
+  return (
+    <div className={cn("mt-1.5 flex flex-wrap items-center gap-1.5", className)}>
+      {picker && (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium bg-primary/10 text-primary border border-primary/25 shadow-2xs">
+          <User className="h-3 w-3 shrink-0 text-primary" />
+          <span>
+            {actionType === "returned" ? "Returned by: " : "Released to: "}
+            <strong className="font-bold text-text bg-bg px-1.5 py-0.5 rounded border border-border/70 ml-0.5 inline-block">
+              {picker}
+            </strong>
+          </span>
+        </span>
+      )}
+      {description && (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-normal bg-bg-subtle text-text border border-border shadow-2xs leading-snug">
+          <FileText className="h-3 w-3 shrink-0 text-text-secondary" />
+          <span>{description}</span>
+        </span>
+      )}
+    </div>
+  );
 }
 
 export function exportToCSV(filename: string, rows: Record<string, unknown>[]) {

@@ -1,6 +1,24 @@
 "use client";
 
 import { useState } from "react";
+import { motion } from "framer-motion";
+import {
+  ClipboardCheck,
+  Inbox,
+  PackageCheck,
+  PackagePlus,
+  PackageSearch,
+  Check,
+  X,
+  Send,
+  User,
+  Building2,
+  FileText,
+  Tag,
+  Package,
+} from "lucide-react";
+import { getCategoryStyle } from "@/constants/categories";
+import { cn } from "@/lib/utils";
 import { QueryErrorBanner } from "@/components/shared/query-error-banner";
 import { ReleaseConsumableRequestDialog } from "@/components/consumable-requests/release-consumable-request-dialog";
 import { useToast } from "@/components/providers/toast-context";
@@ -15,17 +33,160 @@ import {
 } from "@/features/consumable-requests/client";
 import type { ReleaseConsumableRequestPayload } from "@/features/consumable-requests/client/consumable-requests-api";
 
-export function SupplyRequestsQueue() {
+const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
+  pending: {
+    bg: "bg-status-repair-bg/20",
+    text: "text-status-repair-text font-bold",
+    label: "Pending Review",
+  },
+  approved: {
+    bg: "bg-blue-500/15",
+    text: "text-blue-600 dark:text-blue-400 font-bold",
+    label: "Approved",
+  },
+  released: {
+    bg: "bg-status-active-bg/20",
+    text: "text-status-active-text font-bold",
+    label: "Issued",
+  },
+  rejected: {
+    bg: "bg-destructive",
+    text: "text-white font-bold",
+    label: "Rejected",
+  },
+  cancelled: {
+    bg: "bg-bg-subtle",
+    text: "text-text-secondary font-bold",
+    label: "Cancelled",
+  },
+};
+
+export interface SupplyRequestsQueueProps {
+  status?: ConsumableRequest["status"];
+  searchQuery?: string;
+  department?: string;
+}
+
+const SUPPLY_STATUS_THEMES: Record<
+  string,
+  { dot: string; badge: string; activeBadge: string }
+> = {
+  pending: {
+    dot: "bg-amber-500",
+    badge: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20",
+    activeBadge: "bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold border border-amber-500/30",
+  },
+  approved: {
+    dot: "bg-blue-500",
+    badge: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20",
+    activeBadge: "bg-blue-500/20 text-blue-700 dark:text-blue-300 font-bold border border-blue-500/30",
+  },
+  released: {
+    dot: "bg-emerald-500",
+    badge: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20",
+    activeBadge: "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-500/30",
+  },
+  rejected: {
+    dot: "bg-destructive",
+    badge: "bg-destructive/10 text-destructive border border-destructive/20",
+    activeBadge: "bg-destructive/20 text-destructive font-bold border border-destructive/30",
+  },
+  cancelled: {
+    dot: "bg-destructive/70",
+    badge: "bg-destructive/10 text-destructive/80 border border-destructive/20",
+    activeBadge: "bg-destructive/20 text-destructive font-bold border border-destructive/30",
+  },
+};
+
+export function SupplyRequestStatusTabs({
+  status,
+  counts,
+  onStatusChange,
+}: {
+  status: ConsumableRequest["status"] | undefined;
+  counts?: Record<string, number>;
+  onStatusChange: (status: ConsumableRequest["status"]) => void;
+}) {
+  return (
+    <div className="flex items-center gap-2 shrink-0">
+      <span className="text-xs font-bold text-text-secondary uppercase tracking-wider shrink-0">
+        Status:
+      </span>
+      <div className="flex gap-1 rounded-xl border border-border p-1 bg-bg-subtle shrink-0 overflow-x-auto scrollbar-none relative">
+        {(
+          [
+            ["pending", "Pending"],
+            ["approved", "Approved"],
+            ["released", "Issued"],
+            ["rejected", "Rejected"],
+            ["cancelled", "Cancelled"],
+          ] as const
+        ).map(([id, label]) => {
+          const isSelected = status === id;
+          const theme = SUPPLY_STATUS_THEMES[id] || {
+            dot: "bg-text-secondary",
+            badge: "bg-bg-subtle text-text-secondary border border-border",
+            activeBadge: "bg-bg-subtle text-text font-bold border border-border/80",
+          };
+          const count = counts?.[id] ?? 0;
+
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => onStatusChange(id)}
+              className={cn(
+                "relative inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors duration-150 cursor-pointer whitespace-nowrap select-none",
+                isSelected
+                  ? "text-text"
+                  : "text-text-secondary hover:text-text"
+              )}
+            >
+              {isSelected && (
+                <motion.span
+                  layoutId="supply-requests-status-tab"
+                  className="absolute inset-0 rounded-lg bg-bg shadow-xs border border-border/80"
+                  transition={{ type: "spring", stiffness: 500, damping: 38 }}
+                />
+              )}
+              <span
+                className={cn("h-1.5 w-1.5 rounded-full relative z-10 shrink-0", theme.dot)}
+                aria-hidden="true"
+              />
+              <span className="relative z-10">{label}</span>
+              <span
+                className={cn(
+                  "relative z-10 px-1.5 py-0.2 rounded-full text-[10px] font-mono font-semibold transition-colors duration-150",
+                  isSelected ? theme.activeBadge : theme.badge
+                )}
+              >
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+export function SupplyRequestsQueue({
+  status = "pending",
+  searchQuery = "",
+  department,
+}: SupplyRequestsQueueProps) {
   const { canOperate } = useAssetOperator();
   const toast = useToast();
-  const [status, setStatus] = useState<
-    ConsumableRequest["status"] | undefined
-  >("pending");
   const [releaseTarget, setReleaseTarget] = useState<ConsumableRequest | null>(
     null
   );
+  const deptParam =
+    department && department !== "All Departments" ? department : undefined;
+
   const { data, isLoading, isError, error, refetch } = useConsumableRequests({
     status,
+    search: searchQuery.trim() || undefined,
+    department: deptParam,
     limit: 50,
   });
   const rows = data?.data ?? [];
@@ -81,30 +242,6 @@ export function SupplyRequestsQueue() {
 
   return (
     <>
-      <div className="px-4 md:px-6 py-3 bg-bg border-b border-border flex flex-wrap gap-1.5 shrink-0">
-        {(
-          [
-            ["pending", "Pending"],
-            ["approved", "Approved"],
-            ["released", "Issued"],
-            ["rejected", "Rejected"],
-            ["cancelled", "Cancelled"],
-          ] as const
-        ).map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setStatus(id)}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-md border ${
-              status === id
-                ? "bg-bg-subtle border-primary text-text"
-                : "border-border text-text-secondary"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
 
       {isError && (
         <QueryErrorBanner
@@ -115,73 +252,223 @@ export function SupplyRequestsQueue() {
 
       <main className="flex-1 overflow-y-auto min-h-0 bg-bg">
         {isLoading ? (
-          <div className="p-6 space-y-3">
+          <div className="divide-y divide-border">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="h-16 animate-pulse rounded-lg bg-border" />
+              <div key={i} className="p-4 md:px-6 animate-pulse flex flex-col gap-2">
+                <div className="h-4 w-32 bg-border rounded" />
+                <div className="h-5 w-64 bg-border rounded" />
+                <div className="h-4 w-48 bg-border rounded" />
+              </div>
             ))}
           </div>
         ) : rows.length === 0 ? (
-          <p className="p-8 text-sm text-text-secondary text-center">
-            No supply requests in this status.
-          </p>
+          <div className="flex flex-col items-center justify-center gap-3 py-16 px-6 text-center">
+            <span
+              className={cn(
+                "flex h-14 w-14 items-center justify-center rounded-2xl border shadow-xs",
+                status === "pending"
+                  ? "bg-status-active-bg/15 border-status-active-bg/30 text-status-active-text"
+                  : status === "approved"
+                    ? "bg-blue-500/10 border-blue-500/25 text-blue-600 dark:text-blue-400"
+                    : status === "released"
+                      ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-600 dark:text-emerald-400"
+                      : "bg-bg-subtle border-border text-text-secondary"
+              )}
+            >
+              {status === "pending" ? (
+                <ClipboardCheck className="h-7 w-7" strokeWidth={2} />
+              ) : status === "approved" ? (
+                <PackagePlus className="h-7 w-7" strokeWidth={1.8} />
+              ) : status === "released" ? (
+                <PackageCheck className="h-7 w-7" strokeWidth={1.8} />
+              ) : status === "rejected" || status === "cancelled" ? (
+                <Inbox className="h-7 w-7" strokeWidth={1.8} />
+              ) : (
+                <PackageSearch className="h-7 w-7" strokeWidth={1.8} />
+              )}
+            </span>
+            <div>
+              <h3 className="text-base font-bold text-text">
+                {status === "pending"
+                  ? "All supply requests reviewed"
+                  : status === "approved"
+                    ? "No approved requests pending issue"
+                    : status === "released"
+                      ? "No issued supply records"
+                      : status === "rejected"
+                        ? "No rejected supply requests"
+                        : status === "cancelled"
+                          ? "No cancelled supply requests"
+                          : "No supply requests found"}
+              </h3>
+              <p className="text-xs text-text-secondary mt-1 max-w-sm leading-relaxed">
+                {status === "pending"
+                  ? "There are no consumable requisition requests awaiting custodian approval."
+                  : status === "approved"
+                    ? "All approved requisition orders have been fulfilled and disbursed."
+                    : status === "released"
+                      ? "Consumable items released from inventory will appear here."
+                      : "No requisition logs match the selected queue filter."}
+              </p>
+            </div>
+          </div>
         ) : (
-          <ul className="divide-y divide-border">
-            {rows.map((row) => (
-              <li
-                key={row.id}
-                className="px-4 md:px-6 py-4 flex flex-col md:flex-row md:items-center gap-3"
-              >
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-mono text-text-secondary">
-                    {row.requestCode}
-                  </p>
-                  <p className="text-sm font-semibold text-text">
-                    {row.department} · {row.purpose}
-                  </p>
-                  <p className="text-xs text-text-secondary mt-0.5">
-                    {row.lines
-                      .map((l) => `${l.itemName} × ${l.quantityRequested}`)
-                      .join(", ")}
-                  </p>
-                </div>
-                {canOperate && row.status === "pending" && (
-                  <div className="flex gap-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => void handleApprove(row)}
-                      className="px-3 py-1.5 text-xs font-semibold rounded-md bg-accent text-accent-foreground"
-                    >
-                      Approve
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleReject(row)}
-                      className="px-3 py-1.5 text-xs font-semibold rounded-md border border-border"
-                    >
-                      Reject
-                    </button>
+          <ul className="divide-y divide-border" aria-label="Supply requests queue">
+            {rows.map((row) => {
+              const firstLine = row.lines?.[0];
+              const categoryMeta = getCategoryStyle(firstLine?.category || "supplies");
+              const statusMeta = STATUS_STYLES[row.status] || {
+                bg: "bg-bg-subtle",
+                text: "text-text-secondary font-bold",
+                label: row.status,
+              };
+
+              return (
+                <li
+                  key={row.id}
+                  className="group relative flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 md:px-6 bg-bg hover:bg-bg-subtle/80 transition-colors"
+                >
+                  {/* Left Column: Requester & Item Info */}
+                  <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+                    {/* Row 1: Code & Category Tag */}
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="font-mono font-semibold text-text-secondary">
+                        {row.requestCode}
+                      </span>
+                      <span className="text-text-secondary/40">·</span>
+                      <span
+                        className={cn(
+                          "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase",
+                          categoryMeta.bg,
+                          categoryMeta.text
+                        )}
+                      >
+                        <Tag className="h-2.5 w-2.5" />
+                        {categoryMeta.label}
+                      </span>
+                    </div>
+
+                    {/* Row 2: Item Description */}
+                    <h3 className="text-sm font-bold text-text truncate group-hover:text-accent transition-colors">
+                      {firstLine?.itemName &&
+                      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(firstLine.itemName)
+                        ? firstLine.itemName
+                        : `${categoryMeta.label} Supply`}{" "}
+                      {row.lines.length > 1 ? `(+${row.lines.length - 1} more items)` : ""}
+                      {firstLine && (
+                        <span className="ml-2 text-xs font-semibold text-text-secondary">
+                          (Qty: {firstLine.quantityRequested} {firstLine.unit || "pcs"})
+                        </span>
+                      )}
+                    </h3>
+
+                    {/* Row 3: Requester Name, Department, Purpose */}
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-secondary">
+                      <span className="flex items-center gap-1 font-medium text-text">
+                        <User className="h-3.5 w-3.5 text-text-secondary/70 shrink-0" />
+                        {row.requesterName}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Building2 className="h-3.5 w-3.5 text-text-secondary/70 shrink-0" />
+                        {row.department}
+                      </span>
+                      {row.purpose && (
+                        <span className="flex items-center gap-1">
+                          <FileText className="h-3.5 w-3.5 text-text-secondary/70 shrink-0" />
+                          <span className="truncate max-w-xs">{row.purpose}</span>
+                        </span>
+                      )}
+                      {row.lines.length > 1 && (
+                        <span className="hidden sm:inline-flex items-center gap-1 text-text-secondary/80">
+                          <Package className="h-3.5 w-3.5 text-text-secondary/70 shrink-0" />
+                          <span className="truncate max-w-sm">
+                            {row.lines.map((l) => `${l.itemName} (${l.quantityRequested})`).join(", ")}
+                          </span>
+                        </span>
+                      )}
+                    </div>
                   </div>
-                )}
-                {canOperate && row.status === "approved" && (
-                  <div className="flex gap-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setReleaseTarget(row)}
-                      className="px-3 py-1.5 text-xs font-semibold rounded-md bg-primary text-primary-foreground"
+
+                  {/* Right Column: Status Tag & Action Buttons */}
+                  <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+                    {/* Status Badge */}
+                    <span
+                      className={cn(
+                        "inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-semibold tabular-nums whitespace-nowrap",
+                        statusMeta.bg,
+                        statusMeta.text
+                      )}
                     >
-                      Issue…
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleCancelApproved(row)}
-                      className="px-3 py-1.5 text-xs font-semibold rounded-md border border-border"
-                    >
-                      Cancel
-                    </button>
+                      {statusMeta.label}
+                    </span>
+
+                    {/* Inline Actions for Pending */}
+                    {canOperate && row.status === "pending" && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void handleApprove(row)}
+                          aria-label={`Approve request ${row.requestCode}`}
+                          className={cn(
+                            "inline-flex items-center gap-1 rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-accent-foreground",
+                            "shadow-xs transition-colors duration-150 hover:opacity-90 cursor-pointer",
+                            "focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
+                          )}
+                        >
+                          <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
+                          Approve
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleReject(row)}
+                          aria-label={`Reject request ${row.requestCode}`}
+                          className={cn(
+                            "inline-flex items-center gap-1 rounded-md border border-border bg-bg px-3 py-1.5 text-xs font-semibold text-text-secondary cursor-pointer",
+                            "transition-colors duration-150 hover:border-destructive hover:text-destructive hover:bg-destructive/10",
+                            "focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-1"
+                          )}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                          Reject
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Inline Actions for Approved */}
+                    {canOperate && row.status === "approved" && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setReleaseTarget(row)}
+                          aria-label={`Issue supplies for request ${row.requestCode}`}
+                          className={cn(
+                            "inline-flex items-center gap-1 rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-accent-foreground",
+                            "shadow-xs transition-colors duration-150 hover:opacity-90 cursor-pointer",
+                            "focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
+                          )}
+                        >
+                          <Send className="h-3.5 w-3.5" strokeWidth={2} />
+                          Issue…
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleCancelApproved(row)}
+                          aria-label={`Cancel approved request ${row.requestCode}`}
+                          className={cn(
+                            "inline-flex items-center gap-1 rounded-md border border-border bg-bg px-3 py-1.5 text-xs font-semibold text-text-secondary cursor-pointer",
+                            "transition-colors duration-150 hover:border-destructive hover:text-destructive hover:bg-destructive/10",
+                            "focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-1"
+                          )}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                          Cancel
+                        </button>
+                      </div>
+                    )}
                   </div>
-                )}
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         )}
       </main>
