@@ -319,7 +319,7 @@ export function BorrowLogDetailSheet({
   );
 }
 
-function rowCategoryOrDefault(cat?: string): any {
+function rowCategoryOrDefault(cat?: string): string {
   if (cat === "electronics" || cat === "furniture" || cat === "machinery" || cat === "office" || cat === "medical" || cat === "vehicles" || cat === "tools") {
     return cat;
   }

@@ -90,18 +90,21 @@ function AdjustStockDialogForm({
 
   const fifoAllocationPreview = useMemo(() => {
     let remainingToDeduct = Math.abs(adjustmentDelta);
-    return availableLots.map((lot) => {
+    const result: Array<(typeof availableLots)[number] & { deducted: number; balanceAfter: number }> = [];
+    for (const lot of availableLots) {
       if (remainingToDeduct <= 0) {
-        return { ...lot, deducted: 0, balanceAfter: lot.quantityRemaining };
+        result.push({ ...lot, deducted: 0, balanceAfter: lot.quantityRemaining });
+      } else {
+        const deducted = Math.min(lot.quantityRemaining, remainingToDeduct);
+        remainingToDeduct -= deducted;
+        result.push({
+          ...lot,
+          deducted,
+          balanceAfter: lot.quantityRemaining - deducted,
+        });
       }
-      const deducted = Math.min(lot.quantityRemaining, remainingToDeduct);
-      remainingToDeduct -= deducted;
-      return {
-        ...lot,
-        deducted,
-        balanceAfter: lot.quantityRemaining - deducted,
-      };
-    });
+    }
+    return result;
   }, [availableLots, adjustmentDelta]);
 
   useEffect(() => {

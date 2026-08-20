@@ -10,50 +10,65 @@ import { useState, useEffect, useRef } from "react";
 import { useToast } from "@/components/providers/toast-context";
 import { formatFriendlyNetworkError } from "@/lib/network-error";
 
+function createQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: {
+        staleTime: 30_000,
+        retry: 1,
+        retryDelay: 800,
+        refetchOnWindowFocus: false,
+      },
+    },
+  });
+}
+
 export function QueryProvider({ children }: { children: React.ReactNode }) {
   const toast = useToast();
-  const lastErrorToastRef = useRef<{ message: string; timestamp: number }>({
-    message: "",
-    timestamp: 0,
-  });
 
-  const notifyError = (error: unknown, fallback?: string) => {
-    const friendly = formatFriendlyNetworkError(error, fallback);
-    const now = Date.now();
-    // Throttle identical or rapid succession network error toasts (2.5 seconds debounce)
-    if (
-      lastErrorToastRef.current.message === friendly &&
-      now - lastErrorToastRef.current.timestamp < 2500
-    ) {
-      return;
-    }
-    lastErrorToastRef.current = { message: friendly, timestamp: now };
-    toast.error(friendly);
-  };
+  const [queryClient] = useState(createQueryClient);
 
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
-        queryCache: new QueryCache({
-          onError: (error) => {
-            notifyError(error, "Failed to load data. Please check your connection.");
-          },
-        }),
-        mutationCache: new MutationCache({
-          onError: (error) => {
-            notifyError(error, "Operation could not be completed. Please try again.");
-          },
-        }),
-        defaultOptions: {
-          queries: {
-            staleTime: 30_000,
-            retry: 1,
-            retryDelay: 800,
-            refetchOnWindowFocus: false,
-          },
-        },
-      })
-  );
+  // Subscribe to query/mutation errors in effect to keep render pure
+  useEffect(() => {
+    let lastError = { message: "", timestamp: 0 };
+
+    const unsubscribeQuery = queryClient.getQueryCache().subscribe((event) => {
+      if (event.type === "updated" && event.action.type === "error") {
+        const error = event.action.error;
+        const friendly = formatFriendlyNetworkError(
+          error,
+          "Failed to load data. Please check your connection."
+        );
+        const now = Date.now();
+        if (lastError.message === friendly && now - lastError.timestamp < 2500) {
+          return;
+        }
+        lastError = { message: friendly, timestamp: now };
+        toast.error(friendly);
+      }
+    });
+
+    const unsubscribeMutation = queryClient.getMutationCache().subscribe((event) => {
+      if (event.type === "updated" && event.action.type === "error") {
+        const error = event.action.error;
+        const friendly = formatFriendlyNetworkError(
+          error,
+          "Operation could not be completed. Please try again."
+        );
+        const now = Date.now();
+        if (lastError.message === friendly && now - lastError.timestamp < 2500) {
+          return;
+        }
+        lastError = { message: friendly, timestamp: now };
+        toast.error(friendly);
+      }
+    });
+
+    return () => {
+      unsubscribeQuery();
+      unsubscribeMutation();
+    };
+  }, [toast, queryClient]);
 
   // Listen to browser network changes (offline/online)
   useEffect(() => {
