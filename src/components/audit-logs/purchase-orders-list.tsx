@@ -184,7 +184,7 @@ export function PurchaseOrdersList() {
                     onClick={() => setSelectedLot(lot)}
                     className="pl-6 relative group transition-all cursor-pointer"
                   >
-                    <span className="absolute -left-3.25 top-1.5 h-6 w-6 rounded-full border-2 flex items-center justify-center bg-bg shadow-sm z-10 bg-category-av-bg/20 text-category-av-bg border-category-av-bg/30 transition-transform group-hover:scale-110">
+                    <span className="absolute -left-3.25 top-1.5 h-6 w-6 rounded-full border-2 flex items-center justify-center bg-category-av-bg/20 text-category-av-bg border-category-av-bg/30 shadow-2xs z-10 transition-transform group-hover:scale-110">
                       <ShoppingCart className="h-3 w-3" />
                     </span>
 

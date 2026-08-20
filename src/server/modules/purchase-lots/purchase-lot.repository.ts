@@ -49,10 +49,15 @@ export class PurchaseLotRepository implements IPurchaseLotRepository {
     session?: DbSession
   ): Promise<PurchaseLotRow | null> {
     const db = this.db(session);
+    const altCode = lotCode.startsWith("PO-")
+      ? lotCode.replace(/^PO-/, "LOT-")
+      : lotCode.startsWith("LOT-")
+      ? lotCode.replace(/^LOT-/, "PO-")
+      : lotCode;
     const [row] = await db
       .select()
       .from(purchaseLots)
-      .where(eq(purchaseLots.lotCode, lotCode))
+      .where(or(eq(purchaseLots.lotCode, lotCode), eq(purchaseLots.lotCode, altCode)))
       .limit(1);
     return row ?? null;
   }
@@ -61,10 +66,15 @@ export class PurchaseLotRepository implements IPurchaseLotRepository {
     lotCode: string,
     session: DbSession
   ): Promise<PurchaseLotRow | null> {
+    const altCode = lotCode.startsWith("PO-")
+      ? lotCode.replace(/^PO-/, "LOT-")
+      : lotCode.startsWith("LOT-")
+      ? lotCode.replace(/^LOT-/, "PO-")
+      : lotCode;
     const [row] = await session
       .select()
       .from(purchaseLots)
-      .where(eq(purchaseLots.lotCode, lotCode))
+      .where(or(eq(purchaseLots.lotCode, lotCode), eq(purchaseLots.lotCode, altCode)))
       .for("update")
       .limit(1);
     return row ?? null;

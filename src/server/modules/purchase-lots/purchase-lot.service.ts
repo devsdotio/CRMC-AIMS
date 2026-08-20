@@ -35,10 +35,28 @@ export type LotCostAllocation = {
   uncosted?: boolean;
 };
 
+export function derivePONumber(lotCode: string, reference?: string | null): string {
+  if (reference && reference.trim().toUpperCase().startsWith("PO-")) {
+    return reference.trim();
+  }
+  return lotCode.startsWith("LOT-")
+    ? lotCode.replace(/^LOT-/, "PO-")
+    : lotCode.startsWith("PO-")
+    ? lotCode
+    : `PO-${lotCode}`;
+}
+
+export function deriveLotCode(lotCode: string): string {
+  return lotCode.startsWith("PO-") ? lotCode.replace(/^PO-/, "LOT-") : lotCode;
+}
+
 export function toPurchaseLotDTO(row: PurchaseLotRow): PurchaseLotDTO {
+  const poNumber = derivePONumber(row.lotCode, row.reference);
+  const lotCode = deriveLotCode(row.lotCode);
   return {
     id: row.id,
-    lotCode: row.lotCode,
+    poNumber,
+    lotCode,
     itemType: row.itemType,
     consumableId: row.consumableId ?? null,
     assetId: row.assetId ?? null,
@@ -57,7 +75,7 @@ export function toPurchaseLotDTO(row: PurchaseLotRow): PurchaseLotDTO {
     recordedByName: row.recordedByName,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
-    qrPayload: encodeLotQr(row.lotCode),
+    qrPayload: encodeLotQr(lotCode),
   };
 }
 
@@ -358,7 +376,7 @@ export class PurchaseLotService {
 
     const row = await this.repo.create(
       {
-        lotCode: generateOperationalCode("LOT"),
+        lotCode: generateOperationalCode("PO"),
         itemType: input.itemType,
         consumableId: input.consumableId ?? null,
         assetId: input.assetId ?? null,

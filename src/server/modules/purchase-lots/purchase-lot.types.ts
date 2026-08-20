@@ -4,6 +4,7 @@ export type PurchaseLotItemType = "consumable" | "asset";
 
 export type PurchaseLotDTO = {
   id: string;
+  poNumber: string;
   lotCode: string;
   itemType: PurchaseLotItemType;
   consumableId: string | null;

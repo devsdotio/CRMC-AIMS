@@ -2,6 +2,7 @@ export type PurchaseLotItemType = "consumable" | "asset";
 
 export interface PurchaseLot {
   id: string;
+  poNumber: string;
   lotCode: string;
   itemType: PurchaseLotItemType;
   consumableId: string | null;
