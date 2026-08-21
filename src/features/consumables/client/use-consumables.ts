@@ -19,15 +19,15 @@ import {
 
 export type { StockAdjustPayload };
 import { consumableQueryKeys } from "./query-keys";
-import { purchaseLotQueryKeys } from "@/features/purchase-lots/client/query-keys";
-import { stockMovementQueryKeys } from "@/features/stock-movements/client/query-keys";
+import {
+  STOCK_DOMAINS,
+  invalidateDomains,
+} from "@/features/shared/cache-invalidation";
 import type { PaginatedResponse } from "@/types/filters";
 import type { StockHistoryEntry } from "@/types/inventory";
 
 function invalidate(qc: ReturnType<typeof useQueryClient>, id?: string) {
-  qc.invalidateQueries({ queryKey: consumableQueryKeys.all });
-  qc.invalidateQueries({ queryKey: purchaseLotQueryKeys.all });
-  qc.invalidateQueries({ queryKey: stockMovementQueryKeys.all });
+  void invalidateDomains(qc, STOCK_DOMAINS);
   if (id) {
     qc.invalidateQueries({ queryKey: consumableQueryKeys.detail(id) });
   }
@@ -44,9 +44,10 @@ export function useConsumablesQuery(filters?: {
   Error
 > {
   return useQuery({
+    // Stock levels move with every issue and restock, so this rides the global
+    // 30s stale window instead of holding a five-minute snapshot.
     queryKey: consumableQueryKeys.list(filters),
     queryFn: () => consumablesApi.list(filters),
-    staleTime: 5 * 60 * 1000,
   });
 }
 

@@ -155,7 +155,9 @@ export default function ProjectsPage() {
               Projects
             </h1>
             <span className="px-2 py-0.5 text-xs font-bold bg-bg-subtle text-text-secondary rounded-full border border-border">
-              {filtered.length} of {projects.length}
+              {isLoading
+                ? "Loading projects…"
+                : `${filtered.length} of ${projects.length}`}
               {isFetching && !isLoading ? " · updating…" : ""}
             </span>
           </div>
@@ -195,6 +197,9 @@ export default function ProjectsPage() {
         <ProjectTable
           projects={filtered}
           loading={isLoading && !projectsError}
+          deletingProjectId={
+            deleteProject.isPending ? deleteProject.variables : null
+          }
           onSelect={setSelected}
           onEdit={(p) => setEditTarget(p)}
           onDelete={(p) => {

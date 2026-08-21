@@ -16,9 +16,11 @@ import {
   FileText,
   Tag,
   Package,
+  Loader2,
 } from "lucide-react";
-import { getCategoryStyle } from "@/constants/categories";
 import { cn } from "@/lib/utils";
+import { formatItemDescription } from "@/lib/sanitize-display";
+import { useCategoryStyleResolver } from "@/features/categories/client/use-category-style";
 import { QueryErrorBanner } from "@/components/shared/query-error-banner";
 import { ReleaseConsumableRequestDialog } from "@/components/consumable-requests/release-consumable-request-dialog";
 import { useToast } from "@/components/providers/toast-context";
@@ -177,23 +179,33 @@ export function SupplyRequestsQueue({
 }: SupplyRequestsQueueProps) {
   const { canOperate } = useAssetOperator();
   const toast = useToast();
+  const resolveCategoryStyle = useCategoryStyleResolver();
   const [releaseTarget, setReleaseTarget] = useState<ConsumableRequest | null>(
     null
   );
   const deptParam =
     department && department !== "All Departments" ? department : undefined;
 
-  const { data, isLoading, isError, error, refetch } = useConsumableRequests({
-    status,
-    search: searchQuery.trim() || undefined,
-    department: deptParam,
-    limit: 50,
-  });
+  const { data, isLoading, isError, error, refetch, isPlaceholderData } =
+    useConsumableRequests({
+      status,
+      search: searchQuery.trim() || undefined,
+      department: deptParam,
+      limit: 50,
+    });
   const rows = data?.data ?? [];
   const approve = useApproveConsumableRequestMutation();
   const reject = useRejectConsumableRequestMutation();
   const cancel = useCancelConsumableRequestMutation();
   const release = useReleaseConsumableRequestMutation();
+
+  const pendingAction = approve.isPending
+    ? { id: approve.variables?.id, kind: "approve" as const }
+    : reject.isPending
+      ? { id: reject.variables?.id, kind: "reject" as const }
+      : cancel.isPending
+        ? { id: cancel.variables?.id, kind: "cancel" as const }
+        : null;
 
   const handleApprove = async (row: ConsumableRequest) => {
     try {
@@ -313,15 +325,24 @@ export function SupplyRequestsQueue({
             </div>
           </div>
         ) : (
-          <ul className="divide-y divide-border" aria-label="Supply requests queue">
+          <ul
+            className={cn(
+              "divide-y divide-border transition-opacity duration-150",
+              isPlaceholderData && "opacity-40"
+            )}
+            aria-label="Supply requests queue"
+          >
             {rows.map((row) => {
               const firstLine = row.lines?.[0];
-              const categoryMeta = getCategoryStyle(firstLine?.category || "supplies");
+              const categoryMeta = resolveCategoryStyle(firstLine?.category);
               const statusMeta = STATUS_STYLES[row.status] || {
                 bg: "bg-bg-subtle",
                 text: "text-text-secondary font-bold",
                 label: row.status,
               };
+              const rowAction =
+                pendingAction?.id === row.id ? pendingAction.kind : null;
+              const isRowBusy = rowAction !== null;
 
               return (
                 <li
@@ -350,10 +371,11 @@ export function SupplyRequestsQueue({
 
                     {/* Row 2: Item Description */}
                     <h3 className="text-sm font-bold text-text truncate group-hover:text-accent transition-colors">
-                      {firstLine?.itemName &&
-                      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(firstLine.itemName)
-                        ? firstLine.itemName
-                        : `${categoryMeta.label} Supply`}{" "}
+                      {formatItemDescription(
+                        firstLine?.itemName,
+                        categoryMeta.label,
+                        "consumable"
+                      )}{" "}
                       {row.lines.length > 1 ? `(+${row.lines.length - 1} more items)` : ""}
                       {firstLine && (
                         <span className="ml-2 text-xs font-semibold text-text-secondary">
@@ -408,28 +430,40 @@ export function SupplyRequestsQueue({
                         <button
                           type="button"
                           onClick={() => void handleApprove(row)}
+                          disabled={isRowBusy}
                           aria-label={`Approve request ${row.requestCode}`}
                           className={cn(
                             "inline-flex items-center gap-1 rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-accent-foreground",
                             "shadow-xs transition-colors duration-150 hover:opacity-90 cursor-pointer",
-                            "focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
+                            "focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1",
+                            "disabled:cursor-not-allowed disabled:opacity-60"
                           )}
                         >
-                          <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
-                          Approve
+                          {rowAction === "approve" ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
+                          )}
+                          {rowAction === "approve" ? "Approving…" : "Approve"}
                         </button>
                         <button
                           type="button"
                           onClick={() => void handleReject(row)}
+                          disabled={isRowBusy}
                           aria-label={`Reject request ${row.requestCode}`}
                           className={cn(
                             "inline-flex items-center gap-1 rounded-md border border-border bg-bg px-3 py-1.5 text-xs font-semibold text-text-secondary cursor-pointer",
                             "transition-colors duration-150 hover:border-destructive hover:text-destructive hover:bg-destructive/10",
-                            "focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-1"
+                            "focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-1",
+                            "disabled:cursor-not-allowed disabled:opacity-60"
                           )}
                         >
-                          <X className="h-3.5 w-3.5" />
-                          Reject
+                          {rowAction === "reject" ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <X className="h-3.5 w-3.5" />
+                          )}
+                          {rowAction === "reject" ? "Rejecting…" : "Reject"}
                         </button>
                       </div>
                     )}
@@ -440,11 +474,13 @@ export function SupplyRequestsQueue({
                         <button
                           type="button"
                           onClick={() => setReleaseTarget(row)}
+                          disabled={isRowBusy}
                           aria-label={`Issue supplies for request ${row.requestCode}`}
                           className={cn(
                             "inline-flex items-center gap-1 rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-accent-foreground",
                             "shadow-xs transition-colors duration-150 hover:opacity-90 cursor-pointer",
-                            "focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
+                            "focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1",
+                            "disabled:cursor-not-allowed disabled:opacity-60"
                           )}
                         >
                           <Send className="h-3.5 w-3.5" strokeWidth={2} />
@@ -453,15 +489,21 @@ export function SupplyRequestsQueue({
                         <button
                           type="button"
                           onClick={() => void handleCancelApproved(row)}
+                          disabled={isRowBusy}
                           aria-label={`Cancel approved request ${row.requestCode}`}
                           className={cn(
                             "inline-flex items-center gap-1 rounded-md border border-border bg-bg px-3 py-1.5 text-xs font-semibold text-text-secondary cursor-pointer",
                             "transition-colors duration-150 hover:border-destructive hover:text-destructive hover:bg-destructive/10",
-                            "focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-1"
+                            "focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-1",
+                            "disabled:cursor-not-allowed disabled:opacity-60"
                           )}
                         >
-                          <X className="h-3.5 w-3.5" />
-                          Cancel
+                          {rowAction === "cancel" ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <X className="h-3.5 w-3.5" />
+                          )}
+                          {rowAction === "cancel" ? "Cancelling…" : "Cancel"}
                         </button>
                       </div>
                     )}

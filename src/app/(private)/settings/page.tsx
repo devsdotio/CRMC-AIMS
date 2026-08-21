@@ -120,6 +120,7 @@ export default function SettingsPage() {
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to save category.");
+      throw error;
     }
   };
 

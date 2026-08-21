@@ -1,10 +1,10 @@
 "use client";
  
-import { getCategoryStyle } from "@/constants/categories";
-
 import { useEffect, useRef, useState } from "react";
 import { X, Check, Mail, Phone, Building2, Tag, History, FileText, User, Loader2, Send, CheckCircle, XCircle, PackageCheck, PackageMinus, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatItemDescription, isUuid } from "@/lib/sanitize-display";
+import { useCategoryStyleResolver } from "@/features/categories/client/use-category-style";
 import type { BorrowRequest,  RequestStatus } from "@/types/borrow-requests";
 import { AuditNoteDisplay } from "@/components/audit-logs/audit-log-utils";
 
@@ -92,6 +92,7 @@ export function RequestDetailPanel({
 }: RequestDetailPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [isMarkingUnreleased, setIsMarkingUnreleased] = useState(false);
+  const resolveCategoryStyle = useCategoryStyleResolver();
 
   // Keyboard Escape listener
   useEffect(() => {
@@ -116,8 +117,6 @@ export function RequestDetailPanel({
 
   if (!isOpen || !request) return null;
 
-  const firstItem = request.items[0];
-  const categoryMeta = getCategoryStyle(firstItem?.category || "office");
   const statusMeta = STATUS_STYLES[request.status];
   const hasReturnableAssets = request.items?.some(
     (item) => item.itemType === "asset" || Boolean(item.assetId)
@@ -223,15 +222,15 @@ export function RequestDetailPanel({
             </div>
             <div className="rounded-lg border border-border bg-bg overflow-hidden divide-y divide-border">
               {request.items.map((item, idx) => {
-                const itemCategoryMeta = getCategoryStyle(item.category);
-                const isUuidStr = (s?: string | null) =>
-                  Boolean(s && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s.trim()));
-                const displayDesc = isUuidStr(item.itemDescription)
-                  ? `${itemCategoryMeta.label} Equipment`
-                  : item.itemDescription;
+                const itemCategoryMeta = resolveCategoryStyle(item.category);
+                const displayDesc = formatItemDescription(
+                  item.itemDescription,
+                  itemCategoryMeta.label,
+                  item.itemType
+                );
                 const shouldShowAssetCode =
                   Boolean(item.assetCode) &&
-                  !isUuidStr(item.assetCode) &&
+                  !isUuid(item.assetCode) &&
                   !item.assetCode?.toLowerCase().startsWith("cat-");
 
                 return (

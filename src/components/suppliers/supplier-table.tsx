@@ -1,28 +1,77 @@
 "use client";
 
-import { Truck } from "lucide-react";
+import { Loader2, Truck } from "lucide-react";
 import type { Supplier } from "@/types/suppliers";
 import { SupplierStatusBadge } from "./supplier-status-badge";
+
+function SkeletonTableRow() {
+  return (
+    <tr className="border-b border-border bg-bg animate-pulse">
+      <td className="px-5 py-4">
+        <div className="h-4 w-40 bg-border rounded mb-1" />
+        <div className="h-3 w-24 bg-border rounded" />
+      </td>
+      <td className="px-3 py-4">
+        <div className="h-5 w-20 bg-border rounded-full" />
+      </td>
+      <td className="px-3 py-4 hidden md:table-cell">
+        <div className="h-3.5 w-32 bg-border rounded" />
+      </td>
+      <td className="px-3 py-4 hidden lg:table-cell">
+        <div className="h-3.5 w-24 bg-border rounded" />
+      </td>
+      <td className="px-5 py-4">
+        <div className="flex justify-end gap-1.5">
+          <div className="h-7 w-12 bg-border rounded-md" />
+          <div className="h-7 w-20 bg-border rounded-md" />
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+function TableHead() {
+  return (
+    <thead>
+      <tr className="border-b border-border bg-bg-subtle text-[11px] font-bold uppercase tracking-wider text-text-secondary">
+        <th className="px-5 py-3">Supplier</th>
+        <th className="px-3 py-3">Status</th>
+        <th className="px-3 py-3 hidden md:table-cell">Contact</th>
+        <th className="px-3 py-3 hidden lg:table-cell">Phone</th>
+        <th className="px-5 py-3 text-right">
+          <span className="sr-only">Actions</span>
+        </th>
+      </tr>
+    </thead>
+  );
+}
 
 export function SupplierTable({
   suppliers,
   loading,
+  deactivatingSupplierId = null,
   onSelect,
   onEdit,
   onDeactivate,
 }: {
   suppliers: Supplier[];
   loading?: boolean;
+  deactivatingSupplierId?: string | null;
   onSelect: (s: Supplier) => void;
   onEdit?: (s: Supplier) => void;
   onDeactivate?: (s: Supplier) => void;
 }) {
   if (loading) {
     return (
-      <div className="p-6 space-y-3 animate-pulse">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="h-12 bg-border rounded-lg" />
-        ))}
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-sm" aria-label="Suppliers loading">
+          <TableHead />
+          <tbody className="divide-y divide-border">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <SkeletonTableRow key={i} />
+            ))}
+          </tbody>
+        </table>
       </div>
     );
   }
@@ -44,17 +93,7 @@ export function SupplierTable({
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left text-sm" aria-label="Suppliers">
-        <thead>
-          <tr className="border-b border-border bg-bg-subtle text-[11px] font-bold uppercase tracking-wider text-text-secondary">
-            <th className="px-5 py-3">Supplier</th>
-            <th className="px-3 py-3">Status</th>
-            <th className="px-3 py-3 hidden md:table-cell">Contact</th>
-            <th className="px-3 py-3 hidden lg:table-cell">Phone</th>
-            <th className="px-5 py-3 text-right">
-              <span className="sr-only">Actions</span>
-            </th>
-          </tr>
-        </thead>
+        <TableHead />
         <tbody className="divide-y divide-border">
           {suppliers.map((s) => (
             <tr
@@ -96,9 +135,15 @@ export function SupplierTable({
                     <button
                       type="button"
                       onClick={() => onDeactivate(s)}
-                      className="h-7 px-2.5 text-[11px] font-bold rounded-md border border-border text-status-outofservice-text hover:bg-status-outofservice-bg/10 cursor-pointer"
+                      disabled={deactivatingSupplierId === s.id}
+                      className="inline-flex items-center gap-1 h-7 px-2.5 text-[11px] font-bold rounded-md border border-border text-status-outofservice-text hover:bg-status-outofservice-bg/10 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      Deactivate
+                      {deactivatingSupplierId === s.id && (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      )}
+                      {deactivatingSupplierId === s.id
+                        ? "Deactivating…"
+                        : "Deactivate"}
                     </button>
                   )}
                 </div>

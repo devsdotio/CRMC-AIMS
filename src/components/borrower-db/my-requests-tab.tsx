@@ -4,12 +4,10 @@ import { useState, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Search, ChevronLeft, ChevronRight, ClipboardCheck, Inbox } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { MyRequestItem } from "./my-request-item";
+import { MyRequestItem, MyRequestItemSkeleton } from "./my-request-item";
 import { CancelRequestDialog } from "./cancel-request-dialog";
 import { RequestDetailSheet } from "./request-detail-sheet";
 import type { PortalBorrowRequest, RequestStatusFilter } from "./types";
-import { LoadingState } from "@/components/providers/loading-context";
-
 import { useBorrowRequests, useCancelBorrowRequestMutation } from "@/features/borrow-requests/client/use-borrow-requests";
 import { useConsumableRequests, useCancelConsumableRequestMutation } from "@/features/consumable-requests/client";
 import { useToast } from "@/components/providers/toast-context";
@@ -75,8 +73,8 @@ export function MyRequestsTab() {
     [supplyResponse?.data]
   );
   const loading = loadingAssets || loadingSupplies;
-  const { mutate: cancelRequest } = useCancelBorrowRequestMutation();
-  const { mutate: cancelSupply } = useCancelConsumableRequestMutation();
+  const { mutateAsync: cancelRequest } = useCancelBorrowRequestMutation();
+  const { mutateAsync: cancelSupply } = useCancelConsumableRequestMutation();
   const toast = useToast();
 
   useEffect(() => {
@@ -129,21 +127,23 @@ export function MyRequestsTab() {
     );
   }, [assetRequests, supplyRequests]);
 
-  const handleCancelConfirmed = (requestId: string) => {
+  const handleCancelConfirmed = async (requestId: string) => {
     const target = requests.find((r) => r.id === requestId);
     const isSupply = Boolean(
       target?.items.every((i) => i.itemType === "consumable")
     );
-    const onDone = {
-      onSuccess: () => toast.success("Request cancelled."),
-      onError: (err: Error) =>
-        toast.error(err instanceof Error ? err.message : "Failed to cancel request."),
-    };
-    if (isSupply) {
-      cancelSupply({ id: requestId, note: "Cancelled by department" }, onDone);
-      return;
+    try {
+      if (isSupply) {
+        await cancelSupply({ id: requestId, note: "Cancelled by department" });
+      } else {
+        await cancelRequest({ id: requestId, note: "Cancelled by borrower" });
+      }
+      toast.success("Request cancelled.");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to cancel request."
+      );
     }
-    cancelRequest({ id: requestId, note: "Cancelled by borrower" }, onDone);
   };
 
   const matchesFilter = (r: PortalBorrowRequest, key: RequestStatusFilter) => {
@@ -250,15 +250,9 @@ export function MyRequestsTab() {
       {/* List */}
       <div className="flex-1 overflow-y-auto min-h-0 bg-bg divide-y divide-border">
         {loading ? (
-          <div className="p-6">
-            <LoadingState
-              variant="card"
-              icon="clipboard"
-              message="Loading your requests..."
-              subtitle="Fetching your borrow and requisition requests..."
-              className="border-none shadow-none py-12"
-            />
-          </div>
+          Array.from({ length: 5 }).map((_, i) => (
+            <MyRequestItemSkeleton key={i} />
+          ))
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
             <span
@@ -343,8 +337,8 @@ export function MyRequestsTab() {
           onOpenChange={(open) => {
             if (!open) setCancelTarget(null);
           }}
-          onConfirm={() => {
-            handleCancelConfirmed(cancelTarget.id);
+          onConfirm={async () => {
+            await handleCancelConfirmed(cancelTarget.id);
             setCancelTarget(null);
           }}
         />

@@ -1,12 +1,13 @@
 "use client";
 
-import { MoreHorizontal, Pencil, Trash2, Eye } from "lucide-react";
+import { MoreHorizontal, Pencil, Trash2, Eye, Loader2 } from "lucide-react";
 import type { Project } from "@/types/projects";
 import { ProjectStatusBadge } from "./project-status-badge";
 import { formatPhp } from "./format-money";
 
 export interface ProjectTableRowProps {
   project: Project;
+  deleting?: boolean;
   onSelect: (project: Project) => void;
   onEdit: (project: Project) => void;
   onDelete: (project: Project) => void;
@@ -14,6 +15,7 @@ export interface ProjectTableRowProps {
 
 export function ProjectTableRow({
   project,
+  deleting = false,
   onSelect,
   onEdit,
   onDelete,
@@ -76,11 +78,16 @@ export function ProjectTableRow({
             <button
               type="button"
               onClick={() => onDelete(project)}
-              className="inline-flex items-center justify-center h-7 w-7 rounded-md border border-border text-status-outofservice-text hover:bg-status-outofservice-bg/10 transition-colors cursor-pointer"
+              disabled={deleting}
+              className="inline-flex items-center justify-center h-7 w-7 rounded-md border border-border text-status-outofservice-text hover:bg-status-outofservice-bg/10 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
               title="Delete"
               aria-label="Delete project"
             >
-              <Trash2 className="h-3.5 w-3.5" />
+              {deleting ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Trash2 className="h-3.5 w-3.5" />
+              )}
             </button>
           )}
           {!project.isMutable && (

@@ -7,6 +7,7 @@ import { ProjectTableRow } from "./project-table-row";
 export interface ProjectTableProps {
   projects: Project[];
   loading?: boolean;
+  deletingProjectId?: string | null;
   onSelect: (project: Project) => void;
   onEdit: (project: Project) => void;
   onDelete: (project: Project) => void;
@@ -47,6 +48,7 @@ function SkeletonTableRow() {
 export function ProjectTable({
   projects,
   loading = false,
+  deletingProjectId = null,
   onSelect,
   onEdit,
   onDelete,
@@ -137,6 +139,7 @@ export function ProjectTable({
             <ProjectTableRow
               key={project.id}
               project={project}
+              deleting={deletingProjectId === project.id}
               onSelect={onSelect}
               onEdit={onEdit}
               onDelete={onDelete}

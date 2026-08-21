@@ -247,7 +247,9 @@ export default function ConsumablesPage() {
               Consumables Inventory
             </h1>
             <span className="px-2 py-0.5 text-xs font-bold bg-bg-subtle text-text-secondary rounded-full border border-border">
-              {filteredItems.length} of {items.length} supply items
+              {isConsumablesLoading
+                ? "Loading supply items…"
+                : `${filteredItems.length} of ${items.length} supply items`}
             </span>
           </div>
           <p className="text-xs text-text-secondary mt-0.5 max-w-xl">

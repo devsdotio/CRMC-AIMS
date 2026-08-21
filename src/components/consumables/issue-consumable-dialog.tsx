@@ -8,9 +8,10 @@ import { useProjectsQuery } from "@/features/projects/client";
 import { usePurchaseLotsQuery } from "@/features/purchase-lots/client/use-purchase-lots";
 import { fetchJson, type ApiResponse } from "@/features/shared/fetch-json";
 import { useQueryClient } from "@tanstack/react-query";
-import { consumableQueryKeys } from "@/features/consumables/client/query-keys";
-import { purchaseLotQueryKeys } from "@/features/purchase-lots/client/query-keys";
-import { stockMovementQueryKeys } from "@/features/stock-movements/client/query-keys";
+import {
+  STOCK_DOMAINS,
+  invalidateDomains,
+} from "@/features/shared/cache-invalidation";
 import { formatPhp } from "@/components/projects/format-money";
 import { availableQty } from "@/components/consumables/utils";
 
@@ -131,9 +132,7 @@ export function IssueConsumableDialog({
           }),
         }
       );
-      qc.invalidateQueries({ queryKey: consumableQueryKeys.all });
-      qc.invalidateQueries({ queryKey: purchaseLotQueryKeys.all });
-      qc.invalidateQueries({ queryKey: stockMovementQueryKeys.all });
+      void invalidateDomains(qc, STOCK_DOMAINS);
       onSuccess?.(`${item.itemCode} issued (${quantity} ${item.unit}).`);
       onClose();
     } catch (err) {

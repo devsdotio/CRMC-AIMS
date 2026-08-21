@@ -174,7 +174,9 @@ export default function AssetsPage() {
               Institutional Assets Registry
             </h1>
             <span className="px-2 py-0.5 text-xs font-bold bg-bg-subtle text-text-secondary rounded-full border border-border">
-              {filteredAssets.length} of {assets.length} items
+              {isLoading
+                ? "Loading items…"
+                : `${filteredAssets.length} of ${assets.length} items`}
             </span>
           </div>
           <p className="text-xs text-text-secondary mt-0.5">

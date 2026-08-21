@@ -8,7 +8,7 @@ import { AddEditCategoryDialog } from "./add-edit-category-dialog";
 export interface CategoriesSectionProps {
   assetCategories: CategoryItem[];
   consumableCategories: CategoryItem[];
-  onSaveCategory: (categoryData: Partial<CategoryItem>) => void;
+  onSaveCategory: (categoryData: Partial<CategoryItem>) => void | Promise<void>;
   onDeleteCategory: (category: CategoryItem) => void;
 }
 

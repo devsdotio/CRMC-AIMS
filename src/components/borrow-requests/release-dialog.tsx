@@ -5,6 +5,7 @@ import { AlertCircle, Loader2, User } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { formatItemDescription } from "@/lib/sanitize-display";
+import { useCategoryStyleResolver } from "@/features/categories/client/use-category-style";
 import type { BorrowRequest } from "@/types/borrow-requests";
 import type { ReleaseBorrowRequestPayload } from "@/features/borrow-requests/client/borrow-requests-api";
 
@@ -28,6 +29,7 @@ export function ReleaseDialog({
   const [pickedUpBy, setPickedUpBy] = useState("");
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
+  const resolveCategoryStyle = useCategoryStyleResolver();
 
   useEffect(() => {
     if (isOpen && request) {
@@ -93,7 +95,15 @@ export function ReleaseDialog({
           <h2 className="text-base font-bold text-text">Release Request</h2>
           <p className="mt-0.5 text-xs text-text-secondary">
             Releasing {request.requestCode} ·{" "}
-            {request.items.map((i) => formatItemDescription(i.itemDescription, i.category, i.itemType)).join(", ")}
+            {request.items
+              .map((i) =>
+                formatItemDescription(
+                  i.itemDescription,
+                  resolveCategoryStyle(i.category).label,
+                  i.itemType
+                )
+              )
+              .join(", ")}
           </p>
         </div>
 

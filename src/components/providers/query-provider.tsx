@@ -17,7 +17,10 @@ function createQueryClient() {
         staleTime: 30_000,
         retry: 1,
         retryDelay: 800,
-        refetchOnWindowFocus: false,
+        // Custodians and borrowers act on the same records from different tabs,
+        // so returning to a tab resyncs anything older than the stale window.
+        refetchOnWindowFocus: true,
+        refetchOnReconnect: true,
       },
     },
   });

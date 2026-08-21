@@ -119,7 +119,9 @@ export default function SuppliersPage() {
               Suppliers
             </h1>
             <span className="px-2 py-0.5 text-xs font-bold bg-bg-subtle text-text-secondary rounded-full border border-border">
-              {filtered.length} of {suppliers.length}
+              {isLoading
+                ? "Loading suppliers…"
+                : `${filtered.length} of ${suppliers.length}`}
               {isFetching && !isLoading ? " · updating…" : ""}
             </span>
           </div>
@@ -159,6 +161,9 @@ export default function SuppliersPage() {
         <SupplierTable
           suppliers={filtered}
           loading={isLoading && !error}
+          deactivatingSupplierId={
+            deactivateSupplier.isPending ? deactivateSupplier.variables : null
+          }
           onSelect={setSelected}
           onEdit={canOperate ? (s) => setEditTarget(s) : undefined}
           onDeactivate={
