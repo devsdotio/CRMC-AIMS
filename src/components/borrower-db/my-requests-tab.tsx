@@ -7,8 +7,10 @@ import { cn } from "@/lib/utils";
 import { MyRequestItem } from "./my-request-item";
 import { CancelRequestDialog } from "./cancel-request-dialog";
 import { RequestDetailSheet } from "./request-detail-sheet";
+import { EditRequestDialog } from "./edit-request-dialog";
 import type { PortalBorrowRequest, RequestStatusFilter } from "./types";
 import { LoadingState } from "@/components/providers/loading-context";
+import { useAssetOperator } from "@/hooks/use-asset-operator";
 
 import { useBorrowRequests, useCancelBorrowRequestMutation } from "@/features/borrow-requests/client/use-borrow-requests";
 import { useConsumableRequests, useCancelConsumableRequestMutation } from "@/features/consumable-requests/client";
@@ -64,8 +66,10 @@ export function MyRequestsTab() {
   const [statusFilter, setStatusFilter] = useState<RequestStatusFilter>("all");
   const [search, setSearch] = useState("");
   const [cancelTarget, setCancelTarget] = useState<PortalBorrowRequest | null>(null);
+  const [editTarget, setEditTarget] = useState<PortalBorrowRequest | null>(null);
   const [selectedRequest, setSelectedRequest] = useState<PortalBorrowRequest | null>(null);
   const [page, setPage] = useState(1);
+  const { canOperate } = useAssetOperator();
 
   const { data: response, isLoading: loadingAssets } = useBorrowRequests();
   const { data: supplyResponse, isLoading: loadingSupplies } = useConsumableRequests();
@@ -298,6 +302,8 @@ export function MyRequestsTab() {
               onViewDetails={(r) => setSelectedRequest(r as any)}
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               onCancel={(r) => setCancelTarget(r as any)}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              onEdit={canOperate ? (r) => setEditTarget(r as any) : undefined}
             />
           ))
         )}
@@ -350,6 +356,21 @@ export function MyRequestsTab() {
         />
       )}
 
+      {/* Edit Request Dialog */}
+      {editTarget && (
+        <EditRequestDialog
+          request={editTarget}
+          open={Boolean(editTarget)}
+          onOpenChange={(open) => {
+            if (!open) setEditTarget(null);
+          }}
+          onSuccess={() => {
+            setEditTarget(null);
+            setSelectedRequest(null);
+          }}
+        />
+      )}
+
       {/* Request Detail Sheet */}
       {selectedRequest && (
         <RequestDetailSheet
@@ -362,6 +383,14 @@ export function MyRequestsTab() {
             setSelectedRequest(null);
             setCancelTarget(req);
           }}
+          onEdit={
+            canOperate
+              ? (req) => {
+                  setSelectedRequest(null);
+                  setEditTarget(req);
+                }
+              : undefined
+          }
         />
       )}
     </div>

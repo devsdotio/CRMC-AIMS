@@ -105,6 +105,16 @@ export class ConsumableRequestController {
       return handleError(error);
     }
   }
+
+  async update(request: NextRequest | Request, id: string) {
+    try {
+      const session = await requireAssetOperator();
+      const body = await request.json();
+      return ok(await this.service.update(id, body, session.actor));
+    } catch (error) {
+      return handleError(error);
+    }
+  }
 }
 
 export const consumableRequestController = new ConsumableRequestController();

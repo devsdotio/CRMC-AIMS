@@ -95,10 +95,44 @@ export const releaseConsumableRequestSchema = z
     lines: z.array(releaseLineSchema).min(1),
   });
 
+export const updateConsumableRequestSchema = z
+  .object({
+    requesterName: z.string().trim().min(1).max(255).optional(),
+    requesterEmail: z.string().trim().email().max(320).optional(),
+    requesterPhone: z.string().trim().max(40).optional(),
+    departmentId: z.string().uuid().nullable().optional(),
+    projectId: z.string().uuid().nullable().optional(),
+    requestedByName: z.string().trim().max(255).nullable().optional(),
+    purpose: z.string().trim().min(1).max(1000).optional(),
+    notes: z.string().trim().max(2000).nullable().optional(),
+    lines: z
+      .array(requestLineInputSchema)
+      .min(1, "At least one product line is required.")
+      .max(50)
+      .optional(),
+    editReason: z
+      .string()
+      .trim()
+      .min(1, "Edit reason / note is required for accountability.")
+      .max(1000),
+  })
+  .superRefine((data, ctx) => {
+    if (data.departmentId && data.projectId) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Specify department or project, not both.",
+        path: ["departmentId"],
+      });
+    }
+  });
+
 export const consumableRequestIdSchema = z.string().uuid("Invalid request id.");
 
 export type CreateConsumableRequestBody = z.infer<
   typeof createConsumableRequestSchema
+>;
+export type UpdateConsumableRequestBody = z.infer<
+  typeof updateConsumableRequestSchema
 >;
 export type ApproveConsumableRequestBody = z.infer<
   typeof approveConsumableRequestSchema
@@ -115,3 +149,4 @@ export type ReleaseConsumableRequestBody = z.infer<
 export type ListConsumableRequestsQuery = z.infer<
   typeof listConsumableRequestsQuerySchema
 >;
+

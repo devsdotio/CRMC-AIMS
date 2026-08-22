@@ -27,6 +27,7 @@ import { RequestDetailPanel } from "@/components/borrow-requests/request-detail-
 import { ApproveRejectDialog } from "@/components/borrow-requests/approve-reject-dialog";
 import { ReleaseDialog } from "@/components/borrow-requests/release-dialog";
 import { ReturnDialog } from "@/components/borrow-requests/return-dialog";
+import { EditRequestDialog } from "@/components/borrower-db/edit-request-dialog";
 import {
   SupplyRequestsQueue,
   SupplyRequestStatusTabs,
@@ -93,6 +94,7 @@ function BorrowRequestsContent() {
   const [highlightedId, setHighlightedId] = useState<string | null>(
     requestIdParam
   );
+  const [editTarget, setEditTarget] = useState<BorrowRequest | null>(null);
 
   // Filter & Pagination State
   const [filters, setFilters] = useState<
@@ -558,7 +560,30 @@ function BorrowRequestsContent() {
         onRelease={canOperate ? handleOpenReleaseModal : undefined}
         onReturn={canOperate ? handleOpenReturnModal : undefined}
         onMarkUnreleased={canOperate ? handleMarkUnreleased : undefined}
+        onEdit={
+          canOperate
+            ? (req) => {
+                setSelectedRequest(null);
+                setEditTarget(req);
+              }
+            : undefined
+        }
       />
+
+      {/* ── Edit Request Modal ────────────────────────────────────────── */}
+      {editTarget && (
+        <EditRequestDialog
+          request={editTarget}
+          open={Boolean(editTarget)}
+          onOpenChange={(open) => {
+            if (!open) setEditTarget(null);
+          }}
+          onSuccess={() => {
+            setEditTarget(null);
+            refetch();
+          }}
+        />
+      )}
 
       {canOperate && (
       <>

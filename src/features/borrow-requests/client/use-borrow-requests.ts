@@ -14,6 +14,7 @@ import type {
   BorrowRequest,
   CreateBorrowRequestPayload,
   ReleaseBorrowRequestPayload,
+  UpdateBorrowRequestPayload,
 } from "./borrow-requests-api";
 import { borrowRequestsApi } from "./borrow-requests-api";
 import { borrowRequestQueryKeys } from "./query-keys";
@@ -117,6 +118,26 @@ export function useCreateBorrowRequestMutation(): UseMutationResult<
       // 3. Eventually consistent re-fetch
       qc.invalidateQueries({ queryKey: borrowRequestQueryKeys.all });
       qc.invalidateQueries({ queryKey: dashboardQueryKeys.all });
+    },
+  });
+}
+
+export function useUpdateBorrowRequestMutation(): UseMutationResult<
+  BorrowRequest,
+  Error,
+  { id: string; payload: UpdateBorrowRequestPayload }
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }) => borrowRequestsApi.update(id, payload),
+    onSuccess: (updated) => {
+      qc.setQueriesData<BorrowRequest>(
+        { queryKey: borrowRequestQueryKeys.detail(updated.id) },
+        () => updated
+      );
+      qc.invalidateQueries({ queryKey: borrowRequestQueryKeys.all });
+      qc.invalidateQueries({ queryKey: dashboardQueryKeys.all });
+      qc.invalidateQueries({ queryKey: ["audit-logs"] });
     },
   });
 }

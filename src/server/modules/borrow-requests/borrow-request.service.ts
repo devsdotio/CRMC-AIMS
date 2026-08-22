@@ -38,6 +38,7 @@ import {
   releaseBorrowRequestSchema,
   markUnreleasedBorrowRequestSchema,
   returnBorrowRequestSchema,
+  updateBorrowRequestSchema,
 } from "./borrow-request.validation";
 
 function toDTO(row: BorrowRequestRow): BorrowRequestDTO {
@@ -624,6 +625,114 @@ export class BorrowRequestService {
 
       return up;
     });
+    return toDTO(updated);
+  }
+
+  async update(
+    rawId: string,
+    rawInput: unknown,
+    actor: ActorContext
+  ): Promise<BorrowRequestDTO> {
+    const id = borrowRequestIdSchema.parse(rawId);
+    const input = updateBorrowRequestSchema.parse(rawInput);
+    const existing = await this.repo.findById(id);
+    if (!existing) throw new NotFoundError("Borrow request", id);
+    if (existing.status !== "pending") {
+      throw new ConflictError("Only pending requests can be edited.");
+    }
+
+    let departmentName = existing.department;
+    let departmentId = existing.departmentId;
+    if (input.departmentId !== undefined) {
+      if (input.departmentId) {
+        const d = await this.departments.findById(input.departmentId);
+        if (!d) throw new NotFoundError("Department", input.departmentId);
+        departmentName = d.name;
+        departmentId = d.id;
+      } else {
+        departmentId = null;
+      }
+    }
+
+    const nextRequestType = input.requestType ?? existing.requestType ?? "borrowable";
+    const nextItems = input.items ?? existing.items;
+
+    // Validate assets if changed or present
+    if (input.items) {
+      for (const item of nextItems) {
+        if (!item.assetId) continue;
+        const asset = await this.assetRepo.findById(item.assetId);
+        if (!asset) throw new NotFoundError("Asset", item.assetId);
+        if (asset.status !== "active") {
+          throw new ConflictError(
+            `Asset ${asset.assetCode} is not available (${asset.status.replace(/_/g, " ")}).`
+          );
+        }
+        if (asset.currentHolder) {
+          throw new ConflictError(
+            `Asset ${asset.assetCode} is currently in custody (${asset.currentHolder}).`
+          );
+        }
+        if (asset.reservedForRequestId && asset.reservedForRequestId !== existing.id) {
+          throw new ConflictError(
+            `Asset ${asset.assetCode} is already reserved for another request.`
+          );
+        }
+        if (nextRequestType === "borrowable" && asset.assignmentType !== "borrowable") {
+          throw new ConflictError(`Asset ${asset.assetCode} is not borrowable.`);
+        }
+        if (nextRequestType === "assignable" && asset.assignmentType !== "assignable") {
+          throw new ConflictError(`Asset ${asset.assetCode} is not assignable.`);
+        }
+      }
+    }
+
+    const history = [
+      ...(Array.isArray(existing.history) ? existing.history : []),
+      historyEntry("edited", actor.displayName, input.editReason),
+    ];
+
+    const updated = await withTransaction(async (tx) => {
+
+      const up = await this.repo.update(
+        id,
+        {
+          ...(input.requesterName !== undefined ? { requesterName: input.requesterName } : {}),
+          ...(input.requesterEmail !== undefined ? { requesterEmail: input.requesterEmail.toLowerCase() } : {}),
+          ...(input.requesterPhone !== undefined ? { requesterPhone: input.requesterPhone } : {}),
+          ...(input.requestedByName !== undefined ? { requestedByName: input.requestedByName } : {}),
+          department: departmentName,
+          departmentId,
+          requestType: nextRequestType,
+          items: nextItems,
+          ...(input.purpose !== undefined ? { purpose: input.purpose } : {}),
+          expectedReturnDate:
+            nextRequestType === "borrowable"
+              ? (input.expectedReturnDate !== undefined ? input.expectedReturnDate : existing.expectedReturnDate)
+              : null,
+          ...(input.notes !== undefined ? { notes: input.notes } : {}),
+          history,
+          updatedAt: new Date(),
+        },
+        tx
+      );
+      if (!up) throw new NotFoundError("Borrow request", id);
+
+      await this.auditLogs.create(
+        {
+          entityType: "borrow_request",
+          entityId: up.id,
+          action: "update",
+          actorName: actor.displayName,
+          actorUserId: actor.userId,
+          notes: input.editReason,
+        },
+        tx
+      );
+
+      return up;
+    });
+
     return toDTO(updated);
   }
 }

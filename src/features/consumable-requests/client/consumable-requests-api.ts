@@ -33,6 +33,23 @@ export type ReleaseConsumableRequestPayload = {
   }>;
 };
 
+export type UpdateConsumableRequestPayload = {
+  requesterName?: string;
+  requesterEmail?: string;
+  requesterPhone?: string;
+  departmentId?: string | null;
+  projectId?: string | null;
+  requestedByName?: string | null;
+  purpose?: string;
+  notes?: string | null;
+  lines?: Array<{
+    consumableId: string;
+    quantity: number;
+    notes?: string;
+  }>;
+  editReason: string;
+};
+
 export const consumableRequestsApi = {
   async list(params?: {
     status?: ConsumableRequest["status"];
@@ -71,6 +88,17 @@ export const consumableRequestsApi = {
     const res = await fetchJson<ApiResponse<ConsumableRequest>>(
       "/api/consumable-requests",
       { method: "POST", body: JSON.stringify(payload) }
+    );
+    return res.data;
+  },
+
+  async update(
+    id: string,
+    payload: UpdateConsumableRequestPayload
+  ): Promise<ConsumableRequest> {
+    const res = await fetchJson<ApiResponse<ConsumableRequest>>(
+      `/api/consumable-requests/${id}`,
+      { method: "PATCH", body: JSON.stringify(payload) }
     );
     return res.data;
   },

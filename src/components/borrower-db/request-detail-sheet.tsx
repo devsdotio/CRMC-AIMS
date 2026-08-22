@@ -18,6 +18,7 @@ import {
   Send,
   RotateCcw,
   X,
+  Edit3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getCategoryStyle } from "@/constants/categories";
@@ -37,6 +38,7 @@ export interface RequestDetailSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCancel?: (request: PortalBorrowRequest) => void;
+  onEdit?: (request: PortalBorrowRequest) => void;
 }
 
 const STATUS_CONFIG: Record<
@@ -86,6 +88,7 @@ export function RequestDetailSheet({
   open,
   onOpenChange,
   onCancel,
+  onEdit,
 }: RequestDetailSheetProps) {
   const [copied, setCopied] = useState(false);
 
@@ -234,16 +237,30 @@ export function RequestDetailSheet({
               )}
             </div>
 
-            {/* Highlighted Status Badge */}
-            <span
-              className={cn(
-                "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-extrabold border shadow-xs tracking-wide",
-                statusConfig.badge
+            {/* Highlighted Status Badge & Edit Action */}
+            <div className="flex items-center gap-2">
+              {onEdit && request.status === "pending" && (
+                <button
+                  type="button"
+                  onClick={() => onEdit(request)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border border-border bg-bg-subtle text-text hover:bg-accent/10 hover:text-accent hover:border-accent/30 transition-colors shadow-xs cursor-pointer"
+                  title="Edit request details"
+                >
+                  <Edit3 className="h-3.5 w-3.5" />
+                  Edit
+                </button>
               )}
-            >
-              <StatusIcon className="h-3.5 w-3.5 shrink-0" />
-              {statusConfig.label}
-            </span>
+
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-extrabold border shadow-xs tracking-wide",
+                  statusConfig.badge
+                )}
+              >
+                <StatusIcon className="h-3.5 w-3.5 shrink-0" />
+                {statusConfig.label}
+              </span>
+            </div>
           </div>
 
           <div className="flex items-center justify-between text-xs text-text-secondary pt-0.5">

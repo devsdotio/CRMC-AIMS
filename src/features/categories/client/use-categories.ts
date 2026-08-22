@@ -113,6 +113,13 @@ export function useUpdateCategoryMutation(): UseMutationResult<
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["categories"] });
+      queryClient.invalidateQueries({ queryKey: ["assets"] });
+      queryClient.invalidateQueries({ queryKey: ["asset-models"] });
+      queryClient.invalidateQueries({ queryKey: ["consumables"] });
+      queryClient.invalidateQueries({ queryKey: ["borrow-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["consumable-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["maintenance-logs"] });
     },
   });
 }
@@ -145,6 +152,13 @@ export function useDeleteCategoryMutation(): UseMutationResult<
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["categories"] });
+      queryClient.invalidateQueries({ queryKey: ["assets"] });
+      queryClient.invalidateQueries({ queryKey: ["asset-models"] });
+      queryClient.invalidateQueries({ queryKey: ["consumables"] });
+      queryClient.invalidateQueries({ queryKey: ["borrow-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["consumable-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["maintenance-logs"] });
     },
   });
 }

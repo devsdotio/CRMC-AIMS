@@ -20,6 +20,11 @@ export const CATEGORY_STYLES: Record<string, CategoryStyleMeta> = {
   tools:       { bg: "bg-yellow-600",            text: "text-white font-bold", label: "Tools", cssVar: "#CA8A04" },
 };
 
+export const CATEGORIES = Object.entries(CATEGORY_STYLES).map(([id, meta]) => ({
+  id,
+  name: meta.label,
+}));
+
 export interface CategoryColorOption {
   id: string;
   name: string;

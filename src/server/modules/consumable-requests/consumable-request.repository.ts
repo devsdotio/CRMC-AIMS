@@ -198,6 +198,16 @@ export class ConsumableRequestRepository
     return db.insert(consumableRequestLines).values(rows).returning();
   }
 
+  async deleteLinesByRequestId(
+    requestId: string,
+    session?: DbSession
+  ): Promise<void> {
+    const db = this.db(session);
+    await db
+      .delete(consumableRequestLines)
+      .where(eq(consumableRequestLines.requestId, requestId));
+  }
+
   async listLinesByRequestId(
     requestId: string,
     session?: DbSession
