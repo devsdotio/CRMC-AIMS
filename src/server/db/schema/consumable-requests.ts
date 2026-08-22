@@ -40,7 +40,8 @@ export type ConsumableRequestHistoryEntry = {
     | "approved"
     | "rejected"
     | "released"
-    | "cancelled";
+    | "cancelled"
+    | "edited";
   actor: string;
   timestamp: string;
   note?: string;

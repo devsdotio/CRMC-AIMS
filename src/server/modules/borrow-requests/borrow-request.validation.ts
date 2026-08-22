@@ -92,9 +92,44 @@ export const cancelBorrowRequestSchema = z.object({
   note: z.string().trim().max(1000).optional(),
 });
 
+export const updateBorrowRequestSchema = z.object({
+  requesterName: z.string().trim().min(1).max(255).optional(),
+  requesterEmail: z.string().trim().email().max(320).optional(),
+  requesterPhone: z.string().trim().max(40).optional(),
+  departmentId: z.string().uuid().optional(),
+  requestType: z.enum(["borrowable", "assignable"]).optional(),
+  requestedByName: z.string().trim().max(255).optional(),
+  items: z
+    .array(
+      z.object({
+        itemDescription: z.string().trim().min(1).max(500),
+        assetId: z.string().uuid().optional(),
+        assetCode: z.string().trim().max(64).optional(),
+        category: assetCategorySchema,
+        quantity: z.number().int().min(1).max(999).optional().default(1),
+        itemType: z.literal("asset"),
+      })
+    )
+    .min(1, "At least one item is required.")
+    .optional(),
+  purpose: z.string().trim().min(1).max(1000).optional(),
+  expectedReturnDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "expectedReturnDate must be YYYY-MM-DD")
+    .nullable()
+    .optional(),
+  notes: z.string().trim().max(2000).nullable().optional(),
+  editReason: z
+    .string()
+    .trim()
+    .min(1, "Edit reason / note is required for accountability.")
+    .max(1000),
+});
+
 export const borrowRequestIdSchema = z.string().uuid("Invalid request id.");
 
 export type CreateBorrowRequestBody = z.infer<typeof createBorrowRequestSchema>;
+export type UpdateBorrowRequestBody = z.infer<typeof updateBorrowRequestSchema>;
 export type ApproveBorrowRequestBody = z.infer<typeof approveBorrowRequestSchema>;
 export type RejectBorrowRequestBody = z.infer<typeof rejectBorrowRequestSchema>;
 export type ReleaseBorrowRequestBody = z.infer<typeof releaseBorrowRequestSchema>;
@@ -102,3 +137,4 @@ export type MarkUnreleasedBorrowRequestBody = z.infer<typeof markUnreleasedBorro
 export type ReturnBorrowRequestBody = z.infer<typeof returnBorrowRequestSchema>;
 export type CancelBorrowRequestBody = z.infer<typeof cancelBorrowRequestSchema>;
 export type ListBorrowRequestsQuery = z.infer<typeof listBorrowRequestsQuerySchema>;
+

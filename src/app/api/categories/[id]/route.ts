@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { getDb } from "@/server/db";
 import { categories } from "@/server/db/schema";
 import { requireActor } from "@/server/shared/auth";
+import { CategoryRepository, type CategoryType } from "@/server/modules/categories/category.repository";
 
 export async function PUT(
   request: Request,
@@ -11,41 +12,59 @@ export async function PUT(
   try {
     const { id } = await params;
     const actor = await requireActor();
-    const db = getDb();
+    const categoryRepo = new CategoryRepository();
+    const existing = await categoryRepo.findById(id);
+
+    if (!existing) {
+      return NextResponse.json({ error: "Category not found" }, { status: 404 });
+    }
+
+    const canManage =
+      actor.role === "admin" ||
+      actor.role === "superadmin" ||
+      existing.createdByUserId === actor.userId;
+
+    if (!canManage) {
+      return NextResponse.json(
+        { error: "You do not have permission to update this category" },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
-    
-    if (!body.name || !body.type) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    if (!body.name?.trim() || !body.type) {
+      return NextResponse.json({ error: "Missing required fields: name, type" }, { status: 400 });
     }
-    
-    const [updatedCategory] = await db
-      .update(categories)
-      .set({
-        name: String(body.name).trim(),
-        type: body.type,
-        ...(body.colorToken !== undefined ? { colorToken: body.colorToken || null } : {}),
-        updatedAt: new Date(),
-      })
-      .where(
-        actor.role === "admin"
-          ? eq(categories.id, id)
-          : and(eq(categories.id, id), eq(categories.createdByUserId, actor.userId))
-      )
-      .returning();
-      
-    if (!updatedCategory) {
-      return NextResponse.json({ error: "Category not found or unauthorized" }, { status: 404 });
+
+    if (body.type !== "asset" && body.type !== "consumable") {
+      return NextResponse.json(
+        { error: "type must be asset or consumable" },
+        { status: 400 }
+      );
     }
-      
-    return NextResponse.json({
-      data: {
-        id: updatedCategory.id,
-        name: updatedCategory.name,
-        type: updatedCategory.type,
-        colorToken: updatedCategory.colorToken || undefined,
-        itemCount: 0,
-      }
+
+    const newName = String(body.name).trim();
+
+    // Check if renaming conflicts with another category of same type
+    const conflict = await categoryRepo.findByTypeAndName(body.type as CategoryType, newName);
+    if (conflict && conflict.id !== id) {
+      return NextResponse.json(
+        { error: `Category “${newName}” already exists for this type.` },
+        { status: 409 }
+      );
+    }
+
+    const updated = await categoryRepo.updateAndCascade(id, {
+      name: newName,
+      type: body.type as CategoryType,
+      colorToken: body.colorToken !== undefined ? body.colorToken || null : undefined,
     });
+
+    if (!updated) {
+      return NextResponse.json({ error: "Category not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ data: updated });
   } catch (error) {
     console.error("PUT /api/categories/[id] Error:", error);
     return NextResponse.json({ error: "Failed to update category" }, { status: 500 });
@@ -59,21 +78,44 @@ export async function DELETE(
   try {
     const { id } = await params;
     const actor = await requireActor();
-    const db = getDb();
-    
-    const [deletedCategory] = await db
-      .delete(categories)
-      .where(
-        actor.role === "admin"
-          ? eq(categories.id, id)
-          : and(eq(categories.id, id), eq(categories.createdByUserId, actor.userId))
-      )
-      .returning();
-      
-    if (!deletedCategory) {
-      return NextResponse.json({ error: "Category not found or unauthorized" }, { status: 404 });
+    const categoryRepo = new CategoryRepository();
+    const existing = await categoryRepo.findById(id);
+
+    if (!existing) {
+      return NextResponse.json({ error: "Category not found" }, { status: 404 });
     }
-      
+
+    const canManage =
+      actor.role === "admin" ||
+      actor.role === "superadmin" ||
+      existing.createdByUserId === actor.userId;
+
+    if (!canManage) {
+      return NextResponse.json(
+        { error: "You do not have permission to delete this category" },
+        { status: 403 }
+      );
+    }
+
+    const usageCount = await categoryRepo.countUsages(
+      existing.name,
+      existing.type as CategoryType
+    );
+
+    if (usageCount > 0) {
+      return NextResponse.json(
+        {
+          error: `Cannot delete category “${existing.name}” because it is currently assigned to ${usageCount} ${
+            existing.type === "asset" ? "asset(s)" : "supply item(s)"
+          }. Reassign or delete those items first.`,
+        },
+        { status: 409 }
+      );
+    }
+
+    const db = getDb();
+    await db.delete(categories).where(eq(categories.id, id));
+
     return NextResponse.json({ data: { success: true } });
   } catch (error) {
     console.error("DELETE /api/categories/[id] Error:", error);

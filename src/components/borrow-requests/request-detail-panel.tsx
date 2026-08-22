@@ -1,7 +1,7 @@
 "use client";
  
 import { useEffect, useRef, useState } from "react";
-import { X, Check, Mail, Phone, Building2, Tag, History, FileText, User, Loader2, Send, CheckCircle, XCircle, PackageCheck, PackageMinus, RotateCcw } from "lucide-react";
+import { X, Check, Mail, Phone, Building2, Tag, History, FileText, User, Loader2, Send, CheckCircle, XCircle, PackageCheck, PackageMinus, RotateCcw, Edit3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatItemDescription, isUuid } from "@/lib/sanitize-display";
 import { useCategoryStyleResolver } from "@/features/categories/client/use-category-style";
@@ -31,6 +31,7 @@ export interface RequestDetailPanelProps {
   onRelease?: (request: BorrowRequest) => void | Promise<void>;
   onReturn?: (request: BorrowRequest) => void | Promise<void>;
   onMarkUnreleased?: (request: BorrowRequest) => void | Promise<void>;
+  onEdit?: (request: BorrowRequest) => void;
 }
 
 const STATUS_STYLES: Record<RequestStatus, { bg: string; text: string; label: string }> = {
@@ -89,6 +90,7 @@ export function RequestDetailPanel({
   onRelease,
   onReturn,
   onMarkUnreleased,
+  onEdit,
 }: RequestDetailPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [isMarkingUnreleased, setIsMarkingUnreleased] = useState(false);
@@ -162,8 +164,19 @@ export function RequestDetailPanel({
             </p>
           </div>
 
-          {request.status === "released" && onReturn && hasReturnableAssets && (
-            <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
+            {onEdit && request.status === "pending" && (
+              <button
+                type="button"
+                onClick={() => onEdit(request)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md border border-border bg-bg text-text hover:bg-accent/10 hover:text-accent hover:border-accent/30 transition-colors cursor-pointer shadow-xs"
+              >
+                <Edit3 className="h-3.5 w-3.5" />
+                Edit
+              </button>
+            )}
+
+            {request.status === "released" && onReturn && hasReturnableAssets && (
               <button
                 type="button"
                 onClick={() => onReturn(request)}
@@ -172,8 +185,8 @@ export function RequestDetailPanel({
                 <RotateCcw className="h-3.5 w-3.5" strokeWidth={2.5} />
                 Mark Returned
               </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Scrollable Panel Body */}

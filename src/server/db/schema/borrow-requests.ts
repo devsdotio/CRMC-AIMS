@@ -42,7 +42,8 @@ export type BorrowRequestHistoryEntry = {
     | "released"
     | "unreleased"
     | "returned"
-    | "cancelled";
+    | "cancelled"
+    | "edited";
   actor: string;
   timestamp: string;
   note?: string;

@@ -494,8 +494,8 @@ function StepSelect({
     const adminAssetCats = dbCategories.filter((c) => c.type === "asset" || !c.type);
     if (adminAssetCats.length > 0) {
       return adminAssetCats.map((c) => {
-        const style = getCategoryStyle(c.id, c.name, c.colorToken);
-        const Icon = getCategoryIcon(c.id || c.name);
+        const style = getCategoryStyle(c.name, c.name, c.colorToken);
+        const Icon = getCategoryIcon(c.name);
         return {
           id: c.id,
           title: c.name,
@@ -522,14 +522,15 @@ function StepSelect({
   }, [categoryCards, search]);
 
   const toggleCategory = (cat: AssetCategoryCardMeta) => {
-    const isSelected = value.some((v) => v.category === cat.id);
+    const syntheticId = `cat-${cat.id}`;
+    const isSelected = value.some((v) => v.id === syntheticId);
     if (isSelected) {
-      onChange(value.filter((v) => v.category !== cat.id));
+      onChange(value.filter((v) => v.id !== syntheticId));
     } else {
       const categoryItem: BrowseItem = {
-        id: `cat-${cat.id}`,
+        id: syntheticId,
         name: `${cat.title} Equipment`,
-        category: cat.id,
+        category: cat.title,
         type: "asset",
         status: "active",
         assignmentType: requestType === "assignable" ? "assignable" : "borrowable",
@@ -589,7 +590,7 @@ function StepSelect({
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {filteredCategories.map((cat) => {
-              const isSelected = value.some((v) => v.category === cat.id);
+              const isSelected = value.some((v) => v.id === `cat-${cat.id}`);
               const Icon = cat.icon;
               const style = cat.style;
 

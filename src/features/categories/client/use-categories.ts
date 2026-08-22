@@ -9,7 +9,27 @@ import {
 } from "@tanstack/react-query";
 import type { CategoryItem } from "@/types/settings";
 import { fetchJson, type ApiResponse } from "@/features/shared/fetch-json";
+import {
+  invalidateDomains,
+  type CacheDomain,
+} from "@/features/shared/cache-invalidation";
 import { categoryQueryKeys } from "./query-keys";
+
+/** Renaming or removing a category affects labels across inventory and requests. */
+const CATEGORY_CHANGE_DOMAINS = [
+  "categories",
+  "assets",
+  "consumables",
+  "borrowRequests",
+  "consumableRequests",
+  "dashboard",
+  "maintenance",
+] as const satisfies readonly CacheDomain[];
+
+function invalidateCategoryChange(queryClient: ReturnType<typeof useQueryClient>) {
+  void invalidateDomains(queryClient, CATEGORY_CHANGE_DOMAINS);
+  queryClient.invalidateQueries({ queryKey: ["asset-models"] });
+}
 
 async function fetchCategories(): Promise<CategoryItem[]> {
   const result = await fetchJson<ApiResponse<CategoryItem[]>>("/api/categories");
@@ -119,7 +139,7 @@ export function useUpdateCategoryMutation(): UseMutationResult<
       }
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: categoryQueryKeys.all });
+      invalidateCategoryChange(queryClient);
     },
   });
 }
@@ -154,7 +174,7 @@ export function useDeleteCategoryMutation(): UseMutationResult<
       }
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: categoryQueryKeys.all });
+      invalidateCategoryChange(queryClient);
     },
   });
 }

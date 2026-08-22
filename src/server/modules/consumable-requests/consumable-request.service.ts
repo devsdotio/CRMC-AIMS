@@ -46,6 +46,7 @@ import {
   listConsumableRequestsQuerySchema,
   rejectConsumableRequestSchema,
   releaseConsumableRequestSchema,
+  updateConsumableRequestSchema,
 } from "./consumable-request.validation";
 
 function money(value: string | number): string {
@@ -816,6 +817,118 @@ export class ConsumableRequestService {
 
       const lines = await this.repo.listLinesByRequestId(id, tx);
       return toDTO(up, lines, savedAllocations);
+    });
+
+    return dto;
+  }
+
+  async update(
+    rawId: string,
+    rawInput: unknown,
+    actor: ActorContext
+  ): Promise<ConsumableRequestDTO> {
+    const id = consumableRequestIdSchema.parse(rawId);
+    const input = updateConsumableRequestSchema.parse(rawInput);
+    const existing = await this.repo.findById(id);
+    if (!existing) throw new NotFoundError("Consumable request", id);
+    if (existing.status !== "pending") {
+      throw new ConflictError("Only pending requests can be edited.");
+    }
+
+    let departmentName = existing.department;
+    let departmentId = existing.departmentId;
+    let projectId = existing.projectId;
+
+    if (input.departmentId !== undefined || input.projectId !== undefined) {
+      if (input.departmentId) {
+        const dest = await resolveDepartmentSnapshot({
+          actor,
+          submittedDepartmentId: input.departmentId,
+          requireDepartment: true,
+        });
+        departmentName = dest.departmentName ?? existing.department;
+        departmentId = dest.departmentId;
+        projectId = null;
+      } else if (input.projectId) {
+        departmentId = null;
+        projectId = input.projectId;
+      }
+    }
+
+    let lineRowsToInsert: Array<Omit<ConsumableRequestLineRow, "id" | "createdAt" | "updatedAt">> | null = null;
+    if (input.lines && input.lines.length > 0) {
+      const consumableIds = input.lines.map((l) => l.consumableId);
+      const uniqueIds = new Set(consumableIds);
+      if (uniqueIds.size !== consumableIds.length) {
+        throw new BadRequestError(
+          "Duplicate products in one request are not allowed. Combine quantities into a single line."
+        );
+      }
+
+      lineRowsToInsert = await Promise.all(
+        input.lines.map(async (line, index) => {
+          const item = await this.consumables.findById(line.consumableId);
+          if (!item) {
+            throw new NotFoundError("Consumable", line.consumableId);
+          }
+          return {
+            requestId: id,
+            lineNo: index + 1,
+            consumableId: item.id,
+            itemCode: item.itemCode,
+            itemName: item.name,
+            category: item.category,
+            unit: item.unit,
+            quantityRequested: line.quantity,
+            notes: line.notes ?? null,
+          };
+        })
+      );
+    }
+
+    const history = [
+      ...(Array.isArray(existing.history) ? existing.history : []),
+      historyEntry("edited", actor.displayName, input.editReason),
+    ];
+
+    const dto = await withTransaction(async (tx) => {
+      if (lineRowsToInsert) {
+        await this.repo.deleteLinesByRequestId(id, tx);
+        await this.repo.createLines(lineRowsToInsert, tx);
+      }
+
+      const up = await this.repo.update(
+        id,
+        {
+          ...(input.requesterName !== undefined ? { requesterName: input.requesterName } : {}),
+          ...(input.requesterEmail !== undefined ? { requesterEmail: input.requesterEmail.toLowerCase() } : {}),
+          ...(input.requesterPhone !== undefined ? { requesterPhone: input.requesterPhone } : {}),
+          ...(input.requestedByName !== undefined ? { requestedByName: input.requestedByName } : {}),
+          department: departmentName,
+          departmentId,
+          projectId,
+          ...(input.purpose !== undefined ? { purpose: input.purpose } : {}),
+          ...(input.notes !== undefined ? { notes: input.notes } : {}),
+          history,
+        },
+        tx
+      );
+      if (!up) throw new NotFoundError("Consumable request", id);
+
+      await this.auditLogs.create(
+        {
+          entityType: "consumable_request",
+          entityId: up.id,
+          action: "update",
+          actorName: actor.displayName,
+          actorUserId: actor.userId,
+          notes: input.editReason,
+        },
+        tx
+      );
+
+      const lines = await this.repo.listLinesByRequestId(id, tx);
+      return toDTO(up, lines, []);
     });
 
     return dto;

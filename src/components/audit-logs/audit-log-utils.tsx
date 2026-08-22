@@ -64,6 +64,8 @@ export function getActionIcon(rawAction: string): React.ReactNode {
       return <Wrench className="h-3.5 w-3.5" />;
     case "update":
     case "updated":
+    case "edited":
+    case "modified":
       return <Edit className="h-3.5 w-3.5" />;
     case "deactivated":
       return <UserX className="h-3.5 w-3.5" />;
@@ -137,11 +139,13 @@ export function getActionStyle(rawAction: string): { bg: string; text: string; i
       };
     case "update":
     case "updated":
+    case "edited":
+    case "modified":
       return {
-        label: "Updated",
-        bg: "bg-category-computing-bg/20 border-category-computing-bg/30",
-        text: "text-category-computing-bg",
-        borderClass: "border-category-computing-bg/40",
+        label: action === "edited" || action === "modified" ? "Edited by Staff" : "Updated",
+        bg: "bg-amber-500/15 border-amber-500/30",
+        text: "text-amber-600 dark:text-amber-400 font-semibold",
+        borderClass: "border-amber-500/40",
       };
     case "delete":
     case "deleted":

@@ -20,6 +20,7 @@ import {
   type ConsumableRequest,
   type CreateConsumableRequestPayload,
   type ReleaseConsumableRequestPayload,
+  type UpdateConsumableRequestPayload,
 } from "./consumable-requests-api";
 import { consumableRequestQueryKeys } from "./query-keys";
 
@@ -54,6 +55,24 @@ export function useCreateConsumableRequestMutation(): UseMutationResult<
   return useMutation({
     mutationFn: (payload) => consumableRequestsApi.create(payload),
     onSettled: () => invalidate(qc),
+  });
+}
+
+export function useUpdateConsumableRequestMutation(): UseMutationResult<
+  ConsumableRequest,
+  Error,
+  { id: string; payload: UpdateConsumableRequestPayload }
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }) => consumableRequestsApi.update(id, payload),
+    onSuccess: (updated) => {
+      qc.setQueriesData<ConsumableRequest>(
+        { queryKey: consumableRequestQueryKeys.detail(updated.id) },
+        () => updated
+      );
+      invalidate(qc);
+    },
   });
 }
 

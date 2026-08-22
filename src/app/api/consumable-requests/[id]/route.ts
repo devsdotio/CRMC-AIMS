@@ -19,3 +19,12 @@ export async function GET(
   const { id } = await context.params;
   return consumableRequestController.get(id);
 }
+
+export async function PATCH(
+  request: Request,
+  context: { params: Promise<{ id: string }> }
+) {
+  const { id } = await context.params;
+  return consumableRequestController.update(request, id);
+}
+

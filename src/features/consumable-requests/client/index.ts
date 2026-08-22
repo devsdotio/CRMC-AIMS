@@ -3,6 +3,7 @@ export type {
   ConsumableRequest,
   CreateConsumableRequestPayload,
   ReleaseConsumableRequestPayload,
+  UpdateConsumableRequestPayload,
 } from "./consumable-requests-api";
 export { consumableRequestQueryKeys } from "./query-keys";
 export {
@@ -10,6 +11,8 @@ export {
   useCancelConsumableRequestMutation,
   useConsumableRequests,
   useCreateConsumableRequestMutation,
+  useUpdateConsumableRequestMutation,
   useRejectConsumableRequestMutation,
   useReleaseConsumableRequestMutation,
 } from "./use-consumable-requests";
+
