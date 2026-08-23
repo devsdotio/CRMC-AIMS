@@ -167,7 +167,9 @@ export default function PurchaseOrdersPage() {
               Purchase Orders & Intake Batches
             </h1>
             <span className="px-2.5 py-0.5 text-xs font-bold bg-bg-subtle text-text-secondary rounded-full border border-border">
-              {filteredLots.length} of {uniqueLots.length} lots
+              {isLoading
+                ? "Loading lots…"
+                : `${filteredLots.length} of ${uniqueLots.length} lots`}
               {isFetching && !isLoading ? " · updating…" : ""}
             </span>
           </div>

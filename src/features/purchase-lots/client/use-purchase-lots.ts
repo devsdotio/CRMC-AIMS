@@ -9,8 +9,10 @@ import {
 } from "@tanstack/react-query";
 
 import type { PurchaseLot } from "@/types/purchase-lots";
-import { consumableQueryKeys } from "@/features/consumables/client/query-keys";
-import { stockMovementQueryKeys } from "@/features/stock-movements/client/query-keys";
+import {
+  STOCK_DOMAINS,
+  invalidateDomains,
+} from "@/features/shared/cache-invalidation";
 import { purchaseLotsApi, type LotReleaseResult } from "./purchase-lots-api";
 import { purchaseLotQueryKeys } from "./query-keys";
 
@@ -43,10 +45,8 @@ export function useReleaseFromLotMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (payload) => purchaseLotsApi.scanRelease(payload),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: purchaseLotQueryKeys.all });
-      qc.invalidateQueries({ queryKey: consumableQueryKeys.all });
-      qc.invalidateQueries({ queryKey: stockMovementQueryKeys.all });
+    onSettled: () => {
+      void invalidateDomains(qc, STOCK_DOMAINS);
     },
   });
 }

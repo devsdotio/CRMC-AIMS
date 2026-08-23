@@ -18,11 +18,65 @@ import type {
 } from "./borrow-requests-api";
 import { borrowRequestsApi } from "./borrow-requests-api";
 import { borrowRequestQueryKeys } from "./query-keys";
-import { consumableQueryKeys } from "@/features/consumables/client/query-keys";
-import { purchaseLotQueryKeys } from "@/features/purchase-lots/client/query-keys";
-import { auditLogQueryKeys } from "@/features/audit-logs/client/query-keys";
 import { dashboardQueryKeys } from "@/features/dashboard/client/query-keys";
+import {
+  CUSTODY_DOMAINS,
+  invalidateDomains,
+  type CacheDomain,
+} from "@/features/shared/cache-invalidation";
 import type { PaginatedResponse } from "@/features/shared/fetch-json";
+
+/** Queue decisions that only move a request between statuses. */
+const REQUEST_QUEUE_DOMAINS = [
+  "borrowRequests",
+  "dashboard",
+  "auditLogs",
+] as const satisfies readonly CacheDomain[];
+
+/** Approving also reserves the requested assets server-side. */
+const REQUEST_APPROVAL_DOMAINS = [
+  ...REQUEST_QUEUE_DOMAINS,
+  "assets",
+] as const satisfies readonly CacheDomain[];
+
+type CacheSnapshot = [readonly unknown[], unknown][];
+
+/** Captures request caches so a failed optimistic status flip can be undone. */
+function snapshotRequestCaches(
+  qc: ReturnType<typeof useQueryClient>
+): CacheSnapshot {
+  return qc.getQueriesData({ queryKey: borrowRequestQueryKeys.all });
+}
+
+function restoreRequestCaches(
+  qc: ReturnType<typeof useQueryClient>,
+  snapshot?: CacheSnapshot
+) {
+  snapshot?.forEach(([queryKey, data]) => {
+    qc.setQueryData(queryKey, data);
+  });
+}
+
+/** Flips a request's status in every cached list and detail entry. */
+function applyOptimisticStatus(
+  qc: ReturnType<typeof useQueryClient>,
+  id: string,
+  status: BorrowRequest["status"]
+) {
+  qc.setQueriesData<PaginatedResponse<BorrowRequest[]>>(
+    { queryKey: borrowRequestQueryKeys.lists() },
+    (old) => {
+      if (!old || !Array.isArray(old.data)) return old;
+      return {
+        ...old,
+        data: old.data.map((req) => (req.id === id ? { ...req, status } : req)),
+      };
+    }
+  );
+  qc.setQueryData<BorrowRequest>(borrowRequestQueryKeys.detail(id), (old) =>
+    old ? { ...old, status } : old
+  );
+}
 
 export function useBorrowRequests(filters?: {
   status?: BorrowRequest["status"];
@@ -68,7 +122,7 @@ export function useCreateBorrowRequestMutation(): UseMutationResult<
     onSuccess: (newRequest) => {
       // 1. Optimistically add to lists
       qc.setQueriesData<PaginatedResponse<BorrowRequest[]>>(
-        { queryKey: borrowRequestQueryKeys.list() },
+        { queryKey: borrowRequestQueryKeys.lists() },
         (old) => {
           if (!old) {
             return {
@@ -115,9 +169,10 @@ export function useCreateBorrowRequestMutation(): UseMutationResult<
         }
       );
 
-      // 3. Eventually consistent re-fetch
-      qc.invalidateQueries({ queryKey: borrowRequestQueryKeys.all });
-      qc.invalidateQueries({ queryKey: dashboardQueryKeys.all });
+    },
+    // 3. Eventually consistent re-fetch
+    onSettled: () => {
+      void invalidateDomains(qc, REQUEST_QUEUE_DOMAINS);
     },
   });
 }
@@ -165,8 +220,9 @@ export function useApproveBorrowRequestMutation(): UseMutationResult<
           pendingRequests: (old.pendingRequests || []).filter((r: any) => r.id !== id),
         };
       });
-      qc.invalidateQueries({ queryKey: borrowRequestQueryKeys.all });
-      qc.invalidateQueries({ queryKey: dashboardQueryKeys.all });
+    },
+    onSettled: () => {
+      void invalidateDomains(qc, REQUEST_APPROVAL_DOMAINS);
     },
   });
 }
@@ -194,8 +250,9 @@ export function useRejectBorrowRequestMutation(): UseMutationResult<
           pendingRequests: (old.pendingRequests || []).filter((r: any) => r.id !== id),
         };
       });
-      qc.invalidateQueries({ queryKey: borrowRequestQueryKeys.all });
-      qc.invalidateQueries({ queryKey: dashboardQueryKeys.all });
+    },
+    onSettled: () => {
+      void invalidateDomains(qc, REQUEST_QUEUE_DOMAINS);
     },
   });
 }
@@ -222,8 +279,9 @@ export function useCancelBorrowRequestMutation(): UseMutationResult<
           pendingRequests: (old.pendingRequests || []).filter((r: any) => r.id !== id),
         };
       });
-      qc.invalidateQueries({ queryKey: borrowRequestQueryKeys.all });
-      qc.invalidateQueries({ queryKey: dashboardQueryKeys.all });
+    },
+    onSettled: () => {
+      void invalidateDomains(qc, REQUEST_QUEUE_DOMAINS);
     },
   });
 }
@@ -238,26 +296,15 @@ export function useReleaseBorrowRequestMutation(): UseMutationResult<
     mutationFn: ({ id, payload }) => borrowRequestsApi.release(id, payload),
     onMutate: async ({ id }) => {
       await qc.cancelQueries({ queryKey: borrowRequestQueryKeys.all });
-      qc.setQueriesData<PaginatedResponse<BorrowRequest[]>>({ queryKey: borrowRequestQueryKeys.list() }, (old) => {
-        if (!old || !Array.isArray(old.data)) return old;
-        return {
-          ...old,
-          data: old.data.map(req => req.id === id ? { ...req, status: "released" as const } : req),
-        };
-      });
-      qc.setQueriesData<BorrowRequest>({ queryKey: borrowRequestQueryKeys.detail(id) }, (old) => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if (!old || Array.isArray(old)) return old as any;
-        return { ...old, status: "released" };
-      });
+      const previous = snapshotRequestCaches(qc);
+      applyOptimisticStatus(qc, id, "released");
+      return { previous };
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: borrowRequestQueryKeys.all });
-      qc.invalidateQueries({ queryKey: consumableQueryKeys.all });
-      qc.invalidateQueries({ queryKey: purchaseLotQueryKeys.all });
-      qc.invalidateQueries({ queryKey: auditLogQueryKeys.all });
-      qc.invalidateQueries({ queryKey: dashboardQueryKeys.all });
-      qc.invalidateQueries({ queryKey: ["audit-logs"] });
+    onError: (_err, _variables, context) => {
+      restoreRequestCaches(qc, context?.previous);
+    },
+    onSettled: () => {
+      void invalidateDomains(qc, CUSTODY_DOMAINS);
     },
   });
 }
@@ -270,8 +317,17 @@ export function useMarkUnreleasedBorrowRequestMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, payload }) => borrowRequestsApi.markUnreleased(id, payload),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: borrowRequestQueryKeys.all });
+    onMutate: async ({ id }) => {
+      await qc.cancelQueries({ queryKey: borrowRequestQueryKeys.all });
+      const previous = snapshotRequestCaches(qc);
+      applyOptimisticStatus(qc, id, "unreleased");
+      return { previous };
+    },
+    onError: (_err, _variables, context) => {
+      restoreRequestCaches(qc, context?.previous);
+    },
+    onSettled: () => {
+      void invalidateDomains(qc, CUSTODY_DOMAINS);
     },
   });
 }
@@ -286,22 +342,15 @@ export function useMarkReturnedBorrowRequestMutation(): UseMutationResult<
     mutationFn: ({ id, payload }) => borrowRequestsApi.markReturned(id, payload),
     onMutate: async ({ id }) => {
       await qc.cancelQueries({ queryKey: borrowRequestQueryKeys.all });
-      qc.setQueriesData<PaginatedResponse<BorrowRequest[]>>({ queryKey: borrowRequestQueryKeys.list() }, (old) => {
-        if (!old || !Array.isArray(old.data)) return old;
-        return {
-          ...old,
-          data: old.data.map(req => req.id === id ? { ...req, status: "returned" as const } : req),
-        };
-      });
-      qc.setQueriesData<BorrowRequest>({ queryKey: borrowRequestQueryKeys.detail(id) }, (old) => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if (!old || Array.isArray(old)) return old as any;
-        return { ...old, status: "returned" };
-      });
+      const previous = snapshotRequestCaches(qc);
+      applyOptimisticStatus(qc, id, "returned");
+      return { previous };
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: borrowRequestQueryKeys.all });
-      qc.invalidateQueries({ queryKey: dashboardQueryKeys.all });
+    onError: (_err, _variables, context) => {
+      restoreRequestCaches(qc, context?.previous);
+    },
+    onSettled: () => {
+      void invalidateDomains(qc, CUSTODY_DOMAINS);
     },
   });
 }

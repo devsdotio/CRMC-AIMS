@@ -14,6 +14,7 @@ import {
   Building2,
   DollarSign,
   TrendingUp,
+  Loader2,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -35,7 +36,7 @@ export interface RestockDialogProps {
   suppliers: Supplier[];
   isOpen: boolean;
   onClose: () => void;
-  onConfirmRestock: (input: RestockConfirmInput) => void;
+  onConfirmRestock: (input: RestockConfirmInput) => void | Promise<void>;
 }
 
 interface RestockDialogFormProps {
@@ -61,6 +62,7 @@ function RestockDialogForm({
   const [supplierId, setSupplierId] = useState("");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -103,8 +105,9 @@ function RestockDialogForm({
     setStep(2);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     if (!targetItem) {
       setError("Please select a consumable item to restock.");
       return;
@@ -119,14 +122,21 @@ function RestockDialogForm({
       return;
     }
 
-    onConfirmRestock({
-      itemId: targetItem.id,
-      qtyReceived: Number(qtyReceived),
-      unitCost: cost,
-      supplierId: supplierId || null,
-      notes: notes.trim() || undefined,
-    });
-    onClose();
+    setIsSubmitting(true);
+    try {
+      await onConfirmRestock({
+        itemId: targetItem.id,
+        qtyReceived: Number(qtyReceived),
+        unitCost: cost,
+        supplierId: supplierId || null,
+        notes: notes.trim() || undefined,
+      });
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Restock failed.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -254,7 +264,10 @@ function RestockDialogForm({
         </nav>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 pt-1 overflow-hidden">
+        <form
+          onSubmit={(e) => void handleSubmit(e)}
+          className="flex flex-col flex-1 min-h-0 pt-1 overflow-hidden"
+        >
           {error && (
             <div className="mb-3 p-2.5 rounded-lg bg-status-outofservice-bg/15 border border-status-outofservice-bg/40 text-xs font-bold text-status-outofservice-text shrink-0">
               {error}
@@ -561,16 +574,24 @@ function RestockDialogForm({
                   <button
                     type="button"
                     onClick={onClose}
-                    className="px-3.5 py-2 text-xs font-semibold text-text-secondary hover:text-text rounded-md border border-border bg-bg transition-colors cursor-pointer"
+                    disabled={isSubmitting}
+                    className="px-3.5 py-2 text-xs font-semibold text-text-secondary hover:text-text rounded-md border border-border bg-bg transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-md bg-accent text-accent-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+                    disabled={isSubmitting}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-md bg-accent text-accent-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    <Check className="h-4 w-4" strokeWidth={2.5} />
-                    <span>Confirm restock</span>
+                    {isSubmitting ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Check className="h-4 w-4" strokeWidth={2.5} />
+                    )}
+                    <span>
+                      {isSubmitting ? "Recording restock…" : "Confirm restock"}
+                    </span>
                   </button>
                 </div>
               </div>

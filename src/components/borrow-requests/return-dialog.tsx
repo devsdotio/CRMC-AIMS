@@ -5,6 +5,7 @@ import { Loader2, User } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { formatItemDescription } from "@/lib/sanitize-display";
+import { useCategoryStyleResolver } from "@/features/categories/client/use-category-style";
 import type { BorrowRequest } from "@/types/borrow-requests";
 
 export interface ReturnDialogProps {
@@ -27,6 +28,7 @@ export function ReturnDialog({
   const [returnedBy, setReturnedBy] = useState("");
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
+  const resolveCategoryStyle = useCategoryStyleResolver();
 
   // Reset form when dialog opens
   useEffect(() => {
@@ -83,7 +85,16 @@ export function ReturnDialog({
         <div className="px-6 py-5 border-b border-border bg-bg-subtle/50">
           <h2 className="text-lg font-bold text-text">Return Item</h2>
           <p className="mt-1 text-sm text-text-secondary">
-            Returning {request.requestCode} - {request.items.map(i => formatItemDescription(i.itemDescription, i.category, i.itemType)).join(", ")}
+            Returning {request.requestCode} -{" "}
+            {request.items
+              .map((i) =>
+                formatItemDescription(
+                  i.itemDescription,
+                  resolveCategoryStyle(i.category).label,
+                  i.itemType
+                )
+              )
+              .join(", ")}
           </p>
         </div>
 

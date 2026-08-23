@@ -19,7 +19,18 @@ import {
   type MaintenanceLog,
 } from "./maintenance-logs-api";
 import { maintenanceQueryKeys } from "./query-keys";
-import { assetQueryKeys } from "@/features/assets/client/query-keys";
+import {
+  invalidateDomains,
+  type CacheDomain,
+} from "@/features/shared/cache-invalidation";
+
+/** Flagging or resolving a log also flips asset status and lifecycle history. */
+const MAINTENANCE_DOMAINS = [
+  "maintenance",
+  "assets",
+  "dashboard",
+  "auditLogs",
+] as const satisfies readonly CacheDomain[];
 
 export function useMaintenanceLogsQuery(filters?: {
   openOnly?: boolean;
@@ -50,9 +61,8 @@ export function useCreateMaintenanceLogMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (payload) => maintenanceLogsApi.create(payload),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: maintenanceQueryKeys.all });
-      qc.invalidateQueries({ queryKey: assetQueryKeys.all });
+    onSettled: () => {
+      void invalidateDomains(qc, MAINTENANCE_DOMAINS);
     },
   });
 }
@@ -66,9 +76,8 @@ export function useResolveMaintenanceLogMutation(): UseMutationResult<
   return useMutation({
     mutationFn: ({ id, resolutionNotes }) =>
       maintenanceLogsApi.resolve(id, resolutionNotes),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: maintenanceQueryKeys.all });
-      qc.invalidateQueries({ queryKey: assetQueryKeys.all });
+    onSettled: () => {
+      void invalidateDomains(qc, MAINTENANCE_DOMAINS);
     },
   });
 }

@@ -5,6 +5,7 @@ import { AlertCircle, Layers, Loader2, User } from "lucide-react";
 
 import { formatPhp } from "@/components/projects/format-money";
 import { formatItemDescription, formatAssetCodeDisplay } from "@/lib/sanitize-display";
+import { useCategoryStyleResolver } from "@/features/categories/client/use-category-style";
 import { usePurchaseLotsQuery } from "@/features/purchase-lots/client/use-purchase-lots";
 import type { ConsumableRequest } from "@/features/consumable-requests/client";
 import type { ReleaseConsumableRequestPayload } from "@/features/consumable-requests/client/consumable-requests-api";
@@ -33,6 +34,7 @@ function ReleaseLineLotRow({
     itemType: "consumable",
     enabled: Boolean(line.consumableId),
   });
+  const resolveCategoryStyle = useCategoryStyleResolver();
 
   const availableLots = useMemo(
     () => lots.filter((lot) => lot.quantityRemaining > 0),
@@ -43,7 +45,11 @@ function ReleaseLineLotRow({
   const isShortfall =
     selectedLot && selectedLot.quantityRemaining < line.quantityRequested;
 
-  const displayItemName = formatItemDescription(line.itemName, line.category, "consumable");
+  const displayItemName = formatItemDescription(
+    line.itemName,
+    resolveCategoryStyle(line.category).label,
+    "consumable"
+  );
   const displayItemCode = formatAssetCodeDisplay(line.itemCode);
 
   return (

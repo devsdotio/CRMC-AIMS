@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { X, AlertCircle, CheckCircle2, Loader2, User, Building2, FileText, CalendarClock } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useCategoryStyleMap } from "@/features/categories/client/use-categories";
+import { useCategoryStyleResolver } from "@/features/categories/client/use-category-style";
 import { formatItemDescription } from "@/lib/sanitize-display";
 import type { BorrowRequest } from "@/types/borrow-requests";
 
@@ -28,11 +28,11 @@ function ApproveRejectDialogForm({
   onClose,
   onConfirm,
 }: ApproveRejectDialogFormProps) {
-  const { getCategoryStyle } = useCategoryStyleMap();
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const resolveCategoryStyle = useCategoryStyleResolver();
 
   const isApprove = mode === "approve";
 
@@ -135,7 +135,7 @@ function ApproveRejectDialogForm({
             {/* Items */}
             <div className="divide-y divide-border">
               {request.items.map((item, idx) => {
-                const catStyle = getCategoryStyle(item.category);
+                const catStyle = resolveCategoryStyle(item.category);
                 const desc = formatItemDescription(item.itemDescription, catStyle.label, item.itemType);
                 return (
                   <div key={idx} className={cn("flex items-center gap-2.5 px-3.5 py-2", idx % 2 === 1 && "bg-bg-subtle/60")}>

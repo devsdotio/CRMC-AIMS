@@ -1,9 +1,10 @@
 "use client";
  
-import { useCategoryStyleMap } from "@/features/categories/client/use-categories";
 import { useEffect, useRef, useState } from "react";
 import { Check, X, Calendar, User, Building2, Tag, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatItemDescription } from "@/lib/sanitize-display";
+import { useCategoryStyleResolver } from "@/features/categories/client/use-category-style";
 import type { BorrowRequest,  RequestStatus } from "@/types/borrow-requests";
 
 export interface RequestListItemProps {
@@ -38,10 +39,10 @@ export function RequestListItem({
   onMarkUnreleased,
 }: RequestListItemProps) {
   const rowRef = useRef<HTMLDivElement>(null);
-  const { getCategoryStyle } = useCategoryStyleMap();
   const [isMarkingUnreleased, setIsMarkingUnreleased] = useState(false);
+  const resolveCategoryStyle = useCategoryStyleResolver();
   const firstItem = request.items?.[0];
-  const categoryMeta = getCategoryStyle(firstItem?.category || "office");
+  const categoryMeta = resolveCategoryStyle(firstItem?.category);
   const statusMeta = STATUS_STYLES[request.status];
   const hasReturnableAssets = request.items?.some(
     (item) => item.itemType === "asset" || Boolean(item.assetId)
@@ -105,10 +106,11 @@ export function RequestListItem({
 
         {/* Row 2: Item Description */}
         <h3 className="text-sm font-bold text-text truncate group-hover:text-accent transition-colors">
-          {firstItem?.itemDescription &&
-          !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(firstItem.itemDescription)
-            ? firstItem.itemDescription
-            : `${categoryMeta.label} Equipment`}{" "}
+          {formatItemDescription(
+            firstItem?.itemDescription,
+            categoryMeta.label,
+            firstItem?.itemType
+          )}{" "}
           {request.items.length > 1 ? `(+${request.items.length - 1} more)` : ""}
           {request.items.length === 1 && firstItem && firstItem.quantity > 1 && (
             <span className="ml-2 text-xs font-semibold text-text-secondary">

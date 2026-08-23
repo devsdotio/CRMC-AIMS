@@ -8,6 +8,7 @@ export interface UserTableProps {
   users: UserAccount[];
   currentUserId: string;
   loading?: boolean;
+  reactivatingUserId?: string | null;
   onSelect: (user: UserAccount) => void;
   onEdit: (user: UserAccount) => void;
   onDeactivate: (user: UserAccount) => void;
@@ -47,6 +48,7 @@ export function UserTable({
   users,
   currentUserId,
   loading = false,
+  reactivatingUserId = null,
   onSelect,
   onEdit,
   onDeactivate,
@@ -111,6 +113,7 @@ export function UserTable({
               key={user.id}
               user={user}
               currentUserId={currentUserId}
+              reactivating={reactivatingUserId === user.id}
               onSelect={onSelect}
               onEdit={onEdit}
               onDeactivate={onDeactivate}

@@ -25,14 +25,33 @@ import {
   type UseProjectMaterialPayload,
 } from "./projects-api";
 import { projectQueryKeys } from "./query-keys";
-import { consumableQueryKeys } from "@/features/consumables/client/query-keys";
-import { assetQueryKeys } from "@/features/assets/client/query-keys";
-import { maintenanceQueryKeys } from "@/features/maintenance-logs/client/query-keys";
+import {
+  CUSTODY_DOMAINS,
+  STOCK_DOMAINS,
+  invalidateDomains,
+  type CacheDomain,
+} from "@/features/shared/cache-invalidation";
 import type { ProjectAssetDamageReport } from "./projects-api";
 
-function invalidateProjects(qc: ReturnType<typeof useQueryClient>) {
-  qc.invalidateQueries({ queryKey: projectQueryKeys.all });
-}
+/** Plain project/expense bookkeeping that touches no other domain. */
+const PROJECT_DOMAINS = [
+  "projects",
+  "auditLogs",
+] as const satisfies readonly CacheDomain[];
+
+/** Drawing or reversing materials moves consumable stock and lots. */
+const PROJECT_MATERIAL_DOMAINS = [
+  ...PROJECT_DOMAINS,
+  ...STOCK_DOMAINS,
+] as const satisfies readonly CacheDomain[];
+
+/** Writing an asset off also opens a maintenance log and an expense line. */
+const PROJECT_DAMAGE_DOMAINS = [
+  ...PROJECT_DOMAINS,
+  "assets",
+  "maintenance",
+  "dashboard",
+] as const satisfies readonly CacheDomain[];
 
 export function useProjectsQuery(): UseQueryResult<Project[], Error> {
   return useQuery({
@@ -60,7 +79,9 @@ export function useCreateProjectMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (payload) => projectsApi.create(payload),
-    onSuccess: () => invalidateProjects(queryClient),
+    onSettled: () => {
+      void invalidateDomains(queryClient, PROJECT_DOMAINS);
+    },
   });
 }
 
@@ -73,7 +94,9 @@ export function useUpdateProjectMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: ({ id, payload }) => projectsApi.update(id, payload),
-    onSuccess: () => invalidateProjects(queryClient),
+    onSettled: () => {
+      void invalidateDomains(queryClient, PROJECT_DOMAINS);
+    },
   });
 }
 
@@ -86,7 +109,9 @@ export function useDeleteProjectMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: (id) => projectsApi.delete(id),
-    onSuccess: () => invalidateProjects(queryClient),
+    onSettled: () => {
+      void invalidateDomains(queryClient, PROJECT_DOMAINS);
+    },
   });
 }
 
@@ -100,7 +125,9 @@ export function useCreateProjectExpenseMutation(): UseMutationResult<
   return useMutation({
     mutationFn: ({ projectId, payload }) =>
       projectsApi.createExpense(projectId, payload),
-    onSuccess: () => invalidateProjects(queryClient),
+    onSettled: () => {
+      void invalidateDomains(queryClient, PROJECT_DOMAINS);
+    },
   });
 }
 
@@ -114,10 +141,8 @@ export function useProjectMaterialMutation(): UseMutationResult<
   return useMutation({
     mutationFn: ({ projectId, payload }) =>
       projectsApi.useMaterial(projectId, payload),
-    onSuccess: () => {
-      invalidateProjects(queryClient);
-      // Stock changed — refresh inventory caches if present
-      queryClient.invalidateQueries({ queryKey: consumableQueryKeys.all });
+    onSettled: () => {
+      void invalidateDomains(queryClient, PROJECT_MATERIAL_DOMAINS);
     },
   });
 }
@@ -136,7 +161,9 @@ export function useUpdateProjectExpenseMutation(): UseMutationResult<
   return useMutation({
     mutationFn: ({ projectId, expenseId, payload }) =>
       projectsApi.updateExpense(projectId, expenseId, payload),
-    onSuccess: () => invalidateProjects(queryClient),
+    onSettled: () => {
+      void invalidateDomains(queryClient, PROJECT_DOMAINS);
+    },
   });
 }
 
@@ -150,9 +177,8 @@ export function useDeleteProjectExpenseMutation(): UseMutationResult<
   return useMutation({
     mutationFn: ({ projectId, expenseId }) =>
       projectsApi.deleteExpense(projectId, expenseId),
-    onSuccess: () => {
-      invalidateProjects(queryClient);
-      queryClient.invalidateQueries({ queryKey: consumableQueryKeys.all });
+    onSettled: () => {
+      void invalidateDomains(queryClient, PROJECT_MATERIAL_DOMAINS);
     },
   });
 }
@@ -178,9 +204,8 @@ export function useAssignProjectAssetMutation(): UseMutationResult<
   return useMutation({
     mutationFn: ({ projectId, ...payload }) =>
       projectsApi.assignAsset(projectId, payload),
-    onSuccess: () => {
-      invalidateProjects(queryClient);
-      queryClient.invalidateQueries({ queryKey: assetQueryKeys.all });
+    onSettled: () => {
+      void invalidateDomains(queryClient, CUSTODY_DOMAINS);
     },
   });
 }
@@ -195,9 +220,8 @@ export function useReturnProjectAssetMutation(): UseMutationResult<
   return useMutation({
     mutationFn: ({ projectId, assignmentId, notes }) =>
       projectsApi.returnAsset(projectId, assignmentId, { notes }),
-    onSuccess: () => {
-      invalidateProjects(queryClient);
-      queryClient.invalidateQueries({ queryKey: assetQueryKeys.all });
+    onSettled: () => {
+      void invalidateDomains(queryClient, CUSTODY_DOMAINS);
     },
   });
 }
@@ -215,10 +239,8 @@ export function useReportProjectAssetDamageMutation(): UseMutationResult<
   return useMutation({
     mutationFn: ({ projectId, assignmentId, ...payload }) =>
       projectsApi.reportAssetDamage(projectId, assignmentId, payload),
-    onSuccess: () => {
-      invalidateProjects(queryClient);
-      queryClient.invalidateQueries({ queryKey: assetQueryKeys.all });
-      queryClient.invalidateQueries({ queryKey: maintenanceQueryKeys.all });
+    onSettled: () => {
+      void invalidateDomains(queryClient, PROJECT_DAMAGE_DOMAINS);
     },
   });
 }

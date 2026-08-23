@@ -71,9 +71,11 @@ export function PendingApprovalsWidget({
               Pending Approvals
             </h2>
             <p className="text-xs text-text-secondary mt-1">
-              {!loading && requests.length === 0
-                ? "All requests reviewed"
-                : `${requests.length} awaiting custodian review`}
+              {loading
+                ? "Checking the queue…"
+                : requests.length === 0
+                  ? "All requests reviewed"
+                  : `${requests.length} awaiting custodian review`}
             </p>
           </div>
         </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { Edit3, UserX, ShieldAlert, UserCheck } from "lucide-react";
+import { Edit3, UserX, ShieldAlert, UserCheck, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { UserAccount } from "@/types/users";
 import { RoleBadge } from "./role-badge";
@@ -8,6 +8,7 @@ import { RoleBadge } from "./role-badge";
 export interface UserTableRowProps {
   user: UserAccount;
   currentUserId: string;
+  reactivating?: boolean;
   onSelect: (user: UserAccount) => void;
   onEdit: (user: UserAccount) => void;
   onDeactivate: (user: UserAccount) => void;
@@ -17,6 +18,7 @@ export interface UserTableRowProps {
 export function UserTableRow({
   user,
   currentUserId,
+  reactivating = false,
   onSelect,
   onEdit,
   onDeactivate,
@@ -120,11 +122,18 @@ export function UserTableRow({
             <button
               type="button"
               onClick={() => onReactivate(user)}
+              disabled={reactivating}
               aria-label={`Reactivate account for ${user.name}`}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-border bg-bg text-xs font-semibold text-status-active-text hover:border-status-active-text transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-border bg-bg text-xs font-semibold text-status-active-text hover:border-status-active-text transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <UserCheck className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Reactivate</span>
+              {reactivating ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <UserCheck className="h-3.5 w-3.5" />
+              )}
+              <span className="hidden sm:inline">
+                {reactivating ? "Reactivating…" : "Reactivate"}
+              </span>
             </button>
           )}
         </div>
