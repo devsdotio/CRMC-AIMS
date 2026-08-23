@@ -10,6 +10,7 @@ import {
   AddEditProjectDialog,
   type ProjectFormInput,
 } from "@/components/projects/add-edit-project-dialog";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { useMeQuery } from "@/features/users/client";
 import {
   useCreateProjectMutation,
@@ -34,7 +35,6 @@ export default function ProjectsPage() {
   const toast = useToast();
 
   const isManager = me?.role === "superadmin" || me?.role === "admin";
-  // Don't hold the table on me — table only needs projects list.
   const isLoading = projectsLoading;
 
   const [filters, setFilters] = useState<ProjectFilterState>({
@@ -45,6 +45,7 @@ export default function ProjectsPage() {
   const [editTarget, setEditTarget] = useState<Project | null | undefined>(
     undefined
   );
+  const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
@@ -125,19 +126,18 @@ export default function ProjectsPage() {
     }
   };
 
-  const handleDelete = async (project: Project) => {
-    if (
-      !window.confirm(
-        `Delete project "${project.name}" (${project.projectCode})? This cannot be undone.`
-      )
-    ) {
-      return;
-    }
+  const handleDelete = (project: Project) => {
+    setDeleteTarget(project);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
     setPageError(null);
     try {
-      await deleteProject.mutateAsync(project.id);
-      setSelected((prev) => (prev?.id === project.id ? null : prev));
-      toast.success("Project deleted.");
+      await deleteProject.mutateAsync(deleteTarget.id);
+      setSelected((prev) => (prev?.id === deleteTarget.id ? null : prev));
+      toast.success(`Project "${deleteTarget.name}" deleted.`);
+      setDeleteTarget(null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to delete project.");
     }
@@ -154,7 +154,7 @@ export default function ProjectsPage() {
             <h1 className="text-xl font-bold tracking-tight text-text">
               Projects
             </h1>
-            <span className="px-2 py-0.5 text-xs font-bold bg-bg-subtle text-text-secondary rounded-full border border-border">
+            <span className="px-2.5 py-0.5 text-xs font-bold bg-bg-subtle text-text-secondary rounded-full border border-border">
               {isLoading
                 ? "Loading projects…"
                 : `${filtered.length} of ${projects.length}`}
@@ -202,9 +202,7 @@ export default function ProjectsPage() {
           }
           onSelect={setSelected}
           onEdit={(p) => setEditTarget(p)}
-          onDelete={(p) => {
-            void handleDelete(p);
-          }}
+          onDelete={handleDelete}
         />
       </main>
 
@@ -223,6 +221,21 @@ export default function ProjectsPage() {
         project={dialogProject}
         onClose={() => setEditTarget(undefined)}
         onSubmit={handleSubmit}
+      />
+
+      <ConfirmDialog
+        isOpen={Boolean(deleteTarget)}
+        title="Delete Project"
+        description={
+          deleteTarget
+            ? `Are you sure you want to delete project "${deleteTarget.name}" (${deleteTarget.projectCode})? This action cannot be undone.`
+            : ""
+        }
+        confirmLabel="Delete Project"
+        variant="destructive"
+        isLoading={deleteProject.isPending}
+        onConfirm={handleConfirmDelete}
+        onClose={() => setDeleteTarget(null)}
       />
     </div>
   );

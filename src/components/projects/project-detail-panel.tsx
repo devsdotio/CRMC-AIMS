@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
+  FolderKanban,
   X,
   Pencil,
   MapPin,
@@ -11,6 +12,8 @@ import {
   User,
   FileText,
   Package,
+  PackageCheck,
+  Receipt,
   Plus,
   Trash2,
   Lock,
@@ -58,6 +61,7 @@ import {
   ReportDamageDialog,
   type ReportDamageFormInput,
 } from "./report-damage-dialog";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { useToast } from "@/components/providers/toast-context";
 
 export interface ProjectDetailPanelProps {
@@ -127,6 +131,10 @@ export function ProjectDetailPanel({
   const [assignOpen, setAssignOpen] = useState(false);
   const [damageTarget, setDamageTarget] =
     useState<ProjectAssetAssignment | null>(null);
+  const [returnTarget, setReturnTarget] =
+    useState<ProjectAssetAssignment | null>(null);
+  const [deleteExpenseTarget, setDeleteExpenseTarget] =
+    useState<ProjectExpenseLine | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const toast = useToast();
 
@@ -138,13 +146,24 @@ export function ProjectDetailPanel({
         editExpense === undefined &&
         !materialOpen &&
         !assignOpen &&
-        !damageTarget
+        !damageTarget &&
+        !returnTarget &&
+        !deleteExpenseTarget
       )
         onClose();
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose, editExpense, materialOpen, assignOpen, damageTarget]);
+  }, [
+    isOpen,
+    onClose,
+    editExpense,
+    materialOpen,
+    assignOpen,
+    damageTarget,
+    returnTarget,
+    deleteExpenseTarget,
+  ]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -152,12 +171,16 @@ export function ProjectDetailPanel({
       setMaterialOpen(false);
       setAssignOpen(false);
       setDamageTarget(null);
+      setReturnTarget(null);
+      setDeleteExpenseTarget(null);
       setActionError(null);
     }
   }, [isOpen]);
 
   if (!isOpen || !project) return null;
 
+  const budgetCap = project.budget ? Number(project.budget) : 0;
+  const spent = Number(project.totalSpent) || 0;
   const overBudget =
     project.budgetRemaining != null && Number(project.budgetRemaining) < 0;
 
@@ -225,20 +248,20 @@ export function ProjectDetailPanel({
     }
   };
 
-  const handleReturnAsset = async (row: ProjectAssetAssignment) => {
-    if (
-      !window.confirm(
-        `Return "${row.assetName}" (${row.assetCode}) from this project?`
-      )
-    )
-      return;
+  const handleReturnAsset = (row: ProjectAssetAssignment) => {
+    setReturnTarget(row);
+  };
+
+  const handleConfirmReturn = async () => {
+    if (!returnTarget) return;
     setActionError(null);
     try {
       await returnAsset.mutateAsync({
         projectId: project.id,
-        assignmentId: row.id,
+        assignmentId: returnTarget.id,
       });
-      toast.success(`${row.assetName} returned from project.`);
+      toast.success(`${returnTarget.assetName} returned from project.`);
+      setReturnTarget(null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to return asset.");
     }
@@ -273,19 +296,20 @@ export function ProjectDetailPanel({
     return match?.value ?? null;
   })();
 
-  const handleDeleteExpense = async (line: ProjectExpenseLine) => {
-    const msg =
-      line.lineType === "consumable"
-        ? `Remove material charge "${line.description}"? Stock and purchase lots will be restored.`
-        : `Delete expense "${line.description}"?`;
-    if (!window.confirm(msg)) return;
+  const handleDeleteExpense = (line: ProjectExpenseLine) => {
+    setDeleteExpenseTarget(line);
+  };
+
+  const handleConfirmDeleteExpense = async () => {
+    if (!deleteExpenseTarget) return;
     setActionError(null);
     try {
       await deleteExpense.mutateAsync({
         projectId: project.id,
-        expenseId: line.id,
+        expenseId: deleteExpenseTarget.id,
       });
       toast.success("Expense deleted.");
+      setDeleteExpenseTarget(null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to delete expense.");
     }
@@ -308,21 +332,19 @@ export function ProjectDetailPanel({
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-bg-subtle/50 shrink-0">
           <div className="min-w-0 flex-1 pr-3">
             <div className="flex items-center gap-2.5 flex-wrap">
-              <h2
-                id="project-detail-heading"
-                className="font-mono text-lg font-bold tracking-tight text-text"
-              >
+              <span className="inline-flex items-center gap-1.5 font-mono text-sm font-bold tracking-tight px-2.5 py-0.5 rounded-full bg-accent/15 text-accent border border-accent/25">
+                <FolderKanban className="h-3.5 w-3.5" />
                 {project.projectCode}
-              </h2>
+              </span>
               <ProjectStatusBadge status={project.status} />
               {!project.isMutable && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-bg-subtle border border-border text-text-secondary">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-bg-subtle border border-border text-text-secondary">
                   <Lock className="h-3 w-3" />
                   Read-only
                 </span>
               )}
             </div>
-            <p className="text-xs text-text-secondary font-medium mt-0.5 truncate">
+            <p className="text-xs text-text-secondary font-medium mt-1 truncate">
               Project Workspace • <strong className="text-text font-semibold">{project.name}</strong>
             </p>
           </div>
@@ -338,47 +360,51 @@ export function ProjectDetailPanel({
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          <section className="grid grid-cols-2 gap-4">
-            <div className="col-span-2 p-3 rounded-lg border border-border bg-bg-subtle/40 space-y-3">
+          <section className="grid grid-cols-2 gap-3">
+            <div className="col-span-2 p-3.5 rounded-xl border border-border bg-bg-subtle/40 space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
-                  <Wallet className="h-3.5 w-3.5" />
-                  Budget overview
+                  <Wallet className="h-3.5 w-3.5 text-accent" />
+                  Budget & Spend Overview
                 </span>
-                {overBudget && (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-status-outofservice-text">
+                {overBudget ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-status-outofservice-text px-2 py-0.5 rounded-full bg-status-outofservice-bg/15 border border-status-outofservice-bg/25">
                     <AlertTriangle className="h-3 w-3" />
                     Over budget
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-status-active-text px-2 py-0.5 rounded-full bg-status-active-bg/15 border border-status-active-bg/25">
+                    {budgetCap > 0 ? `${Math.round((spent / budgetCap) * 100)}% utilized` : "Active"}
                   </span>
                 )}
               </div>
               <div className="grid grid-cols-3 gap-2 text-center">
-                <div>
-                  <div className="text-[10px] text-text-secondary font-medium">
-                    Budget
+                <div className="p-2.5 rounded-lg bg-bg border border-border/70">
+                  <div className="text-[10px] text-text-secondary font-bold uppercase tracking-wider">
+                    Budget Cap
                   </div>
-                  <div className="text-sm font-bold font-mono tabular-nums text-text">
+                  <div className="text-sm font-bold font-mono tabular-nums text-text mt-0.5">
                     {project.budget ? formatPhp(project.budget) : "—"}
                   </div>
                 </div>
-                <div>
-                  <div className="text-[10px] text-text-secondary font-medium">
-                    Spent
+                <div className="p-2.5 rounded-lg bg-bg border border-border/70">
+                  <div className="text-[10px] text-text-secondary font-bold uppercase tracking-wider">
+                    Total Spent
                   </div>
-                  <div className="text-sm font-bold font-mono tabular-nums text-text">
+                  <div className="text-sm font-bold font-mono tabular-nums text-accent mt-0.5">
                     {formatPhp(project.totalSpent)}
                   </div>
                 </div>
-                <div>
-                  <div className="text-[10px] text-text-secondary font-medium">
+                <div className="p-2.5 rounded-lg bg-bg border border-border/70">
+                  <div className="text-[10px] text-text-secondary font-bold uppercase tracking-wider">
                     Remaining
                   </div>
                   <div
                     className={cn(
-                      "text-sm font-bold font-mono tabular-nums",
+                      "text-sm font-bold font-mono tabular-nums mt-0.5",
                       overBudget
-                        ? "text-status-outofservice-text"
-                        : "text-text"
+                        ? "text-status-outofservice-text font-black"
+                        : "text-status-active-text"
                     )}
                   >
                     {project.budgetRemaining != null
@@ -389,36 +415,61 @@ export function ProjectDetailPanel({
               </div>
             </div>
 
-            <Field label="Location">
-              <span className="inline-flex items-center gap-1.5">
-                <MapPin className="h-3.5 w-3.5 text-text-secondary shrink-0" />
-                {project.location || "—"}
-              </span>
-            </Field>
-            <Field label="Department">
-              <span className="inline-flex items-center gap-1.5">
-                <Building2 className="h-3.5 w-3.5 text-text-secondary shrink-0" />
-                {project.department || "—"}
-              </span>
-            </Field>
-            <Field label="Start date">
-              <span className="inline-flex items-center gap-1.5">
-                <Calendar className="h-3.5 w-3.5 text-text-secondary shrink-0" />
-                {project.startDate || "—"}
-              </span>
-            </Field>
-            <Field label="End date">
-              <span className="inline-flex items-center gap-1.5">
-                <Calendar className="h-3.5 w-3.5 text-text-secondary shrink-0" />
-                {project.endDate || "—"}
-              </span>
-            </Field>
-            <Field label="Created by">
-              <span className="inline-flex items-center gap-1.5">
-                <User className="h-3.5 w-3.5 text-text-secondary shrink-0" />
-                {project.createdByName}
-              </span>
-            </Field>
+            <div className="p-3 rounded-lg border border-border bg-bg-subtle/40 flex items-center gap-2.5">
+              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-category-transport-bg/15 text-category-transport-bg shrink-0">
+                <MapPin className="h-3.5 w-3.5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">
+                  Location
+                </div>
+                <div className="font-semibold text-text text-xs truncate">
+                  {project.location || "—"}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-lg border border-border bg-bg-subtle/40 flex items-center gap-2.5">
+              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-category-computing-bg/15 text-category-computing-bg shrink-0">
+                <Building2 className="h-3.5 w-3.5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">
+                  Department
+                </div>
+                <div className="font-semibold text-text text-xs truncate">
+                  {project.department || "—"}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-lg border border-border bg-bg-subtle/40 flex items-center gap-2.5">
+              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-accent/10 text-accent shrink-0">
+                <Calendar className="h-3.5 w-3.5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">
+                  Duration
+                </div>
+                <div className="font-medium text-text text-[11px] truncate">
+                  {project.startDate || "—"} → {project.endDate || "Ongoing"}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-lg border border-border bg-bg-subtle/40 flex items-center gap-2.5">
+              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-accent/10 text-accent shrink-0">
+                <User className="h-3.5 w-3.5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">
+                  Lead / Created By
+                </div>
+                <div className="font-semibold text-text text-xs truncate">
+                  {project.createdByName}
+                </div>
+              </div>
+            </div>
           </section>
 
           {project.description && (
@@ -485,11 +536,37 @@ export function ProjectDetailPanel({
                 subtitle="Retrieving material costs, item write-offs, and expenditures"
               />
             ) : expenses.length === 0 ? (
-              <p className="text-[11px] text-text-secondary border border-dashed border-border rounded-lg p-3">
-                No spend yet. Use <strong>Materials</strong> for inventory (stock
-                checkout + lot cost) or <strong>Misc</strong> for travel, snacks,
-                fees, and adjustments.
-              </p>
+              <div className="flex flex-col items-center justify-center p-6 text-center rounded-xl border border-dashed border-border/80 bg-bg-subtle/30 space-y-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/10 text-accent">
+                  <Receipt className="h-5 w-5" />
+                </div>
+                <div className="space-y-1 max-w-xs">
+                  <h4 className="text-xs font-bold text-text">No project expenses yet</h4>
+                  <p className="text-[11px] text-text-secondary leading-relaxed">
+                    Track material usages from stock checkout (FIFO lots) or log miscellaneous travel, meals, fees, and credits.
+                  </p>
+                </div>
+                {project.isMutable && (
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setMaterialOpen(true)}
+                      className="inline-flex items-center gap-1.5 h-7 px-3 text-[11px] font-bold rounded-lg border border-border bg-bg text-text hover:bg-bg-subtle transition-colors cursor-pointer shadow-2xs"
+                    >
+                      <Boxes className="h-3 w-3" />
+                      Add Materials
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditExpense(null)}
+                      className="inline-flex items-center gap-1.5 h-7 px-3 text-[11px] font-bold rounded-lg bg-accent text-accent-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-2xs"
+                    >
+                      <Plus className="h-3 w-3" />
+                      Add Expense
+                    </button>
+                  </div>
+                )}
+              </div>
             ) : (
               <ul className="space-y-2">
                 {expenses.map((line) => {
@@ -500,28 +577,38 @@ export function ProjectDetailPanel({
                   return (
                     <li
                       key={line.id}
-                      className="rounded-lg border border-border bg-bg-subtle/40 px-3 py-2.5 text-xs"
+                      className="rounded-xl border border-border bg-bg-subtle/40 p-3 text-xs hover:bg-bg-subtle/70 transition-colors space-y-1.5"
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="font-bold text-text truncate">
                               {line.description}
                             </span>
                             {isMaterial && (
-                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-accent/15 text-accent">
-                                <Boxes className="h-2.5 w-2.5" />
-                                Inventory
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-category-furniture-bg/15 text-category-furniture-bg border border-category-furniture-bg/30">
+                                <Boxes className="h-3 w-3" />
+                                Inventory Stock
                               </span>
                             )}
                             {isWriteOff && (
-                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-status-outofservice-bg/40 text-status-outofservice-text">
-                                <AlertTriangle className="h-2.5 w-2.5" />
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-destructive/15 text-destructive border border-destructive/25">
+                                <AlertTriangle className="h-3 w-3" />
                                 Write-off
                               </span>
                             )}
+                            {line.lineType === "adjustment" && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-status-active-bg/15 text-status-active-text border border-status-active-bg/25">
+                                Credit Adjustment
+                              </span>
+                            )}
+                            {line.lineType === "miscellaneous" && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-bg-subtle text-text-secondary border border-border">
+                                {PROJECT_EXPENSE_CATEGORY_LABELS[line.category]}
+                              </span>
+                            )}
                           </div>
-                          <div className="text-[10px] text-text-secondary mt-0.5">
+                          <div className="text-[10px] text-text-secondary mt-1 flex items-center gap-1.5 flex-wrap">
                             {isMaterial
                               ? [
                                   line.quantity != null
@@ -534,16 +621,16 @@ export function ProjectDetailPanel({
                                 ]
                                   .filter(Boolean)
                                   .join(" · ")
-                              : `${PROJECT_EXPENSE_CATEGORY_LABELS[line.category]} · ${line.incurredOn}`}
+                              : line.incurredOn}
                             {line.recordedByName
-                              ? ` · ${line.recordedByName}`
+                              ? ` · logged by ${line.recordedByName}`
                               : ""}
                           </div>
                         </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
+                        <div className="flex items-center gap-2 shrink-0">
                           <span
                             className={cn(
-                              "font-mono font-bold tabular-nums",
+                              "font-mono font-bold tabular-nums text-sm",
                               isCredit
                                 ? "text-status-active-text"
                                 : "text-text"
@@ -557,7 +644,7 @@ export function ProjectDetailPanel({
                               <button
                                 type="button"
                                 onClick={() => setEditExpense(line)}
-                                className="p-1 rounded-md border border-border hover:bg-bg cursor-pointer"
+                                className="p-1 rounded-md border border-border hover:bg-bg cursor-pointer text-text-secondary hover:text-text"
                                 aria-label="Edit expense"
                               >
                                 <Pencil className="h-3 w-3" />
@@ -616,12 +703,26 @@ export function ProjectDetailPanel({
                 subtitle="Retrieving hardware assignments and custody records"
               />
             ) : assignments.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-border p-3 flex items-start gap-2.5">
-                <Package className="h-4 w-4 text-text-secondary shrink-0 mt-0.5" />
-                <p className="text-[11px] text-text-secondary">
-                  No assets assigned. Use <strong>Assign</strong> for free active
-                  inventory assets.
-                </p>
+              <div className="flex flex-col items-center justify-center p-6 text-center rounded-xl border border-dashed border-border/80 bg-bg-subtle/30 space-y-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/10 text-accent">
+                  <PackageCheck className="h-5 w-5" />
+                </div>
+                <div className="space-y-1 max-w-xs">
+                  <h4 className="text-xs font-bold text-text">No assets assigned</h4>
+                  <p className="text-[11px] text-text-secondary leading-relaxed">
+                    Assign available hardware and equipment to this project workspace for active custodian tracking.
+                  </p>
+                </div>
+                {project.isMutable && (
+                  <button
+                    type="button"
+                    onClick={() => setAssignOpen(true)}
+                    className="inline-flex items-center gap-1.5 h-7 px-3 text-[11px] font-bold rounded-lg bg-accent text-accent-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-2xs"
+                  >
+                    <Plus className="h-3 w-3" />
+                    Assign Asset
+                  </button>
+                )}
               </div>
             ) : (
               <ul className="space-y-2">
@@ -630,34 +731,45 @@ export function ProjectDetailPanel({
                   return (
                     <li
                       key={row.id}
-                      className="rounded-lg border border-border bg-bg-subtle/40 px-3 py-2.5 text-xs"
+                      className="rounded-xl border border-border bg-bg-subtle/40 p-3 text-xs hover:bg-bg-subtle/70 transition-colors space-y-2"
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="font-bold text-text truncate">
                               {row.assetName}
                             </span>
+                            <span className="inline-flex items-center font-mono font-bold text-[10px] px-2 py-0.5 rounded-md bg-category-computing-bg/15 text-category-computing-bg border border-category-computing-bg/25">
+                              {row.assetCode}
+                            </span>
                             <span
                               className={cn(
-                                "px-1.5 py-0.5 rounded text-[9px] font-bold uppercase",
+                                "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border",
                                 isOpenAssignment
-                                  ? "bg-accent/15 text-accent"
+                                  ? "bg-status-active-bg/15 text-status-active-text border-status-active-bg/25"
                                   : row.status === "written_off"
-                                    ? "bg-status-outofservice-bg/40 text-status-outofservice-text"
-                                    : "bg-bg-subtle border border-border text-text-secondary"
+                                    ? "bg-destructive/15 text-destructive border-destructive/25"
+                                    : "bg-status-retired-bg/15 text-status-retired-text border-status-retired-bg/25"
                               )}
                             >
+                              <span
+                                className={cn(
+                                  "h-1.5 w-1.5 rounded-full",
+                                  isOpenAssignment
+                                    ? "bg-status-active-bg"
+                                    : row.status === "written_off"
+                                      ? "bg-destructive"
+                                      : "bg-status-retired-bg"
+                                )}
+                              />
                               {row.status.replace("_", " ")}
                             </span>
                           </div>
-                          <div className="text-[10px] text-text-secondary mt-0.5 font-mono">
-                            {row.assetCode}
-                            {" · "}
+                          <div className="text-[10px] text-text-secondary mt-1">
                             assigned{" "}
                             {new Date(row.assignedAt).toLocaleDateString()}
                             {row.assignedByName
-                              ? ` · ${row.assignedByName}`
+                              ? ` · by ${row.assignedByName}`
                               : ""}
                             {row.returnedAt
                               ? ` · returned ${new Date(row.returnedAt).toLocaleDateString()}`
@@ -754,6 +866,40 @@ export function ProjectDetailPanel({
         defaultValue={damageDefaultValue}
         onClose={() => setDamageTarget(null)}
         onSubmit={handleDamageSubmit}
+      />
+
+      <ConfirmDialog
+        isOpen={Boolean(returnTarget)}
+        title="Return Assigned Asset"
+        description={
+          returnTarget
+            ? `Return "${returnTarget.assetName}" (${returnTarget.assetCode}) from this project back to general custody?`
+            : ""
+        }
+        confirmLabel="Return Asset"
+        variant="warning"
+        isLoading={returnAsset.isPending}
+        onConfirm={handleConfirmReturn}
+        onClose={() => setReturnTarget(null)}
+      />
+
+      <ConfirmDialog
+        isOpen={Boolean(deleteExpenseTarget)}
+        title={
+          deleteExpenseTarget?.lineType === "consumable"
+            ? "Remove Material Usage"
+            : "Delete Expense Line"
+        }
+        description={
+          deleteExpenseTarget?.lineType === "consumable"
+            ? `Remove material charge "${deleteExpenseTarget.description}"? Deducted stock and purchase lots will be restored.`
+            : `Permanently remove expense line "${deleteExpenseTarget?.description}"?`
+        }
+        confirmLabel="Delete"
+        variant="destructive"
+        isLoading={deleteExpense.isPending}
+        onConfirm={handleConfirmDeleteExpense}
+        onClose={() => setDeleteExpenseTarget(null)}
       />
     </div>
   );

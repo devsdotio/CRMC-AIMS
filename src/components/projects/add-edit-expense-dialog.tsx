@@ -1,16 +1,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Receipt, Save } from "lucide-react";
+import {
+  X,
+  Receipt,
+  Pencil,
+  Plus,
+  FileText,
+  Calendar,
+  AlertCircle,
+  Loader2,
+  Tag,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import type {
   ProjectExpenseCategory,
   ProjectExpenseLine,
 } from "@/types/projects";
-import {
-  PROJECT_EXPENSE_CATEGORY_LABELS,
-  PROJECT_EXPENSE_LINE_TYPE_LABELS,
-} from "@/types/projects";
+import { PROJECT_EXPENSE_CATEGORY_LABELS } from "@/types/projects";
 
 export type ExpenseFormInput = {
   lineType: "miscellaneous" | "adjustment";
@@ -88,7 +95,7 @@ export function AddEditExpenseDialog({
       return;
     }
     if (form.lineType === "miscellaneous" && amount < 0) {
-      setError("Expenses must be positive. Use Adjustment for credits.");
+      setError("Expenses must be positive. Use Adjustment / credit for refunds.");
       return;
     }
 
@@ -123,19 +130,20 @@ export function AddEditExpenseDialog({
       <div
         role="dialog"
         aria-modal="true"
-        className="relative w-full max-w-md bg-bg border border-border rounded-xl shadow-2xl z-10 overflow-hidden my-4"
+        aria-labelledby="expense-form-heading"
+        className="relative w-full max-w-md bg-bg border border-border rounded-xl shadow-2xl z-10 overflow-hidden my-4 animate-in fade-in zoom-in-95 duration-150"
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-bg-subtle/50">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/15 text-accent">
-              {isEdit ? <Save className="h-4 w-4" /> : <Receipt className="h-4 w-4" />}
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/15 text-accent shrink-0">
+              {isEdit ? <Pencil className="h-4 w-4" /> : <Receipt className="h-4 w-4" />}
             </div>
             <div>
-              <h2 className="text-sm font-bold text-text">
-                {isEdit ? "Edit expense" : "Add expense"}
+              <h2 id="expense-form-heading" className="text-sm font-bold text-text">
+                {isEdit ? "Edit Expense" : "Add Expense"}
               </h2>
               <p className="text-[11px] text-text-secondary">
-                Unexpected costs, travel, snacks, adjustments, etc.
+                Unexpected costs, travel, snacks, or budget adjustments
               </p>
             </div>
           </div>
@@ -143,52 +151,72 @@ export function AddEditExpenseDialog({
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="p-1.5 rounded-lg text-text-secondary hover:bg-border cursor-pointer"
+            className="p-1.5 rounded-lg text-text-secondary hover:text-text hover:bg-border transition-colors cursor-pointer disabled:opacity-50"
             aria-label="Close"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-3.5">
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          {/* Line Type Pill Toggle */}
           <div>
-            <label htmlFor="exp-type" className={labelClass}>
-              Type
-            </label>
-            <select
-              id="exp-type"
-              value={form.lineType}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  lineType: e.target.value as "miscellaneous" | "adjustment",
-                  category:
-                    e.target.value === "adjustment"
-                      ? "adjustment"
-                      : f.category === "adjustment"
+            <label className={labelClass}>Expense Type</label>
+            <div className="grid grid-cols-2 gap-1.5 p-1 rounded-lg bg-bg-subtle border border-border">
+              <button
+                type="button"
+                onClick={() =>
+                  setForm((f) => ({
+                    ...f,
+                    lineType: "miscellaneous",
+                    category:
+                      f.category === "adjustment"
                         ? "miscellaneous"
                         : f.category,
-                }))
-              }
-              className={cn(fieldClass, "cursor-pointer")}
-            >
-              {(
-                Object.keys(PROJECT_EXPENSE_LINE_TYPE_LABELS) as Array<
-                  keyof typeof PROJECT_EXPENSE_LINE_TYPE_LABELS
-                >
-              ).map((key) => (
-                <option key={key} value={key}>
-                  {PROJECT_EXPENSE_LINE_TYPE_LABELS[key]}
-                </option>
-              ))}
-            </select>
+                  }))
+                }
+                className={cn(
+                  "inline-flex items-center justify-center h-8 px-3 rounded-md text-xs font-bold transition-all cursor-pointer",
+                  form.lineType === "miscellaneous"
+                    ? "bg-accent text-accent-foreground shadow-2xs"
+                    : "text-text-secondary hover:text-text hover:bg-bg"
+                )}
+              >
+                Expense / Misc
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  setForm((f) => ({
+                    ...f,
+                    lineType: "adjustment",
+                    category: "adjustment",
+                  }))
+                }
+                className={cn(
+                  "inline-flex items-center justify-center h-8 px-3 rounded-md text-xs font-bold transition-all cursor-pointer",
+                  form.lineType === "adjustment"
+                    ? "bg-accent text-accent-foreground shadow-2xs"
+                    : "text-text-secondary hover:text-text hover:bg-bg"
+                )}
+              >
+                Adjustment / Credit
+              </button>
+            </div>
           </div>
 
+          {/* Category Dropdown (if miscellaneous) */}
           {form.lineType === "miscellaneous" && (
             <div>
-              <label htmlFor="exp-cat" className={labelClass}>
-                Category
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label htmlFor="exp-cat" className={labelClass}>
+                  Category
+                </label>
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-accent px-1.5 py-0.5 rounded bg-accent/10">
+                  <Tag className="h-2.5 w-2.5" />
+                  {PROJECT_EXPENSE_CATEGORY_LABELS[form.category]}
+                </span>
+              </div>
               <select
                 id="exp-cat"
                 value={form.category}
@@ -209,38 +237,50 @@ export function AddEditExpenseDialog({
             </div>
           )}
 
+          {/* Description */}
           <div>
             <label htmlFor="exp-desc" className={labelClass}>
-              Description *
+              Description <span className="text-accent">*</span>
             </label>
-            <input
-              id="exp-desc"
-              value={form.description}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, description: e.target.value }))
-              }
-              className={fieldClass}
-              placeholder="e.g. Site visit fuel / pizza for crew"
-              autoFocus
-            />
+            <div className="relative">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-text-secondary">
+                <FileText className="h-4 w-4" />
+              </span>
+              <input
+                id="exp-desc"
+                value={form.description}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, description: e.target.value }))
+                }
+                className={cn(fieldClass, "pl-9")}
+                placeholder="e.g. Site visit fuel, crew meals, permits"
+                autoFocus
+              />
+            </div>
           </div>
 
+          {/* Amount and Date Incurred */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label htmlFor="exp-amount" className={labelClass}>
-                Amount (₱) *
+                Amount (₱) <span className="text-accent">*</span>
               </label>
-              <input
-                id="exp-amount"
-                type="number"
-                step="0.01"
-                value={form.amount}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, amount: e.target.value }))
-                }
-                className={fieldClass}
-                placeholder={form.lineType === "adjustment" ? "±0.00" : "0.00"}
-              />
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-xs font-bold text-text-secondary">
+                  ₱
+                </span>
+                <input
+                  id="exp-amount"
+                  type="number"
+                  step="0.01"
+                  value={form.amount}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, amount: e.target.value }))
+                  }
+                  className={cn(fieldClass, "pl-7 font-mono tabular-nums")}
+                  placeholder={form.lineType === "adjustment" ? "±0.00" : "0.00"}
+                />
+              </div>
               {form.lineType === "adjustment" && (
                 <p className="text-[10px] text-text-secondary mt-1">
                   Use negative values for refunds / credits.
@@ -251,18 +291,21 @@ export function AddEditExpenseDialog({
               <label htmlFor="exp-date" className={labelClass}>
                 Date incurred
               </label>
-              <input
-                id="exp-date"
-                type="date"
-                value={form.incurredOn}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, incurredOn: e.target.value }))
-                }
-                className={fieldClass}
-              />
+              <div className="relative">
+                <input
+                  id="exp-date"
+                  type="date"
+                  value={form.incurredOn}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, incurredOn: e.target.value }))
+                  }
+                  className={fieldClass}
+                />
+              </div>
             </div>
           </div>
 
+          {/* Notes */}
           <div>
             <label htmlFor="exp-notes" className={labelClass}>
               Notes
@@ -273,29 +316,39 @@ export function AddEditExpenseDialog({
               onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
               rows={2}
               className={cn(fieldClass, "h-auto py-2 resize-y min-h-14")}
+              placeholder="Receipt reference, vendor name, or additional notes…"
             />
           </div>
 
           {error && (
-            <p className="text-xs text-status-outofservice-text bg-status-outofservice-bg/10 border border-status-outofservice-bg/30 rounded-lg px-3 py-2">
-              {error}
-            </p>
+            <div className="flex items-start gap-2 text-xs text-status-outofservice-text bg-status-outofservice-bg/10 border border-status-outofservice-bg/30 rounded-lg p-2.5">
+              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
           )}
 
-          <div className="flex justify-end gap-2 pt-1">
+          {/* Action buttons */}
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="h-9 px-4 text-xs font-bold rounded-lg border border-border cursor-pointer"
+              className="h-9 px-4 text-xs font-bold rounded-lg border border-border bg-bg text-text hover:bg-bg-subtle transition-colors cursor-pointer disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="inline-flex items-center gap-1.5 h-9 px-4 text-xs font-bold rounded-lg bg-accent text-accent-foreground cursor-pointer disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 h-9 px-4 text-xs font-bold rounded-lg bg-accent text-accent-foreground hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 shadow-xs"
             >
+              {isSubmitting ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : isEdit ? (
+                <Pencil className="h-3.5 w-3.5" />
+              ) : (
+                <Plus className="h-3.5 w-3.5" />
+              )}
               {isSubmitting ? "Saving…" : isEdit ? "Save changes" : "Add expense"}
             </button>
           </div>

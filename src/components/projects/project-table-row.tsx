@@ -1,6 +1,7 @@
 "use client";
 
-import { MoreHorizontal, Pencil, Trash2, Eye, Loader2 } from "lucide-react";
+import { MoreHorizontal, Pencil, Trash2, Eye, Loader2, MapPin, Building2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { Project } from "@/types/projects";
 import { ProjectStatusBadge } from "./project-status-badge";
 import { formatPhp } from "./format-money";
@@ -24,41 +25,80 @@ export function ProjectTableRow({
     project.isMutable &&
     (project.status === "draft" || project.status === "cancelled");
 
+  const budgetNum = project.budget ? Number(project.budget) : 0;
+  const spentNum = Number(project.totalSpent) || 0;
+  const percentUsed = budgetNum > 0 ? Math.round((spentNum / budgetNum) * 100) : null;
+  const isOverBudget = budgetNum > 0 && spentNum > budgetNum;
+
   return (
     <tr
-      className="border-b border-border bg-bg hover:bg-bg-subtle/60 transition-colors cursor-pointer"
+      className="border-b border-border bg-bg hover:bg-bg-subtle/70 transition-colors cursor-pointer group"
       onClick={() => onSelect(project)}
     >
-      <td className="px-5 py-4">
-        <div className="font-bold text-sm text-text leading-tight">
+      <td className="px-5 py-3.5">
+        <div className="font-bold text-sm text-text leading-tight group-hover:text-accent transition-colors">
           {project.name}
         </div>
         <div className="text-[11px] font-mono text-text-secondary mt-0.5">
           {project.projectCode}
         </div>
       </td>
-      <td className="px-3 py-4">
+      <td className="px-3 py-3.5">
         <ProjectStatusBadge status={project.status} />
       </td>
-      <td className="px-3 py-4 text-xs text-text-secondary hidden md:table-cell">
-        {project.location || "—"}
+      <td className="px-3 py-3.5 text-xs text-text-secondary hidden md:table-cell">
+        {project.location ? (
+          <span className="inline-flex items-center gap-1">
+            <MapPin className="h-3 w-3 text-text-secondary shrink-0" />
+            <span className="truncate max-w-32">{project.location}</span>
+          </span>
+        ) : (
+          "—"
+        )}
       </td>
-      <td className="px-3 py-4 text-xs text-text-secondary hidden lg:table-cell">
-        {project.department || "—"}
+      <td className="px-3 py-3.5 text-xs text-text-secondary hidden lg:table-cell">
+        {project.department ? (
+          <span className="inline-flex items-center gap-1">
+            <Building2 className="h-3 w-3 text-text-secondary shrink-0" />
+            <span className="truncate max-w-32">{project.department}</span>
+          </span>
+        ) : (
+          "—"
+        )}
       </td>
-      <td className="px-3 py-4 text-xs font-mono tabular-nums text-text hidden sm:table-cell">
-        {project.budget ? formatPhp(project.budget) : "—"}
+      <td className="px-3 py-3.5 text-xs font-mono tabular-nums text-text hidden sm:table-cell">
+        {project.budget ? (
+          <div className="flex items-center gap-1.5">
+            <span>{formatPhp(project.budget)}</span>
+            {percentUsed != null && (
+              <span
+                className={cn(
+                  "text-[10px] font-bold px-1.5 py-0.2 rounded-full",
+                  isOverBudget
+                    ? "bg-status-outofservice-bg/15 text-status-outofservice-text"
+                    : percentUsed >= 85
+                      ? "bg-status-repair-bg/15 text-status-repair-text"
+                      : "bg-bg-subtle text-text-secondary"
+                )}
+              >
+                {percentUsed}%
+              </span>
+            )}
+          </div>
+        ) : (
+          "—"
+        )}
       </td>
-      <td className="px-3 py-4 text-xs font-mono tabular-nums text-text-secondary hidden sm:table-cell">
+      <td className="px-3 py-3.5 text-xs font-mono tabular-nums text-text-secondary hidden sm:table-cell">
         {formatPhp(project.totalSpent)}
       </td>
-      <td className="px-5 py-4 text-right" onClick={(e) => e.stopPropagation()}>
-        <div className="flex justify-end gap-1.5">
+      <td className="px-5 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
+        <div className="flex justify-end items-center gap-1.5">
           <button
             type="button"
             onClick={() => onSelect(project)}
-            className="inline-flex items-center gap-1 h-7 px-2.5 text-[11px] font-bold rounded-md border border-border bg-bg-subtle text-text hover:bg-border/60 transition-colors cursor-pointer"
-            title="View"
+            className="inline-flex items-center gap-1 h-7 px-2.5 text-[11px] font-bold rounded-lg border border-border bg-bg-subtle text-text hover:bg-border/70 hover:text-text transition-colors cursor-pointer"
+            title="View Details"
           >
             <Eye className="h-3.5 w-3.5" />
             View
@@ -67,8 +107,8 @@ export function ProjectTableRow({
             <button
               type="button"
               onClick={() => onEdit(project)}
-              className="inline-flex items-center gap-1 h-7 px-2.5 text-[11px] font-bold rounded-md border border-border bg-bg text-text hover:bg-bg-subtle transition-colors cursor-pointer"
-              title="Edit"
+              className="inline-flex items-center gap-1 h-7 px-2.5 text-[11px] font-bold rounded-lg border border-border bg-bg text-text hover:bg-bg-subtle transition-colors cursor-pointer"
+              title="Edit Project"
             >
               <Pencil className="h-3.5 w-3.5" />
               Edit
@@ -79,8 +119,8 @@ export function ProjectTableRow({
               type="button"
               onClick={() => onDelete(project)}
               disabled={deleting}
-              className="inline-flex items-center justify-center h-7 w-7 rounded-md border border-border text-status-outofservice-text hover:bg-status-outofservice-bg/10 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
-              title="Delete"
+              className="inline-flex items-center justify-center h-7 w-7 rounded-lg border border-border text-status-outofservice-text hover:bg-status-outofservice-bg/15 hover:border-status-outofservice-bg/30 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
+              title="Delete Project"
               aria-label="Delete project"
             >
               {deleting ? (
@@ -91,8 +131,8 @@ export function ProjectTableRow({
             </button>
           )}
           {!project.isMutable && (
-            <span className="inline-flex items-center h-7 px-2 text-[10px] font-bold text-text-secondary">
-              <MoreHorizontal className="h-3.5 w-3.5 opacity-40" />
+            <span className="inline-flex items-center h-7 px-2 text-[10px] font-bold text-text-secondary opacity-40">
+              <MoreHorizontal className="h-3.5 w-3.5" />
             </span>
           )}
         </div>

@@ -44,6 +44,7 @@ import { QRCodeDisplay } from "./qr-code-display";
 import { useCategoryStyleMap } from "@/features/categories/client/use-categories";
 import { useBorrowRequests } from "@/features/borrow-requests/client";
 import { AuditNoteDisplay } from "@/components/audit-logs/audit-log-utils";
+import { LoadingState } from "@/components/providers/loading-context";
 
 function getTimelineIcon(status: string) {
   switch (status.toLowerCase()) {
@@ -550,9 +551,12 @@ function AssetHistoryTimeline({ asset }: { asset: Asset }) {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center p-8 rounded-xl border border-border bg-bg">
-        <Loader2 className="h-5 w-5 animate-spin text-text-secondary" />
-      </div>
+      <LoadingState
+        variant="card"
+        icon="history"
+        message="Loading asset lifecycle & history..."
+        subtitle="Retrieving custody handovers, borrow records, and audit events"
+      />
     );
   }
 
@@ -866,6 +870,7 @@ function AssetHistoryTimeline({ asset }: { asset: Asset }) {
 export interface AssetDetailPanelProps {
   asset: Asset | null;
   isOpen: boolean;
+  isLoading?: boolean;
   onClose: () => void;
   onEdit?: (asset: Asset) => void;
   onIssue?: (asset: Asset) => void;
@@ -900,6 +905,7 @@ const STATUS_STYLES: Record<
 export function AssetDetailPanel({
   asset,
   isOpen,
+  isLoading = false,
   onClose,
   onEdit,
   onIssue,
@@ -925,7 +931,44 @@ export function AssetDetailPanel({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen || !asset) return null;
+  if (!isOpen) return null;
+
+  if (isLoading || !asset) {
+    return (
+      <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs transition-opacity duration-200">
+        <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
+        <aside
+          role="dialog"
+          aria-modal="true"
+          aria-label="Loading asset details"
+          className={cn(
+            "relative flex flex-col w-full max-w-lg h-full bg-bg border-l border-border shadow-2xl z-10 overflow-hidden",
+            "animate-in slide-in-from-right duration-250 ease-in-out"
+          )}
+        >
+          <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-bg-subtle/50 shrink-0">
+            <div className="h-6 w-36 bg-border/60 rounded-md animate-pulse" />
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-text-secondary hover:text-text hover:bg-border transition-colors cursor-pointer shrink-0"
+              aria-label="Close"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <div className="flex-1 flex items-center justify-center p-6">
+            <LoadingState
+              variant="card"
+              icon="package"
+              message="Loading asset details..."
+              subtitle="Retrieving hardware specifications, maintenance logs, and custody status"
+            />
+          </div>
+        </aside>
+      </div>
+    );
+  }
 
   const categoryMeta = getCategoryStyle(asset.category);
   const statusMeta = STATUS_STYLES[asset.status];

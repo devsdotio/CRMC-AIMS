@@ -23,10 +23,12 @@ import { cn } from "@/lib/utils";
 import type { BorrowLogRecord } from "@/features/borrow-log/client";
 import { useCategoryStyleMap } from "@/features/categories/client/use-categories";
 import { OverdueBadge } from "@/components/ui/overdue-badge";
+import { LoadingState } from "@/components/providers/loading-context";
 
 interface BorrowLogDetailSheetProps {
   record: BorrowLogRecord | null;
   isOpen: boolean;
+  isLoading?: boolean;
   onClose: () => void;
   onRecordReturn?: (record: BorrowLogRecord) => void;
   canOperate?: boolean;
@@ -35,6 +37,7 @@ interface BorrowLogDetailSheetProps {
 export function BorrowLogDetailSheet({
   record,
   isOpen,
+  isLoading = false,
   onClose,
   onRecordReturn,
   canOperate,
@@ -42,7 +45,44 @@ export function BorrowLogDetailSheet({
   const { getCategoryStyle } = useCategoryStyleMap();
   const [copied, setCopied] = useState(false);
 
-  if (!isOpen || !record) return null;
+  if (!isOpen) return null;
+
+  if (isLoading || !record) {
+    return (
+      <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs transition-opacity duration-200">
+        <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
+        <aside
+          role="dialog"
+          aria-modal="true"
+          aria-label="Loading custody record"
+          className={cn(
+            "relative flex flex-col w-full max-w-lg h-full bg-bg border-l border-border shadow-2xl z-10 overflow-hidden",
+            "animate-in slide-in-from-right duration-250 ease-in-out"
+          )}
+        >
+          <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-bg-subtle/50 shrink-0">
+            <div className="h-6 w-36 bg-border/60 rounded-md animate-pulse" />
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-text-secondary hover:text-text hover:bg-border transition-colors cursor-pointer shrink-0"
+              aria-label="Close"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <div className="flex-1 flex items-center justify-center p-6">
+            <LoadingState
+              variant="card"
+              icon="layers"
+              message="Loading custody log record..."
+              subtitle="Retrieving checkout timestamp, borrower profile, and return status"
+            />
+          </div>
+        </aside>
+      </div>
+    );
+  }
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(record.logCode);
