@@ -15,7 +15,7 @@ import {
   Tag,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getCategoryStyle } from "@/constants/categories";
+import { useCategoryStyleMap } from "@/features/categories/client/use-categories";
 import {
   getActionStyle,
   getActionIcon,
@@ -37,6 +37,7 @@ export function RequisitionDetailPanel({
   onClose,
 }: RequisitionDetailPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const { getCategoryStyle } = useCategoryStyleMap();
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {

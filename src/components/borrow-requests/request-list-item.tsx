@@ -1,7 +1,6 @@
 "use client";
  
-import { getCategoryStyle } from "@/constants/categories";
-
+import { useCategoryStyleMap } from "@/features/categories/client/use-categories";
 import { useEffect, useRef, useState } from "react";
 import { Check, X, Calendar, User, Building2, Tag, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -39,6 +38,7 @@ export function RequestListItem({
   onMarkUnreleased,
 }: RequestListItemProps) {
   const rowRef = useRef<HTMLDivElement>(null);
+  const { getCategoryStyle } = useCategoryStyleMap();
   const [isMarkingUnreleased, setIsMarkingUnreleased] = useState(false);
   const firstItem = request.items?.[0];
   const categoryMeta = getCategoryStyle(firstItem?.category || "office");

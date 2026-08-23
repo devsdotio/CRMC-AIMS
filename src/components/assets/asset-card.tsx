@@ -1,5 +1,5 @@
 "use client";
-import { getCategoryStyle } from "@/constants/categories";
+import { useCategoryStyleMap } from "@/features/categories/client/use-categories";
 import { User, MapPin, Tag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -40,6 +40,7 @@ const STATUS_STYLES: Record<
 };
 
 export function AssetCard({ asset, onSelect }: AssetCardProps) {
+  const { getCategoryStyle } = useCategoryStyleMap();
   const categoryMeta = getCategoryStyle(asset.category);
   const statusMeta = STATUS_STYLES[asset.status];
 

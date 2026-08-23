@@ -1,7 +1,6 @@
 "use client";
  
-import { getCategoryStyle } from "@/constants/categories";
-
+import { useCategoryStyleMap } from "@/features/categories/client/use-categories";
 import { useEffect, useRef, useState } from "react";
 import { X, Check, Mail, Phone, Building2, Tag, History, FileText, User, Loader2, Send, CheckCircle, XCircle, PackageCheck, PackageMinus, RotateCcw, Edit3 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -48,17 +47,20 @@ function getActionIcon(action: string) {
   switch (action.toLowerCase()) {
     case "pending":
     case "created":
-      return <FileText className="h-3.5 w-3.5" />;
+      return <Send className="h-3.5 w-3.5 text-accent" />;
     case "approved":
-      return <Check className="h-3.5 w-3.5" />;
-    case "rejected":
-      return <X className="h-3.5 w-3.5" />;
+      return <CheckCircle className="h-3.5 w-3.5 text-status-active-text" />;
     case "released":
-      return <Send className="h-3.5 w-3.5 ml-0.5" />;
+      return <PackageMinus className="h-3.5 w-3.5 text-status-active-text" />;
+    case "unreleased":
+      return <RotateCcw className="h-3.5 w-3.5 text-status-repair-text" />;
     case "returned":
-      return <RotateCcw className="h-3.5 w-3.5" />;
+      return <PackageCheck className="h-3.5 w-3.5 text-status-active-text" />;
+    case "rejected":
+    case "cancelled":
+      return <XCircle className="h-3.5 w-3.5 text-status-outofservice-text" />;
     default:
-      return <History className="h-3.5 w-3.5" />;
+      return <History className="h-3.5 w-3.5 text-text-secondary" />;
   }
 }
 
@@ -93,6 +95,7 @@ export function RequestDetailPanel({
   onEdit,
 }: RequestDetailPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const { getCategoryStyle } = useCategoryStyleMap();
   const [isMarkingUnreleased, setIsMarkingUnreleased] = useState(false);
 
   // Keyboard Escape listener

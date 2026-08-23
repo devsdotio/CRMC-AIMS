@@ -8,7 +8,7 @@ import {
   Package,
   Edit3,
 } from "lucide-react";
-import { getCategoryStyle } from "@/constants/categories";
+import { useCategoryStyleMap } from "@/features/categories/client/use-categories";
 import { cn } from "@/lib/utils";
 import { formatItemDescription } from "@/lib/sanitize-display";
 import type { PortalBorrowRequest } from "./types";
@@ -59,32 +59,35 @@ const WORKFLOW_STATUS_STYLES: Record<
 function Skeleton({ className }: { className?: string }) {
   return (
     <div
-      className={cn("animate-pulse rounded bg-border", className)}
-      aria-hidden
+      className={cn(
+        "animate-pulse rounded bg-border",
+        className
+      )}
     />
   );
 }
 
 export function MyRequestItemSkeleton() {
   return (
-    <div className="flex items-center justify-between p-4 md:px-6 border-b border-border bg-bg">
-      <div className="space-y-2 flex-1 min-w-0 pr-4">
-        <div className="flex items-center gap-2">
-          <Skeleton className="h-3.5 w-24" />
-          <Skeleton className="h-3.5 w-16" />
+    <div className="flex items-center justify-between p-4 bg-bg rounded-xl border border-border">
+      <div className="flex items-center gap-3.5 min-w-0">
+        <Skeleton className="w-9 h-9 rounded-lg shrink-0" />
+        <div className="space-y-1.5 min-w-0">
+          <div className="flex items-center gap-2">
+            <Skeleton className="w-16 h-3.5 rounded" />
+            <Skeleton className="w-20 h-4 rounded-full" />
+          </div>
+          <Skeleton className="w-32 h-4 rounded" />
+          <Skeleton className="w-48 h-3 rounded" />
         </div>
-        <Skeleton className="h-4.5 w-56" />
-        <Skeleton className="h-3.5 w-36" />
       </div>
-      <div className="flex items-center gap-3 shrink-0">
-        <Skeleton className="h-7 w-28 rounded-full" />
-        <Skeleton className="h-4 w-4 rounded" />
-      </div>
+      <Skeleton className="w-24 h-5 rounded-full shrink-0" />
     </div>
   );
 }
 
 export function MyRequestItem({ request, onViewDetails, onEdit }: MyRequestItemProps) {
+  const { getCategoryStyle } = useCategoryStyleMap();
   const statusStyle =
     WORKFLOW_STATUS_STYLES[request.status] ?? WORKFLOW_STATUS_STYLES.pending;
 

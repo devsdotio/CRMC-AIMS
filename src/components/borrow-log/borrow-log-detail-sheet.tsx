@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BorrowLogRecord } from "@/features/borrow-log/client";
-import { getCategoryStyle } from "@/constants/categories";
+import { useCategoryStyleMap } from "@/features/categories/client/use-categories";
 import { OverdueBadge } from "@/components/ui/overdue-badge";
 
 interface BorrowLogDetailSheetProps {
@@ -39,6 +39,7 @@ export function BorrowLogDetailSheet({
   onRecordReturn,
   canOperate,
 }: BorrowLogDetailSheetProps) {
+  const { getCategoryStyle } = useCategoryStyleMap();
   const [copied, setCopied] = useState(false);
 
   if (!isOpen || !record) return null;

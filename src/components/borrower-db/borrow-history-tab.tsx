@@ -14,7 +14,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getCategoryStyle } from "@/constants/categories";
+import { useCategoryStyleMap } from "@/features/categories/client/use-categories";
 import { OverdueBadge } from "@/components/ui/overdue-badge";
 import {
   getActionStyle,
@@ -105,6 +105,7 @@ function RowSkeleton() {
 }
 
 export function BorrowHistoryTab() {
+  const { getCategoryStyle } = useCategoryStyleMap();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<HistoryStatusFilter>("all");
   const [search, setSearch] = useState("");

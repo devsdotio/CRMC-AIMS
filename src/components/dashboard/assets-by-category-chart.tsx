@@ -1,5 +1,5 @@
 "use client";
-import { getCategoryStyle } from "@/constants/categories";
+import { useCategoryStyleMap } from "@/features/categories/client/use-categories";
 import { BarChart2 } from "lucide-react";
 import {
   BarChart,
@@ -71,6 +71,7 @@ export function AssetsByCategoryChart({
   data,
   loading = false,
 }: AssetsByCategoryChartProps) {
+  const { getCategoryStyle } = useCategoryStyleMap();
   const total = data.reduce((sum, d) => sum + d.count, 0);
 
   return (

@@ -9,7 +9,7 @@ import {
 } from "./audit-log-filters";
 import { ConsumableAuditDetailPanel } from "./consumable-audit-detail-panel";
 import { formatDateTime, formatRelativeTime, exportToCSV } from "./audit-log-utils";
-import { getCategoryStyle } from "@/constants/categories";
+import { useCategoryStyleMap } from "@/features/categories/client/use-categories";
 import type { ConsumableItem } from "@/features/consumables/client/consumables-api";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/providers/toast-context";
@@ -23,6 +23,7 @@ const STOCK_STATUS_OPTIONS = [
 
 export function ConsumablesAuditList() {
   const { data: response, isLoading, error } = useConsumablesQuery({ limit: 100 });
+  const { getCategoryStyle } = useCategoryStyleMap();
   const toast = useToast();
 
   // Safely extract consumables array whether wrapped in paginated response or raw array

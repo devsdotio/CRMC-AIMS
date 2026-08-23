@@ -41,7 +41,7 @@ import {
   type AssetChangesMap,
 } from "@/features/assets/client";
 import { QRCodeDisplay } from "./qr-code-display";
-import { getCategoryStyle } from "@/constants/categories";
+import { useCategoryStyleMap } from "@/features/categories/client/use-categories";
 import { useBorrowRequests } from "@/features/borrow-requests/client";
 import { AuditNoteDisplay } from "@/components/audit-logs/audit-log-utils";
 
@@ -905,6 +905,7 @@ export function AssetDetailPanel({
   onIssue,
 }: AssetDetailPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const { getCategoryStyle } = useCategoryStyleMap();
   // Suppliers only needed when panel is open with a linked vendor — never on list paint.
   const { data: suppliers = [] } = useSuppliersQuery({
     enabled: Boolean(isOpen && asset?.supplierId),

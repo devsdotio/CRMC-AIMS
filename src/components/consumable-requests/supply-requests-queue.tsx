@@ -17,7 +17,7 @@ import {
   Tag,
   Package,
 } from "lucide-react";
-import { getCategoryStyle } from "@/constants/categories";
+import { useCategoryStyleMap } from "@/features/categories/client/use-categories";
 import { cn } from "@/lib/utils";
 import { QueryErrorBanner } from "@/components/shared/query-error-banner";
 import { ReleaseConsumableRequestDialog } from "@/components/consumable-requests/release-consumable-request-dialog";
@@ -175,6 +175,7 @@ export function SupplyRequestsQueue({
   searchQuery = "",
   department,
 }: SupplyRequestsQueueProps) {
+  const { getCategoryStyle } = useCategoryStyleMap();
   const { canOperate } = useAssetOperator();
   const toast = useToast();
   const [releaseTarget, setReleaseTarget] = useState<ConsumableRequest | null>(

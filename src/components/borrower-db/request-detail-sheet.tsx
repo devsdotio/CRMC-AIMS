@@ -21,7 +21,7 @@ import {
   Edit3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getCategoryStyle } from "@/constants/categories";
+import { useCategoryStyleMap } from "@/features/categories/client/use-categories";
 import { formatItemDescription, formatAssetCodeDisplay } from "@/lib/sanitize-display";
 import {
   getActionStyle,
@@ -90,6 +90,7 @@ export function RequestDetailSheet({
   onCancel,
   onEdit,
 }: RequestDetailSheetProps) {
+  const { getCategoryStyle } = useCategoryStyleMap();
   const [copied, setCopied] = useState(false);
 
   // Close on escape key

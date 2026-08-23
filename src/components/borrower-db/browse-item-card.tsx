@@ -2,7 +2,7 @@
 
 import { Tag, MapPin, AlertCircle, PackageX, ShoppingCart, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getCategoryStyle } from "@/constants/categories";
+import { useCategoryStyleMap } from "@/features/categories/client/use-categories";
 import type { BrowseItem } from "./types";
 import { useBorrowerPortal } from "./context";
 
@@ -98,6 +98,7 @@ export function BrowseItemCardSkeleton({ viewMode }: { viewMode: "grid" | "list"
 }
 
 export function BrowseItemCard({ item, viewMode }: BrowseItemCardProps) {
+  const { getCategoryStyle } = useCategoryStyleMap();
   const categoryMeta = getCategoryStyle(item.category);
   const statusBadge = getStatusBadge(item);
   const available = isItemAvailable(item);

@@ -1,5 +1,5 @@
 "use client";
-
+import { useMemo } from "react";
 import {
   useMutation,
   useQuery,
@@ -9,6 +9,7 @@ import {
 } from "@tanstack/react-query";
 import type { CategoryItem } from "@/types/settings";
 import { fetchJson, type ApiResponse } from "@/features/shared/fetch-json";
+import { getCategoryStyle, type CategoryStyleMeta } from "@/constants/categories";
 
 async function fetchCategories(): Promise<CategoryItem[]> {
   const result = await fetchJson<ApiResponse<CategoryItem[]>>("/api/categories");
@@ -49,6 +50,33 @@ export function useCategoriesQuery(options?: {
     staleTime: 5 * 60 * 1000,
     enabled: options?.enabled ?? true,
   });
+}
+
+/**
+ * Returns a helper function that resolves CategoryStyleMeta using custom colors from Settings.
+ */
+export function useCategoryStyleMap() {
+  const { data: categories = [] } = useCategoriesQuery();
+
+  return useMemo(() => {
+    const tokenMap = new Map<string, string>();
+    for (const cat of categories) {
+      if (cat.name && cat.colorToken) {
+        tokenMap.set(cat.name.trim().toLowerCase(), cat.colorToken);
+      }
+    }
+
+    return {
+      categories,
+      getCategoryStyle: (
+        categoryName: string,
+        fallbackLabel?: string
+      ): CategoryStyleMeta => {
+        const token = tokenMap.get((categoryName || "").trim().toLowerCase());
+        return getCategoryStyle(categoryName, fallbackLabel, token);
+      },
+    };
+  }, [categories]);
 }
 
 export function useCreateCategoryMutation(): UseMutationResult<

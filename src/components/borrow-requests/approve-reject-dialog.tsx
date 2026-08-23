@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { X, AlertCircle, CheckCircle2, Loader2, User, Building2, FileText, CalendarClock } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getCategoryStyle } from "@/constants/categories";
+import { useCategoryStyleMap } from "@/features/categories/client/use-categories";
 import { formatItemDescription } from "@/lib/sanitize-display";
 import type { BorrowRequest } from "@/types/borrow-requests";
 
@@ -28,6 +28,7 @@ function ApproveRejectDialogForm({
   onClose,
   onConfirm,
 }: ApproveRejectDialogFormProps) {
+  const { getCategoryStyle } = useCategoryStyleMap();
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);

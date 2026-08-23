@@ -30,6 +30,7 @@ import { formatPhp } from "@/components/projects/format-money";
 import { StockLevelBar } from "./stock-level-bar";
 import { LotQrCodeDisplay } from "./lot-qr-code-display";
 import { AuditNoteDisplay } from "@/components/audit-logs/audit-log-utils";
+import { useCategoryStyleMap } from "@/features/categories/client/use-categories";
 
 export interface ConsumableDetailPanelProps {
   item: ConsumableItem | null;
@@ -99,6 +100,7 @@ export function ConsumableDetailPanel({
   onEdit,
 }: ConsumableDetailPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const { getCategoryStyle } = useCategoryStyleMap();
   const [expandedLotId, setExpandedLotId] = useState<string | null>(null);
   const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
 
@@ -143,6 +145,8 @@ export function ConsumableDetailPanel({
 
   if (!isOpen || !item || !displayItem) return null;
 
+  const categoryMeta = getCategoryStyle(displayItem.category);
+
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs transition-opacity duration-200">
       <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
@@ -168,6 +172,16 @@ export function ConsumableDetailPanel({
               </h2>
               <span
                 className={cn(
+                  "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shadow-2xs",
+                  categoryMeta.bg,
+                  categoryMeta.text
+                )}
+              >
+                <Tag className="h-2.5 w-2.5 shrink-0" />
+                {categoryMeta.label}
+              </span>
+              <span
+                className={cn(
                   "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border",
                   displayItem.currentQty === 0
                     ? "bg-status-outofservice-bg/20 text-status-outofservice-text border-status-outofservice-bg/30"
@@ -183,8 +197,8 @@ export function ConsumableDetailPanel({
                   : "In Stock"}
               </span>
             </div>
-            <p className="text-xs text-text-secondary font-medium mt-0.5 truncate">
-              {displayItem.category.replace(/_/g, " ")} • <strong className="text-text font-semibold">{displayItem.name}</strong>
+            <p className="text-xs text-text-secondary font-medium mt-1 truncate">
+              <strong className="text-text font-semibold">{displayItem.name}</strong>
             </p>
           </div>
 

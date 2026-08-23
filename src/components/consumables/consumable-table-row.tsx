@@ -4,6 +4,7 @@ import { PlusCircle, SlidersHorizontal, Tag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ConsumableItem } from "@/types/inventory";
 import { StockLevelBar } from "./stock-level-bar";
+import { useCategoryStyleMap } from "@/features/categories/client/use-categories";
 
 export interface ConsumableTableRowProps {
   item: ConsumableItem;
@@ -18,6 +19,9 @@ export function ConsumableTableRow({
   onRestock,
   onAdjust,
 }: ConsumableTableRowProps) {
+  const { getCategoryStyle } = useCategoryStyleMap();
+  const categoryMeta = getCategoryStyle(item.category);
+
   return (
     <tr
       onClick={() => onSelect(item)}
@@ -48,9 +52,15 @@ export function ConsumableTableRow({
 
       {/* Category Tag */}
       <td className="px-3 py-3.5 whitespace-nowrap">
-        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider bg-bg-subtle text-text-secondary border border-border">
-          <Tag className="h-2.5 w-2.5" />
-          {item.category.replace("_", " ")}
+        <span
+          className={cn(
+            "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shadow-2xs",
+            categoryMeta.bg,
+            categoryMeta.text
+          )}
+        >
+          <Tag className="h-2.5 w-2.5 shrink-0" />
+          {categoryMeta.label}
         </span>
       </td>
 

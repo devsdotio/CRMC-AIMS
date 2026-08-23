@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { getCategoryStyle } from "@/constants/categories";
+import { useCategoryStyleMap } from "@/features/categories/client/use-categories";
 import { useBorrowerPortal } from "./context";
 import {
   PortalSummaryStats,
@@ -95,6 +95,7 @@ function DashStatCard({ label, value, subtext, icon: Icon, tone = "default", isL
 // ─── Active Borrow Card ────────────────────────────────────────────────────────
 
 function ActiveBorrowCard({ record }: { record: PortalBorrowLogRecord }) {
+  const { getCategoryStyle } = useCategoryStyleMap();
   const categoryMeta = getCategoryStyle(record.category);
   const isOverdue = record.status === "overdue";
   const daysLeft = record.dueDate ? calendarDaysUntil(record.dueDate) : null;

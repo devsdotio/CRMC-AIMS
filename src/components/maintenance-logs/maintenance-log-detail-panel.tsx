@@ -1,7 +1,6 @@
 "use client";
  
-import { getCategoryStyle } from "@/constants/categories";
-
+import { useCategoryStyleMap } from "@/features/categories/client/use-categories";
 import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { X, CheckCircle2,   Tag,   ExternalLink } from "lucide-react";
@@ -24,6 +23,7 @@ export function MaintenanceLogDetailPanel({
   onResolve,
 }: MaintenanceLogDetailPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const { getCategoryStyle } = useCategoryStyleMap();
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {

@@ -16,7 +16,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getCategoryStyle, CATEGORIES } from "@/constants/categories";
+import { useCategoriesQuery, useCategoryStyleMap } from "@/features/categories/client/use-categories";
 import { useConsumablesQuery } from "@/features/consumables/client/use-consumables";
 import { useUpdateBorrowRequestMutation } from "@/features/borrow-requests/client/use-borrow-requests";
 import { useUpdateConsumableRequestMutation } from "@/features/consumable-requests/client";
@@ -55,11 +55,20 @@ export function EditRequestDialog({
   const [supplyLines, setSupplyLines] = useState<any[]>([]);
 
   const { data: consumableData } = useConsumablesQuery({ limit: 100 });
-  const consumablesCatalog = useMemo(() => consumableData?.data ?? [], [consumableData]);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const { getCategoryStyle } = useCategoryStyleMap();
+  const { data: dbCategories = [] } = useCategoriesQuery();
+  const assetCategories = useMemo(
+    () => dbCategories.filter((c) => c.type === "asset" || !c.type),
+    [dbCategories]
+  );
 
   const updateBorrowMutation = useUpdateBorrowRequestMutation();
   const updateSupplyMutation = useUpdateConsumableRequestMutation();
   const toast = useToast();
+
+  const consumablesCatalog = useMemo(() => consumableData?.data ?? [], [consumableData]);
 
   const isSupply = useMemo(() => {
     if (!request) return false;
@@ -511,8 +520,8 @@ export function EditRequestDialog({
                               }}
                               className="w-full h-8 px-2 text-xs bg-bg-subtle border border-border rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent capitalize cursor-pointer"
                             >
-                              {CATEGORIES.map((c) => (
-                                <option key={c.id} value={c.id}>
+                              {assetCategories.map((c) => (
+                                <option key={c.id} value={c.name}>
                                   {c.name}
                                 </option>
                               ))}
