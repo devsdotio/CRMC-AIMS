@@ -107,6 +107,7 @@ export const listAssetsQuerySchema = z.object({
   modelId: z.string().uuid().optional(),
   category: categoryLabelSchema.optional(),
   search: z.string().trim().max(200).optional(),
+  assignmentType: assetAssignmentTypeSchema.optional(),
   availableOnly: z
     .union([z.boolean(), z.enum(["true", "false", "1", "0"])])
     .optional()

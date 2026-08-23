@@ -33,12 +33,6 @@ const REQUEST_QUEUE_DOMAINS = [
   "auditLogs",
 ] as const satisfies readonly CacheDomain[];
 
-/** Approving also reserves the requested assets server-side. */
-const REQUEST_APPROVAL_DOMAINS = [
-  ...REQUEST_QUEUE_DOMAINS,
-  "assets",
-] as const satisfies readonly CacheDomain[];
-
 type CacheSnapshot = [readonly unknown[], unknown][];
 
 /** Captures request caches so a failed optimistic status flip can be undone. */
@@ -222,7 +216,7 @@ export function useApproveBorrowRequestMutation(): UseMutationResult<
       });
     },
     onSettled: () => {
-      void invalidateDomains(qc, REQUEST_APPROVAL_DOMAINS);
+      void invalidateDomains(qc, REQUEST_QUEUE_DOMAINS);
     },
   });
 }

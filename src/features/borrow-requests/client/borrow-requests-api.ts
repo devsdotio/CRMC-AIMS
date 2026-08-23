@@ -26,13 +26,21 @@ export type CreateBorrowRequestPayload = {
 
 export type ApproveBorrowRequestPayload = {
   note?: string;
-  assetId?: string;
-  assetCode?: string;
+  items?: {
+    itemDescription: string;
+    category: BorrowRequest["items"][number]["category"];
+    quantity: number;
+    itemType: "asset";
+  }[];
 };
 
 export type ReleaseBorrowRequestPayload = {
   pickedUpBy: string;
   note?: string;
+  lineAllocations: {
+    lineIndex: number;
+    assetIds: string[];
+  }[];
 };
 
 export type UpdateBorrowRequestPayload = {

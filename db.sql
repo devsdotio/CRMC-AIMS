@@ -9,7 +9,6 @@ CREATE TABLE public.assets (
   serial_number text,
   location text NOT NULL,
   current_holder text,
-  reserved_for_request_id uuid,
   department text,
   purchase_date date,
   value numeric,
@@ -22,8 +21,10 @@ CREATE TABLE public.assets (
   assignment_type USER - DEFINED NOT NULL DEFAULT 'borrowable'::asset_assignment_type,
   supplier_id uuid,
   model_id uuid,
+  reserved_for_request_id uuid,
   CONSTRAINT assets_pkey PRIMARY KEY (id),
-  CONSTRAINT assets_model_id_asset_models_id_fk FOREIGN KEY (model_id) REFERENCES public.asset_models(id)
+  CONSTRAINT assets_model_id_asset_models_id_fk FOREIGN KEY (model_id) REFERENCES public.asset_models(id),
+  CONSTRAINT assets_reserved_for_request_id_requests_id_fk FOREIGN KEY (reserved_for_request_id) REFERENCES public.requests(id)
 );
 CREATE TABLE public.categories (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -82,7 +83,9 @@ CREATE TABLE public.profiles (
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   last_active_at timestamp with time zone,
-  CONSTRAINT profiles_pkey PRIMARY KEY (user_id)
+  department_id uuid,
+  CONSTRAINT profiles_pkey PRIMARY KEY (user_id),
+  CONSTRAINT profiles_department_id_departments_id_fk FOREIGN KEY (department_id) REFERENCES public.departments(id)
 );
 CREATE TABLE public.requests (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -93,7 +96,7 @@ CREATE TABLE public.requests (
   requester_phone text NOT NULL DEFAULT ''::text,
   department text NOT NULL,
   purpose text NOT NULL,
-  expected_return_date date NOT NULL,
+  expected_return_date date,
   status USER - DEFINED NOT NULL DEFAULT 'pending'::borrow_request_status,
   notes text,
   rejection_reason text,
@@ -103,7 +106,11 @@ CREATE TABLE public.requests (
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   picked_up_by text,
   items jsonb NOT NULL DEFAULT '[]'::jsonb,
-  CONSTRAINT requests_pkey PRIMARY KEY (id)
+  request_type USER - DEFINED,
+  department_id uuid,
+  requested_by_name text,
+  CONSTRAINT requests_pkey PRIMARY KEY (id),
+  CONSTRAINT requests_department_id_departments_id_fk FOREIGN KEY (department_id) REFERENCES public.departments(id)
 );
 CREATE TABLE public.borrow_transactions (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -120,7 +127,7 @@ CREATE TABLE public.borrow_transactions (
   borrower_phone text NOT NULL DEFAULT ''::text,
   department text NOT NULL,
   released_at timestamp with time zone NOT NULL DEFAULT now(),
-  due_date date NOT NULL,
+  due_date date,
   returned_at timestamp with time zone,
   status USER - DEFINED NOT NULL DEFAULT 'active'::borrow_transaction_status,
   condition_on_return USER - DEFINED,
@@ -132,9 +139,16 @@ CREATE TABLE public.borrow_transactions (
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   history jsonb NOT NULL DEFAULT '[]'::jsonb,
+  custody_kind USER - DEFINED NOT NULL DEFAULT 'borrow'::custody_kind,
+  department_id uuid,
+  project_id uuid,
+  source USER - DEFINED NOT NULL DEFAULT 'portal'::custody_source,
+  requested_by_name text,
   CONSTRAINT borrow_transactions_pkey PRIMARY KEY (id),
   CONSTRAINT borrow_transactions_asset_id_assets_id_fk FOREIGN KEY (asset_id) REFERENCES public.assets(id),
-  CONSTRAINT borrow_transactions_request_id_requests_id_fk FOREIGN KEY (request_id) REFERENCES public.requests(id)
+  CONSTRAINT borrow_transactions_request_id_requests_id_fk FOREIGN KEY (request_id) REFERENCES public.requests(id),
+  CONSTRAINT borrow_transactions_department_id_departments_id_fk FOREIGN KEY (department_id) REFERENCES public.departments(id),
+  CONSTRAINT borrow_transactions_project_id_projects_id_fk FOREIGN KEY (project_id) REFERENCES public.projects(id)
 );
 CREATE TABLE public.consumables (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -143,7 +157,6 @@ CREATE TABLE public.consumables (
   category text NOT NULL,
   unit text NOT NULL,
   current_qty integer NOT NULL DEFAULT 0,
-  reserved_qty integer NOT NULL DEFAULT 0,
   min_threshold integer NOT NULL DEFAULT 0,
   location text NOT NULL,
   supplier text,
@@ -152,6 +165,7 @@ CREATE TABLE public.consumables (
   history jsonb NOT NULL DEFAULT '[]'::jsonb,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  reserved_qty integer NOT NULL DEFAULT 0,
   CONSTRAINT consumables_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.maintenance_logs (
@@ -334,7 +348,13 @@ CREATE TABLE public.consumable_requests (
   requested_at timestamp with time zone NOT NULL DEFAULT now(),
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT consumable_requests_pkey PRIMARY KEY (id)
+  department_id uuid,
+  project_id uuid,
+  source USER - DEFINED NOT NULL DEFAULT 'portal'::consumable_request_source,
+  requested_by_name text,
+  CONSTRAINT consumable_requests_pkey PRIMARY KEY (id),
+  CONSTRAINT consumable_requests_department_id_departments_id_fk FOREIGN KEY (department_id) REFERENCES public.departments(id),
+  CONSTRAINT consumable_requests_project_id_projects_id_fk FOREIGN KEY (project_id) REFERENCES public.projects(id)
 );
 CREATE TABLE public.consumable_request_lines (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -374,4 +394,29 @@ CREATE TABLE public.consumable_request_release_allocations (
   CONSTRAINT consumable_request_release_allocations_line_id_fk FOREIGN KEY (request_line_id) REFERENCES public.consumable_request_lines(id),
   CONSTRAINT consumable_request_release_allocations_consumable_id_fk FOREIGN KEY (consumable_id) REFERENCES public.consumables(id),
   CONSTRAINT consumable_request_release_allocations_lot_id_fk FOREIGN KEY (purchase_lot_id) REFERENCES public.purchase_lots(id)
+);
+CREATE TABLE public.stock_movements (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  movement_code text NOT NULL,
+  consumable_id uuid NOT NULL,
+  qty integer NOT NULL,
+  direction USER - DEFINED NOT NULL,
+  reason USER - DEFINED NOT NULL,
+  department_id uuid,
+  project_id uuid,
+  purchase_lot_id uuid,
+  lot_code text,
+  unit_cost numeric,
+  line_total numeric,
+  request_id uuid,
+  notes text,
+  actor_user_id uuid NOT NULL,
+  actor_name text NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT stock_movements_pkey PRIMARY KEY (id),
+  CONSTRAINT stock_movements_consumable_id_consumables_id_fk FOREIGN KEY (consumable_id) REFERENCES public.consumables(id),
+  CONSTRAINT stock_movements_department_id_departments_id_fk FOREIGN KEY (department_id) REFERENCES public.departments(id),
+  CONSTRAINT stock_movements_project_id_projects_id_fk FOREIGN KEY (project_id) REFERENCES public.projects(id),
+  CONSTRAINT stock_movements_purchase_lot_id_purchase_lots_id_fk FOREIGN KEY (purchase_lot_id) REFERENCES public.purchase_lots(id),
+  CONSTRAINT stock_movements_request_id_consumable_requests_id_fk FOREIGN KEY (request_id) REFERENCES public.consumable_requests(id)
 );

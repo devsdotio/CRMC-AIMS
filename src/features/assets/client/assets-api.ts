@@ -91,6 +91,7 @@ export const assetsApi = {
       category?: string;
       search?: string;
       availableOnly?: boolean;
+      assignmentType?: "borrowable" | "assignable";
     }
   ): Promise<Asset[]> {
     const searchParams = new URLSearchParams();
@@ -102,6 +103,7 @@ export const assetsApi = {
     if (filters?.category) searchParams.set("category", filters.category);
     if (filters?.search) searchParams.set("search", filters.search);
     if (filters?.availableOnly) searchParams.set("availableOnly", "true");
+    if (filters?.assignmentType) searchParams.set("assignmentType", filters.assignmentType);
 
     const queryString = searchParams.toString();
     const path =

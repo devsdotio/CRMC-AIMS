@@ -64,10 +64,17 @@ export const createBorrowRequestSchema = z.object({
   }
 });
 
+const borrowRequestAssetItemSchema = z.object({
+  itemDescription: z.string().trim().min(1).max(500),
+  category: assetCategorySchema,
+  quantity: z.number().int().min(1).max(999),
+  itemType: z.literal("asset"),
+});
+
 export const approveBorrowRequestSchema = z.object({
   note: z.string().trim().max(1000).optional(),
-  assetId: z.string().uuid().optional(),
-  assetCode: z.string().trim().max(64).optional(),
+  /** Optional quantity adjustments applied at approval (category lines only). */
+  items: z.array(borrowRequestAssetItemSchema).min(1).optional(),
 });
 
 export const rejectBorrowRequestSchema = z.object({
@@ -77,6 +84,15 @@ export const rejectBorrowRequestSchema = z.object({
 export const releaseBorrowRequestSchema = z.object({
   note: z.string().trim().max(1000).optional(),
   pickedUpBy: z.string().trim().min(1, "Name of person who picked up the item is required.").max(255),
+  /** Admin-selected physical units to issue, one entry per request line. */
+  lineAllocations: z
+    .array(
+      z.object({
+        lineIndex: z.number().int().min(0),
+        assetIds: z.array(z.string().uuid()).min(1),
+      })
+    )
+    .min(1, "Select at least one asset to issue."),
 });
 
 export const markUnreleasedBorrowRequestSchema = z.object({

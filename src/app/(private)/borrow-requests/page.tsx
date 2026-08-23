@@ -16,7 +16,10 @@ import type {
   TabFilter,
   BorrowRequestFilterState,
 } from "@/types/borrow-requests";
-import type { ReleaseBorrowRequestPayload } from "@/features/borrow-requests/client/borrow-requests-api";
+import type {
+  ApproveBorrowRequestPayload,
+  ReleaseBorrowRequestPayload,
+} from "@/features/borrow-requests/client/borrow-requests-api";
 import { BorrowRequestTabs } from "@/components/borrow-requests/borrow-request-tabs";
 import {
   RequestSearchAndDept,
@@ -278,16 +281,19 @@ function BorrowRequestsContent() {
   const handleConfirmAction = async (
     req: BorrowRequest,
     mode: "approve" | "reject",
-    reason?: string
+    payload?: { reason?: string; approve?: ApproveBorrowRequestPayload }
   ) => {
     try {
       if (mode === "approve") {
-        await approveMutation.mutateAsync({ id: req.id });
+        await approveMutation.mutateAsync({
+          id: req.id,
+          payload: payload?.approve,
+        });
         toast.success("Request approved successfully.");
       } else {
         await rejectMutation.mutateAsync({
           id: req.id,
-          reason: reason || "Rejected by Custodian",
+          reason: payload?.reason || "Rejected by Custodian",
         });
         toast.success("Request rejected.");
       }

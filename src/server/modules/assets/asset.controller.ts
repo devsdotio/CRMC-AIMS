@@ -26,6 +26,7 @@ export class AssetController {
         modelId: url.searchParams.get("modelId") ?? undefined,
         category: url.searchParams.get("category") ?? undefined,
         search: url.searchParams.get("search") ?? undefined,
+        assignmentType: url.searchParams.get("assignmentType") ?? undefined,
         availableOnly:
           url.searchParams.get("availableOnly") ?? undefined,
       });

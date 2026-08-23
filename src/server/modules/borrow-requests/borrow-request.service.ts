@@ -83,6 +83,51 @@ function historyEntry(
   };
 }
 
+type RequestAssetItem = BorrowRequestRow["items"][number];
+
+function normalizeCategoryOnlyItems(
+  items: RequestAssetItem[]
+): RequestAssetItem[] {
+  return items.map((item) => ({
+    itemDescription: item.itemDescription,
+    category: item.category,
+    quantity: item.quantity,
+    itemType: "asset" as const,
+  }));
+}
+
+function expandItemsWithIssuedAssets(
+  items: RequestAssetItem[],
+  allocations: { lineIndex: number; assetIds: string[] }[],
+  assetsById: Map<string, { assetCode: string; name: string }>
+): RequestAssetItem[] {
+  const expanded: RequestAssetItem[] = [];
+
+  for (let lineIndex = 0; lineIndex < items.length; lineIndex++) {
+    const item = items[lineIndex];
+    const allocation = allocations.find((a) => a.lineIndex === lineIndex);
+    if (!allocation) {
+      expanded.push(item);
+      continue;
+    }
+
+    for (const assetId of allocation.assetIds) {
+      const asset = assetsById.get(assetId);
+      if (!asset) continue;
+      expanded.push({
+        itemDescription: asset.name,
+        assetId,
+        assetCode: asset.assetCode,
+        category: item.category,
+        quantity: 1,
+        itemType: "asset",
+      });
+    }
+  }
+
+  return expanded;
+}
+
 export interface PaginatedMeta {
   total: number;
   page: number;
@@ -236,53 +281,40 @@ export class BorrowRequestService {
       throw new ConflictError("Only pending requests can be approved.");
     }
 
+    const nextItems = normalizeCategoryOnlyItems(
+      input.items ?? existing.items
+    );
+
+    const quantityChanged =
+      Boolean(input.items) &&
+      nextItems.some((item, idx) => {
+        const prior = existing.items[idx];
+        return !prior || prior.quantity !== item.quantity;
+      });
+
+    const approveNote = input.note?.trim();
+    const historyNote = quantityChanged
+      ? approveNote
+        ? `${approveNote} (quantities adjusted at approval)`
+        : "Quantities adjusted at approval"
+      : approveNote;
+
     const history = [
       ...(Array.isArray(existing.history) ? existing.history : []),
-      historyEntry("approved", actor.displayName, input.note),
+      historyEntry("approved", actor.displayName, historyNote),
     ];
 
     const updated = await withTransaction(async (tx) => {
-      for (const item of existing.items) {
-        if (!item.assetId) continue;
-        const asset = await this.assetRepo.findByIdForUpdate(item.assetId, tx);
-        if (!asset) throw new NotFoundError("Asset", item.assetId);
-        if (asset.status !== "active") {
-          throw new ConflictError(
-            `Cannot approve: Asset ${asset.assetCode} is not available (${asset.status.replace(/_/g, " ")}).`
-          );
-        }
-        if (asset.currentHolder) {
-          throw new ConflictError(
-            `Cannot approve: Asset ${asset.assetCode} is currently in custody (${asset.currentHolder}).`
-          );
-        }
-        if (asset.reservedForRequestId) {
-          throw new ConflictError(
-            `Cannot approve: Asset ${asset.assetCode} is already reserved for another request.`
-          );
-        }
-        if (existing.requestType === "borrowable" && asset.assignmentType !== "borrowable") {
-          throw new ConflictError(`Asset ${asset.assetCode} is not borrowable.`);
-        }
-        if (existing.requestType === "assignable" && asset.assignmentType !== "assignable") {
-          throw new ConflictError(`Asset ${asset.assetCode} is not assignable.`);
-        }
-      }
-
-      const up = await this.repo.update(id, {
-        status: "approved",
-        history,
-      }, tx);
+      const up = await this.repo.update(
+        id,
+        {
+          status: "approved",
+          items: nextItems,
+          history,
+        },
+        tx
+      );
       if (!up) throw new NotFoundError("Borrow request", id);
-
-      for (const item of existing.items) {
-        if (!item.assetId) continue;
-        await this.assetRepo.update(
-          item.assetId,
-          { reservedForRequestId: up.id, lastUpdated: new Date() },
-          tx
-        );
-      }
 
       await this.auditLogs.create({
         entityType: "borrow_request",
@@ -290,7 +322,7 @@ export class BorrowRequestService {
         action: "approved",
         actorName: actor.displayName,
         actorUserId: actor.userId,
-        notes: input.note,
+        notes: historyNote,
       }, tx);
 
       return up;
@@ -360,11 +392,77 @@ export class BorrowRequestService {
       );
     }
 
+    const requestType = existing.requestType ?? "borrowable";
+    const expectedAssignmentType =
+      requestType === "assignable" ? "assignable" : "borrowable";
+
+    if (input.lineAllocations.length !== existing.items.length) {
+      throw new BadRequestError(
+        "Provide asset selections for every requested line before releasing."
+      );
+    }
+
+    const seenAssetIds = new Set<string>();
+    const assetsById = new Map<
+      string,
+      Awaited<ReturnType<AssetRepository["findById"]>>
+    >();
+
+    for (const allocation of input.lineAllocations) {
+      const line = existing.items[allocation.lineIndex];
+      if (!line) {
+        throw new BadRequestError(
+          `Invalid line index ${allocation.lineIndex} in release allocation.`
+        );
+      }
+      if (allocation.assetIds.length !== line.quantity) {
+        throw new BadRequestError(
+          `Line "${line.itemDescription}" requires ${line.quantity} unit(s); ${allocation.assetIds.length} selected.`
+        );
+      }
+
+      for (const assetId of allocation.assetIds) {
+        if (seenAssetIds.has(assetId)) {
+          throw new ConflictError("Each asset can only be issued once per release.");
+        }
+        seenAssetIds.add(assetId);
+
+        const asset = await this.assetRepo.findById(assetId);
+        if (!asset) throw new NotFoundError("Asset", assetId);
+        if (asset.status !== "active") {
+          throw new ConflictError(
+            `Asset ${asset.assetCode} is not available (${asset.status.replace(/_/g, " ")}).`
+          );
+        }
+        if (asset.currentHolder) {
+          throw new ConflictError(
+            `Asset ${asset.assetCode} is currently in custody (${asset.currentHolder}).`
+          );
+        }
+        if (asset.reservedForRequestId) {
+          throw new ConflictError(
+            `Asset ${asset.assetCode} is reserved for another request.`
+          );
+        }
+        if (asset.assignmentType !== expectedAssignmentType) {
+          throw new ConflictError(
+            `Asset ${asset.assetCode} is not ${expectedAssignmentType}.`
+          );
+        }
+        if (asset.category !== line.category) {
+          throw new ConflictError(
+            `Asset ${asset.assetCode} is in category "${asset.category}", expected "${line.category}".`
+          );
+        }
+
+        assetsById.set(assetId, asset);
+      }
+    }
+
     const noteWithPicker = input.note
       ? `Released to: ${input.pickedUpBy}. ${input.note}`
       : `Released to: ${input.pickedUpBy}`;
 
-    const requestType = existing.requestType ?? "borrowable";
     const custodyKind = requestType === "assignable" ? "assignment" : "borrow";
 
     let departmentId = existing.departmentId ?? null;
@@ -380,14 +478,11 @@ export class BorrowRequestService {
       );
     }
 
-    // Open accountable custody log for assets first while request is still approved.
-    for (const item of existing.items) {
-      if (item.assetId) {
-        const asset = await this.assetRepo.findById(item.assetId);
-        if (!asset) throw new NotFoundError("Asset", item.assetId);
+    for (const allocation of input.lineAllocations) {
+      for (const assetId of allocation.assetIds) {
         await this.borrowLogs.release(
           {
-            assetId: item.assetId,
+            assetId,
             requestId: existing.id,
             custodyKind,
             source: "portal",
@@ -408,6 +503,17 @@ export class BorrowRequestService {
       }
     }
 
+    const issuedItems = expandItemsWithIssuedAssets(
+      existing.items,
+      input.lineAllocations,
+      new Map(
+        [...assetsById.entries()].map(([assetId, asset]) => [
+          assetId,
+          { assetCode: asset!.assetCode, name: asset!.name },
+        ])
+      )
+    );
+
     const history = [
       ...(Array.isArray(existing.history) ? existing.history : []),
       historyEntry("released", actor.displayName, noteWithPicker),
@@ -419,6 +525,7 @@ export class BorrowRequestService {
         {
           status: "released",
           pickedUpBy: input.pickedUpBy,
+          items: issuedItems,
           history,
         },
         tx
@@ -436,6 +543,7 @@ export class BorrowRequestService {
           metadata: {
             requestCode: existing.requestCode,
             pickedUpBy: input.pickedUpBy,
+            issuedAssetIds: [...seenAssetIds],
           },
         },
         tx

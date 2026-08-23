@@ -81,6 +81,9 @@ export class AssetRepository implements IAssetRepository {
     if (filters?.category?.trim()) {
       conditions.push(eq(assets.category, filters.category.trim()));
     }
+    if (filters?.assignmentType) {
+      conditions.push(eq(assets.assignmentType, filters.assignmentType));
+    }
     if (filters?.availableOnly) {
       conditions.push(eq(assets.status, "active"));
       conditions.push(isNull(assets.currentHolder));
