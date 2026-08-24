@@ -222,6 +222,7 @@ export function ProjectDetailPanel({
         projectId: project.id,
         payload: {
           consumableId: input.consumableId,
+          purchaseLotId: input.purchaseLotId,
           quantity: input.quantity,
           notes: input.notes || null,
         },

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Search, FilterX, ArrowUpDown, Tag, AlertCircle, ChevronDown, Check } from "lucide-react";
+import { Search, FilterX, ArrowUpDown, Tag, AlertCircle, ChevronDown, Check, PackageCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AssetFilterState, AssetStatus } from "@/types/assets";
 import { useCategoriesQuery } from "@/features/categories/client/use-categories";
@@ -127,7 +127,8 @@ export function AssetFilters({
   const activeCount =
     (filters.searchQuery ? 1 : 0) +
     filters.categories.length +
-    filters.statuses.length;
+    filters.statuses.length +
+    (filters.availability === "available" ? 1 : 0);
 
   const toggleCategory = (catId: string) => {
     const exists = filters.categories.includes(catId);
@@ -200,6 +201,25 @@ export function AssetFilters({
               selectedIds={filters.statuses}
               onToggle={(id) => toggleStatus(id as AssetStatus)}
             />
+
+            <button
+              type="button"
+              onClick={() =>
+                onFilterChange({
+                  availability:
+                    filters.availability === "available" ? "all" : "available",
+                })
+              }
+              className={cn(
+                "inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors",
+                filters.availability === "available"
+                  ? "border-accent/50 bg-accent/5 text-text"
+                  : "border-border bg-bg-subtle text-text-secondary hover:bg-border/60 hover:text-text"
+              )}
+            >
+              <PackageCheck className="h-3.5 w-3.5" />
+              Available only
+            </button>
           </div>
 
           <div className="w-px h-6 bg-border mx-1 hidden sm:block" />

@@ -20,6 +20,7 @@ import { QueryErrorBanner } from "@/components/shared/query-error-banner";
 import { OperatorReadOnlyBanner } from "@/components/shared/operator-read-only-banner";
 import { useToast } from "@/components/providers/toast-context";
 import { useAssetOperator } from "@/hooks/use-asset-operator";
+import { isAssetAvailableForRequest } from "@/lib/assets-custody";
 
 export default function AssetsPage() {
   const {
@@ -41,6 +42,7 @@ export default function AssetsPage() {
     searchQuery: "",
     categories: [],
     statuses: [],
+    availability: "all",
     sortBy: "name",
     sortOrder: "asc",
   });
@@ -76,6 +78,14 @@ export default function AssetsPage() {
         return false;
       }
 
+      // 4. Availability — not borrowed, assigned, or reserved
+      if (
+        filters.availability === "available" &&
+        !isAssetAvailableForRequest(asset)
+      ) {
+        return false;
+      }
+
       return true;
     });
 
@@ -103,6 +113,7 @@ export default function AssetsPage() {
       searchQuery: "",
       categories: [],
       statuses: [],
+      availability: "all",
       sortBy: "name",
       sortOrder: "asc",
     });

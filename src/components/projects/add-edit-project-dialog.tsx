@@ -15,6 +15,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { Project, ProjectStatus } from "@/types/projects";
 import { PROJECT_STATUS_LABELS } from "@/types/projects";
+import { useDepartmentsQuery } from "@/features/departments/client";
 
 export type ProjectFormInput = {
   name: string;
@@ -24,7 +25,6 @@ export type ProjectFormInput = {
   department: string;
   startDate: string;
   endDate: string;
-  budget: string;
   notes: string;
 };
 
@@ -44,7 +44,6 @@ function emptyForm(): ProjectFormInput {
     department: "",
     startDate: "",
     endDate: "",
-    budget: "",
     notes: "",
   };
 }
@@ -58,7 +57,6 @@ function fromProject(project: Project): ProjectFormInput {
     department: project.department ?? "",
     startDate: project.startDate ?? "",
     endDate: project.endDate ?? "",
-    budget: project.budget ?? "",
     notes: project.notes ?? "",
   };
 }
@@ -81,6 +79,7 @@ export function AddEditProjectDialog({
   const [form, setForm] = useState<ProjectFormInput>(emptyForm);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { data: departments = [] } = useDepartmentsQuery({ enabled: isOpen });
 
   useEffect(() => {
     if (!isOpen) return;
@@ -117,13 +116,6 @@ export function AddEditProjectDialog({
       setError("End date cannot be earlier than start date.");
       return;
     }
-    if (form.budget.trim()) {
-      const n = Number(form.budget);
-      if (!Number.isFinite(n) || n < 0) {
-        setError("Budget must be a non-negative number.");
-        return;
-      }
-    }
 
     setIsSubmitting(true);
     setError("");
@@ -135,7 +127,6 @@ export function AddEditProjectDialog({
         location: form.location.trim(),
         department: form.department.trim(),
         notes: form.notes.trim(),
-        budget: form.budget.trim(),
       });
       onClose();
     } catch (err) {
@@ -262,63 +253,47 @@ export function AddEditProjectDialog({
             </div>
           </div>
 
-          {/* Budget & Location */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="project-budget" className={labelClass}>
-                Budget (₱, optional)
-              </label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-xs font-bold text-text-secondary">
-                  ₱
-                </span>
-                <input
-                  id="project-budget"
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={form.budget}
-                  onChange={(e) => handleChange("budget", e.target.value)}
-                  className={cn(fieldClass, "pl-7 font-mono tabular-nums")}
-                  placeholder="0.00"
-                />
-              </div>
-            </div>
-            <div>
-              <label htmlFor="project-location" className={labelClass}>
-                Location
-              </label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-text-secondary">
-                  <MapPin className="h-3.5 w-3.5" />
-                </span>
-                <input
-                  id="project-location"
-                  value={form.location}
-                  onChange={(e) => handleChange("location", e.target.value)}
-                  className={cn(fieldClass, "pl-8.5")}
-                  placeholder="Building / Room"
-                />
-              </div>
+          {/* Location */}
+          <div>
+            <label htmlFor="project-location" className={labelClass}>
+              Location
+            </label>
+            <div className="relative">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-text-secondary">
+                <MapPin className="h-3.5 w-3.5" />
+              </span>
+              <input
+                id="project-location"
+                value={form.location}
+                onChange={(e) => handleChange("location", e.target.value)}
+                className={cn(fieldClass, "pl-8.5")}
+                placeholder="Building / Room"
+              />
             </div>
           </div>
 
-          {/* Department */}
+          {/* Department (optional, from settings registry) */}
           <div>
             <label htmlFor="project-department" className={labelClass}>
-              Department
+              Department <span className="font-normal text-text-secondary">(optional)</span>
             </label>
             <div className="relative">
               <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-text-secondary">
                 <Building2 className="h-3.5 w-3.5" />
               </span>
-              <input
+              <select
                 id="project-department"
                 value={form.department}
                 onChange={(e) => handleChange("department", e.target.value)}
-                className={cn(fieldClass, "pl-8.5")}
-                placeholder="e.g. IT Department, Facilities"
-              />
+                className={cn(fieldClass, "pl-8.5 cursor-pointer")}
+              >
+                <option value="">No department</option>
+                {departments.map((dept) => (
+                  <option key={dept.id} value={dept.name}>
+                    {dept.code} — {dept.name}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 

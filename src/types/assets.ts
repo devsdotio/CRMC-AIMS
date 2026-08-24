@@ -44,6 +44,8 @@ export interface Asset {
 export interface AssetFilterState extends BaseFilterState {
   categories: AssetCategory[];
   statuses: AssetStatus[];
+  /** When "available", only units not in custody and not reserved. */
+  availability: "all" | "available";
   sortBy: "name" | "code" | "date";
   sortOrder: "asc" | "desc";
 }

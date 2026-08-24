@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 
 import { requireAssetOperator, requireActor } from "@/server/shared/auth";
+import { BadRequestError } from "@/server/shared/errors";
 import { created, handleError, ok } from "@/server/shared/http";
 
 import { ConsumableService } from "./consumable.service";
@@ -84,7 +85,13 @@ export class ConsumableController {
   async issue(request: NextRequest | Request, id: string) {
     try {
       const session = await requireAssetOperator();
-      const body = await request.json();
+      let body: unknown = {};
+      try {
+        const text = await request.text();
+        body = text.trim() ? JSON.parse(text) : {};
+      } catch {
+        throw new BadRequestError("Invalid JSON body for issue request.");
+      }
       return ok(await this.service.issue(id, body, session.actor));
     } catch (error) {
       return handleError(error);

@@ -20,6 +20,8 @@ import { scanReleaseLotSchema } from "@/server/modules/purchase-lots/purchase-lo
 import { CategoryRepository } from "@/server/modules/categories/category.repository";
 import { DepartmentRepository } from "@/server/modules/departments/department.repository";
 import { ProjectRepository } from "@/server/modules/projects/project.repository";
+import { ProjectExpenseRepository } from "@/server/modules/projects/project-expense.repository";
+import type { ProjectExpenseMetadata } from "@/server/db/schema";
 import {
   StockMovementService,
   allocationsToMovementLines,
@@ -113,6 +115,7 @@ export class ConsumableService {
     private readonly taxonomy = new CategoryRepository(),
     private readonly departments = new DepartmentRepository(),
     private readonly projects = new ProjectRepository(),
+    private readonly projectExpenses = new ProjectExpenseRepository(),
     private readonly movements = new StockMovementService()
   ) {}
 
@@ -120,7 +123,14 @@ export class ConsumableService {
     departmentId: string | undefined,
     projectId: string | undefined,
     tx?: DbSession
-  ): Promise<{ departmentId: string | null; projectId: string | null }> {
+  ): Promise<{
+    departmentId: string | null;
+    projectId: string | null;
+    projectCode?: string;
+    projectName?: string;
+    departmentCode?: string;
+    departmentName?: string;
+  }> {
     if (departmentId && projectId) {
       throw new BadRequestError(
         "Specify exactly one destination: department or project."
@@ -129,12 +139,27 @@ export class ConsumableService {
     if (projectId) {
       const project = await this.projects.findById(projectId, tx);
       if (!project) throw new NotFoundError("Project", projectId);
-      return { departmentId: null, projectId };
+      if (project.status === "completed") {
+        throw new ConflictError(
+          "Completed projects are read-only. Issue materials to an active project instead."
+        );
+      }
+      return {
+        departmentId: null,
+        projectId,
+        projectCode: project.projectCode,
+        projectName: project.name,
+      };
     }
     if (departmentId) {
       const dept = await this.departments.findById(departmentId, tx);
       if (!dept) throw new NotFoundError("Department", departmentId);
-      return { departmentId, projectId: null };
+      return {
+        departmentId,
+        projectId: null,
+        departmentCode: dept.code,
+        departmentName: dept.name,
+      };
     }
     throw new BadRequestError(
       "Specify exactly one destination: department or project."
@@ -689,6 +714,8 @@ export class ConsumableService {
   /**
    * Admin walk-up issue: dest required, stock deducted immediately.
    * Same engine as checkout / lot scan — never a pending request.
+   * When destination is a project, also writes a consumable expense line
+   * so the charge appears on the project ledger.
    */
   async issue(
     rawId: string,
@@ -704,7 +731,7 @@ export class ConsumableService {
 
       if (existing.currentQty < input.quantity) {
         throw new BadRequestError(
-          `Not on hand for ${existing.itemCode}. Available: ${existing.currentQty} ${existing.unit}. Restock first. Purchase orders will be added later.`
+          `Not on hand for ${existing.itemCode}. Available: ${existing.currentQty} ${existing.unit}. Restock first.`
         );
       }
       const freeQty = availableQty(existing);
@@ -720,7 +747,6 @@ export class ConsumableService {
         tx
       );
 
-      let allocations: LotCostAllocation[] = [];
       if (!input.lotId && !input.lotCode) {
         throw new BadRequestError("Select a purchase lot to issue from.");
       }
@@ -737,12 +763,17 @@ export class ConsumableService {
             tx,
             existing.id
           );
-      allocations = [result.allocation];
+      const allocations: LotCostAllocation[] = [result.allocation];
 
       const totalCost = allocations.reduce((sum, a) => sum + Number(a.total), 0);
       const primary = allocations[0];
       const destNote = [
         input.reason,
+        dest.projectCode
+          ? `Issued to project ${dest.projectCode}${dest.projectName ? ` (${dest.projectName})` : ""}`
+          : dest.departmentCode
+            ? `Issued to department ${dest.departmentCode}${dest.departmentName ? ` (${dest.departmentName})` : ""}`
+            : null,
         input.requestedByName ? `Requested by: ${input.requestedByName}` : null,
         input.receivedBy ? `Received by: ${input.receivedBy}` : null,
       ]
@@ -792,6 +823,47 @@ export class ConsumableService {
         },
         tx
       );
+
+      // Mirror project "Use inventory material" so the charge shows on the project.
+      if (dest.projectId) {
+        const averageUnit =
+          input.quantity > 0
+            ? (totalCost / input.quantity).toFixed(2)
+            : "0.00";
+        const metadata: ProjectExpenseMetadata = {
+          lotAllocations: allocations.map((a) => ({
+            lotId: a.lotId,
+            lotCode: a.lotCode,
+            quantity: a.quantity,
+            unitCost: a.unitCost,
+            total: a.total,
+            uncosted: a.uncosted,
+          })),
+          consumableCode: existing.itemCode,
+          consumableName: existing.name,
+          consumableUnit: existing.unit,
+        };
+
+        await this.projectExpenses.create(
+          {
+            projectId: dest.projectId,
+            lineType: "consumable",
+            category: "miscellaneous",
+            description: `${existing.name} (${existing.itemCode}) × ${input.quantity} ${existing.unit}`,
+            amount: totalCost.toFixed(2),
+            quantity: String(input.quantity),
+            unitCost: averageUnit,
+            consumableId: existing.id,
+            assetId: null,
+            incurredOn: todayDateString(),
+            notes: input.notes ?? destNote ?? null,
+            metadata,
+            recordedByUserId: actor.userId,
+            recordedByName: actor.displayName,
+          },
+          tx
+        );
+      }
 
       return toDTO(updated);
     });

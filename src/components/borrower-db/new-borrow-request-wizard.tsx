@@ -36,6 +36,8 @@ import type { BrowseItem, WizardFormValues, RequestWizardStep, PortalBorrowReque
 import { useCategoriesQuery } from "@/features/categories/client/use-categories";
 import { useCreateBorrowRequestMutation } from "@/features/borrow-requests/client/use-borrow-requests";
 import { useCreateConsumableRequestMutation } from "@/features/consumable-requests/client";
+import { useConsumablesQuery } from "@/features/consumables/client/use-consumables";
+import { availableQty } from "@/components/consumables/utils";
 import { useMeQuery } from "@/features/users/client/use-users";
 import type { MeProfile } from "@/features/users/client/users-api";
 import { LoadingState } from "@/components/providers/loading-context";
@@ -84,8 +86,16 @@ const STEPS: { key: RequestWizardStep; label: string; stepNumber: number }[] = [
   { key: "review", label: "Review & Submit", stepNumber: 4 },
 ];
 
-function MilestoneStepIndicator({ current }: { current: RequestWizardStep }) {
+function MilestoneStepIndicator({
+  current,
+  requestType,
+}: {
+  current: RequestWizardStep;
+  requestType?: WizardFormValues["requestType"];
+}) {
   const currentIdx = STEPS.findIndex((s) => s.key === current);
+  const selectLabel =
+    requestType === "consumable" ? "Select Supplies" : "Select Category";
 
   return (
     <nav aria-label="Request Progress" className="w-full">
@@ -138,7 +148,7 @@ function MilestoneStepIndicator({ current }: { current: RequestWizardStep }) {
                         : "font-medium text-text-secondary"
                     )}
                   >
-                    {step.label}
+                    {step.key === "select" ? selectLabel : step.label}
                   </p>
                 </div>
               </div>
@@ -646,6 +656,178 @@ function StepSelect({
                   <p className="text-xs text-text-secondary/80 leading-relaxed line-clamp-2 flex-1">
                     {cat.description}
                   </p>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function StepSelectConsumables({
+  value,
+  onChange,
+}: {
+  value: BrowseItem[];
+  onChange: (items: BrowseItem[]) => void;
+}) {
+  const [search, setSearch] = useState("");
+  const { data: paginatedData, isLoading } = useConsumablesQuery({ limit: 100 });
+  const consumables = paginatedData?.data ?? [];
+
+  const supplyItems = useMemo(() => {
+    return consumables
+      .map((c) => {
+        const free = c.availableQty ?? availableQty(c);
+        return {
+          id: c.id,
+          name: c.name,
+          category: c.category,
+          type: "consumable" as const,
+          status:
+            free <= 0
+              ? ("out_of_stock" as const)
+              : free <= c.minThreshold
+                ? ("low_stock" as const)
+                : ("available" as const),
+          itemCode: c.itemCode,
+          unit: c.unit,
+          currentQty: free,
+          location: c.location,
+        };
+      })
+      .filter((c) => c.status !== "out_of_stock");
+  }, [consumables]);
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return supplyItems;
+    const q = search.toLowerCase();
+    return supplyItems.filter(
+      (item) =>
+        item.name.toLowerCase().includes(q) ||
+        item.itemCode.toLowerCase().includes(q) ||
+        item.category.toLowerCase().includes(q)
+    );
+  }, [supplyItems, search]);
+
+  const toggleItem = (item: (typeof supplyItems)[number]) => {
+    const isSelected = value.some((v) => v.id === item.id);
+    if (isSelected) {
+      onChange(value.filter((v) => v.id !== item.id));
+    } else {
+      onChange([...value, item]);
+    }
+  };
+
+  return (
+    <div className="space-y-3.5 h-full flex flex-col min-h-0">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shrink-0">
+        <p className="text-xs font-semibold text-text">
+          Choose one or more supplies for this requisition:
+        </p>
+        <div className="relative w-full sm:w-64">
+          <label htmlFor="search-supplies" className="sr-only">
+            Search supplies
+          </label>
+          <Search
+            className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-secondary"
+            aria-hidden
+          />
+          <input
+            id="search-supplies"
+            type="search"
+            placeholder="Search by name or code…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full h-8.5 rounded-lg border border-border bg-card pl-8.5 pr-3 text-xs text-text placeholder:text-text-secondary/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          />
+        </div>
+      </div>
+
+      <div className="flex-1 min-h-60 overflow-y-auto pr-1">
+        {isLoading ? (
+          <LoadingState
+            variant="inline"
+            icon="package"
+            message="Loading supplies..."
+            subtitle="Fetching consumable inventory..."
+            className="py-12"
+          />
+        ) : filtered.length === 0 ? (
+          <div className="p-8 text-center my-auto rounded-xl border border-border bg-card">
+            <FlaskConical className="h-8 w-8 text-text-secondary/50 mx-auto mb-2" />
+            <p className="text-sm font-semibold text-text">No supplies found</p>
+            <p className="text-xs text-text-secondary mt-0.5">
+              Try a different search term or check back when stock is available.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {filtered.map((item) => {
+              const isSelected = value.some((v) => v.id === item.id);
+              const style = getCategoryStyle(item.category);
+
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => toggleItem(item)}
+                  className={cn(
+                    "flex flex-col text-left p-4 rounded-xl border transition-all duration-150 relative cursor-pointer group select-none",
+                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+                    isSelected
+                      ? "border-accent bg-accent/5 ring-1 ring-accent/30 shadow-2xs"
+                      : "border-border bg-card hover:bg-bg-subtle/70 hover:border-border"
+                  )}
+                  aria-pressed={isSelected}
+                >
+                  <div className="flex items-start justify-between gap-2.5 w-full mb-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div
+                        className={cn(
+                          "h-10 w-10 rounded-xl flex items-center justify-center shrink-0",
+                          style.bg,
+                          "text-white"
+                        )}
+                      >
+                        <FlaskConical className="h-5 w-5 text-white" />
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="text-sm font-bold text-text truncate">
+                          {item.name}
+                        </h4>
+                        <p className="text-[11px] font-mono text-text-secondary truncate mt-0.5">
+                          {item.itemCode}
+                        </p>
+                      </div>
+                    </div>
+                    <div
+                      className={cn(
+                        "h-5 w-5 rounded-full flex items-center justify-center shrink-0 border transition-all duration-150 mt-0.5",
+                        isSelected
+                          ? "bg-accent border-accent text-accent-foreground shadow-2xs"
+                          : "border-border bg-bg-subtle/80"
+                      )}
+                    >
+                      {isSelected && <Check className="h-3 w-3 stroke-3" />}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 text-[11px]">
+                    <span
+                      className={cn(
+                        "rounded px-1.5 py-px font-bold uppercase",
+                        style.bg,
+                        style.text
+                      )}
+                    >
+                      {style.label}
+                    </span>
+                    <span className="text-text-secondary font-medium">
+                      {item.currentQty} {item.unit} available
+                    </span>
+                  </div>
                 </button>
               );
             })}
@@ -1221,6 +1403,11 @@ export function NewBorrowRequestWizard({
       const hasAsset = items.some((item) => item.itemType === "asset");
 
       if (values.requestType === "consumable") {
+        const supplyLines = items.filter((item) => item.consumableId);
+        if (supplyLines.length === 0) {
+          setErrorMessage("Select at least one supply item before submitting.");
+          return;
+        }
         const created = await createConsumableRequest({
           requesterUserId: isValidUuid(me.id) ? me.id : undefined,
           requesterName: me.name,
@@ -1228,9 +1415,7 @@ export function NewBorrowRequestWizard({
           departmentId: me.departmentId,
           purpose: values.purpose,
           notes: values.notes || undefined,
-          lines: items
-            .filter((item) => item.consumableId)
-            .map((item) => ({
+          lines: supplyLines.map((item) => ({
               consumableId: item.consumableId!,
               quantity: item.quantity,
             })),
@@ -1365,7 +1550,7 @@ export function NewBorrowRequestWizard({
 
           {/* Milestone Stepper */}
           <div className="pt-1">
-            <MilestoneStepIndicator current={step} />
+            <MilestoneStepIndicator current={step} requestType={values.requestType} />
           </div>
         </div>
 
@@ -1379,14 +1564,20 @@ export function NewBorrowRequestWizard({
               }}
             />
           )}
-          {step === "select" && (
-            <StepSelect
-              value={values.selectedItems}
-              onChange={(items) => patchValues({ selectedItems: items })}
-              initialType={initialType}
-              requestType={values.requestType}
-            />
-          )}
+          {step === "select" &&
+            (values.requestType === "consumable" ? (
+              <StepSelectConsumables
+                value={values.selectedItems}
+                onChange={(items) => patchValues({ selectedItems: items })}
+              />
+            ) : (
+              <StepSelect
+                value={values.selectedItems}
+                onChange={(items) => patchValues({ selectedItems: items })}
+                initialType={initialType}
+                requestType={values.requestType}
+              />
+            ))}
           {step === "details" && values.selectedItems.length > 0 && (
             <StepDetails
               items={values.selectedItems}

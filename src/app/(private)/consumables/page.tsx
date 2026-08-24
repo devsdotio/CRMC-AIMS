@@ -74,6 +74,7 @@ export default function ConsumablesPage() {
   }>({ isOpen: false, item: null });
   const [issueItem, setIssueItem] = useState<ConsumableItem | null>(null);
   const [issueLotId, setIssueLotId] = useState<string | undefined>(undefined);
+  const [issueOpen, setIssueOpen] = useState(false);
 
   // Suppliers only matter for Restock dialog (add/edit loads its own registry list).
   const { data: suppliers = [] } = useSuppliersQuery({
@@ -265,8 +266,8 @@ export default function ConsumablesPage() {
             type="button"
             onClick={() => {
               setIssueLotId(undefined);
-              if (selectedItem) setIssueItem(selectedItem);
-              else if (filteredItems[0]) setIssueItem(filteredItems[0]);
+              setIssueItem(selectedItem);
+              setIssueOpen(true);
             }}
             className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-border bg-bg text-text hover:border-primary transition-colors cursor-pointer"
           >
@@ -376,6 +377,7 @@ export default function ConsumablesPage() {
             ? (item, lot) => {
                 setIssueLotId(lot?.id);
                 setIssueItem(item);
+                setIssueOpen(true);
               }
             : undefined
         }
@@ -413,9 +415,11 @@ export default function ConsumablesPage() {
 
       <IssueConsumableDialog
         item={issueItem}
-        isOpen={Boolean(issueItem)}
+        allItems={items}
+        isOpen={issueOpen}
         initialLotId={issueLotId}
         onClose={() => {
+          setIssueOpen(false);
           setIssueItem(null);
           setIssueLotId(undefined);
         }}

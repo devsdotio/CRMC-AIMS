@@ -175,44 +175,77 @@ export class ProjectExpenseService {
         ProjectExpenseMetadata["lotAllocations"]
       > = [];
 
-      const availableLots = await this.lots.listAvailableForConsumableFifo(
-        item.id,
-        tx
-      );
-
-      for (const lot of availableLots) {
-        if (remaining <= 0) break;
-        const take = Math.min(remaining, lot.quantityRemaining);
-        if (take <= 0) continue;
+      if (input.purchaseLotId) {
+        const lot = await this.lots.findById(input.purchaseLotId, tx);
+        if (!lot) throw new NotFoundError("Purchase lot", input.purchaseLotId);
+        if (lot.consumableId !== item.id) {
+          throw new BadRequestError(
+            "Selected purchase lot does not belong to this consumable."
+          );
+        }
+        if (lot.quantityRemaining < input.quantity) {
+          throw new BadRequestError(
+            `Selected lot only has ${lot.quantityRemaining} ${item.unit} remaining.`
+          );
+        }
 
         const unit = Number(lot.unitCost);
-        const lineTotal = unit * take;
-        totalCost += lineTotal;
+        const lineTotal = unit * input.quantity;
+        totalCost = lineTotal;
         lotAllocations.push({
           lotId: lot.id,
           lotCode: lot.lotCode,
-          quantity: take,
+          quantity: input.quantity,
           unitCost: unit.toFixed(2),
           total: lineTotal.toFixed(2),
         });
 
         await this.lots.updateRemaining(
           lot.id,
-          lot.quantityRemaining - take,
+          lot.quantityRemaining - input.quantity,
           tx
         );
-        remaining -= take;
-      }
+        remaining = 0;
+      } else {
+        const availableLots = await this.lots.listAvailableForConsumableFifo(
+          item.id,
+          tx
+        );
 
-      if (remaining > 0) {
-        lotAllocations.push({
-          lotId: null,
-          lotCode: null,
-          quantity: remaining,
-          unitCost: "0.00",
-          total: "0.00",
-          uncosted: true,
-        });
+        for (const lot of availableLots) {
+          if (remaining <= 0) break;
+          const take = Math.min(remaining, lot.quantityRemaining);
+          if (take <= 0) continue;
+
+          const unit = Number(lot.unitCost);
+          const lineTotal = unit * take;
+          totalCost += lineTotal;
+          lotAllocations.push({
+            lotId: lot.id,
+            lotCode: lot.lotCode,
+            quantity: take,
+            unitCost: unit.toFixed(2),
+            total: lineTotal.toFixed(2),
+          });
+
+          await this.lots.updateRemaining(
+            lot.id,
+            lot.quantityRemaining - take,
+            tx
+          );
+          remaining -= take;
+        }
+
+        if (remaining > 0) {
+          lotAllocations.push({
+            lotId: null,
+            lotCode: null,
+            quantity: remaining,
+            unitCost: "0.00",
+            total: "0.00",
+            uncosted: true,
+          });
+        }
       }
 
       const averageUnit =

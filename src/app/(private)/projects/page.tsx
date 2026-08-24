@@ -104,7 +104,6 @@ export default function ProjectsPage() {
       department: input.department || null,
       startDate: input.startDate || null,
       endDate: input.endDate || null,
-      budget: input.budget || null,
       notes: input.notes || null,
     };
 
@@ -162,8 +161,7 @@ export default function ProjectsPage() {
             </span>
           </div>
           <p className="text-xs text-text-secondary mt-0.5">
-            Track custodian-supported work units and their budgets. Materials,
-            expenses, and asset assignments follow in later phases.
+            Track work units, charge materials from inventory, assign assets, and log expenses.
           </p>
         </div>
 
