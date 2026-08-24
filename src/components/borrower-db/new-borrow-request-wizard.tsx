@@ -675,7 +675,10 @@ function StepSelectConsumables({
 }) {
   const [search, setSearch] = useState("");
   const { data: paginatedData, isLoading } = useConsumablesQuery({ limit: 100 });
-  const consumables = paginatedData?.data ?? [];
+  const consumables = useMemo(
+    () => paginatedData?.data ?? [],
+    [paginatedData?.data]
+  );
 
   const supplyItems = useMemo(() => {
     return consumables

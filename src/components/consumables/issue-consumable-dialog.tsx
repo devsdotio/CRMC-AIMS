@@ -143,15 +143,15 @@ export function IssueConsumableDialog({
 
   // When supply changes (user picker), clear lot unless initialLot matches
   useEffect(() => {
-    if (!isOpen || !selectedItem) return;
-    if (initialLotId && lockedItem?.id === selectedItem.id) return;
+    if (!isOpen || !selectedItemId) return;
+    if (initialLotId && lockedItem?.id === selectedItemId) return;
     setLotId("");
     setQuantity(1);
-  }, [selectedItem?.id]);
+  }, [isOpen, selectedItemId, initialLotId, lockedItem?.id]);
 
   // Prefill first available lot when lots load
   useEffect(() => {
-    if (!isOpen || !selectedItem) return;
+    if (!isOpen || !selectedItemId) return;
     if (lotId && availableLots.some((l) => l.id === lotId)) return;
     if (initialLotId && availableLots.some((l) => l.id === initialLotId)) {
       setLotId(initialLotId);
@@ -160,7 +160,7 @@ export function IssueConsumableDialog({
     if (availableLots.length > 0) {
       setLotId(availableLots[0].id);
     }
-  }, [availableLots, isOpen, selectedItem?.id, initialLotId, lotId]);
+  }, [availableLots, isOpen, selectedItemId, initialLotId, lotId]);
 
   useEffect(() => {
     if (!isOpen) return;

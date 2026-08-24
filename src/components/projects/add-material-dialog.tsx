@@ -95,10 +95,10 @@ export function AddMaterialDialog({
   }, [isOpen, available]);
 
   useEffect(() => {
-    if (!isOpen || !selected) return;
+    if (!isOpen || !consumableId) return;
     setPurchaseLotId("");
     setQuantity(1);
-  }, [isOpen, selected?.id]);
+  }, [isOpen, consumableId]);
 
   useEffect(() => {
     if (!purchaseLotId && availableLots.length > 0) {
