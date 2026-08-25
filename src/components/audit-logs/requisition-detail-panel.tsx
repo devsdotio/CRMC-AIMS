@@ -236,66 +236,6 @@ export function RequisitionDetailPanel({
               <History className="h-3.5 w-3.5" />
               Action History
             </h3>
-            <div className="p-4 rounded-lg border border-border bg-bg">
-              <ol className="relative border-l-2 border-border/60 ml-3 space-y-6">
-                {[...request.history].reverse().map((h) => {
-                  const hStyle = getActionStyle(h.action);
-                  const icon = getActionIcon(h.action);
-                  const { picker, description } = parseAuditNote(h.action, h.note);
-                  const isRejected = h.action === "rejected" || h.action === "cancelled";
-
-                  return (
-                    <li key={h.id} className="pl-6 relative">
-                      <span
-                        className={cn(
-                          "absolute -left-3.25 top-1.5 h-6 w-6 rounded-full border-2 flex items-center justify-center bg-bg shadow-sm z-10",
-                          hStyle.bg,
-                          hStyle.iconText || hStyle.text
-                        )}
-                      >
-                        {icon}
-                      </span>
-                      <div className="flex flex-col gap-0.5 pt-1.5">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className={cn("font-bold capitalize", hStyle.text)}>
-                            {hStyle.label}
-                          </span>
-                          <time className="text-[11px] text-text-secondary font-medium">
-                            {formatDateTime(h.timestamp)}
-                          </time>
-                        </div>
-                        <p className="text-xs text-text-secondary font-medium">By {h.actor}</p>
-                      </div>
-
-                      {(picker || description) && (
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {picker && (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-bg-subtle text-text-secondary border border-border shadow-xs">
-                              <User className="h-3 w-3" />
-                              Received by: {picker}
-                            </span>
-                          )}
-                          {description && (
-                            <span
-                              className={cn(
-                                "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border shadow-xs max-w-full",
-                                hStyle.bg,
-                                isRejected ? "text-white" : "text-text"
-                              )}
-                            >
-                              <FileText className="h-3 w-3 shrink-0" />
-                              <span className="truncate whitespace-normal leading-tight">
-                                {description}
-                              </span>
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </li>
-                  );
-                })}
-              </ol>
-            </div>
           </div>
         </div>
 

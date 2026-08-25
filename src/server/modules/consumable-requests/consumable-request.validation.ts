@@ -57,8 +57,15 @@ export const createConsumableRequestSchema = z
     }
   });
 
+const approveConsumableLineSchema = z.object({
+  lineId: z.string().uuid().optional(),
+  consumableId: z.string().uuid(),
+  quantity: z.number().int().min(1).max(99999),
+});
+
 export const approveConsumableRequestSchema = z.object({
   note: z.string().trim().max(1000).optional(),
+  lines: z.array(approveConsumableLineSchema).min(1).optional(),
 });
 
 export const rejectConsumableRequestSchema = z.object({

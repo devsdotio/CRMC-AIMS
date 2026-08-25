@@ -14,6 +14,7 @@ export type DashboardSummaryDTO = {
   pendingApprovals: number;
   lowStockItems: number;
   overdueAssets: number;
+  totalRequests?: number;
 };
 
 export type DashboardPendingRequest = {
@@ -137,12 +138,24 @@ export class DashboardService {
   async getSidebarSummary(userId?: string): Promise<DashboardSummaryDTO> {
     if (userId) {
       const [activeBorrows, pendingApprovals, overdueAssets] = await Promise.all([
-        this.borrowLog.countActive(undefined, userId),
+        this.borrowLog.countActive(undefined, userId).catch((err) => {
+          console.error("[dashboard] failed to count active borrows for borrower:", err);
+          return 0;
+        }),
         Promise.all([
-          this.requests.countPending(undefined, userId),
-          this.consumableRequests.countPending(undefined, userId),
+          this.requests.countPending(undefined, userId).catch((err) => {
+            console.error("[dashboard] failed to count pending requests for borrower:", err);
+            return 0;
+          }),
+          this.consumableRequests.countPending(undefined, userId).catch((err) => {
+            console.error("[dashboard] failed to count pending supply requests for borrower:", err);
+            return 0;
+          }),
         ]).then(([a, b]) => a + b),
-        this.borrowLog.countOverdue(undefined, userId),
+        this.borrowLog.countOverdue(undefined, userId).catch((err) => {
+          console.error("[dashboard] failed to count overdue assets for borrower:", err);
+          return 0;
+        }),
       ]);
       return {
         activeBorrows,
@@ -154,13 +167,28 @@ export class DashboardService {
 
     const [activeBorrows, pendingApprovals, lowStockItems, overdueAssets] =
       await Promise.all([
-        this.borrowLog.countActive(),
+        this.borrowLog.countActive().catch((err) => {
+          console.error("[dashboard] failed to count active borrows:", err);
+          return 0;
+        }),
         Promise.all([
-          this.requests.countPending(),
-          this.consumableRequests.countPending(),
+          this.requests.countPending().catch((err) => {
+            console.error("[dashboard] failed to count pending requests:", err);
+            return 0;
+          }),
+          this.consumableRequests.countPending().catch((err) => {
+            console.error("[dashboard] failed to count pending supply requests:", err);
+            return 0;
+          }),
         ]).then(([a, b]) => a + b),
-        this.consumables.countLowStock(),
-        this.borrowLog.countOverdue(),
+        this.consumables.countLowStock().catch((err) => {
+          console.error("[dashboard] failed to count low stock consumables:", err);
+          return 0;
+        }),
+        this.borrowLog.countOverdue().catch((err) => {
+          console.error("[dashboard] failed to count overdue assets:", err);
+          return 0;
+        }),
       ]);
 
     return {
@@ -172,26 +200,67 @@ export class DashboardService {
   }
 
   async getBorrowerSnapshot(userId: string, limit = 5): Promise<DashboardSnapshotDTO> {
+    const isRealUuid = Boolean(
+      userId &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          userId.trim()
+        )
+    );
+    const targetUserId = isRealUuid ? userId.trim() : undefined;
+
     const [
       activeBorrows,
       pendingApprovals,
       overdueAssets,
+      totalRequests,
       pendingRows,
       pendingSupplyRows,
       overdueRows,
     ] = await Promise.all([
-      this.borrowLog.countActive(undefined, userId),
+      this.borrowLog.countActive(undefined, targetUserId).catch((err) => {
+        console.error("[dashboard] failed to count borrower active borrows:", err);
+        return 0;
+      }),
       Promise.all([
-        this.requests.countPending(undefined, userId),
-        this.consumableRequests.countPending(undefined, userId),
+        this.requests.countPending(undefined, targetUserId).catch((err) => {
+          console.error("[dashboard] failed to count borrower pending requests:", err);
+          return 0;
+        }),
+        this.consumableRequests.countPending(undefined, targetUserId).catch((err) => {
+          console.error("[dashboard] failed to count borrower pending supply requests:", err);
+          return 0;
+        }),
       ]).then(([a, b]) => a + b),
-      this.borrowLog.countOverdue(undefined, userId),
-      this.requests.list({ status: "pending", requesterUserId: userId }),
+      this.borrowLog.countOverdue(undefined, targetUserId).catch((err) => {
+        console.error("[dashboard] failed to count borrower overdue assets:", err);
+        return 0;
+      }),
+      Promise.all([
+        this.requests.count(targetUserId ? { requesterUserId: targetUserId } : {}).catch((err) => {
+          console.error("[dashboard] failed to count total borrow requests for requester:", err);
+          return 0;
+        }),
+        this.consumableRequests.count(targetUserId ? { requesterUserId: targetUserId } : {}).catch((err) => {
+          console.error("[dashboard] failed to count total supply requests for requester:", err);
+          return 0;
+        }),
+      ]).then(([a, b]) => a + b),
+      this.requests.list({ status: "pending", ...(targetUserId ? { requesterUserId: targetUserId } : {}), limit }).catch((err) => {
+        console.error("[dashboard] failed to list borrower pending requests:", err);
+        return [];
+      }),
       this.consumableRequests.list({
         status: "pending",
-        requesterUserId: userId,
+        ...(targetUserId ? { requesterUserId: targetUserId } : {}),
+        limit,
+      }).catch((err) => {
+        console.error("[dashboard] failed to list borrower pending supply requests:", err);
+        return [];
       }),
-      this.borrowLog.list({ status: "overdue", borrowerUserId: userId }),
+      this.borrowLog.list({ status: "overdue", ...(targetUserId ? { borrowerUserId: targetUserId } : {}) }).catch((err) => {
+        console.error("[dashboard] failed to list borrower overdue rows:", err);
+        return [];
+      }),
     ]);
 
     return {
@@ -200,6 +269,7 @@ export class DashboardService {
         pendingApprovals,
         lowStockItems: 0,
         overdueAssets,
+        totalRequests,
       },
       pendingRequests: this.mergePendingRequests(
         pendingRows,
@@ -237,19 +307,52 @@ export class DashboardService {
       allAssets,
       recentLifecycle,
     ] = await Promise.all([
-      this.borrowLog.countActive(),
+      this.borrowLog.countActive().catch((err) => {
+        console.error("[dashboard] failed to count active borrows:", err);
+        return 0;
+      }),
       Promise.all([
-        this.requests.countPending(),
-        this.consumableRequests.countPending(),
+        this.requests.countPending().catch((err) => {
+          console.error("[dashboard] failed to count pending requests:", err);
+          return 0;
+        }),
+        this.consumableRequests.countPending().catch((err) => {
+          console.error("[dashboard] failed to count pending supply requests:", err);
+          return 0;
+        }),
       ]).then(([a, b]) => a + b),
-      this.consumables.countLowStock(),
-      this.borrowLog.countOverdue(),
-      this.requests.list({ status: "pending" }),
-      this.consumableRequests.list({ status: "pending" }),
-      this.borrowLog.list({ status: "overdue" }),
-      this.consumables.getLowStockItems(limit),
-      this.assets.getCategoryDistribution(),
-      this.listRecentLifecycle(limit),
+      this.consumables.countLowStock().catch((err) => {
+        console.error("[dashboard] failed to count low stock items:", err);
+        return 0;
+      }),
+      this.borrowLog.countOverdue().catch((err) => {
+        console.error("[dashboard] failed to count overdue assets:", err);
+        return 0;
+      }),
+      this.requests.list({ status: "pending", limit }).catch((err) => {
+        console.error("[dashboard] failed to list pending requests:", err);
+        return [];
+      }),
+      this.consumableRequests.list({ status: "pending", limit }).catch((err) => {
+        console.error("[dashboard] failed to list pending supply requests:", err);
+        return [];
+      }),
+      this.borrowLog.list({ status: "overdue" }).catch((err) => {
+        console.error("[dashboard] failed to list overdue logs:", err);
+        return [];
+      }),
+      this.consumables.getLowStockItems(limit).catch((err) => {
+        console.error("[dashboard] failed to get low stock items:", err);
+        return [];
+      }),
+      this.assets.getCategoryDistribution().catch((err) => {
+        console.error("[dashboard] failed to get category distribution:", err);
+        return [];
+      }),
+      this.listRecentLifecycle(limit).catch((err) => {
+        console.error("[dashboard] failed to list recent lifecycle:", err);
+        return [];
+      }),
     ]);
 
     const lowStock = allConsumables.map((c) => ({

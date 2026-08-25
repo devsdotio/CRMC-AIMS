@@ -113,6 +113,7 @@ export const borrowRequests = pgTable(
     index("requests_department_id_idx").on(table.departmentId),
     index("requests_request_type_idx").on(table.requestType),
     index("requests_requested_at_idx").on(table.requestedAt),
+    index("requests_status_user_idx").on(table.status, table.requesterUserId),
   ]
 );
 

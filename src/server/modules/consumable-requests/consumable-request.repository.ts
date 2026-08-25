@@ -220,6 +220,22 @@ export class ConsumableRequestRepository
       .orderBy(asc(consumableRequestLines.lineNo));
   }
 
+  async updateLine(
+    id: string,
+    data: Partial<
+      Omit<ConsumableRequestLineRow, "id" | "createdAt" | "requestId">
+    >,
+    session?: DbSession
+  ): Promise<ConsumableRequestLineRow | null> {
+    const db = this.db(session);
+    const [row] = await db
+      .update(consumableRequestLines)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(consumableRequestLines.id, id))
+      .returning();
+    return row ?? null;
+  }
+
   async listLinesByRequestIds(
     requestIds: string[],
     session?: DbSession

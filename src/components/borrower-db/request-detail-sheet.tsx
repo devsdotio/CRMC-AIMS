@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCategoryStyleMap } from "@/features/categories/client/use-categories";
-import { formatItemDescription, formatAssetCodeDisplay } from "@/lib/sanitize-display";
+import { formatItemDescription, formatAssetCodeDisplay, formatQuantityWithUnit } from "@/lib/sanitize-display";
 import {
   getActionStyle,
   getActionIcon,
@@ -135,9 +135,9 @@ export function RequestDetailSheet({
           {
             id: "sub-1",
             action: "submitted" as const,
-            actor: request.requesterName || "Borrower",
+            actor: request.requesterName || "Requester",
             timestamp: request.requestedAt || new Date().toISOString(),
-            note: request.purpose || "Borrow request submitted for review",
+            note: request.purpose || "Request submitted for review",
           },
           ...(request.status === "approved" || request.status === "released" || request.status === "returned"
             ? [
@@ -172,7 +172,7 @@ export function RequestDetailSheet({
                     ? `Released to: ${request.pickedUpBy}`
                     : isConsumable
                     ? "Supplies issued and deducted from stock"
-                    : "Items released to borrower",
+                    : "Items released to requester",
                 },
               ]
             : []),
@@ -367,7 +367,9 @@ export function RequestDetailSheet({
                     </div>
                     <div className="text-right shrink-0 bg-bg-subtle px-2.5 py-1 rounded-md border border-border">
                       <p className="text-[10px] uppercase tracking-wider text-text-secondary font-semibold">Qty</p>
-                      <p className="font-bold text-xs text-text">{item.quantity} {item.itemType === "consumable" ? "units" : "units"}</p>
+                      <p className="font-bold text-xs text-text">
+                        {formatQuantityWithUnit(item.quantity, (item as any).unit, item.itemType)}
+                      </p>
                     </div>
                   </div>
                 );

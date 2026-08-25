@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { formatItemDescription, isUuid } from "@/lib/sanitize-display";
 import { useCategoryStyleResolver } from "@/features/categories/client/use-category-style";
 import type { BorrowRequest,  RequestStatus } from "@/types/borrow-requests";
-import { AuditNoteDisplay } from "@/components/audit-logs/audit-log-utils";
+import { ActionHistoryTimeline } from "@/components/audit-logs/audit-log-utils";
 import { LoadingState } from "@/components/providers/loading-context";
 
 /** Deterministic color from a string — same code always gets the same hue. */
@@ -418,58 +418,44 @@ export function RequestDetailPanel({
               <History className="h-3.5 w-3.5" />
               Action History
             </h3>
-            <div className="p-4 rounded-lg border border-border bg-bg">
-              <ol className="relative border-l-2 border-border/60 ml-3 space-y-6">
-                {[...request.history].reverse().map((h, index) => {
-                  const style = getActionStyle(h.action);
-                  return (
-                    <li key={h.id} className="pl-6 relative">
-                      <span className={cn(
-                        "absolute -left-3.25 top-1.5 h-6 w-6 rounded-full border-2 flex items-center justify-center bg-bg shadow-sm z-10",
-                        style.bg,
-                        (style as Record<string, string>).iconText || style.text
-                      )}>
-                        {getActionIcon(h.action)}
-                      </span>
-                      <div className="flex flex-col gap-0.5 pt-1.5">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className={cn("font-bold capitalize", style.text)}>
-                            {h.action}
-                          </span>
-                          <time className="text-[11px] text-text-secondary font-medium">{h.timestamp}</time>
-                        </div>
-                        <p className="text-xs text-text-secondary font-medium">By {h.actor}</p>
-                      </div>
-                      
-                      {h.note && (
-                        <AuditNoteDisplay action={h.action} note={h.note} className="mt-2" />
-                      )}
-                    </li>
-                  );
-                })}
-              </ol>
-            </div>
+            <ActionHistoryTimeline entries={request.history} />
           </div>
         </div>
 
         {/* Action Footer (Only for pending requests with action handlers) */}
-        {request.status === "pending" && onApprove && onReject && (
-          <div className="p-4 border-t border-border bg-bg-subtle flex items-center justify-end gap-3 shrink-0">
-            <button
-              type="button"
-              onClick={() => onReject(request)}
-              className="px-4 py-2 text-xs font-semibold rounded-md border border-border bg-bg text-text-secondary hover:border-destructive hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
-            >
-              Reject Request
-            </button>
-            <button
-              type="button"
-              onClick={() => onApprove(request)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
-            >
-              <Check className="h-4 w-4" strokeWidth={2.5} />
-              Approve Request
-            </button>
+        {request.status === "pending" && (onApprove || onReject || onEdit) && (
+          <div className="p-4 border-t border-border bg-bg-subtle flex items-center justify-between gap-3 shrink-0">
+            {onReject && (
+              <button
+                type="button"
+                onClick={() => onReject(request)}
+                className="px-3.5 py-2 text-xs font-semibold rounded-md border border-border bg-bg text-text-secondary hover:border-destructive hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+              >
+                Reject Request
+              </button>
+            )}
+            <div className="flex items-center gap-2 ml-auto">
+              {onEdit && (
+                <button
+                  type="button"
+                  onClick={() => onEdit(request)}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-md border border-border bg-bg text-text hover:bg-bg-subtle hover:border-accent/40 transition-colors cursor-pointer"
+                >
+                  <Edit3 className="h-3.5 w-3.5 text-text-secondary" />
+                  Edit Request
+                </button>
+              )}
+              {onApprove && (
+                <button
+                  type="button"
+                  onClick={() => onApprove(request)}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-md bg-accent text-accent-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+                >
+                  <Check className="h-4 w-4" strokeWidth={2.5} />
+                  Approve Request
+                </button>
+              )}
+            </div>
           </div>
         )}
         

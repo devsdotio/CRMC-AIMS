@@ -180,7 +180,7 @@ export function RecentActivityFeed({
 
   return (
     <section
-      className="rounded-xl border border-border bg-card overflow-hidden shadow-xs"
+      className="rounded-lg border border-border bg-card overflow-hidden shadow-xs"
       aria-labelledby="recent-activity-heading"
     >
       {/* Header */}

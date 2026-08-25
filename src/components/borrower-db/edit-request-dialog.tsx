@@ -268,7 +268,7 @@ export function EditRequestDialog({
       aria-labelledby="edit-dialog-title"
     >
       {/* Fixed-size container — 680px wide × 600px tall */}
-      <div className="relative w-[680px] h-[600px] bg-card border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div className="relative w-170 h-150 bg-card border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
 
         {/* ── Header ─────────────────────────────────────────────────── */}
         <div className="px-5 py-4 border-b border-border bg-bg-subtle/50 flex items-center justify-between shrink-0">

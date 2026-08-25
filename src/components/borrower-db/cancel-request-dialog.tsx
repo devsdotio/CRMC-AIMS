@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { formatItemDescription } from "@/lib/sanitize-display";
+import { formatItemDescription, formatQuantityWithUnit } from "@/lib/sanitize-display";
 import type { PortalBorrowRequest } from "./types";
 
 interface CancelRequestDialogProps {
@@ -77,8 +77,7 @@ export function CancelRequestDialog({
               <p key={idx} className="font-semibold text-text">
                 {formatItemDescription(item.itemDescription, item.category, item.itemType)}
                 <span className="ml-2 text-xs font-normal text-text-secondary">
-                  × {item.quantity}{" "}
-                  {item.itemType === "consumable" ? "unit(s)" : "item(s)"}
+                  × {formatQuantityWithUnit(item.quantity, (item as any).unit, item.itemType)}
                 </span>
               </p>
             ))}

@@ -50,6 +50,15 @@ export type UpdateConsumableRequestPayload = {
   editReason: string;
 };
 
+export type ApproveConsumableRequestPayload = {
+  note?: string;
+  lines?: Array<{
+    lineId?: string;
+    consumableId: string;
+    quantity: number;
+  }>;
+};
+
 export const consumableRequestsApi = {
   async list(params?: {
     status?: ConsumableRequest["status"];
@@ -103,10 +112,15 @@ export const consumableRequestsApi = {
     return res.data;
   },
 
-  async approve(id: string, note?: string): Promise<ConsumableRequest> {
+  async approve(
+    id: string,
+    payload?: ApproveConsumableRequestPayload | string
+  ): Promise<ConsumableRequest> {
+    const body =
+      typeof payload === "string" ? { note: payload } : (payload ?? {});
     const res = await fetchJson<ApiResponse<ConsumableRequest>>(
       `/api/consumable-requests/${id}/approve`,
-      { method: "POST", body: JSON.stringify({ note }) }
+      { method: "POST", body: JSON.stringify(body) }
     );
     return res.data;
   },

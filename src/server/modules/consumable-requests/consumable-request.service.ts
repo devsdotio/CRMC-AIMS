@@ -402,18 +402,49 @@ export class ConsumableRequestService {
       throw new ConflictError("Only pending requests can be approved.");
     }
 
-    const history = [
-      ...(Array.isArray(existing.history) ? existing.history : []),
-      historyEntry("approved", actor.displayName, input.note),
-    ];
-
     const updated = await withTransaction(async (tx) => {
-      const lines = await this.repo.listLinesByRequestId(id, tx);
-      if (lines.length === 0) {
+      const existingLines = await this.repo.listLinesByRequestId(id, tx);
+      if (existingLines.length === 0) {
         throw new BadRequestError("Request has no product lines.");
       }
 
-      for (const line of lines) {
+      let quantityChanged = false;
+      const linesToProcess = existingLines.map((line) => {
+        const matchingInputLine = input.lines?.find(
+          (il) =>
+            (il.lineId && il.lineId === line.id) ||
+            il.consumableId === line.consumableId
+        );
+        if (
+          matchingInputLine &&
+          matchingInputLine.quantity !== line.quantityRequested
+        ) {
+          quantityChanged = true;
+          return {
+            ...line,
+            quantityRequested: matchingInputLine.quantity,
+            isModified: true,
+          };
+        }
+        return {
+          ...line,
+          isModified: false,
+        };
+      });
+
+      if (quantityChanged) {
+        for (const line of linesToProcess) {
+          if (line.isModified) {
+            await this.repo.updateLine(
+              line.id,
+              { quantityRequested: line.quantityRequested },
+              tx
+            );
+          }
+        }
+      }
+
+      for (const line of linesToProcess) {
         const item = await this.consumables.findByIdForUpdate(
           line.consumableId,
           tx
@@ -422,7 +453,7 @@ export class ConsumableRequestService {
         const freeQty = Math.max(0, item.currentQty - (item.reservedQty ?? 0));
         if (line.quantityRequested > freeQty) {
           throw new BadRequestError(
-            `Not enough unreserved stock for ${item.itemCode}. Available: ${freeQty} ${item.unit}, requested: ${line.quantityRequested}.`
+            `Not enough unreserved stock for ${item.itemCode}. Available: ${freeQty} ${item.unit}, requested/approved: ${line.quantityRequested}.`
           );
         }
         await this.consumables.update(
@@ -431,6 +462,18 @@ export class ConsumableRequestService {
           tx
         );
       }
+
+      const approveNote = input.note?.trim();
+      const historyNote = quantityChanged
+        ? approveNote
+          ? `${approveNote} (quantities adjusted at approval)`
+          : "Quantities adjusted at approval"
+        : approveNote;
+
+      const history = [
+        ...(Array.isArray(existing.history) ? existing.history : []),
+        historyEntry("approved", actor.displayName, historyNote),
+      ];
 
       const up = await this.repo.update(
         id,
@@ -452,7 +495,7 @@ export class ConsumableRequestService {
           action: "approved",
           actorName: actor.displayName,
           actorUserId: actor.userId,
-          notes: input.note,
+          notes: historyNote,
         },
         tx
       );

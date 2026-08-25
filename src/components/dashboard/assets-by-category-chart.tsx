@@ -76,7 +76,7 @@ export function AssetsByCategoryChart({
 
   return (
     <section
-      className="flex flex-col rounded-xl border border-border bg-card overflow-hidden shadow-xs"
+      className="flex flex-col rounded-lg border border-border bg-card overflow-hidden shadow-xs"
       aria-labelledby="assets-by-category-heading"
     >
       {/* Header */}

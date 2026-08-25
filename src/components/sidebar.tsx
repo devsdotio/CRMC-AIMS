@@ -123,7 +123,7 @@ export default function Sidebar({
           roles: ["superadmin", "admin", "staff"],
         },
         {
-          name: "My Dashboard",
+          name: "Requester Dashboard",
           href: "/borrower-db/dashboard",
           icon: LayoutDashboard,
           roles: ["borrower"],

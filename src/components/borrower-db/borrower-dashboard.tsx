@@ -13,6 +13,7 @@ import {
   ChevronRight,
   TrendingUp,
   Zap,
+  FileText,
 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -35,55 +36,81 @@ interface StatCardProps {
   value?: number;
   subtext: string;
   icon: React.ElementType;
-  tone?: "default" | "warning" | "danger" | "success";
+  tone?: "blue" | "amber" | "danger" | "purple" | "success" | "default";
   isLoading?: boolean;
 }
 
 function DashStatCard({ label, value, subtext, icon: Icon, tone = "default", isLoading }: StatCardProps) {
   const toneStyles = {
     default: {
-      icon: "bg-accent/10 text-accent",
-      value: "text-text",
+      card: "bg-white hover:bg-white border-border hover:border-text-secondary/40 shadow-xs",
+      icon: "bg-slate-100 text-slate-700 border border-slate-200",
+      value: "text-text font-bold",
+      badge: "",
+      badgeText: "",
     },
-    success: {
-      icon: "bg-status-active-bg/15 text-status-active-text",
-      value: "text-text",
+    blue: {
+      card: "bg-white hover:bg-white border-blue-400/90 hover:border-blue-500 shadow-xs",
+      icon: "bg-blue-600 text-white shadow-2xs",
+      value: "text-text font-bold",
+      badge: "text-blue-700 bg-blue-50 border-blue-200 shadow-2xs",
+      badgeText: "Active",
     },
-    warning: {
-      icon: "bg-status-repair-bg/15 text-status-repair-text",
-      value: "text-status-repair-text",
+    amber: {
+      card: "bg-white hover:bg-white border-amber-400/90 hover:border-amber-500 shadow-xs",
+      icon: "bg-amber-500 text-white shadow-2xs",
+      value: "text-text font-bold",
+      badge: "text-amber-800 bg-amber-50 border-amber-200 shadow-2xs",
+      badgeText: "Pending",
     },
     danger: {
-      icon: "bg-status-outofservice-bg/15 text-status-outofservice-text",
-      value: "text-status-outofservice-text",
+      card: "bg-white hover:bg-white border-rose-400/90 hover:border-rose-500 shadow-xs",
+      icon: "bg-rose-600 text-white shadow-2xs",
+      value: "text-text font-bold",
+      badge: "text-rose-800 bg-rose-50 border-rose-200 shadow-2xs",
+      badgeText: "Overdue",
+    },
+    purple: {
+      card: "bg-white hover:bg-white border-purple-400/90 hover:border-purple-500 shadow-xs",
+      icon: "bg-purple-600 text-white shadow-2xs",
+      value: "text-text font-bold",
+      badge: "text-purple-800 bg-purple-50 border-purple-200 shadow-2xs",
+      badgeText: "Total",
+    },
+    success: {
+      card: "bg-white hover:bg-white border-emerald-400/90 hover:border-emerald-500 shadow-xs",
+      icon: "bg-emerald-600 text-white shadow-2xs",
+      value: "text-text font-bold",
+      badge: "text-emerald-800 bg-emerald-50 border-emerald-200 shadow-2xs",
+      badgeText: "Good",
     },
   };
 
   const styles = toneStyles[tone];
-  const showBadge = !isLoading && value !== undefined && value > 0;
+  const showBadge = Boolean(styles.badgeText);
 
   return (
-    <div className="rounded-xl border border-border bg-card p-5 flex flex-col gap-3 hover:border-text-secondary/30 transition-colors duration-200">
+    <div
+      className={cn(
+        "rounded-lg border p-5 flex flex-col gap-3 transition-all duration-200 hover:shadow-sm",
+        styles.card
+      )}
+    >
       <div className="flex items-start justify-between">
-        <div className={cn("h-10 w-10 rounded-xl flex items-center justify-center", styles.icon)}>
+        <div className={cn("h-10 w-10 rounded-lg flex items-center justify-center transition-transform duration-200 group-hover:scale-105", styles.icon)}>
           <Icon className="h-5 w-5" aria-hidden />
         </div>
-        {tone === "warning" && showBadge && (
-          <span className="text-[10px] font-bold uppercase tracking-widest text-status-repair-text bg-status-repair-bg/10 border border-status-repair-bg/30 px-2 py-0.5 rounded-full">
-            Attention
-          </span>
-        )}
-        {tone === "danger" && showBadge && (
-          <span className="text-[10px] font-bold uppercase tracking-widest text-status-outofservice-text bg-status-outofservice-bg/10 border border-status-outofservice-bg/30 px-2 py-0.5 rounded-full">
-            Urgent
+        {showBadge && (
+          <span className={cn("text-[10px] font-bold uppercase tracking-wider border px-2.5 py-0.5 rounded-full font-sans", styles.badge)}>
+            {styles.badgeText}
           </span>
         )}
       </div>
       <div>
         {isLoading ? (
-          <div className="h-9 w-12 bg-border animate-pulse rounded my-1" />
+          <div className="h-9 w-12 bg-border/60 animate-pulse rounded my-1" />
         ) : (
-          <p className={cn("text-3xl font-bold tabular-nums", styles.value)}>{value ?? 0}</p>
+          <p className={cn("text-3xl font-bold tabular-nums tracking-tight", styles.value)}>{value ?? 0}</p>
         )}
         <p className="text-sm font-semibold text-text mt-0.5">{label}</p>
         <p className="text-xs text-text-secondary mt-0.5">{subtext}</p>
@@ -111,7 +138,7 @@ function ActiveBorrowCard({ record }: { record: PortalBorrowLogRecord }) {
     >
       <div
         className={cn(
-          "h-10 w-10 shrink-0 rounded-xl flex items-center justify-center",
+          "h-9 w-9 shrink-0 rounded-lg flex items-center justify-center",
           categoryMeta.bg
         )}
       >
@@ -164,7 +191,7 @@ function ActiveBorrowCard({ record }: { record: PortalBorrowLogRecord }) {
 function ActiveBorrowCardSkeleton() {
   return (
     <div className="flex items-center gap-3 px-4 py-3 border-b border-border last:border-b-0 border-l-4 border-l-transparent">
-      <div className="h-10 w-10 shrink-0 rounded-xl bg-border animate-pulse" />
+      <div className="h-9 w-9 shrink-0 rounded-lg bg-border animate-pulse" />
       <div className="flex-1 min-w-0 space-y-2">
         <div className="h-4 w-32 bg-border animate-pulse rounded" />
         <div className="h-3 w-24 bg-border animate-pulse rounded" />
@@ -246,7 +273,7 @@ function QuickActionBtn({
   const inner = (
     <div
       className={cn(
-        "flex items-center gap-3 rounded-xl border p-4 w-full text-left cursor-pointer",
+        "flex items-center gap-3 rounded-lg border p-4 w-full text-left cursor-pointer",
         "hover:border-text-secondary/30 transition-colors duration-150",
         tone === "accent"
           ? "border-accent/30 bg-accent/5 hover:bg-accent/10"
@@ -255,7 +282,7 @@ function QuickActionBtn({
     >
       <div
         className={cn(
-          "h-10 w-10 rounded-xl flex items-center justify-center shrink-0",
+          "h-10 w-10 rounded-lg flex items-center justify-center shrink-0",
           tone === "accent" ? "bg-accent text-accent-foreground" : "bg-bg-subtle text-text-secondary"
         )}
       >
@@ -281,11 +308,19 @@ function QuickActionBtn({
 
 export function BorrowerDashboard() {
   const { openWizard } = useBorrowerPortal();
-  const { data: snapshot, isLoading } = useDashboardSnapshotQuery();
+  const { data: snapshot, isLoading, isError, refetch } = useDashboardSnapshotQuery();
   const { data: me } = useMeQuery();
-  const loading = isLoading || !snapshot;
+  const loading = isLoading && !snapshot;
 
-  const stats = snapshot?.summary;
+  const defaultSummary = {
+    activeBorrows: 0,
+    pendingApprovals: 0,
+    lowStockItems: 0,
+    overdueAssets: 0,
+    totalRequests: 0,
+  };
+
+  const stats = snapshot?.summary ?? defaultSummary;
   const overdueAssets = snapshot?.overdueAssets || [];
   const rawPending = snapshot?.pendingRequests || [];
 
@@ -307,7 +342,7 @@ export function BorrowerDashboard() {
       value: stats?.activeBorrows,
       subtext: "Items currently out on loan",
       icon: Package,
-      tone: "default",
+      tone: "blue",
       isLoading: loading,
     },
     {
@@ -315,7 +350,7 @@ export function BorrowerDashboard() {
       value: stats?.pendingApprovals,
       subtext: stats?.pendingApprovals ? "Awaiting staff approval" : "No pending requests",
       icon: Clock,
-      tone: stats && stats.pendingApprovals > 0 ? "warning" : "default",
+      tone: "amber",
       isLoading: loading,
     },
     {
@@ -323,33 +358,33 @@ export function BorrowerDashboard() {
       value: stats?.overdueAssets,
       subtext: stats?.overdueAssets ? "Past due date — return immediately" : "All items on time",
       icon: AlertTriangle,
-      tone: stats && stats.overdueAssets > 0 ? "danger" : "default",
+      tone: "danger",
       isLoading: loading,
     },
     {
-      label: "Low Stock Consumables",
-      value: stats?.lowStockItems,
-      subtext: "Needs attention",
-      icon: Tag,
-      tone: "warning",
+      label: "Total Requests",
+      value: stats?.totalRequests,
+      subtext: "All requests submitted by this account",
+      icon: FileText,
+      tone: "purple",
       isLoading: loading,
     },
   ];
 
   return (
-    <div className="flex flex-col gap-3 bg-bg-subtle max-w-full overflow-x-hidden" data-theme="light">
+    <div className="h-full flex flex-col min-h-0 gap-3 bg-bg-subtle max-w-full" data-theme="light">
 
       {/* ── Greeting Banner ─────────────────────────────────────────── */}
-      <div className="rounded-xl border border-border bg-card p-6 flex flex-col sm:flex-row sm:items-center gap-3">
-        <div className="h-12 w-12 rounded-xl bg-accent/10 flex items-center justify-center shrink-0">
+      <div className="rounded-lg border border-border bg-card p-6 flex flex-col sm:flex-row sm:items-center gap-3 shrink-0">
+        <div className="h-12 w-12 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
           <TrendingUp className="h-6 w-6 text-accent" aria-hidden />
         </div>
         <div className="flex-1">
           <h1 className="text-lg font-bold text-text">
-            {me?.department ? `${me.department} portal` : "Department portal"}
+            {me?.department ? `${me.department} Requester Portal` : "Requester Portal"}
           </h1>
           <p className="text-sm text-text-secondary mt-0.5">
-            Request items for your department. You have{" "}
+            Submit and track equipment, borrow, and supply requests for your department. You have{" "}
             {loading ? (
               <span className="inline-block w-12 h-3.5 bg-border animate-pulse rounded align-middle" />
             ) : (
@@ -364,7 +399,7 @@ export function BorrowerDashboard() {
           <button
             type="button"
             onClick={() => openWizard(null)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-accent text-accent-foreground text-sm font-semibold hover:opacity-90 active:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-accent shadow-xs cursor-pointer"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-accent text-accent-foreground text-sm font-semibold hover:opacity-90 active:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-accent shadow-xs cursor-pointer"
           >
             <Package className="h-4 w-4" aria-hidden />
             New Request
@@ -372,15 +407,28 @@ export function BorrowerDashboard() {
         </div>
       </div>
 
+      {isError && !snapshot && (
+        <div className="rounded-lg border border-status-repair-bg/40 bg-status-repair-bg/10 px-4 py-2.5 flex items-center justify-between gap-3 text-xs text-status-repair-text shrink-0">
+          <span>Failed to load live dashboard statistics. Default values are shown.</span>
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="font-bold underline hover:opacity-80 cursor-pointer"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       {me && !me.departmentId && (
-        <div className="rounded-xl border border-status-repair-bg/40 bg-status-repair-bg/10 px-4 py-3 text-xs text-status-repair-text">
+        <div className="rounded-lg border border-status-repair-bg/40 bg-status-repair-bg/10 px-4 py-3 text-xs text-status-repair-text shrink-0">
           This login is not linked to a department yet. Ask Property Custodian
           to assign a department before submitting requests.
         </div>
       )}
 
       {/* ── Stat Cards ──────────────────────────────────────────────── */}
-      <section aria-label="Borrowing overview">
+      <section aria-label="Borrowing overview" className="shrink-0">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {statCards.map((card) => (
             <DashStatCard key={card.label} {...card} />
@@ -389,11 +437,11 @@ export function BorrowerDashboard() {
       </section>
 
       {/* ── Row 2: Active Items + Recent Requests ──────────────────────── */}
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 flex-1 min-h-0">
 
         {/* Active Borrowings (Showing Overdue from Snapshot for now) */}
-        <section aria-labelledby="active-borrowings-heading">
-          <div className="rounded-xl border border-border bg-card overflow-hidden h-full flex flex-col">
+        <section aria-labelledby="active-borrowings-heading" className="h-full min-h-0 flex flex-col">
+          <div className="rounded-lg border border-border bg-card overflow-hidden h-full flex flex-col min-h-0">
             <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
               <h2 id="active-borrowings-heading" className="text-sm font-bold text-text">
                 Attention Required (Overdue)
@@ -407,14 +455,14 @@ export function BorrowerDashboard() {
             </div>
 
             {loading ? (
-              <div className="overflow-y-auto">
+              <div className="flex-1 min-h-0 overflow-y-auto">
                 <ActiveBorrowCardSkeleton />
                 <ActiveBorrowCardSkeleton />
                 <ActiveBorrowCardSkeleton />
               </div>
             ) : activeItemsMapped.length === 0 ? (
               <div className="flex flex-col items-center justify-center flex-1 py-12 text-center px-6">
-                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-status-active-bg/15 border border-status-active-bg/30 text-status-active-text shadow-xs mb-3">
+                <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-status-active-bg/15 border border-status-active-bg/30 text-status-active-text shadow-xs mb-3">
                   <CheckCircle2 className="h-6 w-6" strokeWidth={2.2} aria-hidden />
                 </span>
                 <p className="text-sm font-bold text-text">All caught up!</p>
@@ -423,7 +471,7 @@ export function BorrowerDashboard() {
                 </p>
               </div>
             ) : (
-              <div className="overflow-y-auto">
+              <div className="flex-1 min-h-0 overflow-y-auto">
                 {activeItemsMapped.map((record) => (
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   <ActiveBorrowCard key={record.id} record={record as any} />
@@ -434,8 +482,8 @@ export function BorrowerDashboard() {
         </section>
 
         {/* Recent Requests */}
-        <section aria-labelledby="recent-requests-heading">
-          <div className="rounded-xl border border-border bg-card overflow-hidden h-full flex flex-col">
+        <section aria-labelledby="recent-requests-heading" className="h-full min-h-0 flex flex-col">
+          <div className="rounded-lg border border-border bg-card overflow-hidden h-full flex flex-col min-h-0">
             <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
               <h2 id="recent-requests-heading" className="text-sm font-bold text-text">
                 Recent Pending Requests
@@ -449,14 +497,14 @@ export function BorrowerDashboard() {
             </div>
 
             {loading ? (
-              <div className="overflow-y-auto">
+              <div className="flex-1 min-h-0 overflow-y-auto">
                 <PendingRequestCardSkeleton />
                 <PendingRequestCardSkeleton />
                 <PendingRequestCardSkeleton />
               </div>
             ) : pendingRequestsMapped.length === 0 ? (
               <div className="flex flex-col items-center justify-center flex-1 py-12 text-center px-6">
-                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-bg-subtle border border-border text-text-secondary shadow-xs mb-3">
+                <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-bg-subtle border border-border text-text-secondary shadow-xs mb-3">
                   <Package className="h-6 w-6" strokeWidth={1.8} aria-hidden />
                 </span>
                 <p className="text-sm font-bold text-text">No pending requests</p>
@@ -465,7 +513,7 @@ export function BorrowerDashboard() {
                 </p>
               </div>
             ) : (
-              <div className="overflow-y-auto">
+              <div className="flex-1 min-h-0 overflow-y-auto">
                 {pendingRequestsMapped.slice(0, 5).map((req) => (
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   <PendingRequestCard key={req.id} request={req as any} />

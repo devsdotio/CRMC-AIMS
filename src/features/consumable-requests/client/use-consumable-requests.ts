@@ -17,6 +17,7 @@ import {
 
 import {
   consumableRequestsApi,
+  type ApproveConsumableRequestPayload,
   type ConsumableRequest,
   type CreateConsumableRequestPayload,
   type ReleaseConsumableRequestPayload,
@@ -79,11 +80,12 @@ export function useUpdateConsumableRequestMutation(): UseMutationResult<
 export function useApproveConsumableRequestMutation(): UseMutationResult<
   ConsumableRequest,
   Error,
-  { id: string; note?: string }
+  { id: string; payload?: ApproveConsumableRequestPayload; note?: string }
 > {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, note }) => consumableRequestsApi.approve(id, note),
+    mutationFn: ({ id, payload, note }) =>
+      consumableRequestsApi.approve(id, payload ?? (note ? { note } : undefined)),
     onSettled: () => invalidate(qc),
   });
 }

@@ -493,6 +493,7 @@ function BorrowRequestsContent() {
           }}
           onApprove={canOperate ? handleOpenApproveModal : undefined}
           onReject={canOperate ? handleOpenRejectModal : undefined}
+          onEdit={canOperate ? (req) => setEditTarget(req) : undefined}
           onRelease={canOperate ? handleOpenReleaseModal : undefined}
           onReturn={canOperate ? handleOpenReturnModal : undefined}
           onMarkUnreleased={canOperate ? handleMarkUnreleased : undefined}

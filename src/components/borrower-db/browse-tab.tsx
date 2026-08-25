@@ -194,10 +194,10 @@ export function BrowseTab() {
             onClick={() => setCategory(f.key)}
             aria-pressed={category === f.key}
             className={cn(
-              "px-3 py-1 rounded-full text-xs font-semibold border transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+              "px-3 py-1 rounded-full text-xs font-semibold border transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent cursor-pointer",
               category === f.key
-                ? "bg-accent text-accent-foreground border-accent"
-                : "bg-card border-border text-text-secondary hover:border-text-secondary/50 hover:text-text"
+                ? "bg-accent/15 text-accent border-accent/40 font-bold shadow-2xs"
+                : "bg-white border-border text-text-secondary hover:border-accent/40 hover:text-text hover:bg-bg-subtle"
             )}
           >
             {f.label}

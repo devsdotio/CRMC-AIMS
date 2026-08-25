@@ -14,6 +14,7 @@ export interface RequestListProps {
   onSelect: (request: BorrowRequest) => void;
   onApprove?: (request: BorrowRequest) => void;
   onReject?: (request: BorrowRequest) => void;
+  onEdit?: (request: BorrowRequest) => void;
   onRelease?: (request: BorrowRequest) => void;
   onReturn?: (request: BorrowRequest) => void;
   onMarkUnreleased?: (request: BorrowRequest) => void;
@@ -82,6 +83,7 @@ export function RequestList({
   onSelect,
   onApprove,
   onReject,
+  onEdit,
   onRelease,
   onReturn,
   onMarkUnreleased,
@@ -139,6 +141,7 @@ export function RequestList({
           onSelect={onSelect}
           onApprove={onApprove}
           onReject={onReject}
+          onEdit={onEdit}
           onRelease={onRelease}
           onReturn={onReturn}
           onMarkUnreleased={onMarkUnreleased}

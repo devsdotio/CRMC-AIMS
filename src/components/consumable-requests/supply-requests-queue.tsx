@@ -23,6 +23,8 @@ import { formatItemDescription } from "@/lib/sanitize-display";
 import { useCategoryStyleResolver } from "@/features/categories/client/use-category-style";
 import { QueryErrorBanner } from "@/components/shared/query-error-banner";
 import { ReleaseConsumableRequestDialog } from "@/components/consumable-requests/release-consumable-request-dialog";
+import { ApproveRejectConsumableDialog } from "@/components/consumable-requests/approve-reject-consumable-dialog";
+import { SupplyRequestDetailPanel } from "@/components/consumable-requests/supply-request-detail-panel";
 import { useToast } from "@/components/providers/toast-context";
 import { useAssetOperator } from "@/hooks/use-asset-operator";
 import {
@@ -33,7 +35,10 @@ import {
   useReleaseConsumableRequestMutation,
   type ConsumableRequest,
 } from "@/features/consumable-requests/client";
-import type { ReleaseConsumableRequestPayload } from "@/features/consumable-requests/client/consumable-requests-api";
+import type {
+  ApproveConsumableRequestPayload,
+  ReleaseConsumableRequestPayload,
+} from "@/features/consumable-requests/client/consumable-requests-api";
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
   pending: {
@@ -180,9 +185,17 @@ export function SupplyRequestsQueue({
   const { canOperate } = useAssetOperator();
   const toast = useToast();
   const resolveCategoryStyle = useCategoryStyleResolver();
-  const [releaseTarget, setReleaseTarget] = useState<ConsumableRequest | null>(
-    null
-  );
+  const [releaseTarget, setReleaseTarget] = useState<ConsumableRequest | null>(null);
+  const [detailTarget, setDetailTarget] = useState<ConsumableRequest | null>(null);
+  const [dialogState, setDialogState] = useState<{
+    request: ConsumableRequest | null;
+    mode: "approve" | "reject" | null;
+    isOpen: boolean;
+  }>({
+    request: null,
+    mode: null,
+    isOpen: false,
+  });
   const deptParam =
     department && department !== "All Departments" ? department : undefined;
 
@@ -199,31 +212,44 @@ export function SupplyRequestsQueue({
   const cancel = useCancelConsumableRequestMutation();
   const release = useReleaseConsumableRequestMutation();
 
-  const pendingAction = approve.isPending
-    ? { id: approve.variables?.id, kind: "approve" as const }
-    : reject.isPending
-      ? { id: reject.variables?.id, kind: "reject" as const }
-      : cancel.isPending
-        ? { id: cancel.variables?.id, kind: "cancel" as const }
-        : null;
-
-  const handleApprove = async (row: ConsumableRequest) => {
-    try {
-      await approve.mutateAsync({ id: row.id });
-      toast.success(`${row.requestCode} approved.`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Approve failed.");
-    }
+  const handleOpenApproveModal = (row: ConsumableRequest) => {
+    setDialogState({
+      request: row,
+      mode: "approve",
+      isOpen: true,
+    });
   };
 
-  const handleReject = async (row: ConsumableRequest) => {
-    const reason = window.prompt("Rejection reason?");
-    if (!reason?.trim()) return;
-    try {
-      await reject.mutateAsync({ id: row.id, reason: reason.trim() });
-      toast.success(`${row.requestCode} rejected.`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Reject failed.");
+  const handleOpenRejectModal = (row: ConsumableRequest) => {
+    setDialogState({
+      request: row,
+      mode: "reject",
+      isOpen: true,
+    });
+  };
+
+  const handleCloseDialog = () => {
+    setDialogState((prev) => ({ ...prev, isOpen: false }));
+  };
+
+  const handleConfirmAction = async (
+    targetRequest: ConsumableRequest,
+    mode: "approve" | "reject",
+    payload?: { reason?: string; approve?: ApproveConsumableRequestPayload }
+  ) => {
+    if (mode === "approve") {
+      await approve.mutateAsync({
+        id: targetRequest.id,
+        payload: payload?.approve,
+      });
+      toast.success(`${targetRequest.requestCode} approved.`);
+    } else {
+      if (!payload?.reason) return;
+      await reject.mutateAsync({
+        id: targetRequest.id,
+        reason: payload.reason,
+      });
+      toast.success(`${targetRequest.requestCode} rejected.`);
     }
   };
 
@@ -340,14 +366,12 @@ export function SupplyRequestsQueue({
                 text: "text-text-secondary font-bold",
                 label: row.status,
               };
-              const rowAction =
-                pendingAction?.id === row.id ? pendingAction.kind : null;
-              const isRowBusy = rowAction !== null;
 
               return (
                 <li
                   key={row.id}
-                  className="group relative flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 md:px-6 bg-bg hover:bg-bg-subtle/80 transition-colors"
+                  onClick={() => setDetailTarget(row)}
+                  className="group relative flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 md:px-6 bg-bg hover:bg-bg-subtle/80 transition-colors cursor-pointer"
                 >
                   {/* Left Column: Requester & Item Info */}
                   <div className="flex flex-col gap-1.5 flex-1 min-w-0">
@@ -429,41 +453,29 @@ export function SupplyRequestsQueue({
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          onClick={() => void handleApprove(row)}
-                          disabled={isRowBusy}
+                          onClick={(e) => { e.stopPropagation(); handleOpenApproveModal(row); }}
                           aria-label={`Approve request ${row.requestCode}`}
                           className={cn(
                             "inline-flex items-center gap-1 rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-accent-foreground",
                             "shadow-xs transition-colors duration-150 hover:opacity-90 cursor-pointer",
-                            "focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1",
-                            "disabled:cursor-not-allowed disabled:opacity-60"
+                            "focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
                           )}
                         >
-                          {rowAction === "approve" ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
-                          )}
-                          {rowAction === "approve" ? "Approving…" : "Approve"}
+                          <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
+                          Approve
                         </button>
                         <button
                           type="button"
-                          onClick={() => void handleReject(row)}
-                          disabled={isRowBusy}
+                          onClick={(e) => { e.stopPropagation(); handleOpenRejectModal(row); }}
                           aria-label={`Reject request ${row.requestCode}`}
                           className={cn(
                             "inline-flex items-center gap-1 rounded-md border border-border bg-bg px-3 py-1.5 text-xs font-semibold text-text-secondary cursor-pointer",
                             "transition-colors duration-150 hover:border-destructive hover:text-destructive hover:bg-destructive/10",
-                            "focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-1",
-                            "disabled:cursor-not-allowed disabled:opacity-60"
+                            "focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-1"
                           )}
                         >
-                          {rowAction === "reject" ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <X className="h-3.5 w-3.5" />
-                          )}
-                          {rowAction === "reject" ? "Rejecting…" : "Reject"}
+                          <X className="h-3.5 w-3.5" />
+                          Reject
                         </button>
                       </div>
                     )}
@@ -473,8 +485,8 @@ export function SupplyRequestsQueue({
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          onClick={() => setReleaseTarget(row)}
-                          disabled={isRowBusy}
+                          onClick={(e) => { e.stopPropagation(); setReleaseTarget(row); }}
+                          disabled={cancel.isPending}
                           aria-label={`Issue supplies for request ${row.requestCode}`}
                           className={cn(
                             "inline-flex items-center gap-1 rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-accent-foreground",
@@ -488,8 +500,8 @@ export function SupplyRequestsQueue({
                         </button>
                         <button
                           type="button"
-                          onClick={() => void handleCancelApproved(row)}
-                          disabled={isRowBusy}
+                          onClick={(e) => { e.stopPropagation(); void handleCancelApproved(row); }}
+                          disabled={cancel.isPending}
                           aria-label={`Cancel approved request ${row.requestCode}`}
                           className={cn(
                             "inline-flex items-center gap-1 rounded-md border border-border bg-bg px-3 py-1.5 text-xs font-semibold text-text-secondary cursor-pointer",
@@ -498,12 +510,14 @@ export function SupplyRequestsQueue({
                             "disabled:cursor-not-allowed disabled:opacity-60"
                           )}
                         >
-                          {rowAction === "cancel" ? (
+                          {cancel.isPending && cancel.variables?.id === row.id ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
                           ) : (
                             <X className="h-3.5 w-3.5" />
                           )}
-                          {rowAction === "cancel" ? "Cancelling…" : "Cancel"}
+                          {cancel.isPending && cancel.variables?.id === row.id
+                            ? "Cancelling…"
+                            : "Cancel"}
                         </button>
                       </div>
                     )}
@@ -515,11 +529,28 @@ export function SupplyRequestsQueue({
         )}
       </main>
 
+      <ApproveRejectConsumableDialog
+        request={dialogState.request}
+        mode={dialogState.mode}
+        isOpen={dialogState.isOpen}
+        onClose={handleCloseDialog}
+        onConfirm={handleConfirmAction}
+      />
+
       <ReleaseConsumableRequestDialog
         request={releaseTarget}
         isOpen={Boolean(releaseTarget)}
         onClose={() => setReleaseTarget(null)}
         onConfirm={handleReleaseConfirm}
+      />
+
+      <SupplyRequestDetailPanel
+        request={detailTarget}
+        isOpen={Boolean(detailTarget)}
+        onClose={() => setDetailTarget(null)}
+        onApprove={canOperate ? (req) => { setDetailTarget(null); handleOpenApproveModal(req); } : undefined}
+        onReject={canOperate ? (req) => { setDetailTarget(null); handleOpenRejectModal(req); } : undefined}
+        onRelease={canOperate ? (req) => { setDetailTarget(null); setReleaseTarget(req); } : undefined}
       />
     </>
   );

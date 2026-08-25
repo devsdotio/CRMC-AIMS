@@ -141,7 +141,7 @@ export function MyRequestsTab() {
       if (isSupply) {
         await cancelSupply({ id: requestId, note: "Cancelled by department" });
       } else {
-        await cancelRequest({ id: requestId, note: "Cancelled by borrower" });
+        await cancelRequest({ id: requestId, note: "Cancelled by requester" });
       }
       toast.success("Request cancelled.");
     } catch (err) {

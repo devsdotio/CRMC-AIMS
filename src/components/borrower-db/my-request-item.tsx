@@ -6,7 +6,6 @@ import {
   Tag,
   FileText,
   Package,
-  Edit3,
 } from "lucide-react";
 import { useCategoryStyleMap } from "@/features/categories/client/use-categories";
 import { cn } from "@/lib/utils";
@@ -182,22 +181,8 @@ export function MyRequestItem({ request, onViewDetails, onEdit }: MyRequestItemP
         </div>
       </div>
 
-      {/* Right Column: Edit Button, Status Badge & Chevron */}
+      {/* Right Column: Status Badge & Chevron */}
       <div className="flex items-center gap-2.5 shrink-0 self-end md:self-center">
-        {onEdit && (request.status === "pending" || request.status === "approved") && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onEdit(request);
-            }}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border border-border bg-bg-subtle text-text hover:bg-accent/10 hover:text-accent hover:border-accent/30 transition-colors cursor-pointer"
-            title="Edit request details"
-          >
-            <Edit3 className="h-3 w-3" />
-            Edit
-          </button>
-        )}
         <span
           className={cn(
             "inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-semibold tabular-nums whitespace-nowrap",

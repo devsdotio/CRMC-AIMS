@@ -121,7 +121,7 @@ export function AddEditExpenseDialog({
   ).filter((c) => c !== "adjustment");
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
+    <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
       <div
         className="absolute inset-0"
         onClick={isSubmitting ? undefined : onClose}

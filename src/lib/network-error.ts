@@ -36,7 +36,7 @@ export function formatFriendlyNetworkError(
   }
 
   if (/timeout|timed out|abort/i.test(raw)) {
-    return "The server took too long to respond. Please try refreshing the page.";
+    return "It looks like your internet connection is unstable. Please check your connection and try again.";
   }
 
   if (/database|supabase|500|502|503|internal server/i.test(raw)) {

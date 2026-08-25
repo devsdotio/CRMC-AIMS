@@ -43,7 +43,7 @@ export function ConfirmDialog({
   const isDestructive = variant === "destructive";
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs transition-opacity">
+    <div className="fixed inset-0 z-70 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs transition-opacity">
       <div
         className="absolute inset-0"
         onClick={isLoading ? undefined : onClose}

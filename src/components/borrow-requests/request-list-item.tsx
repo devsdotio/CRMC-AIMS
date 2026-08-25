@@ -13,6 +13,7 @@ export interface RequestListItemProps {
   onSelect: (request: BorrowRequest) => void;
   onApprove?: (request: BorrowRequest) => void;
   onReject?: (request: BorrowRequest) => void;
+  onEdit?: (request: BorrowRequest) => void;
   onRelease?: (request: BorrowRequest) => void | Promise<void>;
   onReturn?: (request: BorrowRequest) => void | Promise<void>;
   onMarkUnreleased?: (request: BorrowRequest) => void | Promise<void>;
@@ -34,6 +35,7 @@ export function RequestListItem({
   onSelect,
   onApprove,
   onReject,
+  onEdit,
   onRelease,
   onReturn,
   onMarkUnreleased,
@@ -160,14 +162,14 @@ export function RequestListItem({
         </span>
 
         {/* Inline Actions (only for Pending requests) */}
-        {request.status === "pending" && onApprove && onReject && (
-          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+        {request.status === "pending" && onApprove && (
+          <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
             <button
               type="button"
               onClick={() => onApprove(request)}
               aria-label={`Approve request ${request.requestCode} from ${request.requesterName}`}
               className={cn(
-                "inline-flex items-center gap-1 rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-accent-foreground",
+                "inline-flex items-center gap-1 rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-accent-foreground cursor-pointer",
                 "shadow-xs transition-colors duration-150 hover:opacity-90",
                 "focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
               )}
@@ -175,19 +177,21 @@ export function RequestListItem({
               <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
               Approve
             </button>
-            <button
-              type="button"
-              onClick={() => onReject(request)}
-              aria-label={`Reject request ${request.requestCode} from ${request.requesterName}`}
-              className={cn(
-                "inline-flex items-center gap-1 rounded-md border border-border bg-bg px-3 py-1.5 text-xs font-semibold text-text-secondary",
-                "transition-colors duration-150 hover:border-destructive hover:text-destructive hover:bg-destructive/10",
-                "focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-1"
-              )}
-            >
-              <X className="h-3.5 w-3.5" />
-              Reject
-            </button>
+            {onReject && (
+              <button
+                type="button"
+                onClick={() => onReject(request)}
+                aria-label={`Reject request ${request.requestCode} from ${request.requesterName}`}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-md border border-border bg-bg px-2.5 py-1.5 text-xs font-semibold text-text-secondary cursor-pointer",
+                  "transition-colors duration-150 hover:border-destructive hover:text-destructive hover:bg-destructive/10",
+                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-1"
+                )}
+              >
+                <X className="h-3.5 w-3.5" />
+                Reject
+              </button>
+            )}
           </div>
         )}
 

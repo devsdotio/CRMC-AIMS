@@ -9,7 +9,6 @@ import {
   User,
   Building2,
   FileText,
-  CalendarClock,
   Minus,
   Plus,
   SlidersHorizontal,
@@ -20,52 +19,57 @@ import {
 import { cn } from "@/lib/utils";
 import { useCategoryStyleResolver } from "@/features/categories/client/use-category-style";
 import { formatItemDescription } from "@/lib/sanitize-display";
-import type { BorrowRequest } from "@/types/borrow-requests";
-import type { ApproveBorrowRequestPayload } from "@/features/borrow-requests/client/borrow-requests-api";
+import type { ConsumableRequest } from "@/features/consumable-requests/client";
+import type { ApproveConsumableRequestPayload } from "@/features/consumable-requests/client/consumable-requests-api";
 
-type ApproveItem = ApproveBorrowRequestPayload["items"] extends
-  | (infer T)[]
-  | undefined
-  ? T
-  : never;
-
-export interface ApproveRejectDialogProps {
-  request: BorrowRequest | null;
+export interface ApproveRejectConsumableDialogProps {
+  request: ConsumableRequest | null;
   mode: "approve" | "reject" | null;
   isOpen: boolean;
   onClose: () => void;
   onConfirm: (
-    request: BorrowRequest,
+    request: ConsumableRequest,
     mode: "approve" | "reject",
-    payload?: { reason?: string; approve?: ApproveBorrowRequestPayload }
+    payload?: { reason?: string; approve?: ApproveConsumableRequestPayload }
   ) => void | Promise<void>;
 }
 
-interface ApproveRejectDialogFormProps {
-  request: BorrowRequest;
+interface ApproveRejectConsumableDialogFormProps {
+  request: ConsumableRequest;
   mode: "approve" | "reject";
   onClose: () => void;
-  onConfirm: ApproveRejectDialogProps["onConfirm"];
+  onConfirm: ApproveRejectConsumableDialogProps["onConfirm"];
 }
 
-function ApproveRejectDialogForm({
+interface EditableSupplyLine {
+  id: string;
+  consumableId: string;
+  itemName: string;
+  category: string;
+  unit: string;
+  quantity: number;
+  originalQuantity: number;
+}
+
+function ApproveRejectConsumableDialogForm({
   request,
   mode,
   onClose,
   onConfirm,
-}: ApproveRejectDialogFormProps) {
+}: ApproveRejectConsumableDialogFormProps) {
   const [reason, setReason] = useState("");
   const [approveNote, setApproveNote] = useState("");
   const [isEditingQty, setIsEditingQty] = useState(false);
-  const [items, setItems] = useState<ApproveItem[]>(() =>
-    request.items
-      .filter((item) => item.itemType !== "consumable" && !item.consumableId)
-      .map((item) => ({
-        itemDescription: item.itemDescription,
-        category: item.category,
-        quantity: item.quantity,
-        itemType: "asset" as const,
-      }))
+  const [lines, setLines] = useState<EditableSupplyLine[]>(() =>
+    request.lines.map((line) => ({
+      id: line.id,
+      consumableId: line.consumableId,
+      itemName: line.itemName,
+      category: line.category,
+      unit: line.unit || "units",
+      quantity: line.quantityRequested,
+      originalQuantity: line.quantityRequested,
+    }))
   );
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -73,43 +77,33 @@ function ApproveRejectDialogForm({
   const resolveCategoryStyle = useCategoryStyleResolver();
 
   const isApprove = mode === "approve";
-  const isAssignable = request.requestType === "assignable";
 
-  const originalAssetItems = useMemo(
-    () =>
-      request.items.filter(
-        (item) => item.itemType !== "consumable" && !item.consumableId
-      ),
-    [request.items]
-  );
-
-  const modifiedItems = useMemo(() => {
-    return items
-      .map((item, idx) => {
-        const original = originalAssetItems[idx];
-        const originalQty = original?.quantity ?? item.quantity;
-        const diff = item.quantity - originalQty;
+  const modifiedLines = useMemo(() => {
+    return lines
+      .map((line, idx) => {
+        const diff = line.quantity - line.originalQuantity;
         return {
-          ...item,
+          ...line,
           index: idx,
-          originalQty,
-          currentQty: item.quantity,
           diff,
           isModified: diff !== 0,
         };
       })
-      .filter((it) => it.isModified);
-  }, [items, originalAssetItems]);
+      .filter((l) => l.isModified);
+  }, [lines]);
 
-  const hasQuantityChanges = modifiedItems.length > 0;
+  const hasQuantityChanges = modifiedLines.length > 0;
 
   const resetQuantities = () => {
-    setItems(
-      originalAssetItems.map((item) => ({
-        itemDescription: item.itemDescription,
-        category: item.category,
-        quantity: item.quantity,
-        itemType: "asset" as const,
+    setLines(
+      request.lines.map((line) => ({
+        id: line.id,
+        consumableId: line.consumableId,
+        itemName: line.itemName,
+        category: line.category,
+        unit: line.unit || "units",
+        quantity: line.quantityRequested,
+        originalQuantity: line.quantityRequested,
       }))
     );
   };
@@ -131,11 +125,11 @@ function ApproveRejectDialogForm({
   }, [onClose, isSubmitting]);
 
   const adjustQuantity = (index: number, delta: number) => {
-    setItems((prev) =>
-      prev.map((item, idx) => {
-        if (idx !== index) return item;
-        const nextQty = Math.max(1, Math.min(999, item.quantity + delta));
-        return { ...item, quantity: nextQty };
+    setLines((prev) =>
+      prev.map((line, idx) => {
+        if (idx !== index) return line;
+        const nextQty = Math.max(1, Math.min(99999, line.quantity + delta));
+        return { ...line, quantity: nextQty };
       })
     );
   };
@@ -146,8 +140,8 @@ function ApproveRejectDialogForm({
       setError("Please provide a brief reason for rejecting this request.");
       return;
     }
-    if (isApprove && items.length === 0) {
-      setError("This request has no asset lines to approve.");
+    if (isApprove && lines.length === 0) {
+      setError("This request has no supply lines to approve.");
       return;
     }
 
@@ -158,7 +152,11 @@ function ApproveRejectDialogForm({
         await onConfirm(request, mode, {
           approve: {
             note: approveNote.trim() || undefined,
-            items,
+            lines: lines.map((l) => ({
+              lineId: l.id,
+              consumableId: l.consumableId,
+              quantity: l.quantity,
+            })),
           },
         });
       } else {
@@ -180,7 +178,7 @@ function ApproveRejectDialogForm({
       <div
         role="dialog"
         aria-modal="true"
-        aria-labelledby="dialog-title"
+        aria-labelledby="supply-dialog-title"
         className="relative w-full max-w-lg max-h-[90vh] rounded-xl border border-border bg-bg shadow-2xl z-10 animate-in fade-in zoom-in-95 duration-150 flex flex-col overflow-hidden"
       >
         <div className="flex items-start justify-between gap-3 px-6 py-4 border-b border-border bg-bg-subtle/50 shrink-0">
@@ -200,12 +198,8 @@ function ApproveRejectDialogForm({
               )}
             </div>
             <div>
-              <h3 id="dialog-title" className="text-base font-bold text-text leading-tight">
-                {isApprove
-                  ? isAssignable
-                    ? "Approve Assignment Request"
-                    : "Approve Borrow Request"
-                  : "Reject Request"}
+              <h3 id="supply-dialog-title" className="text-base font-bold text-text leading-tight">
+                {isApprove ? "Approve Supply Requisition" : "Reject Requisition"}
               </h3>
               <p className="text-xs text-text-secondary mt-0.5 font-mono">
                 {request.requestCode}
@@ -246,7 +240,7 @@ function ApproveRejectDialogForm({
               {/* Items Section Header with Adjust Quantities Toggle */}
               <div className="flex items-center justify-between px-3.5 py-2 border-b border-border bg-bg-subtle/30">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-text-secondary">
-                  Requested Items ({items.length})
+                  Requested Supplies ({lines.length})
                 </span>
                 {isApprove && (
                   <div className="flex items-center gap-2">
@@ -289,22 +283,21 @@ function ApproveRejectDialogForm({
               </div>
 
               <div className="divide-y divide-border">
-                {(isApprove ? items : request.items).map((item, idx) => {
-                  const catStyle = resolveCategoryStyle(item.category);
+                {lines.map((line, idx) => {
+                  const catStyle = resolveCategoryStyle(line.category);
                   const desc = formatItemDescription(
-                    item.itemDescription,
+                    line.itemName,
                     catStyle.label,
-                    item.itemType ?? "asset"
+                    "consumable"
                   );
-                  const origQty = originalAssetItems[idx]?.quantity ?? item.quantity;
-                  const isItemModified = isApprove && item.quantity !== origQty;
+                  const isLineModified = isApprove && line.quantity !== line.originalQuantity;
 
                   return (
                     <div
-                      key={idx}
+                      key={line.id || idx}
                       className={cn(
                         "flex items-center gap-2.5 px-3.5 py-2.5 transition-colors",
-                        isItemModified ? "bg-amber-500/5" : idx % 2 === 1 ? "bg-bg-subtle/60" : "bg-card"
+                        isLineModified ? "bg-amber-500/5" : idx % 2 === 1 ? "bg-bg-subtle/60" : "bg-card"
                       )}
                     >
                       {isApprove && isEditingQty ? (
@@ -312,20 +305,20 @@ function ApproveRejectDialogForm({
                           <button
                             type="button"
                             onClick={() => adjustQuantity(idx, -1)}
-                            disabled={item.quantity <= 1 || isSubmitting}
-                            className="flex h-6 w-6 items-center justify-center rounded border border-border bg-card text-text-secondary hover:text-text disabled:opacity-30 cursor-pointer transition-colors"
+                            disabled={line.quantity <= 1 || isSubmitting}
+                            className="flex h-6 w-6 items-center justify-center rounded border border-border bg-bg text-text-secondary hover:text-text hover:border-accent/40 hover:bg-accent/10 disabled:opacity-30 cursor-pointer transition-colors"
                             aria-label="Decrease quantity"
                           >
                             <Minus className="h-3 w-3" />
                           </button>
                           <span className="min-w-6 text-center text-xs font-bold text-text">
-                            {item.quantity}
+                            {line.quantity}
                           </span>
                           <button
                             type="button"
                             onClick={() => adjustQuantity(idx, 1)}
-                            disabled={item.quantity >= 999 || isSubmitting}
-                            className="flex h-6 w-6 items-center justify-center rounded border border-border bg-card text-text-secondary hover:text-text disabled:opacity-30 cursor-pointer transition-colors"
+                            disabled={line.quantity >= 99999 || isSubmitting}
+                            className="flex h-6 w-6 items-center justify-center rounded border border-border bg-bg text-text-secondary hover:text-text hover:border-accent/40 hover:bg-accent/10 disabled:opacity-30 cursor-pointer transition-colors"
                             aria-label="Increase quantity"
                           >
                             <Plus className="h-3 w-3" />
@@ -334,7 +327,7 @@ function ApproveRejectDialogForm({
                       ) : (
                         <div className="flex items-center gap-1 shrink-0">
                           <span className="flex items-center justify-center h-5 min-w-5 px-1.5 rounded bg-bg border border-border text-[11px] font-bold text-text shrink-0">
-                            ×{item.quantity}
+                            ×{line.quantity}
                           </span>
                         </div>
                       )}
@@ -343,11 +336,14 @@ function ApproveRejectDialogForm({
                         <span className="text-text font-medium truncate">
                           {desc}
                         </span>
-                        {isItemModified && (
+                        <span className="text-[10px] text-text-secondary font-mono shrink-0">
+                          ({line.unit})
+                        </span>
+                        {isLineModified && (
                           <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-800 dark:text-amber-300 border border-amber-500/25 shrink-0">
-                            <span className="line-through opacity-70">req: {origQty}</span>
+                            <span className="line-through opacity-70">req: {line.originalQuantity}</span>
                             <ArrowRight className="h-2.5 w-2.5" />
-                            <span>{item.quantity}</span>
+                            <span>{line.quantity}</span>
                           </span>
                         )}
                       </div>
@@ -366,30 +362,21 @@ function ApproveRejectDialogForm({
                 })}
               </div>
 
-              <div className="px-3.5 py-2.5 border-t border-border bg-primary/5 space-y-1.5">
-                <div className="flex items-start gap-2">
-                  <FileText className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
-                  <div className="flex-1 min-w-0">
-                    <span className="text-[10px] font-semibold uppercase text-text-secondary block mb-0.5">
-                      Purpose
-                    </span>
-                    <p className="text-text font-medium leading-snug line-clamp-2">
-                      {request.purpose}
-                    </p>
+              {request.purpose && (
+                <div className="px-3.5 py-2.5 border-t border-border bg-primary/5 space-y-1.5">
+                  <div className="flex items-start gap-2">
+                    <FileText className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-[10px] font-semibold uppercase text-text-secondary block mb-0.5">
+                        Purpose
+                      </span>
+                      <p className="text-text font-medium leading-snug line-clamp-2">
+                        {request.purpose}
+                      </p>
+                    </div>
                   </div>
                 </div>
-                {request.expectedReturnDate && (
-                  <div className="flex items-center gap-1.5 justify-end">
-                    <CalendarClock className="h-3.5 w-3.5 text-primary" />
-                    <span className="text-[10px] font-semibold uppercase text-text-secondary">
-                      Return:
-                    </span>
-                    <span className="text-primary font-bold">
-                      {request.expectedReturnDate}
-                    </span>
-                  </div>
-                )}
-              </div>
+              )}
             </div>
 
             {/* Live Show of Exact Changes Made by Admin */}
@@ -399,7 +386,7 @@ function ApproveRejectDialogForm({
                   <div className="flex items-center gap-2">
                     <SlidersHorizontal className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                     <span className="text-xs font-bold text-amber-900 dark:text-amber-200">
-                      Live Quantity Adjustments ({modifiedItems.length})
+                      Live Quantity Adjustments ({modifiedLines.length})
                     </span>
                   </div>
                   <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
@@ -408,16 +395,16 @@ function ApproveRejectDialogForm({
                 </div>
 
                 <div className="divide-y divide-amber-500/20 rounded-lg border border-amber-500/20 bg-card overflow-hidden text-xs">
-                  {modifiedItems.map((mod) => (
-                    <div key={mod.index} className="p-2.5 flex items-center justify-between gap-3">
+                  {modifiedLines.map((mod) => (
+                    <div key={mod.id || mod.index} className="p-2.5 flex items-center justify-between gap-3">
                       <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-text truncate">{mod.itemDescription}</p>
+                        <p className="font-semibold text-text truncate">{mod.itemName}</p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0 text-xs">
-                        <span className="text-text-secondary line-through">{mod.originalQty} requested</span>
+                        <span className="text-text-secondary line-through">{mod.originalQuantity} requested</span>
                         <ArrowRight className="h-3 w-3 text-amber-500 shrink-0" />
                         <span className="font-bold text-amber-800 dark:text-amber-300 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
-                          {mod.currentQty} approved
+                          {mod.quantity} approved
                         </span>
                         <span
                           className={cn(
@@ -435,7 +422,7 @@ function ApproveRejectDialogForm({
                 </div>
 
                 <p className="text-[11px] text-text-secondary">
-                  Adjusted quantities will be approved instead of requested amounts and logged in the request timeline.
+                  Adjusted quantities will be approved and reserved instead of requested amounts, and logged in the audit trail.
                 </p>
               </div>
             )}
@@ -443,21 +430,21 @@ function ApproveRejectDialogForm({
             {isApprove ? (
               <div className="space-y-3">
                 <p className="text-xs text-text-secondary">
-                  Review the items above. Click &quot;Adjust Quantities&quot; if you need to modify approved unit counts before confirmation.
+                  Review the requested supplies above. Click &quot;Adjust Quantities&quot; if you need to modify approved counts before confirmation.
                 </p>
                 <div className="space-y-1.5">
                   <label
-                    htmlFor="approve-note"
+                    htmlFor="supply-approve-note"
                     className="block text-xs font-semibold text-text"
                   >
                     Approval note (optional)
                   </label>
                   <textarea
-                    id="approve-note"
+                    id="supply-approve-note"
                     value={approveNote}
                     onChange={(e) => setApproveNote(e.target.value)}
                     rows={2}
-                    placeholder="Any notes for the requester or audit trail…"
+                    placeholder="Any notes for the requester or inventory audit trail…"
                     disabled={isSubmitting}
                     className="w-full p-2.5 text-xs bg-bg border border-border rounded-lg text-text placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent resize-none"
                   />
@@ -470,11 +457,11 @@ function ApproveRejectDialogForm({
               </div>
             ) : (
               <div className="space-y-1.5">
-                <label htmlFor="rejection-reason" className="block text-xs font-semibold text-text">
+                <label htmlFor="supply-rejection-reason" className="block text-xs font-semibold text-text">
                   Reason for Rejection <span className="text-accent">*</span>
                 </label>
                 <textarea
-                  id="rejection-reason"
+                  id="supply-rejection-reason"
                   ref={textareaRef}
                   value={reason}
                   onChange={(e) => {
@@ -482,7 +469,7 @@ function ApproveRejectDialogForm({
                     if (error) setError("");
                   }}
                   rows={3}
-                  placeholder="State reason (e.g. Reserved for maintenance, Conflict with schedule…)"
+                  placeholder="State reason (e.g. Out of stock, Exceeds department quota, Alternative item recommended…)"
                   className={cn(
                     "w-full p-2.5 text-xs bg-bg border rounded-lg text-text placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent",
                     error ? "border-status-outofservice-bg" : "border-border"
@@ -538,17 +525,17 @@ function ApproveRejectDialogForm({
   );
 }
 
-export function ApproveRejectDialog({
+export function ApproveRejectConsumableDialog({
   request,
   mode,
   isOpen,
   onClose,
   onConfirm,
-}: ApproveRejectDialogProps) {
+}: ApproveRejectConsumableDialogProps) {
   if (!isOpen || !request || !mode) return null;
 
   return (
-    <ApproveRejectDialogForm
+    <ApproveRejectConsumableDialogForm
       key={`${request.id}-${mode}`}
       request={request}
       mode={mode}
