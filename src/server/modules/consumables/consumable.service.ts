@@ -1,4 +1,4 @@
-import type { ConsumableRow, StockHistoryEntry } from "@/server/db/schema";
+import type { ConsumableRow } from "@/server/db/schema";
 import {
   generateOperationalCode,
   todayDateString,
@@ -53,7 +53,6 @@ function availableQty(row: { currentQty: number; reservedQty?: number | null }):
 }
 
 function toDTO(row: ConsumableRow): ConsumableDTO {
-  const history = Array.isArray(row.history) ? row.history : [];
   const reservedQty = row.reservedQty ?? 0;
   return {
     id: row.id,
@@ -73,38 +72,8 @@ function toDTO(row: ConsumableRow): ConsumableDTO {
         : String(row.lastRestocked).slice(0, 10)
       : "—",
     notes: row.notes ?? undefined,
-    history,
-  };
-}
-
-function historyEntry(
-  type: StockHistoryEntry["type"],
-  quantityChange: number,
-  actor: string,
-  reason?: string,
-  notes?: string,
-  extra?: Partial<
-    Pick<
-      StockHistoryEntry,
-      | "unitCost"
-      | "supplierId"
-      | "supplierName"
-      | "lotCode"
-      | "totalCost"
-      | "lotAllocations"
-      | "recipientName"
-    >
-  >
-): StockHistoryEntry {
-  return {
-    id: crypto.randomUUID(),
-    date: todayDateString(),
-    type,
-    quantityChange,
-    actor,
-    ...(reason ? { reason } : {}),
-    ...(notes ? { notes } : {}),
-    ...extra,
+    // Stock ledger is stock_movements (Issue History). Do not grow JSONB history.
+    history: [],
   };
 }
 
@@ -280,31 +249,16 @@ export class ConsumableService {
         tx
       );
 
-      const history: StockHistoryEntry[] = [
-        historyEntry(
-          "restock",
-          input.currentQty,
-          actor.displayName,
-          "Initial stock",
-          input.notes,
-          {
-            unitCost: lot.unitCost,
-            supplierId: lot.supplierId ?? undefined,
-            supplierName: lot.supplierName ?? undefined,
-            lotCode: lot.lotCode,
-          }
-        ),
-      ];
-
-      const updated = await this.repo.update(
-        row.id,
-        {
-          history,
-          ...(lot.supplierName ? { supplier: lot.supplierName } : {}),
-        },
-        tx
-      );
-      if (!updated) throw new NotFoundError("Consumable", row.id);
+      let updated = row;
+      if (lot.supplierName) {
+        const next = await this.repo.update(
+          row.id,
+          { supplier: lot.supplierName },
+          tx
+        );
+        if (!next) throw new NotFoundError("Consumable", row.id);
+        updated = next;
+      }
 
       await this.movements.record(
         {
@@ -387,29 +341,11 @@ export class ConsumableService {
         tx
       );
 
-      const history = [
-        ...(Array.isArray(existing.history) ? existing.history : []),
-        historyEntry(
-          "restock",
-          input.quantity,
-          actor.displayName,
-          input.reason,
-          input.notes,
-          {
-            unitCost: lot.unitCost,
-            supplierId: lot.supplierId ?? undefined,
-            supplierName: lot.supplierName ?? undefined,
-            lotCode: lot.lotCode,
-          }
-        ),
-      ];
-
       const updated = await this.repo.update(
         id,
         {
           currentQty: existing.currentQty + input.quantity,
           lastRestocked: new Date(),
-          history,
           ...(lot.supplierName ? { supplier: lot.supplierName } : {}),
         },
         tx
@@ -518,31 +454,10 @@ export class ConsumableService {
         tx
       );
 
-      const history = [
-        ...(Array.isArray(existing.history) ? existing.history : []),
-        historyEntry(
-          "checkout",
-          -input.quantity,
-          actor.displayName,
-          input.reason,
-          input.notes,
-          {
-            unitCost: allocation.unitCost,
-            supplierId: allocation.supplierId ?? undefined,
-            supplierName: allocation.supplierName ?? undefined,
-            lotCode: allocation.lotCode ?? undefined,
-            totalCost: allocation.total,
-            lotAllocations: [allocation],
-            recipientName: input.recipientName,
-          }
-        ),
-      ];
-
       const updated = await this.repo.update(
         existing.id,
         {
           currentQty: existing.currentQty - input.quantity,
-          history,
         },
         tx
       );
@@ -662,35 +577,9 @@ export class ConsumableService {
         });
       }
 
-      const primary = lotAllocations[0];
-
-      const totalCost = lotAllocations.reduce(
-        (sum, a) => sum + Number(a.total),
-        0
-      );
-
-      const history = [
-        ...(Array.isArray(existing.history) ? existing.history : []),
-        historyEntry(
-          "adjustment",
-          input.quantityChange,
-          actor.displayName,
-          input.reason,
-          input.notes,
-          {
-            unitCost: primary?.unitCost,
-            supplierId: primary?.supplierId ?? undefined,
-            supplierName: primary?.supplierName ?? undefined,
-            lotCode: primary?.lotCode ?? undefined,
-            totalCost: totalCost.toFixed(2),
-            lotAllocations,
-          }
-        ),
-      ];
-
       const updated = await this.repo.update(
         id,
-        { currentQty: next, history },
+        { currentQty: next },
         tx
       );
       if (!updated) throw new NotFoundError("Consumable", id);
@@ -766,7 +655,6 @@ export class ConsumableService {
       const allocations: LotCostAllocation[] = [result.allocation];
 
       const totalCost = allocations.reduce((sum, a) => sum + Number(a.total), 0);
-      const primary = allocations[0];
       const destNote = [
         input.reason,
         dest.projectCode
@@ -780,31 +668,10 @@ export class ConsumableService {
         .filter(Boolean)
         .join(". ");
 
-      const history = [
-        ...(Array.isArray(existing.history) ? existing.history : []),
-        historyEntry(
-          "checkout",
-          -input.quantity,
-          actor.displayName,
-          destNote || "Admin issue",
-          input.notes,
-          {
-            unitCost: primary?.unitCost,
-            supplierId: primary?.supplierId ?? undefined,
-            supplierName: primary?.supplierName ?? undefined,
-            lotCode: primary?.lotCode ?? undefined,
-            totalCost: totalCost.toFixed(2),
-            lotAllocations: allocations,
-            recipientName: input.receivedBy,
-          }
-        ),
-      ];
-
       const updated = await this.repo.update(
         id,
         {
           currentQty: existing.currentQty - input.quantity,
-          history,
         },
         tx
       );

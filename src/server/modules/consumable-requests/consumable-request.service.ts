@@ -3,13 +3,11 @@ import type {
   ConsumableRequestLineRow,
   ConsumableRequestReleaseAllocationRow,
   ConsumableRequestRow,
-  StockHistoryEntry,
 } from "@/server/db/schema";
 import { formatRelativeTime } from "@/lib/format-relative-time";
 import {
   generateOperationalCode,
   isoNow,
-  todayDateString,
 } from "@/server/shared/codes";
 import type { ActorContext } from "@/server/shared/auth";
 import { resolveDepartmentSnapshot } from "@/server/shared/auth";
@@ -21,7 +19,6 @@ import {
   NotFoundError,
 } from "@/server/shared/errors";
 import { withTransaction } from "@/server/db/transaction";
-import { AuditLogRepository } from "@/server/modules/audit-logs/audit-logs.repository";
 import { ConsumableRepository } from "@/server/modules/consumables/consumable.repository";
 import {
   PurchaseLotService,
@@ -154,37 +151,6 @@ function historyEntry(
   };
 }
 
-function stockHistoryEntry(
-  type: StockHistoryEntry["type"],
-  quantityChange: number,
-  actor: string,
-  reason?: string,
-  notes?: string,
-  extra?: Partial<
-    Pick<
-      StockHistoryEntry,
-      | "unitCost"
-      | "supplierId"
-      | "supplierName"
-      | "lotCode"
-      | "totalCost"
-      | "lotAllocations"
-      | "recipientName"
-    >
-  >
-): StockHistoryEntry {
-  return {
-    id: crypto.randomUUID(),
-    date: todayDateString(),
-    type,
-    quantityChange,
-    actor,
-    ...(reason ? { reason } : {}),
-    ...(notes ? { notes } : {}),
-    ...extra,
-  };
-}
-
 export interface PaginatedMeta {
   total: number;
   page: number;
@@ -198,7 +164,6 @@ export class ConsumableRequestService {
     private readonly repo = new ConsumableRequestRepository(),
     private readonly consumables = new ConsumableRepository(),
     private readonly purchaseLots = new PurchaseLotService(),
-    private readonly auditLogs = new AuditLogRepository(),
     private readonly movements = new StockMovementService()
   ) {}
 
@@ -366,23 +331,6 @@ export class ConsumableRequestService {
         tx
       );
 
-      await this.auditLogs.create(
-        {
-          entityType: "consumable_request",
-          entityId: created.id,
-          action: "submitted",
-          actorName: actor.displayName,
-          actorUserId: actor.userId,
-          notes: `${lines.length} line(s)`,
-          metadata: {
-            requestCode,
-            lineCount: lines.length,
-            department: dest.departmentName ?? "",
-          },
-        },
-        tx
-      );
-
       return toDTO(created, lines, []);
     });
 
@@ -488,18 +436,6 @@ export class ConsumableRequestService {
       );
       if (!up) throw new NotFoundError("Consumable request", id);
 
-      await this.auditLogs.create(
-        {
-          entityType: "consumable_request",
-          entityId: up.id,
-          action: "approved",
-          actorName: actor.displayName,
-          actorUserId: actor.userId,
-          notes: historyNote,
-        },
-        tx
-      );
-
       return up;
     });
 
@@ -535,18 +471,6 @@ export class ConsumableRequestService {
         tx
       );
       if (!up) throw new NotFoundError("Consumable request", id);
-
-      await this.auditLogs.create(
-        {
-          entityType: "consumable_request",
-          entityId: up.id,
-          action: "rejected",
-          actorName: actor.displayName,
-          actorUserId: actor.userId,
-          notes: input.reason,
-        },
-        tx
-      );
 
       return up;
     });
@@ -610,18 +534,6 @@ export class ConsumableRequestService {
         tx
       );
       if (!up) throw new NotFoundError("Consumable request", id);
-
-      await this.auditLogs.create(
-        {
-          entityType: "consumable_request",
-          entityId: up.id,
-          action: "cancelled",
-          actorName: actor.displayName,
-          actorUserId: actor.userId,
-          notes: input.note,
-        },
-        tx
-      );
 
       return up;
     });
@@ -737,33 +649,6 @@ export class ConsumableRequestService {
           lotAllocations.push(result.allocation);
         }
 
-        const totalCost = lotAllocations.reduce(
-          (sum, a) => sum + Number(a.total),
-          0
-        );
-        const primary =
-          lotAllocations.find((a) => !a.uncosted) ?? lotAllocations[0];
-
-        const history = [
-          ...(Array.isArray(item.history) ? item.history : []),
-          stockHistoryEntry(
-            "checkout",
-            -line.quantityRequested,
-            actor.displayName,
-            `Request ${existing.requestCode}`,
-            noteWithReceiver,
-            {
-              unitCost: primary?.unitCost,
-              supplierId: primary?.supplierId ?? undefined,
-              supplierName: primary?.supplierName ?? undefined,
-              lotCode: primary?.lotCode ?? undefined,
-              totalCost: money(totalCost),
-              lotAllocations,
-              recipientName: input.receivedBy,
-            }
-          ),
-        ];
-
         await this.consumables.update(
           item.id,
           {
@@ -772,7 +657,6 @@ export class ConsumableRequestService {
               0,
               (item.reservedQty ?? 0) - line.quantityRequested
             ),
-            history,
           },
           tx
         );
@@ -834,29 +718,6 @@ export class ConsumableRequestService {
         tx
       );
       if (!up) throw new NotFoundError("Consumable request", id);
-
-      const expenseTotal = savedAllocations.reduce(
-        (sum, a) => sum + Number(a.lineTotal),
-        0
-      );
-
-      await this.auditLogs.create(
-        {
-          entityType: "consumable_request",
-          entityId: up.id,
-          action: "released",
-          actorName: actor.displayName,
-          actorUserId: actor.userId,
-          notes: noteWithReceiver,
-          metadata: {
-            requestCode: existing.requestCode,
-            department: existing.department,
-            totalCost: money(expenseTotal),
-            allocationCount: savedAllocations.length,
-          },
-        },
-        tx
-      );
 
       const lines = await this.repo.listLinesByRequestId(id, tx);
       return toDTO(up, lines, savedAllocations);
@@ -957,18 +818,6 @@ export class ConsumableRequestService {
         tx
       );
       if (!up) throw new NotFoundError("Consumable request", id);
-
-      await this.auditLogs.create(
-        {
-          entityType: "consumable_request",
-          entityId: up.id,
-          action: "update",
-          actorName: actor.displayName,
-          actorUserId: actor.userId,
-          notes: input.editReason,
-        },
-        tx
-      );
 
       const lines = await this.repo.listLinesByRequestId(id, tx);
       return toDTO(up, lines, []);

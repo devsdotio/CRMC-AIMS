@@ -30,8 +30,7 @@ import { AssetLifecycleService } from "@/server/modules/assets/asset.lifecycle.s
 import { BorrowRequestRepository } from "@/server/modules/borrow-requests/borrow-request.repository";
 import { MaintenanceRepository } from "@/server/modules/maintenance/maintenance.repository";
 
-import { BorrowLogRepository } from "./borrow-log.repository";
-import { AuditLogRepository } from "@/server/modules/audit-logs/audit-logs.repository";
+import type { AuditLogRow } from "@/server/db/schema/audit-logs";
 import type { BorrowLogDTO } from "./borrow-log.types";
 import {
   borrowLogIdSchema,
@@ -46,7 +45,49 @@ function daysBetween(from: string, to: string): number {
   return Math.floor((b - a) / (24 * 60 * 60 * 1000));
 }
 
-export function toBorrowLogDTO(row: BorrowTransactionRow, history: import("@/server/db/schema/audit-logs").AuditLogRow[] = []): BorrowLogDTO {
+function asIso(value: Date | string): string {
+  return value instanceof Date ? value.toISOString() : String(value);
+}
+
+function asDate(value: Date | string): Date {
+  return value instanceof Date ? value : new Date(value);
+}
+
+/** Derive custody timeline from the transaction row — no audit_logs writes. */
+function custodyHistoryFromRow(row: BorrowTransactionRow): AuditLogRow[] {
+  const released: AuditLogRow = {
+    id: `${row.id}-released`,
+    entityType: "borrow_transaction",
+    entityId: row.id,
+    action: "released",
+    actorName: row.releasedByName,
+    actorUserId: row.releasedByUserId,
+    timestamp: asDate(row.releasedAt),
+    notes: null,
+    metadata: null,
+  };
+  if (!row.returnedAt) return [released];
+
+  const flagged =
+    row.conditionOnReturn === "needs_repair" ||
+    row.conditionOnReturn === "damaged";
+  return [
+    released,
+    {
+      id: `${row.id}-returned`,
+      entityType: "borrow_transaction",
+      entityId: row.id,
+      action: flagged ? "flagged_repair" : "returned",
+      actorName: row.receivedByName ?? row.releasedByName,
+      actorUserId: row.receivedByUserId,
+      timestamp: asDate(row.returnedAt),
+      notes: row.conditionNotes,
+      metadata: null,
+    },
+  ];
+}
+
+export function toBorrowLogDTO(row: BorrowTransactionRow): BorrowLogDTO {
   const today = todayDateString();
   let status: BorrowLogDTO["status"] = "active";
   let daysOverdue: number | undefined;
@@ -74,23 +115,16 @@ export function toBorrowLogDTO(row: BorrowTransactionRow, history: import("@/ser
     assetCode: row.assetCode,
     assetName: row.assetName,
     category: row.category,
-    releasedAt:
-      row.releasedAt instanceof Date
-        ? row.releasedAt.toISOString()
-        : String(row.releasedAt),
+    releasedAt: asIso(row.releasedAt),
     dueDate: row.dueDate ?? null,
-    returnedAt: row.returnedAt
-      ? row.returnedAt instanceof Date
-        ? row.returnedAt.toISOString()
-        : String(row.returnedAt)
-      : undefined,
+    returnedAt: row.returnedAt ? asIso(row.returnedAt) : undefined,
     daysOverdue,
     status,
     conditionOnReturn: row.conditionOnReturn ?? undefined,
     conditionNotes: row.conditionNotes ?? undefined,
     releasedBy: row.releasedByName,
     receivedBy: row.receivedByName ?? undefined,
-    history,
+    history: custodyHistoryFromRow(row),
   };
 }
 
@@ -106,7 +140,6 @@ export class BorrowLogService {
     private readonly lifecycle = new AssetLifecycleService(),
     private readonly requests = new BorrowRequestRepository(),
     private readonly maintenance = new MaintenanceRepository(),
-    private readonly auditLogs = new AuditLogRepository(),
     private readonly departments = new DepartmentRepository(),
     private readonly projects = new ProjectRepository(),
     private readonly projectAssignments = new ProjectAssetAssignmentRepository()
@@ -118,12 +151,7 @@ export class BorrowLogService {
       filters.borrowerUserId = actor.userId;
     }
     const rows = await this.repo.list(filters);
-    return Promise.all(
-      rows.map(async (row) => {
-        const history = await this.auditLogs.list({ entityType: "borrow_transaction", entityId: row.id });
-        return toBorrowLogDTO(row, history);
-      })
-    );
+    return rows.map((row) => toBorrowLogDTO(row));
   }
 
   async getById(rawId: string, actor?: ActorContext): Promise<BorrowLogDTO> {
@@ -133,8 +161,7 @@ export class BorrowLogService {
     if (actor && !isAssetOperatorRole(actor.role) && row.borrowerUserId !== actor.userId) {
       throw new ForbiddenError("You are not allowed to view this log.");
     }
-    const history = await this.auditLogs.list({ entityType: "borrow_transaction", entityId: row.id });
-    return toBorrowLogDTO(row, history);
+    return toBorrowLogDTO(row);
   }
 
   /**
@@ -184,18 +211,6 @@ export class BorrowLogService {
         conditionOnReturn: "damaged",
         conditionNotes: notes ?? null,
         receivedByName: actor.displayName,
-      },
-      tx
-    );
-
-    await this.auditLogs.create(
-      {
-        entityType: "borrow_transaction",
-        entityId: open.id,
-        action: "returned",
-        actorName: actor.displayName,
-        actorUserId: actor.userId,
-        notes: notes ?? "Closed with project write-off.",
       },
       tx
     );
@@ -375,18 +390,6 @@ export class BorrowLogService {
       tx
     );
 
-    await this.auditLogs.create(
-      {
-        entityType: "borrow_transaction",
-        entityId: row.id,
-        action: "released",
-        actorName: actor.displayName,
-        actorUserId: actor.userId,
-        notes: input.notes,
-      },
-      tx
-    );
-
     await this.assets.update(
       asset.id,
       {
@@ -406,7 +409,7 @@ export class BorrowLogService {
         tx
       );
       if (!alreadyOpen) {
-        const assignment = await this.projectAssignments.create(
+        await this.projectAssignments.create(
           {
             projectId: destination.projectId,
             assetId: asset.id,
@@ -421,25 +424,6 @@ export class BorrowLogService {
             returnedByName: null,
             notes: input.notes ?? null,
             returnNotes: null,
-          },
-          tx
-        );
-
-        await this.auditLogs.create(
-          {
-            entityType: "project_asset_assignment",
-            entityId: assignment.id,
-            action: "assigned",
-            actorName: actor.displayName,
-            actorUserId: actor.userId,
-            notes: input.notes ?? undefined,
-            metadata: {
-              projectId: destination.projectId,
-              assetId: asset.id,
-              assetCode: asset.assetCode,
-              via: "custody_release",
-              logCode,
-            },
           },
           tx
         );
@@ -523,18 +507,6 @@ export class BorrowLogService {
         tx
       );
       if (!updated) throw new NotFoundError("Borrow log", id);
-
-      await this.auditLogs.create(
-        {
-          entityType: "borrow_transaction",
-          entityId: updated.id,
-          action: needsMaint ? "flagged_repair" : "returned",
-          actorName: actor.displayName,
-          actorUserId: actor.userId,
-          notes: input.conditionNotes ?? `Condition: ${input.condition}`,
-        },
-        tx
-      );
 
       if (existing.assetId) {
         const asset = await this.assets.findByIdForUpdate(existing.assetId, tx);
@@ -684,8 +656,7 @@ export class BorrowLogService {
         }
       }
 
-      const history = await this.auditLogs.list({ entityType: "borrow_transaction", entityId: updated.id }, tx);
-      return toBorrowLogDTO(updated, history);
+      return toBorrowLogDTO(updated);
   }
 
   /** Helper for AssetService.releaseAsset → single custody path. */

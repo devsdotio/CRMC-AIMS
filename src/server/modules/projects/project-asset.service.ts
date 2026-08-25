@@ -16,7 +16,6 @@ import {
 import { withTransaction } from "@/server/db/transaction";
 import { AssetRepository } from "@/server/modules/assets/asset.repository";
 import { AssetLifecycleService } from "@/server/modules/assets/asset.lifecycle.service";
-import { AuditLogRepository } from "@/server/modules/audit-logs/audit-logs.repository";
 import { MaintenanceRepository } from "@/server/modules/maintenance/maintenance.repository";
 
 import { ProjectRepository } from "./project.repository";
@@ -84,7 +83,6 @@ export class ProjectAssetService {
     private readonly projects = new ProjectRepository(),
     private readonly assets = new AssetRepository(),
     private readonly lifecycle = new AssetLifecycleService(),
-    private readonly auditLogs = new AuditLogRepository(),
     private readonly maintenance = new MaintenanceRepository(),
     private readonly expenses = new ProjectExpenseRepository(),
     private readonly borrowLogs = new BorrowLogService(),
@@ -218,23 +216,6 @@ export class ProjectAssetService {
           tx
         );
       }
-
-      await this.auditLogs.create(
-        {
-          entityType: "project_asset_assignment",
-          entityId: assignment.id,
-          action: "returned",
-          actorName: actor.displayName,
-          actorUserId: actor.userId,
-          notes: input.notes ?? undefined,
-          metadata: {
-            projectId,
-            assetId: assignment.assetId,
-            assetCode: assignment.assetCode,
-          },
-        },
-        tx
-      );
 
       if (!updated) throw new NotFoundError("Project asset assignment", assignmentId);
       return toDTO(updated);

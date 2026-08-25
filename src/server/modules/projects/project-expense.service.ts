@@ -1,7 +1,6 @@
 import type {
   ProjectExpenseLineRow,
   ProjectExpenseMetadata,
-  StockHistoryEntry,
 } from "@/server/db/schema";
 import type { ActorContext } from "@/server/shared/auth";
 import { todayDateString } from "@/server/shared/codes";
@@ -58,24 +57,6 @@ function toDTO(row: ProjectExpenseLineRow): ProjectExpenseLineDTO {
     consumableCode: metadata.consumableCode ?? null,
     consumableName: metadata.consumableName ?? null,
     consumableUnit: metadata.consumableUnit ?? null,
-  };
-}
-
-function stockHistoryEntry(
-  type: StockHistoryEntry["type"],
-  quantityChange: number,
-  actor: string,
-  reason?: string,
-  notes?: string
-): StockHistoryEntry {
-  return {
-    id: crypto.randomUUID(),
-    date: todayDateString(),
-    type,
-    quantityChange,
-    actor,
-    ...(reason ? { reason } : {}),
-    ...(notes ? { notes } : {}),
   };
 }
 
@@ -291,23 +272,10 @@ export class ProjectExpenseService {
         input.description?.trim() ||
         `${item.name} (${item.itemCode}) × ${input.quantity} ${item.unit}`;
 
-      const history = [
-        ...(Array.isArray(item.history) ? item.history : []),
-        stockHistoryEntry(
-          "checkout",
-          -input.quantity,
-          actor.displayName,
-          "Project material use",
-          input.notes ??
-            `Charged to ${project.projectCode} — ${project.name}`
-        ),
-      ];
-
       await this.consumables.update(
         item.id,
         {
           currentQty: item.currentQty - input.quantity,
-          history,
         },
         tx
       );
@@ -489,22 +457,11 @@ export class ProjectExpenseService {
       }
 
       const returnNote = `Project material line removed — stock returned to inventory`;
-      const history = [
-        ...(Array.isArray(item.history) ? item.history : []),
-        stockHistoryEntry(
-          "restock",
-          qty,
-          actor.displayName,
-          returnNote,
-          `Reversed expense ${existing.id}`
-        ),
-      ];
 
       await this.consumables.update(
         item.id,
         {
           currentQty: item.currentQty + qty,
-          history,
         },
         tx
       );

@@ -72,6 +72,7 @@ export const consumables = pgTable(
     lastRestocked: timestamp("last_restocked", { withTimezone: true }),
     notes: text("notes"),
 
+    /** Legacy JSON trail. Stock events go to stock_movements; this stays empty. */
     history: jsonb("history")
       .$type<StockHistoryEntry[]>()
       .notNull()

@@ -23,7 +23,6 @@ import type {
   IBorrowRequestRepository,
 } from "./borrow-request.types";
 import { AssetRepository } from "../assets/asset.repository";
-import { AuditLogRepository } from "../audit-logs/audit-logs.repository";
 import { BorrowLogService } from "../borrow-log/borrow-log.service";
 import { BorrowLogRepository } from "../borrow-log/borrow-log.repository";
 import { DepartmentRepository } from "../departments/department.repository";
@@ -141,7 +140,6 @@ export interface PaginatedMeta {
 export class BorrowRequestService {
   constructor(
     private readonly repo: IBorrowRequestRepository = new BorrowRequestRepository(),
-    private readonly auditLogs = new AuditLogRepository(),
     private readonly assetRepo = new AssetRepository(),
     private readonly borrowLogs = new BorrowLogService(),
     private readonly borrowLogRepo = new BorrowLogRepository(),
@@ -281,15 +279,6 @@ export class BorrowRequestService {
         requestedAt: new Date(),
       }, tx);
 
-      await this.auditLogs.create({
-        entityType: "borrow_request",
-        entityId: created.id,
-        action: "submitted",
-        actorName: actor.displayName,
-        actorUserId: actor.userId,
-        notes: "Request recorded",
-      }, tx);
-
       return created;
     });
 
@@ -354,15 +343,6 @@ export class BorrowRequestService {
         );
       }
 
-      await this.auditLogs.create({
-        entityType: "borrow_request",
-        entityId: up.id,
-        action: "approved",
-        actorName: actor.displayName,
-        actorUserId: actor.userId,
-        notes: historyNote,
-      }, tx);
-
       return up;
     });
     return toDTO(updated);
@@ -393,15 +373,6 @@ export class BorrowRequestService {
         history,
       }, tx);
       if (!up) throw new NotFoundError("Borrow request", id);
-
-      await this.auditLogs.create({
-        entityType: "borrow_request",
-        entityId: up.id,
-        action: "rejected",
-        actorName: actor.displayName,
-        actorUserId: actor.userId,
-        notes: input.reason,
-      }, tx);
 
       return up;
     });
@@ -559,23 +530,6 @@ export class BorrowRequestService {
       );
       if (!up) throw new NotFoundError("Borrow request", id);
 
-      await this.auditLogs.create(
-        {
-          entityType: "borrow_request",
-          entityId: up.id,
-          action: "released",
-          actorName: actor.displayName,
-          actorUserId: actor.userId,
-          notes: noteWithPicker,
-          metadata: {
-            requestCode: existing.requestCode,
-            pickedUpBy: input.pickedUpBy,
-            issuedAssetIds: [...seenAssetIds],
-          },
-        },
-        tx
-      );
-
       return up;
     });
     return toDTO(updated);
@@ -613,18 +567,6 @@ export class BorrowRequestService {
         tx
       );
       if (!up) throw new NotFoundError("Borrow request", id);
-
-      await this.auditLogs.create(
-        {
-          entityType: "borrow_request",
-          entityId: up.id,
-          action: "cancelled",
-          actorName: actor.displayName,
-          actorUserId: actor.userId,
-          notes: input.note,
-        },
-        tx
-      );
 
       return up;
     });
@@ -666,15 +608,6 @@ export class BorrowRequestService {
           );
         }
       }
-
-      await this.auditLogs.create({
-        entityType: "borrow_request",
-        entityId: up.id,
-        action: "unreleased",
-        actorName: actor.displayName,
-        actorUserId: actor.userId,
-        notes: input.note,
-      }, tx);
 
       return up;
     });
@@ -759,18 +692,6 @@ export class BorrowRequestService {
       );
       if (!up) throw new NotFoundError("Borrow request", id);
 
-      await this.auditLogs.create(
-        {
-          entityType: "borrow_request",
-          entityId: up.id,
-          action: "returned",
-          actorName: actor.displayName,
-          actorUserId: actor.userId,
-          notes: noteWithReturner,
-        },
-        tx
-      );
-
       return up;
     });
     return toDTO(updated);
@@ -853,18 +774,6 @@ export class BorrowRequestService {
         tx
       );
       if (!up) throw new NotFoundError("Borrow request", id);
-
-      await this.auditLogs.create(
-        {
-          entityType: "borrow_request",
-          entityId: up.id,
-          action: "update",
-          actorName: actor.displayName,
-          actorUserId: actor.userId,
-          notes: input.editReason,
-        },
-        tx
-      );
 
       return up;
     });
