@@ -854,8 +854,8 @@ export class AssetService {
         departmentId: input.departmentId,
         projectId: input.projectId,
         borrowerName: input.borrowerName,
-        borrowerEmail: input.borrowerEmail ?? "",
-        borrowerPhone: input.borrowerPhone ?? "",
+        borrowerEmail: input.borrowerEmail || undefined,
+        borrowerPhone: input.borrowerPhone || undefined,
         dueDate:
           custodyKind === "borrow"
             ? (input.expectedReturnDate ?? this.borrowLogs.defaultDueDate())

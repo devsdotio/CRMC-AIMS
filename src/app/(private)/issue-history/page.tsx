@@ -91,7 +91,16 @@ function supplyToDetailRecord(row: StockMovement): IssueDetailRecord {
     qtyLabel: `${signed}${row.unit ? ` ${row.unit}` : ""}`,
     when: row.createdAt,
     actor: row.actorName || "Custodian",
-    source: row.reason === "issue" ? "Issued Consumable" : `Movement (${row.reason})`,
+    source:
+      row.reason === "issue"
+        ? "Issued Consumable"
+        : row.reason === "restock"
+          ? row.notes?.toLowerCase().includes("project material line removed")
+            ? "Project Line Reversed"
+            : "Restocked"
+          : row.reason === "adjust"
+            ? "Stock Adjustment"
+            : `Movement (${row.reason})`,
     extra: row.lotCode
       ? `Lot: ${row.lotCode}${row.lineTotal ? ` · ${formatPhp(Number(row.lineTotal))}` : ""}`
       : row.lineTotal

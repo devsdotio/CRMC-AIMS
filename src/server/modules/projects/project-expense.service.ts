@@ -13,6 +13,10 @@ import {
 import { withTransaction } from "@/server/db/transaction";
 import { ConsumableRepository } from "@/server/modules/consumables/consumable.repository";
 import { PurchaseLotRepository } from "@/server/modules/purchase-lots/purchase-lot.repository";
+import {
+  StockMovementService,
+  allocationsToMovementLines,
+} from "@/server/modules/stock-movements/stock-movement.service";
 
 import { ProjectRepository } from "./project.repository";
 import { ProjectExpenseRepository } from "./project-expense.repository";
@@ -80,7 +84,8 @@ export class ProjectExpenseService {
     private readonly expenses = new ProjectExpenseRepository(),
     private readonly projects = new ProjectRepository(),
     private readonly consumables = new ConsumableRepository(),
-    private readonly lots = new PurchaseLotRepository()
+    private readonly lots = new PurchaseLotRepository(),
+    private readonly movements = new StockMovementService()
   ) {}
 
   private async requireMutableProject(projectId: string) {
@@ -286,6 +291,24 @@ export class ProjectExpenseService {
         tx
       );
 
+      await this.movements.record(
+        {
+          consumableId: item.id,
+          direction: "out",
+          reason: "issue",
+          actor,
+          projectId,
+          notes:
+            input.notes ??
+            `Charged to ${project.projectCode} — ${project.name}`,
+          lines:
+            lotAllocations.length > 0
+              ? allocationsToMovementLines(lotAllocations)
+              : [{ qty: input.quantity }],
+        },
+        tx
+      );
+
       const row = await this.expenses.create(
         {
           projectId,
@@ -379,7 +402,7 @@ export class ProjectExpenseService {
   async delete(
     rawProjectId: string,
     rawExpenseId: string,
-    actor?: ActorContext
+    actor: ActorContext
   ): Promise<void> {
     const projectId = projectIdSchema.parse(rawProjectId);
     const expenseId = expenseIdSchema.parse(rawExpenseId);
@@ -411,7 +434,7 @@ export class ProjectExpenseService {
 
   private async reverseConsumableExpense(
     existing: ProjectExpenseLineRow,
-    actor?: ActorContext
+    actor: ActorContext
   ): Promise<void> {
     const qty = Math.round(Number(existing.quantity ?? 0));
     if (!existing.consumableId || !Number.isFinite(qty) || qty <= 0) {
@@ -444,14 +467,14 @@ export class ProjectExpenseService {
         );
       }
 
-      const actorName = actor?.displayName ?? "System";
+      const returnNote = `Project material line removed — stock returned to inventory`;
       const history = [
         ...(Array.isArray(item.history) ? item.history : []),
         stockHistoryEntry(
           "restock",
           qty,
-          actorName,
-          "Project material line removed",
+          actor.displayName,
+          returnNote,
           `Reversed expense ${existing.id}`
         ),
       ];
@@ -461,6 +484,32 @@ export class ProjectExpenseService {
         {
           currentQty: item.currentQty + qty,
           history,
+        },
+        tx
+      );
+
+      // Issue-history / stock_movements ledger must mirror the stock return.
+      await this.movements.record(
+        {
+          consumableId: item.id,
+          direction: "in",
+          reason: "restock",
+          actor,
+          projectId: existing.projectId,
+          notes: returnNote,
+          lines:
+            allocations.length > 0
+              ? allocationsToMovementLines(
+                  allocations.map((a) => ({
+                    lotId: a.lotId,
+                    lotCode: a.lotCode,
+                    quantity: a.quantity,
+                    unitCost: a.unitCost,
+                    total: a.total,
+                    uncosted: a.uncosted,
+                  }))
+                )
+              : [{ qty }],
         },
         tx
       );

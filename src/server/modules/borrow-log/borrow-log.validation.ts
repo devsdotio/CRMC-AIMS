@@ -31,7 +31,15 @@ export const releaseBorrowSchema = z
     projectId: z.string().uuid().optional(),
     /** Display name for person who picked up (optional; destination is dept/project). */
     borrowerName: z.string().trim().max(255).optional(),
-    borrowerEmail: z.string().trim().email().max(320).optional().default(""),
+    borrowerEmail: z
+      .string()
+      .trim()
+      .max(320)
+      .optional()
+      .default("")
+      .refine((v) => v === "" || z.string().email().safeParse(v).success, {
+        message: "Invalid email address",
+      }),
     borrowerPhone: z.string().trim().max(40).optional().default(""),
     dueDate: z
       .string()

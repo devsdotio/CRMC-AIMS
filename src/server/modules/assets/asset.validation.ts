@@ -50,7 +50,14 @@ export const releaseAssetSchema = z
     projectId: z.string().uuid().optional(),
     borrowerName: z.string().trim().max(255).optional(),
     borrowerDepartment: z.string().trim().min(1).max(120).optional(),
-    borrowerEmail: z.string().trim().email().max(320).optional(),
+    borrowerEmail: z
+      .string()
+      .trim()
+      .max(320)
+      .optional()
+      .refine((v) => !v || z.string().email().safeParse(v).success, {
+        message: "Invalid email address",
+      }),
     borrowerPhone: z.string().trim().max(40).optional(),
     notes: z.string().trim().max(2000).optional(),
     expectedReturnDate: z
