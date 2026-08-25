@@ -80,6 +80,7 @@ export const borrowRequests = pgTable(
         category: string;
         quantity: number;
         itemType: "asset" | "consumable";
+        unit?: string;
       }[]>()
       .notNull()
       .default(sql`'[]'::jsonb`),

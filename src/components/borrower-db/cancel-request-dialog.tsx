@@ -77,7 +77,7 @@ export function CancelRequestDialog({
               <p key={idx} className="font-semibold text-text">
                 {formatItemDescription(item.itemDescription, item.category, item.itemType)}
                 <span className="ml-2 text-xs font-normal text-text-secondary">
-                  × {formatQuantityWithUnit(item.quantity, (item as any).unit, item.itemType)}
+                  × {formatQuantityWithUnit(item.quantity, item.unit, item.itemType)}
                 </span>
               </p>
             ))}

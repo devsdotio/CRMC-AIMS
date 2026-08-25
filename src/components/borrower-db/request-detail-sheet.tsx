@@ -368,7 +368,7 @@ export function RequestDetailSheet({
                     <div className="text-right shrink-0 bg-bg-subtle px-2.5 py-1 rounded-md border border-border">
                       <p className="text-[10px] uppercase tracking-wider text-text-secondary font-semibold">Qty</p>
                       <p className="font-bold text-xs text-text">
-                        {formatQuantityWithUnit(item.quantity, (item as any).unit, item.itemType)}
+                        {formatQuantityWithUnit(item.quantity, item.unit, item.itemType)}
                       </p>
                     </div>
                   </div>

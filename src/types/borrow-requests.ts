@@ -42,6 +42,7 @@ export interface BorrowRequest {
     category: AssetCategory;
     quantity: number;
     itemType: "asset" | "consumable";
+    unit?: string;
   }[];
   purpose: string;
   requestedAt: string;

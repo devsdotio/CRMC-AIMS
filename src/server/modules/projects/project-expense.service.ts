@@ -79,6 +79,27 @@ function stockHistoryEntry(
   };
 }
 
+/** Normalize project expense lot rows into stock-movement line payloads. */
+function expenseAllocationsToMovementLines(
+  allocations: Array<{
+    lotId?: string | null;
+    lotCode?: string | null;
+    quantity: number;
+    unitCost: string;
+    total: string;
+  }>
+) {
+  return allocationsToMovementLines(
+    allocations.map((a) => ({
+      lotId: a.lotId ?? null,
+      lotCode: a.lotCode ?? null,
+      quantity: a.quantity,
+      unitCost: a.unitCost,
+      total: a.total,
+    }))
+  );
+}
+
 export class ProjectExpenseService {
   constructor(
     private readonly expenses = new ProjectExpenseRepository(),
@@ -303,7 +324,7 @@ export class ProjectExpenseService {
             `Charged to ${project.projectCode} — ${project.name}`,
           lines:
             lotAllocations.length > 0
-              ? allocationsToMovementLines(lotAllocations)
+              ? expenseAllocationsToMovementLines(lotAllocations)
               : [{ qty: input.quantity }],
         },
         tx
@@ -499,16 +520,7 @@ export class ProjectExpenseService {
           notes: returnNote,
           lines:
             allocations.length > 0
-              ? allocationsToMovementLines(
-                  allocations.map((a) => ({
-                    lotId: a.lotId,
-                    lotCode: a.lotCode,
-                    quantity: a.quantity,
-                    unitCost: a.unitCost,
-                    total: a.total,
-                    uncosted: a.uncosted,
-                  }))
-                )
+              ? expenseAllocationsToMovementLines(allocations)
               : [{ qty }],
         },
         tx
