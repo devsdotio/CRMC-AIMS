@@ -164,6 +164,7 @@ export function SignInForm() {
         body: JSON.stringify({
           email: formValues.email.trim(),
           password: formValues.password,
+          rememberMe: formValues.rememberMe,
         }),
       });
 

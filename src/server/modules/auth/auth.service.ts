@@ -1,6 +1,11 @@
 import type { Session, User } from "@supabase/supabase-js";
+import { cookies } from "next/headers";
 
 import { createClient } from "@/lib/supabase/server";
+import {
+  REMEMBER_ME_COOKIE,
+  rememberMePreferenceOptions,
+} from "@/lib/auth/remember-me";
 import {
   ForbiddenError,
   UnauthorizedError,
@@ -64,7 +69,7 @@ export class AuthService {
    */
   async signIn(raw: unknown): Promise<SignInResultDTO> {
     const input = signInSchema.parse(raw);
-    return this.authenticate(input);
+    return this.authenticate(input, { rememberMe: Boolean(input.rememberMe) });
   }
 
   /**
@@ -101,13 +106,30 @@ export class AuthService {
       // Idempotent: already signed out is not a failure for the client.
       console.warn("[auth] signOut:", error.message);
     }
+
+    try {
+      const cookieStore = await cookies();
+      cookieStore.set(REMEMBER_ME_COOKIE, "", {
+        ...rememberMePreferenceOptions(false),
+        maxAge: 0,
+      });
+    } catch {
+      // Route handler should allow cookie writes; ignore if not.
+    }
   }
 
   /**
    * Shared credential + profile gate used by sign-in and OAuth2 token flows.
+   * Pass `cookiePrefs` only from browser sign-in so Swagger token calls do not
+   * overwrite the device remember-me preference.
    */
-  private async authenticate(input: SignInInput): Promise<SignInResultDTO> {
-    const supabase = await createClient();
+  private async authenticate(
+    input: SignInInput,
+    cookiePrefs?: { rememberMe: boolean }
+  ): Promise<SignInResultDTO> {
+    const supabase = cookiePrefs
+      ? await createClient({ rememberMe: cookiePrefs.rememberMe })
+      : await createClient();
 
     const { data, error } = await supabase.auth.signInWithPassword({
       email: input.email,
@@ -133,6 +155,17 @@ export class AuthService {
     } catch (gateError) {
       // Drop partial cookies so a deactivated/missing profile cannot stick.
       await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
+      if (cookiePrefs) {
+        try {
+          const cookieStore = await cookies();
+          cookieStore.set(REMEMBER_ME_COOKIE, "", {
+            ...rememberMePreferenceOptions(false),
+            maxAge: 0,
+          });
+        } catch {
+          // ignore
+        }
+      }
       throw gateError;
     }
   }

@@ -4,6 +4,8 @@ import type { AppRole, ProfileStatus } from "@/server/shared/roles";
 export interface SignInInput {
   email: string;
   password: string;
+  /** Keep session cookies across browser restarts when true. */
+  rememberMe?: boolean;
 }
 
 /**
