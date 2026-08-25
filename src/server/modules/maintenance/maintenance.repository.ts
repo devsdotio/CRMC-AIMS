@@ -71,6 +71,23 @@ export class MaintenanceRepository implements IMaintenanceRepository {
     return Number(row?.value ?? 0);
   }
 
+  async countOpenByAssetId(
+    assetId: string,
+    session?: DbSession
+  ): Promise<number> {
+    const db = this.db(session);
+    const [row] = await db
+      .select({ value: count() })
+      .from(maintenanceLogs)
+      .where(
+        and(
+          eq(maintenanceLogs.assetId, assetId),
+          eq(maintenanceLogs.isResolved, false)
+        )
+      );
+    return Number(row?.value ?? 0);
+  }
+
   async countYear(session?: DbSession): Promise<number> {
     const db = this.db(session);
     const [row] = await db

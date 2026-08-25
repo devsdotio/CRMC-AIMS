@@ -128,58 +128,30 @@ export class ProjectAssetService {
     const project = await this.requireMutableProject(projectId);
     const input = assignAssetToProjectSchema.parse(rawInput);
 
-    await this.borrowLogs.release(
-      {
-        assetId: input.assetId,
-        projectId,
-        custodyKind: "assignment",
-        source: "project_legacy",
-        borrowerName: holderLabel(project.projectCode, project.name),
-        notes: input.notes,
-      },
-      actor
-    );
-
+    // Single TX: release creates borrow log + holder + project_asset_assignments.
     return withTransaction(async (tx) => {
-      const asset = await this.assets.findById(input.assetId, tx);
-      if (!asset) throw new NotFoundError("Asset", input.assetId);
-
-      const assignment = await this.assignments.create(
+      await this.borrowLogs.release(
         {
+          assetId: input.assetId,
           projectId,
-          assetId: asset.id,
-          assetCode: asset.assetCode,
-          assetName: asset.name,
-          status: "assigned",
-          assignedAt: new Date(),
-          returnedAt: null,
-          assignedByUserId: actor.userId,
-          assignedByName: actor.displayName,
-          returnedByUserId: null,
-          returnedByName: null,
-          notes: input.notes ?? null,
-          returnNotes: null,
+          custodyKind: "assignment",
+          source: "project_legacy",
+          borrowerName: holderLabel(project.projectCode, project.name),
+          notes: input.notes,
         },
+        actor,
         tx
       );
 
-      await this.auditLogs.create(
-        {
-          entityType: "project_asset_assignment",
-          entityId: assignment.id,
-          action: "assigned",
-          actorName: actor.displayName,
-          actorUserId: actor.userId,
-          notes: input.notes ?? undefined,
-          metadata: {
-            projectId: project.id,
-            projectCode: project.projectCode,
-            assetId: asset.id,
-            assetCode: asset.assetCode,
-          },
-        },
+      const assignment = await this.assignments.findOpenByAssetId(
+        input.assetId,
         tx
       );
+      if (!assignment) {
+        throw new ConflictError(
+          "Project assignment was not created. Try again or check asset availability."
+        );
+      }
 
       return toDTO(assignment);
     });
@@ -210,27 +182,42 @@ export class ProjectAssetService {
         tx
       );
       if (openLog) {
+        // Closes borrow log + assignment + clears holder in one nested path.
         await this.borrowLogs.returnLog(
           openLog.id,
           {
             condition: "good",
             conditionNotes: input.notes,
           },
-          actor
+          actor,
+          tx
         );
       }
 
-      const updated = await this.assignments.update(
-        assignment.id,
-        {
-          status: "returned",
-          returnedAt: new Date(),
-          returnedByUserId: actor.userId,
-          returnedByName: actor.displayName,
-          returnNotes: input.notes ?? null,
-        },
-        tx
-      );
+      let updated = await this.assignments.findById(assignmentId, tx);
+      if (updated?.status === "assigned") {
+        updated = await this.assignments.update(
+          assignment.id,
+          {
+            status: "returned",
+            returnedAt: new Date(),
+            returnedByUserId: actor.userId,
+            returnedByName: actor.displayName,
+            returnNotes: input.notes ?? null,
+          },
+          tx
+        );
+      }
+
+      // Always clear holder even if borrow log was already missing (legacy orphan).
+      const asset = await this.assets.findById(assignment.assetId, tx);
+      if (asset?.currentHolder) {
+        await this.assets.update(
+          assignment.assetId,
+          { currentHolder: null, lastUpdated: new Date() },
+          tx
+        );
+      }
 
       await this.auditLogs.create(
         {
@@ -405,6 +392,14 @@ export class ProjectAssetService {
         input.amount ??
         parseMoney(asset.value) ??
         "0.00";
+
+      // Close active borrow log first so borrow-log UI doesn't keep a ghost custody.
+      await this.borrowLogs.closeActiveBorrowLogOnlyInTx(
+        asset.id,
+        actor,
+        `Write-off on project ${project.projectCode}: ${notes}`,
+        tx
+      );
 
       const updated = await this.assignments.update(
         assignment.id,

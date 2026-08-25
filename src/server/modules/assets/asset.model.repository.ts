@@ -5,6 +5,7 @@ import type { DbSession } from "@/server/db/transaction";
 import {
   assetModels,
   assets,
+  borrowTransactions,
   projectAssetAssignments,
   type AssetModelRow,
   type NewAssetModelRow,
@@ -170,6 +171,11 @@ export class AssetModelRepository {
             select 1 from ${projectAssetAssignments}
             where ${projectAssetAssignments.assetId} = ${assets.id}
               and ${projectAssetAssignments.status} = 'assigned'
+          )`,
+          sql`not exists (
+            select 1 from ${borrowTransactions}
+            where ${borrowTransactions.assetId} = ${assets.id}
+              and ${borrowTransactions.status} = 'active'
           )`
         )
       );

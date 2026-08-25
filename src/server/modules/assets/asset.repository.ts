@@ -4,6 +4,7 @@ import { getDb } from "@/server/db";
 import type { DbSession } from "@/server/db/transaction";
 import {
   assets,
+  borrowTransactions,
   projectAssetAssignments,
   type AssetRow,
   type NewAssetRow,
@@ -93,12 +94,19 @@ export class AssetRepository implements IAssetRepository {
       conditions.push(eq(assets.status, "active"));
       conditions.push(isNull(assets.currentHolder));
       conditions.push(isNull(assets.reservedForRequestId));
-      // Must match release checks: open project custody blocks issue/assign.
+      // Must match release checks: open project or borrow custody blocks issue/assign.
       conditions.push(
         sql`not exists (
           select 1 from ${projectAssetAssignments}
           where ${projectAssetAssignments.assetId} = ${assets.id}
             and ${projectAssetAssignments.status} = 'assigned'
+        )`
+      );
+      conditions.push(
+        sql`not exists (
+          select 1 from ${borrowTransactions}
+          where ${borrowTransactions.assetId} = ${assets.id}
+            and ${borrowTransactions.status} = 'active'
         )`
       );
     }

@@ -241,6 +241,7 @@ export function IssueAssetDialog({
             type="submit"
             disabled={
               releaseMutation.isPending ||
+              asset.status !== "active" ||
               Boolean(asset.currentHolder) ||
               Boolean(asset.reservedForRequestId)
             }

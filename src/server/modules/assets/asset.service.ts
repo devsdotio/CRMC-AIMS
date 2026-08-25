@@ -206,9 +206,9 @@ export class AssetService {
   }
 
   /**
-   * If an open project assignment exists but assets.current_holder was cleared
-   * (orphan from a borrow-log-only return), surface the project as holder so
-   * the UI does not show "Available" / allow Issue.
+   * If an open project assignment or active borrow log exists but
+   * assets.current_holder was cleared, surface the holder so the UI does not
+   * show "Available" / allow Issue.
    */
   private async withOpenProjectCustodyHolders(
     dtos: AssetDTOWithMeta[]
@@ -218,15 +218,21 @@ export class AssetService {
       .map((d) => d.id);
     if (missingHolderIds.length === 0) return dtos;
 
-    const labels =
+    const projectLabels =
       await this.projectAssignments.findOpenHolderLabelsByAssetIds(
         missingHolderIds
       );
-    if (labels.size === 0) return dtos;
+    const stillMissing = missingHolderIds.filter((id) => !projectLabels.has(id));
+    const borrowLabels =
+      stillMissing.length === 0
+        ? new Map<string, string>()
+        : await this.borrowLogRepo.findActiveHolderLabelsByAssetIds(stillMissing);
+
+    if (projectLabels.size === 0 && borrowLabels.size === 0) return dtos;
 
     return dtos.map((d) => {
       if (d.currentHolder) return d;
-      const label = labels.get(d.id);
+      const label = projectLabels.get(d.id) ?? borrowLabels.get(d.id);
       return label ? { ...d, currentHolder: label } : d;
     });
   }
@@ -671,6 +677,26 @@ export class AssetService {
     let categoryName: string | undefined;
     if (input.category !== undefined) {
       categoryName = await this.resolveAssetCategoryName(input.category);
+    }
+
+    if (input.status !== undefined && input.status !== existing.status) {
+      if (input.status === "retired" || input.status === "out_of_service") {
+        const open = await this.borrowLogRepo.findActiveByAssetId(id);
+        const openProject = await this.projectAssignments.findOpenByAssetId(id);
+        if (open || openProject || existing.currentHolder) {
+          throw new ConflictError(
+            "Return the asset from custody (borrow log or project) before retiring or marking out of service."
+          );
+        }
+      }
+      if (input.status === "active" && existing.status === "needs_repair") {
+        const openMaint = await this.maintenanceRepo.countOpenByAssetId(id);
+        if (openMaint > 0) {
+          throw new ConflictError(
+            "Resolve open maintenance logs before marking this asset active."
+          );
+        }
+      }
     }
 
     try {

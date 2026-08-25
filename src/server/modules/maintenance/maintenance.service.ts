@@ -161,15 +161,9 @@ export class MaintenanceLogService {
       if (existing.assetId) {
         const asset = await this.assets.findByIdForUpdate(existing.assetId, tx);
         if (asset && asset.status === "needs_repair") {
-          // Only clear repair status if no other open maintenance cases for asset
-          const openOthers = await this.repo.list(
-            { openOnly: true, search: asset.assetCode },
-            tx
-          );
-          const stillOpen = openOthers.some(
-            (m) => m.assetId === asset.id && m.id !== id
-          );
-          if (!stillOpen) {
+          // This log is already marked resolved above; only reactivate if none remain open.
+          const stillOpen = await this.repo.countOpenByAssetId(asset.id, tx);
+          if (stillOpen === 0) {
             await this.assets.update(
               asset.id,
               { status: "active", lastUpdated: new Date() },

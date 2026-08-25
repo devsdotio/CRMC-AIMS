@@ -140,12 +140,19 @@ export class BorrowLogService {
   /**
    * Atomic release: lock asset → open log → set holder → lifecycle.
    * Race-safe via FOR UPDATE + unique index on one active log per asset.
+   * Pass `session` to join an outer transaction (multi-unit release / project assign).
    */
-  async release(rawInput: unknown, actor: ActorContext): Promise<BorrowLogDTO> {
+  async release(
+    rawInput: unknown,
+    actor: ActorContext,
+    session?: DbSession
+  ): Promise<BorrowLogDTO> {
     const input = releaseBorrowSchema.parse(rawInput);
+    const run = (tx: DbSession) => this.releaseInTx(input, actor, tx);
 
     try {
-      return await withTransaction(async (tx) => this.releaseInTx(input, actor, tx));
+      if (session) return await run(session);
+      return await withTransaction(run);
     } catch (error) {
       if (isUniqueViolation(error)) {
         throw new ConflictError(
@@ -154,6 +161,44 @@ export class BorrowLogService {
       }
       throw error;
     }
+  }
+
+  /**
+   * Close an active borrow log without clearing holder / project assignment.
+   * Used by project write-off which owns those fields itself.
+   */
+  async closeActiveBorrowLogOnlyInTx(
+    assetId: string,
+    actor: ActorContext,
+    notes: string | undefined,
+    tx: DbSession
+  ): Promise<void> {
+    const open = await this.repo.findActiveByAssetId(assetId, tx);
+    if (!open) return;
+
+    await this.repo.update(
+      open.id,
+      {
+        status: "returned",
+        returnedAt: new Date(),
+        conditionOnReturn: "damaged",
+        conditionNotes: notes ?? null,
+        receivedByName: actor.displayName,
+      },
+      tx
+    );
+
+    await this.auditLogs.create(
+      {
+        entityType: "borrow_transaction",
+        entityId: open.id,
+        action: "returned",
+        actorName: actor.displayName,
+        actorUserId: actor.userId,
+        notes: notes ?? "Closed with project write-off.",
+      },
+      tx
+    );
   }
 
   private async resolveDestination(
@@ -353,6 +398,54 @@ export class BorrowLogService {
       tx
     );
 
+    // Keep project panel in sync whenever custody goes to a project
+    // (Issue from assets page and Project → Assign share this path).
+    if (destination.projectId) {
+      const alreadyOpen = await this.projectAssignments.findOpenByAssetId(
+        asset.id,
+        tx
+      );
+      if (!alreadyOpen) {
+        const assignment = await this.projectAssignments.create(
+          {
+            projectId: destination.projectId,
+            assetId: asset.id,
+            assetCode: asset.assetCode,
+            assetName: asset.name,
+            status: "assigned",
+            assignedAt: new Date(),
+            returnedAt: null,
+            assignedByUserId: actor.userId,
+            assignedByName: actor.displayName,
+            returnedByUserId: null,
+            returnedByName: null,
+            notes: input.notes ?? null,
+            returnNotes: null,
+          },
+          tx
+        );
+
+        await this.auditLogs.create(
+          {
+            entityType: "project_asset_assignment",
+            entityId: assignment.id,
+            action: "assigned",
+            actorName: actor.displayName,
+            actorUserId: actor.userId,
+            notes: input.notes ?? undefined,
+            metadata: {
+              projectId: destination.projectId,
+              assetId: asset.id,
+              assetCode: asset.assetCode,
+              via: "custody_release",
+              logCode,
+            },
+          },
+          tx
+        );
+      }
+    }
+
     await this.lifecycle.record(
       {
         assetId: asset.id,
@@ -386,16 +479,27 @@ export class BorrowLogService {
   /**
    * Atomic return: lock log → close → clear holder → lifecycle
    * → optional maintenance case → mark request returned.
+   * Pass `session` to join an outer transaction (project return).
    */
   async returnLog(
     rawId: string,
     rawInput: unknown,
-    actor: ActorContext
+    actor: ActorContext,
+    session?: DbSession
   ): Promise<BorrowLogDTO> {
     const id = borrowLogIdSchema.parse(rawId);
     const input = returnBorrowSchema.parse(rawInput);
+    const run = (tx: DbSession) => this.returnLogInTx(id, input, actor, tx);
+    if (session) return run(session);
+    return withTransaction(run);
+  }
 
-    return withTransaction(async (tx) => {
+  private async returnLogInTx(
+    id: string,
+    input: ReturnType<typeof returnBorrowSchema.parse>,
+    actor: ActorContext,
+    tx: DbSession
+  ): Promise<BorrowLogDTO> {
       const existing = await this.repo.findByIdForUpdate(id, tx);
       if (!existing) throw new NotFoundError("Borrow log", id);
       if (existing.status !== "active") {
@@ -582,7 +686,6 @@ export class BorrowLogService {
 
       const history = await this.auditLogs.list({ entityType: "borrow_transaction", entityId: updated.id }, tx);
       return toBorrowLogDTO(updated, history);
-    });
   }
 
   /** Helper for AssetService.releaseAsset → single custody path. */

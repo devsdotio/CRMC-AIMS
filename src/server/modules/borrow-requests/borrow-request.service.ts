@@ -27,7 +27,9 @@ import { AuditLogRepository } from "../audit-logs/audit-logs.repository";
 import { BorrowLogService } from "../borrow-log/borrow-log.service";
 import { BorrowLogRepository } from "../borrow-log/borrow-log.repository";
 import { DepartmentRepository } from "../departments/department.repository";
-import { withTransaction } from "@/server/db/transaction";
+import { ProjectAssetAssignmentRepository } from "../projects/project-asset.repository";
+import { withTransaction, type DbSession } from "@/server/db/transaction";
+import type { AssetRow } from "@/server/db/schema";
 import {
   approveBorrowRequestSchema,
   borrowRequestIdSchema,
@@ -143,8 +145,48 @@ export class BorrowRequestService {
     private readonly assetRepo = new AssetRepository(),
     private readonly borrowLogs = new BorrowLogService(),
     private readonly borrowLogRepo = new BorrowLogRepository(),
-    private readonly departments = new DepartmentRepository()
+    private readonly departments = new DepartmentRepository(),
+    private readonly projectAssignments = new ProjectAssetAssignmentRepository()
   ) {}
+
+  /** Shared gate: unit must be free of holder, reservation, and open project custody. */
+  private async assertAssetFreeForRequest(
+    asset: AssetRow,
+    opts?: { allowReservedForRequestId?: string }
+  ): Promise<void> {
+    if (asset.status !== "active") {
+      throw new ConflictError(
+        `Asset ${asset.assetCode} is not available (${asset.status.replace(/_/g, " ")}).`
+      );
+    }
+    if (asset.currentHolder) {
+      throw new ConflictError(
+        `Asset ${asset.assetCode} is currently in custody (${asset.currentHolder}).`
+      );
+    }
+    if (
+      asset.reservedForRequestId &&
+      asset.reservedForRequestId !== opts?.allowReservedForRequestId
+    ) {
+      throw new ConflictError(
+        opts?.allowReservedForRequestId
+          ? `Asset ${asset.assetCode} is reserved for another request.`
+          : `Asset ${asset.assetCode} is already reserved for an approved request.`
+      );
+    }
+    const openProject = await this.projectAssignments.findOpenByAssetId(asset.id);
+    if (openProject) {
+      throw new ConflictError(
+        `Asset ${asset.assetCode} is assigned to a project. Return it from the project panel first.`
+      );
+    }
+    const openBorrow = await this.borrowLogRepo.findActiveByAssetId(asset.id);
+    if (openBorrow) {
+      throw new ConflictError(
+        `Asset ${asset.assetCode} already has an active custody log. Return it first.`
+      );
+    }
+  }
 
   async list(
     rawQuery: unknown,
@@ -206,21 +248,7 @@ export class BorrowRequestService {
       if (!item.assetId) continue;
       const asset = await this.assetRepo.findById(item.assetId);
       if (!asset) throw new NotFoundError("Asset", item.assetId);
-      if (asset.status !== "active") {
-        throw new ConflictError(
-          `Asset ${asset.assetCode} is not available (${asset.status.replace(/_/g, " ")}).`
-        );
-      }
-      if (asset.currentHolder) {
-        throw new ConflictError(
-          `Asset ${asset.assetCode} is currently in custody (${asset.currentHolder}).`
-        );
-      }
-      if (asset.reservedForRequestId) {
-        throw new ConflictError(
-          `Asset ${asset.assetCode} is already reserved for an approved request.`
-        );
-      }
+      await this.assertAssetFreeForRequest(asset);
       if (requestType === "borrowable" && asset.assignmentType !== "borrowable") {
         throw new ConflictError(`Asset ${asset.assetCode} is not borrowable.`);
       }
@@ -315,6 +343,16 @@ export class BorrowRequestService {
         tx
       );
       if (!up) throw new NotFoundError("Borrow request", id);
+
+      // Lock pre-picked units so walk-up issue cannot steal them before release.
+      for (const item of nextItems) {
+        if (!item.assetId) continue;
+        await this.assetRepo.update(
+          item.assetId,
+          { reservedForRequestId: id, lastUpdated: new Date() },
+          tx
+        );
+      }
 
       await this.auditLogs.create({
         entityType: "borrow_request",
@@ -429,21 +467,9 @@ export class BorrowRequestService {
 
         const asset = await this.assetRepo.findById(assetId);
         if (!asset) throw new NotFoundError("Asset", assetId);
-        if (asset.status !== "active") {
-          throw new ConflictError(
-            `Asset ${asset.assetCode} is not available (${asset.status.replace(/_/g, " ")}).`
-          );
-        }
-        if (asset.currentHolder) {
-          throw new ConflictError(
-            `Asset ${asset.assetCode} is currently in custody (${asset.currentHolder}).`
-          );
-        }
-        if (asset.reservedForRequestId) {
-          throw new ConflictError(
-            `Asset ${asset.assetCode} is reserved for another request.`
-          );
-        }
+        await this.assertAssetFreeForRequest(asset, {
+          allowReservedForRequestId: existing.id,
+        });
         if (asset.assignmentType !== expectedAssignmentType) {
           throw new ConflictError(
             `Asset ${asset.assetCode} is not ${expectedAssignmentType}.`
@@ -478,31 +504,6 @@ export class BorrowRequestService {
       );
     }
 
-    for (const allocation of input.lineAllocations) {
-      for (const assetId of allocation.assetIds) {
-        await this.borrowLogs.release(
-          {
-            assetId,
-            requestId: existing.id,
-            custodyKind,
-            source: "portal",
-            departmentId,
-            borrowerName: input.pickedUpBy,
-            borrowerEmail: existing.requesterEmail,
-            borrowerPhone: existing.requesterPhone || "",
-            dueDate:
-              custodyKind === "borrow"
-                ? (existing.expectedReturnDate ?? this.borrowLogs.defaultDueDate())
-                : null,
-            requestedByName: existing.requestedByName ?? input.pickedUpBy,
-            notes: noteWithPicker,
-            borrowerUserId: existing.requesterUserId ?? undefined,
-          },
-          actor
-        );
-      }
-    }
-
     const issuedItems = expandItemsWithIssuedAssets(
       existing.items,
       input.lineAllocations,
@@ -519,7 +520,33 @@ export class BorrowRequestService {
       historyEntry("released", actor.displayName, noteWithPicker),
     ];
 
-    const updated = await withTransaction(async (tx) => {
+    const updated = await withTransaction(async (tx: DbSession) => {
+      for (const allocation of input.lineAllocations) {
+        for (const assetId of allocation.assetIds) {
+          await this.borrowLogs.release(
+            {
+              assetId,
+              requestId: existing.id,
+              custodyKind,
+              source: "portal",
+              departmentId,
+              borrowerName: input.pickedUpBy,
+              borrowerEmail: existing.requesterEmail,
+              borrowerPhone: existing.requesterPhone || "",
+              dueDate:
+                custodyKind === "borrow"
+                  ? (existing.expectedReturnDate ?? this.borrowLogs.defaultDueDate())
+                  : null,
+              requestedByName: existing.requestedByName ?? input.pickedUpBy,
+              notes: noteWithPicker,
+              borrowerUserId: existing.requesterUserId ?? undefined,
+            },
+            actor,
+            tx
+          );
+        }
+      }
+
       const up = await this.repo.update(
         id,
         {
@@ -691,12 +718,25 @@ export class BorrowRequestService {
             actor
           );
         } else {
-          // Legacy release without log — clear holder so registry is usable again.
+          // Legacy release without log — clear holder + any orphan project row.
           const asset = await this.assetRepo.findById(item.assetId);
           if (asset?.currentHolder) {
             await this.assetRepo.update(item.assetId, {
               currentHolder: null,
+              reservedForRequestId: null,
               lastUpdated: new Date(),
+            });
+          }
+          const openProject = await this.projectAssignments.findOpenByAssetId(
+            item.assetId
+          );
+          if (openProject) {
+            await this.projectAssignments.update(openProject.id, {
+              status: "returned",
+              returnedAt: new Date(),
+              returnedByUserId: actor.userId,
+              returnedByName: actor.displayName,
+              returnNotes: noteWithReturner,
             });
           }
         }
@@ -771,21 +811,9 @@ export class BorrowRequestService {
         if (!item.assetId) continue;
         const asset = await this.assetRepo.findById(item.assetId);
         if (!asset) throw new NotFoundError("Asset", item.assetId);
-        if (asset.status !== "active") {
-          throw new ConflictError(
-            `Asset ${asset.assetCode} is not available (${asset.status.replace(/_/g, " ")}).`
-          );
-        }
-        if (asset.currentHolder) {
-          throw new ConflictError(
-            `Asset ${asset.assetCode} is currently in custody (${asset.currentHolder}).`
-          );
-        }
-        if (asset.reservedForRequestId && asset.reservedForRequestId !== existing.id) {
-          throw new ConflictError(
-            `Asset ${asset.assetCode} is already reserved for another request.`
-          );
-        }
+        await this.assertAssetFreeForRequest(asset, {
+          allowReservedForRequestId: existing.id,
+        });
         if (nextRequestType === "borrowable" && asset.assignmentType !== "borrowable") {
           throw new ConflictError(`Asset ${asset.assetCode} is not borrowable.`);
         }
