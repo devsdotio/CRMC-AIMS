@@ -1,8 +1,13 @@
-import { and, asc, count, eq, ilike, isNull, or } from "drizzle-orm";
+import { and, asc, count, eq, ilike, isNull, or, sql } from "drizzle-orm";
 
 import { getDb } from "@/server/db";
 import type { DbSession } from "@/server/db/transaction";
-import { assets, type AssetRow, type NewAssetRow } from "@/server/db/schema";
+import {
+  assets,
+  projectAssetAssignments,
+  type AssetRow,
+  type NewAssetRow,
+} from "@/server/db/schema";
 
 import type { IAssetRepository, ListAssetsFilters } from "./asset.types";
 
@@ -88,6 +93,14 @@ export class AssetRepository implements IAssetRepository {
       conditions.push(eq(assets.status, "active"));
       conditions.push(isNull(assets.currentHolder));
       conditions.push(isNull(assets.reservedForRequestId));
+      // Must match release checks: open project custody blocks issue/assign.
+      conditions.push(
+        sql`not exists (
+          select 1 from ${projectAssetAssignments}
+          where ${projectAssetAssignments.assetId} = ${assets.id}
+            and ${projectAssetAssignments.status} = 'assigned'
+        )`
+      );
     }
     if (filters?.search?.trim()) {
       const q = `%${filters.search.trim()}%`;

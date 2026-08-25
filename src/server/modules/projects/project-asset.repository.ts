@@ -1,12 +1,14 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 
 import { getDb } from "@/server/db";
 import type { DbSession } from "@/server/db/transaction";
 import {
   projectAssetAssignments,
+  projects,
   type NewProjectAssetAssignmentRow,
   type ProjectAssetAssignmentRow,
 } from "@/server/db/schema";
+import { projectHolderLabel } from "@/server/shared/custody-labels";
 
 import type {
   IProjectAssetAssignmentRepository,
@@ -66,6 +68,43 @@ export class ProjectAssetAssignmentRepository
       )
       .limit(1);
     return row ?? null;
+  }
+
+  /**
+   * Holder labels for open project custody, keyed by asset id.
+   * Used to keep asset list/detail UI honest when currentHolder was cleared
+   * but the assignment row is still open.
+   */
+  async findOpenHolderLabelsByAssetIds(
+    assetIds: string[],
+    session?: DbSession
+  ): Promise<Map<string, string>> {
+    const out = new Map<string, string>();
+    if (assetIds.length === 0) return out;
+
+    const db = this.db(session);
+    const rows = await db
+      .select({
+        assetId: projectAssetAssignments.assetId,
+        projectCode: projects.projectCode,
+        projectName: projects.name,
+      })
+      .from(projectAssetAssignments)
+      .innerJoin(projects, eq(projects.id, projectAssetAssignments.projectId))
+      .where(
+        and(
+          inArray(projectAssetAssignments.assetId, assetIds),
+          eq(projectAssetAssignments.status, "assigned")
+        )
+      );
+
+    for (const row of rows) {
+      out.set(
+        row.assetId,
+        projectHolderLabel(row.projectCode, row.projectName)
+      );
+    }
+    return out;
   }
 
   async create(

@@ -5,6 +5,7 @@ import type { DbSession } from "@/server/db/transaction";
 import {
   assetModels,
   assets,
+  projectAssetAssignments,
   type AssetModelRow,
   type NewAssetModelRow,
 } from "@/server/db/schema";
@@ -148,8 +149,8 @@ export class AssetModelRepository {
   }
 
   /**
-   * Count of available (in stock) units: active, no holder, borrowable path
-   * uses status active + null holder as "on shelf".
+   * Count of available (in stock) units: active, no holder, not reserved,
+   * and no open project assignment (same rules as release / availableOnly).
    */
   async countAvailableUnits(
     modelId: string,
@@ -164,7 +165,12 @@ export class AssetModelRepository {
           eq(assets.modelId, modelId),
           eq(assets.status, "active"),
           sql`${assets.currentHolder} is null`,
-          sql`${assets.reservedForRequestId} is null`
+          sql`${assets.reservedForRequestId} is null`,
+          sql`not exists (
+            select 1 from ${projectAssetAssignments}
+            where ${projectAssetAssignments.assetId} = ${assets.id}
+              and ${projectAssetAssignments.status} = 'assigned'
+          )`
         )
       );
     return Number(row?.value ?? 0);

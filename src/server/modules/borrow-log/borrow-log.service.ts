@@ -257,9 +257,26 @@ export class BorrowLogService {
       tx
     );
     if (openProject) {
-      throw new ConflictError(
-        "Asset already has an open project assignment. Return it first."
-      );
+      // Orphaned ledger: assignment still "assigned" but asset is already back
+      // in stock (no holder). Close it so availability and release stay aligned.
+      if (!asset.currentHolder) {
+        await this.projectAssignments.update(
+          openProject.id,
+          {
+            status: "returned",
+            returnedAt: new Date(),
+            returnedByUserId: actor.userId,
+            returnedByName: actor.displayName,
+            returnNotes:
+              "Auto-closed orphaned project assignment (asset already returned to stock).",
+          },
+          tx
+        );
+      } else {
+        throw new ConflictError(
+          "Asset already has an open project assignment. Return it first."
+        );
+      }
     }
 
     let requestId: string | null = input.requestId ?? null;
@@ -419,6 +436,30 @@ export class BorrowLogService {
         const asset = await this.assets.findByIdForUpdate(existing.assetId, tx);
         if (asset) {
           const nextStatus = needsMaint ? "needs_repair" : asset.status;
+
+          // Keep project_asset_assignments in sync with the custody ledger.
+          // Returning via borrow-log / assets page used to clear currentHolder
+          // while leaving status=assigned, so the UI showed Available but
+          // release still blocked on the open project row.
+          const openProject = await this.projectAssignments.findOpenByAssetId(
+            asset.id,
+            tx
+          );
+          if (openProject) {
+            await this.projectAssignments.update(
+              openProject.id,
+              {
+                status: "returned",
+                returnedAt: new Date(),
+                returnedByUserId: actor.userId,
+                returnedByName: actor.displayName,
+                returnNotes:
+                  input.conditionNotes?.trim() ||
+                  `Returned via custody log ${existing.logCode}`,
+              },
+              tx
+            );
+          }
 
           await this.assets.update(
             asset.id,

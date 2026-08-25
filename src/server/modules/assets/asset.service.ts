@@ -171,7 +171,7 @@ export class AssetService {
   async listAssets(rawQuery: unknown): Promise<AssetDTOWithMeta[]> {
     const filters: ListAssetsFilters = listAssetsQuerySchema.parse(rawQuery ?? {});
     const rows = await this.assetRepository.findMany(filters);
-    return rows.map(toAssetDTO);
+    return this.withOpenProjectCustodyHolders(rows.map(toAssetDTO));
   }
 
   async getAssetById(rawId: string): Promise<AssetDTOWithMeta> {
@@ -182,7 +182,8 @@ export class AssetService {
       throw new NotFoundError("Asset", id);
     }
 
-    return toAssetDTO(row);
+    const [dto] = await this.withOpenProjectCustodyHolders([toAssetDTO(row)]);
+    return dto!;
   }
 
   async getAssetByCode(rawCode: string): Promise<AssetDTOWithMeta> {
@@ -194,13 +195,40 @@ export class AssetService {
     if (!row) {
       throw new NotFoundError("Asset", parsed.code);
     }
-    return toAssetDTO(row);
+    const [dto] = await this.withOpenProjectCustodyHolders([toAssetDTO(row)]);
+    return dto!;
   }
 
   async listUnitsForModel(rawModelId: string): Promise<AssetDTOWithMeta[]> {
     const model = await this.models.requireModel(rawModelId);
     const rows = await this.assetRepository.findByModelId(model.id);
-    return rows.map(toAssetDTO);
+    return this.withOpenProjectCustodyHolders(rows.map(toAssetDTO));
+  }
+
+  /**
+   * If an open project assignment exists but assets.current_holder was cleared
+   * (orphan from a borrow-log-only return), surface the project as holder so
+   * the UI does not show "Available" / allow Issue.
+   */
+  private async withOpenProjectCustodyHolders(
+    dtos: AssetDTOWithMeta[]
+  ): Promise<AssetDTOWithMeta[]> {
+    const missingHolderIds = dtos
+      .filter((d) => !d.currentHolder)
+      .map((d) => d.id);
+    if (missingHolderIds.length === 0) return dtos;
+
+    const labels =
+      await this.projectAssignments.findOpenHolderLabelsByAssetIds(
+        missingHolderIds
+      );
+    if (labels.size === 0) return dtos;
+
+    return dtos.map((d) => {
+      if (d.currentHolder) return d;
+      const label = labels.get(d.id);
+      return label ? { ...d, currentHolder: label } : d;
+    });
   }
 
   async resolveScan(rawCode: string): Promise<AssetScanResolveDTO> {
