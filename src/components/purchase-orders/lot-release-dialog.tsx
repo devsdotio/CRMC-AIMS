@@ -4,17 +4,22 @@ import React, { useState, useEffect } from "react";
 import {
   X,
   Send,
-  Package,
   AlertCircle,
-  CheckCircle2,
   Loader2,
-  DollarSign,
-  User,
 } from "lucide-react";
 import type { PurchaseLot } from "@/types/purchase-lots";
 import { useReleaseFromLotMutation } from "@/features/purchase-lots/client/use-purchase-lots";
+import { useDepartmentsQuery } from "@/features/departments/client";
+import { useProjectsQuery } from "@/features/projects/client";
 import { useToast } from "@/components/providers/toast-context";
 import { cn } from "@/lib/utils";
+import {
+  filterUnsignedIntInput,
+  parseUnsignedInt,
+} from "@/lib/numeric-input";
+import { formatPhp } from "@/components/projects/format-money";
+
+type DestinationKind = "department" | "project";
 
 interface LotReleaseDialogProps {
   lot: PurchaseLot | null;
@@ -31,26 +36,59 @@ export function LotReleaseDialog({
 }: LotReleaseDialogProps) {
   const toast = useToast();
   const releaseMutation = useReleaseFromLotMutation();
+  const {
+    data: departments = [],
+    isLoading: departmentsLoading,
+    error: departmentsError,
+  } = useDepartmentsQuery({ enabled: isOpen });
+  const { data: projects = [] } = useProjectsQuery();
+  const mutableProjects = projects.filter((p) => p.status !== "completed");
 
-  const [quantity, setQuantity] = useState<number>(1);
-  const [recipientName, setRecipientName] = useState<string>("");
-  const [reason, setReason] = useState<string>("");
+  const [quantity, setQuantity] = useState("1");
+  const [destinationKind, setDestinationKind] =
+    useState<DestinationKind>("department");
+  const [departmentId, setDepartmentId] = useState("");
+  const [projectId, setProjectId] = useState("");
+  const [recipientName, setRecipientName] = useState("");
+  const [reason, setReason] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isOpen && lot) {
-      setQuantity(1);
-      setRecipientName("");
-      setReason("");
-      setErrorMsg(null);
-    }
+    if (!isOpen || !lot) return;
+    setQuantity("1");
+    setDestinationKind("department");
+    setRecipientName("");
+    setReason("");
+    setErrorMsg(null);
   }, [isOpen, lot]);
 
   useEffect(() => {
+    if (!isOpen) return;
+    if (departments.length === 0) {
+      setDepartmentId("");
+      return;
+    }
+    setDepartmentId((prev) =>
+      prev && departments.some((d) => d.id === prev) ? prev : departments[0].id
+    );
+  }, [isOpen, departments]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (mutableProjects.length === 0) {
+      setProjectId("");
+      return;
+    }
+    setProjectId((prev) =>
+      prev && mutableProjects.some((p) => p.id === prev)
+        ? prev
+        : mutableProjects[0].id
+    );
+  }, [isOpen, mutableProjects]);
+
+  useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && isOpen) {
-        onClose();
-      }
+      if (e.key === "Escape" && isOpen) onClose();
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
@@ -59,38 +97,68 @@ export function LotReleaseDialog({
   if (!isOpen || !lot) return null;
 
   const maxQty = lot.quantityRemaining;
+  const qtyValue = parseUnsignedInt(quantity, 0);
   const unitCostNum = parseFloat(lot.unitCost) || 0;
-  const totalReleaseValue = quantity * unitCostNum;
+  const totalReleaseValue = qtyValue * unitCostNum;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
 
-    if (quantity <= 0) {
+    if (lot.itemType !== "consumable") {
+      setErrorMsg("Only supply lots can be released from this screen.");
+      return;
+    }
+
+    if (qtyValue < 1) {
       setErrorMsg("Please enter a valid quantity of at least 1.");
       return;
     }
 
-    if (quantity > maxQty) {
-      setErrorMsg(`Cannot release more than available lot balance (${maxQty} units).`);
+    if (qtyValue > maxQty) {
+      setErrorMsg(
+        `Cannot release more than available lot balance (${maxQty} units).`
+      );
+      return;
+    }
+
+    if (destinationKind === "department" && !departmentId) {
+      setErrorMsg(
+        departmentsLoading
+          ? "Still loading departments. Please wait a moment."
+          : departmentsError
+            ? "Could not load departments. Check Settings → Departments."
+            : "Select a department."
+      );
+      return;
+    }
+
+    if (destinationKind === "project" && !projectId) {
+      setErrorMsg("Select a project.");
       return;
     }
 
     try {
       await releaseMutation.mutateAsync({
         code: lot.lotCode,
-        quantity,
+        quantity: qtyValue,
         recipientName: recipientName.trim() || undefined,
         reason: reason.trim() || undefined,
+        departmentId:
+          destinationKind === "department" ? departmentId : undefined,
+        projectId: destinationKind === "project" ? projectId : undefined,
       });
 
       toast.success(
-        `Successfully released ${quantity}x ${lot.itemName} from lot ${lot.lotCode}.`
+        `Released ${qtyValue}× ${lot.itemName} from lot ${lot.lotCode}.`
       );
       onSuccess?.();
       onClose();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to release stock from lot.";
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "Failed to release stock from lot.";
       setErrorMsg(msg);
       toast.error(msg);
     }
@@ -106,12 +174,14 @@ export function LotReleaseDialog({
         aria-labelledby="release-dialog-title"
         className="relative w-full max-w-md rounded-2xl border border-border bg-bg shadow-2xl z-10 overflow-hidden flex flex-col animate-in zoom-in-95 duration-200"
       >
-        {/* Modal Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-bg-subtle/50">
           <div className="flex items-center gap-2">
             <Send className="h-4 w-4 text-category-transport-bg" />
-            <h2 id="release-dialog-title" className="text-sm font-bold text-text">
-              Direct Stock Release from Lot
+            <h2
+              id="release-dialog-title"
+              className="text-sm font-bold text-text"
+            >
+              Release stock from lot
             </h2>
           </div>
           <button
@@ -124,7 +194,6 @@ export function LotReleaseDialog({
           </button>
         </div>
 
-        {/* Modal Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs">
           {errorMsg && (
             <div className="p-3 rounded-lg bg-status-outofservice-bg/10 border border-status-outofservice-bg/30 text-status-outofservice-text flex items-start gap-2">
@@ -133,30 +202,122 @@ export function LotReleaseDialog({
             </div>
           )}
 
-          {/* Lot Summary Card */}
           <div className="p-3.5 rounded-xl border border-border bg-card space-y-2">
             <div className="flex items-center justify-between">
               <span className="font-mono text-xs font-bold text-text bg-bg-subtle px-1.5 py-0.5 rounded border border-border">
                 {lot.lotCode}
               </span>
               <span className="font-bold text-status-active-text">
-                {lot.quantityRemaining} units available
+                {lot.quantityRemaining} available
               </span>
             </div>
             <p className="text-sm font-bold text-text">{lot.itemName}</p>
             <div className="flex items-center justify-between text-text-secondary text-[11px] pt-1 border-t border-border">
               <span>Cost snapshot:</span>
               <span className="font-mono font-medium text-text">
-                ₱{unitCostNum.toLocaleString("en-US", { minimumFractionDigits: 2 })} / unit
+                {formatPhp(unitCostNum)} / unit
               </span>
             </div>
           </div>
 
-          {/* Quantity Input */}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setDestinationKind("department")}
+              className={cn(
+                "flex-1 py-2 text-xs font-semibold rounded-lg border cursor-pointer",
+                destinationKind === "department"
+                  ? "border-primary bg-primary/5 text-text"
+                  : "border-border text-text-secondary"
+              )}
+            >
+              Department
+            </button>
+            <button
+              type="button"
+              onClick={() => setDestinationKind("project")}
+              className={cn(
+                "flex-1 py-2 text-xs font-semibold rounded-lg border cursor-pointer",
+                destinationKind === "project"
+                  ? "border-primary bg-primary/5 text-text"
+                  : "border-border text-text-secondary"
+              )}
+            >
+              Project
+            </button>
+          </div>
+
+          {destinationKind === "department" ? (
+            <div className="space-y-1.5">
+              <label htmlFor="release-dept" className="font-semibold text-text">
+                Department <span className="text-accent">*</span>
+              </label>
+              {departmentsLoading ? (
+                <p className="text-xs text-text-secondary animate-pulse py-2">
+                  Loading departments…
+                </p>
+              ) : departmentsError ? (
+                <p className="text-status-outofservice-text">
+                  Failed to load departments. Check Settings → Departments.
+                </p>
+              ) : (
+                <select
+                  id="release-dept"
+                  value={departmentId}
+                  onChange={(e) => setDepartmentId(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-bg-subtle text-text text-xs focus:bg-bg focus:ring-1 focus:ring-ring focus:outline-hidden"
+                  required
+                >
+                  {departments.length === 0 ? (
+                    <option value="">No departments configured</option>
+                  ) : (
+                    <>
+                      <option value="">Select a department…</option>
+                      {departments.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name} ({d.code})
+                        </option>
+                      ))}
+                    </>
+                  )}
+                </select>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <label
+                htmlFor="release-project"
+                className="font-semibold text-text"
+              >
+                Project <span className="text-accent">*</span>
+              </label>
+              <select
+                id="release-project"
+                value={projectId}
+                onChange={(e) => setProjectId(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-border bg-bg-subtle text-text text-xs focus:bg-bg focus:ring-1 focus:ring-ring focus:outline-hidden"
+                required
+              >
+                {mutableProjects.length === 0 ? (
+                  <option value="">No active projects available</option>
+                ) : (
+                  <>
+                    <option value="">Select a project…</option>
+                    {mutableProjects.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.projectCode})
+                      </option>
+                    ))}
+                  </>
+                )}
+              </select>
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <label htmlFor="release-qty" className="font-semibold text-text">
-                Quantity to Release <span className="text-accent">*</span>
+                Quantity to release <span className="text-accent">*</span>
               </label>
               <span className="text-[11px] text-text-secondary">
                 Max: <strong>{maxQty}</strong>
@@ -164,35 +325,39 @@ export function LotReleaseDialog({
             </div>
             <input
               id="release-qty"
-              type="number"
-              min={1}
-              max={maxQty}
+              type="text"
+              inputMode="numeric"
               value={quantity}
-              onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 0))}
+              onChange={(e) => {
+                const next = filterUnsignedIntInput(e.target.value);
+                if (next !== null) setQuantity(next);
+              }}
+              placeholder="1"
               required
-              className="w-full px-3 py-2 rounded-lg border border-border bg-bg-subtle text-text text-sm font-bold focus:bg-bg focus:ring-1 focus:ring-ring focus:outline-hidden"
+              className="w-full px-3 py-2 rounded-lg border border-border bg-bg-subtle text-text text-sm font-bold font-mono focus:bg-bg focus:ring-1 focus:ring-ring focus:outline-hidden"
             />
           </div>
 
-          {/* Recipient Name */}
           <div className="space-y-1.5">
-            <label htmlFor="release-recipient" className="font-semibold text-text">
-              Recipient / Department / Requester
+            <label
+              htmlFor="release-recipient"
+              className="font-semibold text-text"
+            >
+              Received by (optional)
             </label>
             <input
               id="release-recipient"
               type="text"
-              placeholder="e.g. Dr. Santos / Pharmacy Ward"
+              placeholder="e.g. Dr. Santos"
               value={recipientName}
               onChange={(e) => setRecipientName(e.target.value)}
               className="w-full px-3 py-2 rounded-lg border border-border bg-bg-subtle text-text text-xs focus:bg-bg focus:ring-1 focus:ring-ring focus:outline-hidden"
             />
           </div>
 
-          {/* Reason / Notes */}
           <div className="space-y-1.5">
             <label htmlFor="release-reason" className="font-semibold text-text">
-              Disbursement Purpose / Notes
+              Purpose / notes (optional)
             </label>
             <textarea
               id="release-reason"
@@ -204,15 +369,15 @@ export function LotReleaseDialog({
             />
           </div>
 
-          {/* Financial Calculation summary */}
           <div className="p-3 rounded-lg bg-bg-subtle/70 border border-border flex items-center justify-between">
-            <span className="text-text-secondary font-medium">Total Cost Deduction:</span>
+            <span className="text-text-secondary font-medium">
+              Total cost deduction:
+            </span>
             <span className="font-mono font-bold text-status-active-text text-sm">
-              ₱{totalReleaseValue.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              {formatPhp(totalReleaseValue)}
             </span>
           </div>
 
-          {/* Form Actions */}
           <div className="pt-2 flex items-center justify-end gap-2">
             <button
               type="button"
@@ -223,18 +388,23 @@ export function LotReleaseDialog({
             </button>
             <button
               type="submit"
-              disabled={releaseMutation.isPending || quantity <= 0 || quantity > maxQty}
+              disabled={
+                releaseMutation.isPending ||
+                qtyValue < 1 ||
+                qtyValue > maxQty ||
+                lot.itemType !== "consumable"
+              }
               className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg bg-category-transport-bg text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-xs"
             >
               {releaseMutation.isPending ? (
                 <>
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  <span>Processing...</span>
+                  <span>Processing…</span>
                 </>
               ) : (
                 <>
                   <Send className="h-3.5 w-3.5" />
-                  <span>Confirm Dispatch</span>
+                  <span>Confirm release</span>
                 </>
               )}
             </button>

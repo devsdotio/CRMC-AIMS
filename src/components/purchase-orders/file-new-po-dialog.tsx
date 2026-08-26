@@ -6,9 +6,7 @@ import {
   FilePlus2,
   Plus,
   Trash2,
-  Building2,
   Calendar,
-  DollarSign,
   User,
   ShieldCheck,
   Loader2,
@@ -16,6 +14,7 @@ import {
 } from "lucide-react";
 import { useMeQuery } from "@/features/users/client/use-users";
 import { useSuppliersQuery } from "@/features/suppliers/client";
+import { useCategoriesQuery } from "@/features/categories/client/use-categories";
 import {
   useConsumablesQuery,
   useRestockConsumableMutation,
@@ -23,6 +22,13 @@ import {
 } from "@/features/consumables/client";
 import { useToast } from "@/components/providers/toast-context";
 import { cn } from "@/lib/utils";
+import {
+  filterMoneyInput,
+  filterUnsignedIntInput,
+  parseMoney,
+  parseUnsignedInt,
+} from "@/lib/numeric-input";
+import { formatPhp } from "@/components/projects/format-money";
 
 interface FileNewPODialogProps {
   isOpen: boolean;
@@ -32,23 +38,23 @@ interface FileNewPODialogProps {
 
 interface POLineItem {
   id: string;
-  quantity: number;
+  quantity: string;
   description: string;
   consumableId?: string;
   suggestedDealer: string;
   supplierId?: string;
   purpose: string;
-  estimatedCost: number;
+  estimatedCost: string;
 }
 
 function generateInitialRow(): POLineItem {
   return {
     id: `row-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    quantity: 1,
+    quantity: "1",
     description: "",
     suggestedDealer: "",
     purpose: "",
-    estimatedCost: 0,
+    estimatedCost: "",
   };
 }
 
@@ -58,12 +64,16 @@ export function FileNewPODialog({
   onSuccess,
 }: FileNewPODialogProps) {
   const { data: me } = useMeQuery();
-  const { data: suppliers = [] } = useSuppliersQuery();
+  const { data: suppliers = [] } = useSuppliersQuery({ activeOnly: true });
+  const { data: allCategories = [] } = useCategoriesQuery();
   const { data: consumablePage } = useConsumablesQuery({ limit: 100 });
   const consumables = consumablePage?.data ?? [];
   const restockMutation = useRestockConsumableMutation();
   const createMutation = useCreateConsumableMutation();
   const toast = useToast();
+
+  const defaultCategory =
+    allCategories.find((c) => c.type === "consumable")?.name ?? "";
 
   const [poDate, setPoDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [requestedBy, setRequestedBy] = useState("");
@@ -110,36 +120,46 @@ export function FileNewPODialog({
   const handleItemChange = (
     id: string,
     field: keyof POLineItem,
-    value: string | number
+    value: string
   ) => {
     setItems((prev) =>
       prev.map((item) => {
         if (item.id !== id) return item;
 
+        if (field === "quantity") {
+          const next = filterUnsignedIntInput(value);
+          return next === null ? item : { ...item, quantity: next };
+        }
+
+        if (field === "estimatedCost") {
+          const next = filterMoneyInput(value);
+          return next === null ? item : { ...item, estimatedCost: next };
+        }
+
         if (field === "description") {
           const matched = consumables.find(
-            (c) => c.name.toLowerCase() === String(value).toLowerCase() || c.id === value
+            (c) =>
+              c.name.toLowerCase() === value.trim().toLowerCase() ||
+              c.id === value
           );
-          if (matched) {
-            return {
-              ...item,
-              description: matched.name,
-              consumableId: matched.id,
-            };
-          }
+          return {
+            ...item,
+            description: value,
+            consumableId: matched?.id,
+          };
         }
 
         if (field === "suggestedDealer") {
           const matchedSup = suppliers.find(
-            (s) => s.name.toLowerCase() === String(value).toLowerCase() || s.id === value
+            (s) =>
+              s.name.toLowerCase() === value.trim().toLowerCase() ||
+              s.id === value
           );
-          if (matchedSup) {
-            return {
-              ...item,
-              suggestedDealer: matchedSup.name,
-              supplierId: matchedSup.id,
-            };
-          }
+          return {
+            ...item,
+            suggestedDealer: value,
+            supplierId: matchedSup?.id,
+          };
         }
 
         return { ...item, [field]: value };
@@ -147,47 +167,88 @@ export function FileNewPODialog({
     );
   };
 
-  const totalEstimatedAmount = items.reduce(
-    (sum, item) => sum + (Number(item.estimatedCost) || 0),
-    0
-  );
+  const totalEstimatedAmount = items.reduce((sum, item) => {
+    const cost = parseMoney(item.estimatedCost);
+    return sum + (cost ?? 0);
+  }, 0);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
-    const validItems = items.filter((it) => it.description.trim() && it.quantity > 0);
+    if (!requestedBy.trim()) {
+      setErrorMessage("Requested by is required.");
+      return;
+    }
+
+    const validItems = items.filter(
+      (it) => it.description.trim() && parseUnsignedInt(it.quantity, 0) > 0
+    );
     if (validItems.length === 0) {
-      setErrorMessage("Please add at least one line item with a description and quantity.");
+      setErrorMessage(
+        "Please add at least one line item with a description and quantity."
+      );
+      return;
+    }
+
+    for (const item of validItems) {
+      const qty = parseUnsignedInt(item.quantity, 0);
+      const lineTotal = parseMoney(item.estimatedCost);
+      if (lineTotal === null || lineTotal <= 0) {
+        setErrorMessage(
+          `“${item.description.trim()}” needs an estimated cost greater than zero.`
+        );
+        return;
+      }
+      if (!item.supplierId) {
+        setErrorMessage(
+          `Select a registered supplier for “${item.description.trim()}”.`
+        );
+        return;
+      }
+      if (qty < 1) {
+        setErrorMessage(
+          `Quantity for “${item.description.trim()}” must be at least 1.`
+        );
+        return;
+      }
+    }
+
+    if (!defaultCategory) {
+      setErrorMessage(
+        "No consumable categories yet. Add one under Settings → Categories first."
+      );
       return;
     }
 
     setIsSubmitting(true);
     try {
-      // Process item restocks for all valid lines (auto-create catalog item if not exists)
       for (const item of validItems) {
+        const qty = parseUnsignedInt(item.quantity, 0);
+        const lineTotal = parseMoney(item.estimatedCost) ?? 0;
         let targetConsumableId = item.consumableId;
 
         if (!targetConsumableId) {
           const createdItem = await createMutation.mutateAsync({
             name: item.description.trim(),
-            category: "other",
+            category: defaultCategory,
             location: "Main Property Supply",
             unit: "pcs",
             currentQty: 0,
             minThreshold: 5,
+            supplierId: item.supplierId,
+            supplier: item.suggestedDealer.trim() || undefined,
           });
           targetConsumableId = createdItem.id;
         }
 
-        const unitCost =
-          item.quantity > 0 ? (item.estimatedCost / item.quantity).toFixed(2) : "0.00";
+        const unitCost = qty > 0 ? (lineTotal / qty).toFixed(2) : "0.00";
 
         await restockMutation.mutateAsync({
           id: targetConsumableId,
           payload: {
-            quantity: item.quantity,
-            unitCost: parseFloat(unitCost) || 0,
+            quantity: qty,
+            unitCost: parseFloat(unitCost),
             supplierId: item.supplierId || null,
             reason: item.purpose || "Official Purchase Order Intake",
             notes: `PO Date: ${poDate} · Req by: ${requestedBy.trim()}`,
@@ -196,11 +257,14 @@ export function FileNewPODialog({
         });
       }
 
-      toast.success("Purchase Order created and filed successfully.");
+      toast.success(
+        `${validItems.length} intake lot${validItems.length === 1 ? "" : "s"} filed successfully.`
+      );
       onSuccess?.();
       onClose();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to file Purchase Order.";
+      const msg =
+        err instanceof Error ? err.message : "Failed to file Purchase Order.";
       setErrorMessage(msg);
       toast.error(msg);
     } finally {
@@ -328,14 +392,15 @@ export function FileNewPODialog({
                         {/* 1. Quantity */}
                         <td className="p-2 border-r border-border">
                           <input
-                            type="number"
-                            min={1}
-                            value={item.quantity || ""}
+                            type="text"
+                            inputMode="numeric"
+                            value={item.quantity}
                             onChange={(e) =>
-                              handleItemChange(item.id, "quantity", parseInt(e.target.value) || 0)
+                              handleItemChange(item.id, "quantity", e.target.value)
                             }
                             required
-                            className="w-14 h-8 px-1.5 text-center font-bold rounded-md border border-border bg-bg text-text focus:ring-1 focus:ring-ring focus:outline-hidden"
+                            placeholder="1"
+                            className="w-14 h-8 px-1.5 text-center font-bold font-mono rounded-md border border-border bg-bg text-text focus:ring-1 focus:ring-ring focus:outline-hidden"
                           />
                         </td>
 
@@ -363,9 +428,20 @@ export function FileNewPODialog({
                             onChange={(e) =>
                               handleItemChange(item.id, "suggestedDealer", e.target.value)
                             }
-                            placeholder="Dealer / Supplier..."
-                            className="w-full h-8 px-2.5 rounded-md border border-border bg-bg text-text focus:ring-1 focus:ring-ring focus:outline-hidden"
+                            placeholder="Select supplier…"
+                            required
+                            className={cn(
+                              "w-full h-8 px-2.5 rounded-md border bg-bg text-text focus:ring-1 focus:ring-ring focus:outline-hidden",
+                              item.suggestedDealer && !item.supplierId
+                                ? "border-status-outofservice-bg/50"
+                                : "border-border"
+                            )}
                           />
+                          {item.suggestedDealer && !item.supplierId && (
+                            <p className="text-[10px] text-status-outofservice-text mt-0.5">
+                              Pick a registered supplier
+                            </p>
+                          )}
                         </td>
 
                         {/* 4. Purpose */}
@@ -384,18 +460,18 @@ export function FileNewPODialog({
                         {/* 5. Estimated */}
                         <td className="p-2 border-r border-border text-right">
                           <input
-                            type="number"
-                            min={0}
-                            step="0.01"
-                            value={item.estimatedCost || ""}
+                            type="text"
+                            inputMode="decimal"
+                            value={item.estimatedCost}
                             onChange={(e) =>
                               handleItemChange(
                                 item.id,
                                 "estimatedCost",
-                                parseFloat(e.target.value) || 0
+                                e.target.value
                               )
                             }
                             placeholder="0.00"
+                            required
                             className="w-24 h-8 px-2 text-right font-mono font-bold rounded-md border border-border bg-bg text-text focus:ring-1 focus:ring-ring focus:outline-hidden"
                           />
                         </td>
@@ -452,7 +528,7 @@ export function FileNewPODialog({
                 Total Estimated PO Value
               </span>
               <span className="text-lg font-mono font-bold text-status-active-text">
-                ₱{totalEstimatedAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                {formatPhp(totalEstimatedAmount)}
               </span>
             </div>
           </div>

@@ -139,7 +139,7 @@ export class ConsumableService {
     const uncosted = allocations.find((a) => a.uncosted);
     if (uncosted) {
       throw new BadRequestError(
-        `Not on hand for ${itemCode}: not enough costed lot quantity (short ${uncosted.quantity}). Restock first. Purchase orders will be added later.`
+        `Not on hand for ${itemCode}: not enough costed lot quantity (short ${uncosted.quantity}). Restock or file a purchase order first.`
       );
     }
   }
@@ -436,7 +436,7 @@ export class ConsumableService {
 
       if (existing.currentQty < input.quantity) {
         throw new BadRequestError(
-          `Not on hand for ${existing.itemCode}. Available: ${existing.currentQty} ${existing.unit}. Restock first. Purchase orders will be added later.`
+          `Not on hand for ${existing.itemCode}. Available: ${existing.currentQty} ${existing.unit}. Restock or file a purchase order first.`
         );
       }
       const freeQty = availableQty(existing);

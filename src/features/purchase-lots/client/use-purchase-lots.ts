@@ -40,6 +40,8 @@ export function useReleaseFromLotMutation(): UseMutationResult<
     reason?: string;
     notes?: string;
     recipientName?: string;
+    departmentId?: string;
+    projectId?: string;
   }
 > {
   const qc = useQueryClient();

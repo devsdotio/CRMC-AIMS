@@ -615,7 +615,7 @@ export class ConsumableRequestService {
 
         if (item.currentQty < line.quantityRequested) {
           throw new BadRequestError(
-            `Not on hand for ${item.itemCode}. Available: ${item.currentQty} ${item.unit}, requested: ${line.quantityRequested}. Restock first. Purchase orders will be added later.`
+            `Not on hand for ${item.itemCode}. Available: ${item.currentQty} ${item.unit}, requested: ${line.quantityRequested}. Restock or file a purchase order first.`
           );
         }
 

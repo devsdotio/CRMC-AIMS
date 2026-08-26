@@ -4,21 +4,26 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   X,
   FileText,
-  DollarSign,
   ShieldCheck,
   Printer,
   Copy,
   Check,
   Layers,
+  Send,
+  Tag,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { PurchaseLot } from "@/types/purchase-lots";
+import { formatPhp } from "@/components/projects/format-money";
 
 interface PurchaseOrderDetailSheetProps {
   lot: PurchaseLot | null;
   isOpen: boolean;
   onClose: () => void;
   onPrintSlip: (lot: PurchaseLot) => void;
+  onPrintTag?: (lot: PurchaseLot) => void;
+  onReleaseStock?: (lot: PurchaseLot) => void;
+  canOperate?: boolean;
 }
 
 export function PurchaseOrderDetailSheet({
@@ -26,6 +31,9 @@ export function PurchaseOrderDetailSheet({
   isOpen,
   onClose,
   onPrintSlip,
+  onPrintTag,
+  onReleaseStock,
+  canOperate = false,
 }: PurchaseOrderDetailSheetProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [copiedCode, setCopiedCode] = useState(false);
@@ -53,11 +61,15 @@ export function PurchaseOrderDetailSheet({
   const unitCostNum = parseFloat(lot.unitCost) || 0;
   const consumedUnits = Math.max(0, lot.quantity - lot.quantityRemaining);
   const remainingValue = lot.quantityRemaining * unitCostNum;
-  const consumedValue = consumedUnits * unitCostNum;
   const remainingRatio = lot.quantity > 0 ? (lot.quantityRemaining / lot.quantity) * 100 : 0;
   const isDepleted = lot.quantityRemaining === 0;
   const isLowStock = !isDepleted && remainingRatio <= 20;
   const poDate = lot.purchasedOn || lot.createdAt.split("T")[0];
+  const canRelease =
+    canOperate &&
+    lot.itemType === "consumable" &&
+    lot.quantityRemaining > 0 &&
+    Boolean(onReleaseStock);
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs transition-opacity duration-200">
@@ -233,6 +245,16 @@ export function PurchaseOrderDetailSheet({
                 <span className="text-sm font-bold text-text-secondary block">{consumedUnits}</span>
               </div>
             </div>
+
+            <div className="flex items-center justify-between text-[11px] pt-1 border-t border-border/60">
+              <span className="text-text-secondary">Remaining value</span>
+              <span className="font-mono font-bold text-text">
+                {formatPhp(remainingValue)}
+              </span>
+            </div>
+            <p className="text-[10px] text-text-secondary font-mono truncate" title={payload}>
+              QR: {payload}
+            </p>
           </div>
 
           {/* Official Sign-Off Block */}
@@ -266,17 +288,41 @@ export function PurchaseOrderDetailSheet({
         </div>
 
         {/* Action Footer */}
-        <div className="p-4 border-t border-border bg-bg-subtle flex items-center justify-between shrink-0 gap-2">
-          <span className="text-xs text-text-secondary font-medium">Official CRMC PO</span>
+        <div className="p-4 border-t border-border bg-bg-subtle flex items-center justify-between shrink-0 gap-2 flex-wrap">
+          <span className="text-xs text-text-secondary font-medium">
+            Lot actions
+          </span>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            {onPrintTag && (
+              <button
+                type="button"
+                onClick={() => onPrintTag(lot)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg border border-border bg-bg text-text hover:bg-bg-subtle transition-colors cursor-pointer"
+              >
+                <Tag className="h-3.5 w-3.5" />
+                <span>Print tag</span>
+              </button>
+            )}
+
+            {canRelease && (
+              <button
+                type="button"
+                onClick={() => onReleaseStock?.(lot)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg bg-category-transport-bg/10 text-category-transport-bg border border-category-transport-bg/30 hover:bg-category-transport-bg/20 transition-colors cursor-pointer"
+              >
+                <Send className="h-3.5 w-3.5" />
+                <span>Release stock</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={() => onPrintSlip(lot)}
               className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg bg-primary text-primary-foreground hover:bg-accent transition-colors cursor-pointer shadow-2xs"
             >
               <FileText className="h-3.5 w-3.5" />
-              <span>Print PO Slip</span>
+              <span>Print PO slip</span>
             </button>
 
             <button
