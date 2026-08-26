@@ -190,6 +190,17 @@ export class AssetController {
     }
   }
 
+  async reportMissing(request: NextRequest | Request, id: string) {
+    try {
+      const session = await requireAssetOperator();
+      const body = await request.json();
+      const data = await this.assetService.reportMissing(id, body, session.actor);
+      return ok(data);
+    } catch (error) {
+      return handleError(error);
+    }
+  }
+
   async listLifecycle(request: NextRequest | Request, id: string) {
     try {
       await requireActor();

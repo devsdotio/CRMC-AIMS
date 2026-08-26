@@ -5,7 +5,13 @@ const assetCategorySchema = z
   .trim()
   .min(1, "Category is required.")
   .max(120);
-const returnConditionSchema = z.enum(["good", "damaged", "needs_repair"]);
+const returnConditionSchema = z.enum([
+  "good",
+  "damaged",
+  "needs_repair",
+  "lost",
+  "stolen",
+]);
 
 /** DTO/query filter includes computed overdue. */
 export const logFilterStatusSchema = z.enum(["active", "overdue", "returned"]);

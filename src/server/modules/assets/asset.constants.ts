@@ -16,6 +16,7 @@ export const ASSET_STATUSES = [
   "needs_repair",
   "out_of_service",
   "retired",
+  "missing",
 ] as const;
 
 export const ASSET_ASSIGNMENT_TYPES = [

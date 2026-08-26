@@ -10,6 +10,7 @@ import {
   dashboardApi,
   type DashboardSnapshot,
   type DashboardSummary,
+  type DashboardNotification,
 } from "./dashboard-api";
 import { dashboardQueryKeys } from "./query-keys";
 
@@ -33,6 +34,19 @@ export function useDashboardSidebarSummaryQuery(options?: {
     queryKey: dashboardQueryKeys.sidebarSummary(),
     queryFn: () => dashboardApi.getSidebarSummary(),
     staleTime: 60_000,
+    enabled: options?.enabled ?? true,
+  });
+}
+
+/** Header notification bell. */
+export function useDashboardNotificationsQuery(options?: {
+  enabled?: boolean;
+}): UseQueryResult<DashboardNotification[], Error> {
+  return useQuery({
+    queryKey: dashboardQueryKeys.notifications(),
+    queryFn: () => dashboardApi.getNotifications(),
+    staleTime: 60_000,
+    refetchInterval: 120_000,
     enabled: options?.enabled ?? true,
   });
 }

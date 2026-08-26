@@ -301,6 +301,7 @@ function AddEditAssetDialogForm({
                     <option value="needs_repair">Needs Repair</option>
                     <option value="out_of_service">Out of Service</option>
                     <option value="retired">Retired</option>
+                    <option value="missing">Missing</option>
                   </select>
                 </div>
               </div>

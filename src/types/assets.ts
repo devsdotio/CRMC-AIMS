@@ -2,7 +2,12 @@ import type { AssetCategory } from './shared';
 export type { AssetCategory };
 import type { BaseFilterState } from "./filters";
 
-export type AssetStatus = "active" | "needs_repair" | "out_of_service" | "retired";
+export type AssetStatus =
+  | "active"
+  | "needs_repair"
+  | "out_of_service"
+  | "retired"
+  | "missing";
 export type AssetAssignmentType = "borrowable" | "assignable";
 
 export interface MaintenanceLogEntry {

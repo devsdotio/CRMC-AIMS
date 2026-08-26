@@ -1,4 +1,4 @@
-import type { Asset, MaintenanceLogEntry } from "@/types/assets";
+import type { Asset } from "@/types/assets";
 import type { AssetModelRow, AssetRow } from "@/server/db/schema";
 import {
   BadRequestError,
@@ -42,11 +42,13 @@ import {
   flagMaintenanceSchema,
   listAssetsQuerySchema,
   releaseAssetSchema,
+  reportMissingSchema,
   returnAssetSchema,
   updateAssetSchema,
   type CreateAssetBody,
   type FlagMaintenanceBody,
   type ReleaseAssetBody,
+  type ReportMissingBody,
   type ReturnAssetBody,
   type UpdateAssetBody,
 } from "./asset.validation";
@@ -76,21 +78,13 @@ function parseValue(value: string | null): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
-function normalizeMaintenanceHistory(
-  value: MaintenanceLogEntry[] | null | undefined
-): MaintenanceLogEntry[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return value;
-}
-
 function padSeq(n: number, width = 3): string {
   return String(n).padStart(width, "0");
 }
 
 /**
  * Maps a DB row → the frontend `Asset` contract (+ QR payload / model link).
+ * Maintenance truth lives in `maintenance_logs` + lifecycle events — JSONB is unused.
  */
 export function toAssetDTO(row: AssetRow): AssetDTOWithMeta {
   const base: Asset & { modelId?: string } = {
@@ -112,7 +106,7 @@ export function toAssetDTO(row: AssetRow): AssetDTOWithMeta {
     imageUrl: row.imageUrl ?? undefined,
     notes: row.notes ?? undefined,
     lastUpdated: toDateString(row.lastUpdated),
-    maintenanceHistory: normalizeMaintenanceHistory(row.maintenanceHistory),
+    maintenanceHistory: [],
   };
   return withAssetMeta(base);
 }
@@ -1011,20 +1005,10 @@ export class AssetService {
         input.description?.trim() ||
         "Flagged for maintenance inspection by Property Custodian.";
 
-      const entry: MaintenanceLogEntry = {
-        id: crypto.randomUUID(),
-        date: todayDateString(),
-        type: "flagged",
-        description,
-        technician: actor.displayName,
-      };
-
-      const history = normalizeMaintenanceHistory(existing.maintenanceHistory);
       const next = await this.assetRepository.update(
         id,
         {
           status: "needs_repair",
-          maintenanceHistory: [...history, entry],
           lastUpdated: new Date(),
         },
         tx
@@ -1069,7 +1053,6 @@ export class AssetService {
           payload: {
             description,
             notes: input.notes ?? null,
-            maintenanceEntryId: entry.id,
             maintenanceLogCode: mntCode,
           },
         },
@@ -1090,6 +1073,103 @@ export class AssetService {
           tx
         );
       }
+
+      return next;
+    });
+
+    return toAssetDTO(updated);
+  }
+
+  /**
+   * Mark a coded unit missing (lost / stolen / unaccounted).
+   * Closes any open custody log first, then sets status to `missing`.
+   */
+  async reportMissing(
+    rawId: string,
+    rawInput: unknown,
+    actor: ActorContext
+  ): Promise<AssetDTOWithMeta> {
+    const id = assetIdSchema.parse(rawId);
+    const input: ReportMissingBody = reportMissingSchema.parse(rawInput ?? {});
+
+    const updated = await withTransaction(async (tx) => {
+      const existing = await this.assetRepository.findByIdForUpdate(id, tx);
+      if (!existing) throw new NotFoundError("Asset", id);
+
+      if (existing.status === "retired") {
+        throw new ConflictError("Retired assets cannot be marked missing.");
+      }
+      if (existing.status === "missing") {
+        throw new ConflictError("Asset is already marked missing.");
+      }
+
+      const note = `[${input.reason}] ${input.notes.trim()}`;
+      const returnCondition =
+        input.reason === "stolen"
+          ? ("stolen" as const)
+          : input.reason === "lost"
+            ? ("lost" as const)
+            : ("lost" as const);
+
+      const open = await this.borrowLogRepo.findActiveByAssetId(id);
+      if (open) {
+        await this.borrowLogs.returnLog(
+          open.id,
+          {
+            condition: returnCondition,
+            conditionNotes: note,
+            flagMaintenance: false,
+          },
+          actor,
+          tx
+        );
+      } else {
+        const openProject = await this.projectAssignments.findOpenByAssetId(id);
+        if (openProject) {
+          await this.projectAssignments.update(
+            openProject.id,
+            {
+              status: "written_off",
+              returnedAt: new Date(),
+              returnedByUserId: actor.userId,
+              returnedByName: actor.displayName,
+              returnNotes: note,
+            },
+            tx
+          );
+        }
+      }
+
+      const next = await this.assetRepository.update(
+        id,
+        {
+          status: "missing",
+          currentHolder: null,
+          reservedForRequestId: null,
+          lastUpdated: new Date(),
+        },
+        tx
+      );
+      if (!next) throw new NotFoundError("Asset", id);
+
+      await this.lifecycleService.record(
+        {
+          assetId: next.id,
+          assetCode: next.assetCode,
+          eventType: "status_changed",
+          actor,
+          fromStatus: existing.status,
+          toStatus: "missing",
+          fromHolder: existing.currentHolder,
+          toHolder: null,
+          payload: {
+            via: "report_missing",
+            reason: input.reason,
+            notes: input.notes.trim(),
+          },
+        },
+        tx
+      );
 
       return next;
     });

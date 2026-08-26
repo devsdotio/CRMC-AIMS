@@ -20,6 +20,7 @@ const STATUSES: { id: AssetStatus; label: string; bg: string; text: string; dotB
   { id: "needs_repair",   label: "Needs Repair",   bg: "bg-status-repair-bg/20",     text: "text-status-repair-text",       dotBg: "bg-status-repair-bg" },
   { id: "out_of_service", label: "Out of Service", bg: "bg-status-outofservice-bg/20", text: "text-status-outofservice-text", dotBg: "bg-status-outofservice-bg" },
   { id: "retired",        label: "Retired",        bg: "bg-status-retired-bg/20",    text: "text-status-retired-text",      dotBg: "bg-status-retired-bg" },
+  { id: "missing",        label: "Missing",        bg: "bg-status-outofservice-bg/20", text: "text-status-outofservice-text", dotBg: "bg-status-outofservice-bg" },
 ];
 
 function MultiSelectDropdown({

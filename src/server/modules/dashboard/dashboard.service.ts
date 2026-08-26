@@ -58,6 +58,16 @@ export type DashboardActivityEntry = {
   relativeTime: string;
 };
 
+export type DashboardNotificationItem = {
+  id: string;
+  title: string;
+  message: string;
+  href: string;
+  type: "urgent" | "warning" | "info";
+  relativeTime: string;
+  sortAt: string;
+};
+
 export type DashboardSnapshotDTO = {
   summary: DashboardSummaryDTO;
   pendingRequests: DashboardPendingRequest[];
@@ -439,5 +449,70 @@ export class DashboardService {
         relativeTime: formatRelativeTime(row.createdAt),
       };
     });
+  }
+
+  /**
+   * Header bell feed — compact overdue / pending / low-stock alerts.
+   * Cheaper than full snapshot: same lists, no category chart or activity.
+   */
+  async getNotifications(
+    userId?: string,
+    limit = 8
+  ): Promise<DashboardNotificationItem[]> {
+    const snapshot = userId
+      ? await this.getBorrowerSnapshot(userId, limit)
+      : await this.getSnapshot(limit);
+
+    const items: DashboardNotificationItem[] = [];
+
+    for (const row of snapshot.overdueAssets) {
+      items.push({
+        id: `overdue-${row.id}`,
+        title: "Overdue return",
+        message: `${row.assetName} (${row.assetCode}) is ${row.daysOverdue} day${
+          row.daysOverdue === 1 ? "" : "s"
+        } overdue — ${row.borrowerName}, ${row.department}.`,
+        href: userId ? "/borrower-db/history" : "/borrow-log?status=overdue",
+        type: "urgent",
+        relativeTime: `${row.daysOverdue}d overdue`,
+        sortAt: row.dueSince,
+      });
+    }
+
+    for (const row of snapshot.pendingRequests) {
+      const kindLabel =
+        row.kind === "supply"
+          ? "Supply request"
+          : row.kind === "assign"
+            ? "Assignment request"
+            : "Borrow request";
+      items.push({
+        id: `pending-${row.kind}-${row.id}`,
+        title: kindLabel,
+        message: `${row.requesterName} (${row.department}) — ${row.itemDescription}`,
+        href: userId
+          ? "/borrower-db/requests"
+          : "/borrow-requests?status=pending",
+        type: "info",
+        relativeTime: row.relativeTime,
+        sortAt: row.requestedAt,
+      });
+    }
+
+    for (const row of snapshot.lowStockItems) {
+      items.push({
+        id: `lowstock-${row.id}`,
+        title: "Low stock",
+        message: `${row.itemName} is at ${row.currentQty} ${row.unit} (min ${row.minThreshold}).`,
+        href: "/consumables",
+        type: "warning",
+        relativeTime: "stock alert",
+        sortAt: new Date().toISOString(),
+      });
+    }
+
+    return items
+      .sort((a, b) => Date.parse(b.sortAt) - Date.parse(a.sortAt))
+      .slice(0, limit);
   }
 }

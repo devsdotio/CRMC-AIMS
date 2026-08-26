@@ -74,6 +74,11 @@ export type FlagMaintenanceInput = {
   notes?: string;
 };
 
+export type ReportMissingInput = {
+  reason: "lost" | "stolen" | "missing";
+  notes: string;
+};
+
 export type ScanResolveResult = {
   kind: "asset";
   code: string;
@@ -236,6 +241,20 @@ export const assetsApi = {
       }
     );
 
+    return response.data;
+  },
+
+  async reportMissing(
+    id: string,
+    payload: ReportMissingInput
+  ): Promise<Asset> {
+    const response = await fetchJson<ApiResponse<Asset>>(
+      `/api/assets/${id}/report-missing`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }
+    );
     return response.data;
   },
 

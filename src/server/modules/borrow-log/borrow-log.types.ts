@@ -24,7 +24,7 @@ export type BorrowLogDTO = {
   returnedAt?: string;
   daysOverdue?: number;
   status: "active" | "overdue" | "returned";
-  conditionOnReturn?: "good" | "damaged" | "needs_repair";
+  conditionOnReturn?: "good" | "damaged" | "needs_repair" | "lost" | "stolen";
   conditionNotes?: string;
   releasedBy: string;
   receivedBy?: string;

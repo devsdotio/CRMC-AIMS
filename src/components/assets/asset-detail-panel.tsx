@@ -679,21 +679,7 @@ function AssetHistoryTimeline({ asset }: { asset: Asset }) {
     }
   }
 
-  // 3. Map Standalone Maintenance Logs
-  if (asset.maintenanceHistory) {
-    for (const log of asset.maintenanceHistory) {
-      timeline.push({
-        id: `maint-${log.id}`,
-        kind: "maintenance",
-        date: new Date(log.date),
-        title: `Maintenance: ${log.type}`,
-        subtitle: `By ${log.technician}`,
-        status: "maintenance",
-        iconType: "maintenance",
-        maintenance: log,
-      });
-    }
-  }
+  // 3. Standalone JSONB maintenance trail removed — lifecycle + maintenance_logs are source of truth.
 
   // Sort descending (newest first)
   timeline.sort((a, b) => b.date.getTime() - a.date.getTime());
@@ -874,6 +860,7 @@ export interface AssetDetailPanelProps {
   onClose: () => void;
   onEdit?: (asset: Asset) => void;
   onIssue?: (asset: Asset) => void;
+  onReportMissing?: (asset: Asset) => void;
 }
 
 const STATUS_STYLES: Record<
@@ -900,6 +887,11 @@ const STATUS_STYLES: Record<
     text: "text-white font-bold",
     label: "Retired",
   },
+  missing: {
+    bg: "bg-status-outofservice-bg",
+    text: "text-white font-bold",
+    label: "Missing",
+  },
 };
 
 export function AssetDetailPanel({
@@ -909,6 +901,7 @@ export function AssetDetailPanel({
   onClose,
   onEdit,
   onIssue,
+  onReportMissing,
 }: AssetDetailPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const { getCategoryStyle } = useCategoryStyleMap();
@@ -1007,6 +1000,8 @@ export function AssetDetailPanel({
                       ? "bg-status-active-bg/20 text-status-active-text border-status-active-bg/30"
                       : asset.status === "needs_repair"
                       ? "bg-status-repair-bg/20 text-status-repair-text border-status-repair-bg/30"
+                      : asset.status === "missing"
+                      ? "bg-status-outofservice-bg/20 text-status-outofservice-text border-status-outofservice-bg/30"
                       : "bg-status-outofservice-bg/20 text-status-outofservice-text border-status-outofservice-bg/30"
                   )}
                 >
@@ -1033,6 +1028,17 @@ export function AssetDetailPanel({
               >
                 <PackageMinus className="h-3.5 w-3.5" />
                 <span>Issue</span>
+              </button>
+            )}
+            {onReportMissing && asset.status !== "missing" && asset.status !== "retired" && (
+              <button
+                type="button"
+                onClick={() => onReportMissing(asset)}
+                aria-label="Report asset as missing"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-bg text-status-outofservice-text border border-status-outofservice-bg/40 hover:bg-status-outofservice-bg/10 transition-colors cursor-pointer shadow-xs"
+              >
+                <AlertCircle className="h-3.5 w-3.5" />
+                <span>Missing</span>
               </button>
             )}
             {onIssue && !asset.currentHolder && !asset.reservedForRequestId && asset.status === "active" && onEdit && (

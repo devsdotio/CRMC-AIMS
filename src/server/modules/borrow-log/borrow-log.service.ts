@@ -491,10 +491,13 @@ export class BorrowLogService {
         throw new ConflictError("Only active borrow logs can be returned.");
       }
 
+      const isMissing =
+        input.condition === "lost" || input.condition === "stolen";
       const needsMaint =
-        input.condition === "needs_repair" ||
-        input.condition === "damaged" ||
-        Boolean(input.flagMaintenance);
+        !isMissing &&
+        (input.condition === "needs_repair" ||
+          input.condition === "damaged" ||
+          Boolean(input.flagMaintenance));
 
       const updated = await this.repo.update(
         id,
@@ -512,7 +515,11 @@ export class BorrowLogService {
       if (existing.assetId) {
         const asset = await this.assets.findByIdForUpdate(existing.assetId, tx);
         if (asset) {
-          const nextStatus = needsMaint ? "needs_repair" : asset.status;
+          const nextStatus = isMissing
+            ? ("missing" as const)
+            : needsMaint
+              ? ("needs_repair" as const)
+              : asset.status;
 
           // Keep project_asset_assignments in sync with the custody ledger.
           // Returning via borrow-log / assets page used to clear currentHolder

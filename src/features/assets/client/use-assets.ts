@@ -13,6 +13,7 @@ import {
   type AssetLifecycleEvent,
   type FlagMaintenanceInput,
   type ReleaseAssetInput,
+  type ReportMissingInput,
   type ScanResolveResult,
 } from "@/features/assets/client/assets-api";
 import { assetQueryKeys } from "@/features/assets/client/query-keys";
@@ -260,6 +261,24 @@ export function useFlagMaintenanceMutation(): UseMutationResult<
 
   return useMutation({
     mutationFn: ({ id, payload }) => assetsApi.flagForMaintenance(id, payload),
+    onSuccess: (asset) => {
+      queryClient.setQueryData(assetQueryKeys.detail(asset.id), asset);
+    },
+    onSettled: () => {
+      void invalidateDomains(queryClient, MAINTENANCE_FLAG_DOMAINS);
+    },
+  });
+}
+
+export function useReportMissingMutation(): UseMutationResult<
+  Asset,
+  Error,
+  { id: string; payload: ReportMissingInput }
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, payload }) => assetsApi.reportMissing(id, payload),
     onSuccess: (asset) => {
       queryClient.setQueryData(assetQueryKeys.detail(asset.id), asset);
     },

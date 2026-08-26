@@ -2,7 +2,6 @@ import type {
   ProjectAssetAssignmentRow,
   ProjectExpenseMetadata,
 } from "@/server/db/schema";
-import type { MaintenanceLogEntry } from "@/types/assets";
 import type { ActorContext } from "@/server/shared/auth";
 import {
   generateOperationalCode,
@@ -69,12 +68,6 @@ function parseMoney(value: string | null | undefined): string | null {
   const n = Number(value);
   if (!Number.isFinite(n) || n < 0) return null;
   return n.toFixed(2);
-}
-
-function normalizeMaintenanceHistory(
-  value: MaintenanceLogEntry[] | null | undefined
-): MaintenanceLogEntry[] {
-  return Array.isArray(value) ? value : [];
 }
 
 export class ProjectAssetService {
@@ -265,21 +258,12 @@ export class ProjectAssetService {
           : `Damaged on ${project.projectCode}: ${asset.name}`);
 
       if (input.mode === "maintenance") {
-        const entry: MaintenanceLogEntry = {
-          id: crypto.randomUUID(),
-          date: todayDateString(),
-          type: "flagged",
-          description: notes,
-          technician: actor.displayName,
-        };
-        const history = normalizeMaintenanceHistory(asset.maintenanceHistory);
         const nextStatus = "needs_repair" as const;
 
         await this.assets.update(
           asset.id,
           {
             status: nextStatus,
-            maintenanceHistory: [...history, entry],
             lastUpdated: new Date(),
           },
           tx
@@ -397,22 +381,11 @@ export class ProjectAssetService {
         throw new NotFoundError("Project asset assignment", assignmentId);
       }
 
-      const entry: MaintenanceLogEntry = {
-        id: crypto.randomUUID(),
-        date: todayDateString(),
-        type: "flagged",
-        description: notes,
-        technician: actor.displayName,
-        cost: Number(amount) || undefined,
-      };
-      const history = normalizeMaintenanceHistory(asset.maintenanceHistory);
-
       await this.assets.update(
         asset.id,
         {
           status: disposition,
           currentHolder: null,
-          maintenanceHistory: [...history, entry],
           lastUpdated: new Date(),
         },
         tx

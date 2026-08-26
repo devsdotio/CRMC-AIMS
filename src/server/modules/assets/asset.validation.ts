@@ -109,6 +109,11 @@ export const flagMaintenanceSchema = z.object({
   notes: z.string().trim().max(2000).optional(),
 });
 
+export const reportMissingSchema = z.object({
+  reason: z.enum(["lost", "stolen", "missing"]),
+  notes: z.string().trim().min(1, "notes are required.").max(2000),
+});
+
 export const listAssetsQuerySchema = z.object({
   status: assetStatusSchema.optional(),
   modelId: z.string().uuid().optional(),
@@ -132,4 +137,5 @@ export type UpdateAssetBody = z.infer<typeof updateAssetSchema>;
 export type ReturnAssetBody = z.infer<typeof returnAssetSchema>;
 export type ReleaseAssetBody = z.infer<typeof releaseAssetSchema>;
 export type FlagMaintenanceBody = z.infer<typeof flagMaintenanceSchema>;
+export type ReportMissingBody = z.infer<typeof reportMissingSchema>;
 export type ListAssetsQuery = z.infer<typeof listAssetsQuerySchema>;

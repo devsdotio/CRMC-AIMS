@@ -16,6 +16,7 @@ import { AssetDetailPanel } from "@/components/assets/asset-detail-panel";
 import { AddEditAssetDialog } from "@/components/assets/add-edit-asset-dialog";
 import { ScanAssetDialog } from "@/components/assets/scan-asset-dialog";
 import { IssueAssetDialog } from "@/components/assets/issue-asset-dialog";
+import { ReportMissingDialog } from "@/components/assets/report-missing-dialog";
 import { QueryErrorBanner } from "@/components/shared/query-error-banner";
 import { OperatorReadOnlyBanner } from "@/components/shared/operator-read-only-banner";
 import { useToast } from "@/components/providers/toast-context";
@@ -55,6 +56,7 @@ export default function AssetsPage() {
   });
   const [scanOpen, setScanOpen] = useState(false);
   const [issueAsset, setIssueAsset] = useState<Asset | null>(null);
+  const [missingAsset, setMissingAsset] = useState<Asset | null>(null);
 
   // Filter & Sort Assets
   const filteredAssets = useMemo(() => {
@@ -276,12 +278,27 @@ export default function AssetsPage() {
               }
             : undefined
         }
+        onReportMissing={
+          canOperate
+            ? (asset) => {
+                setSelectedAsset(null);
+                setMissingAsset(asset);
+              }
+            : undefined
+        }
       />
 
       <IssueAssetDialog
         asset={issueAsset}
         isOpen={Boolean(issueAsset)}
         onClose={() => setIssueAsset(null)}
+        onSuccess={(message) => toast.success(message)}
+      />
+
+      <ReportMissingDialog
+        asset={missingAsset}
+        isOpen={Boolean(missingAsset)}
+        onClose={() => setMissingAsset(null)}
         onSuccess={(message) => toast.success(message)}
       />
 

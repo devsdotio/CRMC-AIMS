@@ -37,6 +37,11 @@ const STATUS_STYLES: Record<
     text: "text-white font-bold",
     label: "Retired",
   },
+  missing: {
+    bg: "bg-status-outofservice-bg",
+    text: "text-white font-bold",
+    label: "Missing",
+  },
 };
 
 export function AssetTableRow({ asset, onSelect }: AssetTableRowProps) {
