@@ -31,6 +31,7 @@ import { BorrowRequestRepository } from "@/server/modules/borrow-requests/borrow
 import { MaintenanceRepository } from "@/server/modules/maintenance/maintenance.repository";
 
 import type { AuditLogRow } from "@/server/db/schema/audit-logs";
+import { BorrowLogRepository } from "./borrow-log.repository";
 import type { BorrowLogDTO } from "./borrow-log.types";
 import {
   borrowLogIdSchema,
