@@ -156,7 +156,20 @@ export default function ConsumablesPage() {
     });
   };
 
-  const handleSaveConsumable = async (itemData: Partial<ConsumableItem>) => {
+  const handleSaveConsumable = async (itemData: {
+    id?: string;
+    itemCode?: string;
+    name?: string;
+    category?: ConsumableItem["category"];
+    unit?: string;
+    currentQty?: number;
+    minThreshold?: number;
+    location?: string;
+    supplier?: string | null;
+    supplierId?: string | null;
+    unitCost?: string | number;
+    notes?: string;
+  }) => {
     try {
       if (addEditState.item) {
         await updateMutation.mutateAsync({
@@ -185,6 +198,8 @@ export default function ConsumablesPage() {
           minThreshold: itemData.minThreshold ?? 15,
           location: itemData.location || "Supply Storage",
           supplier: itemData.supplier || undefined,
+          supplierId: itemData.supplierId ?? undefined,
+          unitCost: itemData.unitCost,
           notes: itemData.notes,
         });
         setSelectedId(created.id);

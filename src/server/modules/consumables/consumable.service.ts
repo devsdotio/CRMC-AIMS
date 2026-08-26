@@ -237,9 +237,13 @@ export class ConsumableService {
           consumableId: row.id,
           itemCode: row.itemCode,
           itemName: row.name,
+          supplierId: input.supplierId ?? null,
           supplierName: input.supplier ?? null,
           quantity: input.currentQty,
-          unitCost: "0.00",
+          unitCost:
+            typeof input.unitCost === "number"
+              ? input.unitCost.toFixed(2)
+              : Number(input.unitCost).toFixed(2),
           purchasedOn: todayDateString(),
           reference: "Initial stock",
           notes: input.notes ?? "Opening balance on item create",

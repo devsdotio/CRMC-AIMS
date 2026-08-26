@@ -14,6 +14,7 @@ import type { ConsumableItem } from "@/types/inventory";
 import type { StockAdjustPayload } from "@/features/consumables/client";
 import { usePurchaseLotsQuery } from "@/features/purchase-lots/client";
 import { formatPhp } from "@/components/projects/format-money";
+import { filterMoneyInput } from "@/lib/numeric-input";
 
 export interface AdjustStockDialogProps {
   item: ConsumableItem | null;
@@ -62,7 +63,7 @@ function AdjustStockDialogForm({
     "new_batch" | "attach_existing"
   >("new_batch");
   const [attachLotId, setAttachLotId] = useState<string>("");
-  const [unitCost, setUnitCost] = useState<string>("0.00");
+  const [unitCost, setUnitCost] = useState<string>("");
   const [lotSearchQuery, setLotSearchQuery] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -698,11 +699,13 @@ function AdjustStockDialogForm({
                             Estimated Unit Valuation (₱)
                           </label>
                           <input
-                            type="number"
-                            min={0}
-                            step="0.01"
+                            type="text"
+                            inputMode="decimal"
                             value={unitCost}
-                            onChange={(e) => setUnitCost(e.target.value)}
+                            onChange={(e) => {
+                              const next = filterMoneyInput(e.target.value);
+                              if (next !== null) setUnitCost(next);
+                            }}
                             placeholder="0.00"
                             className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg font-mono font-bold text-text focus:outline-none focus:ring-2 focus:ring-accent"
                           />

@@ -15,6 +15,10 @@ import {
 import { formatPhp } from "@/components/projects/format-money";
 import { availableQty } from "@/components/consumables/utils";
 import { cn } from "@/lib/utils";
+import {
+  filterUnsignedIntInput,
+  parseUnsignedInt,
+} from "@/lib/numeric-input";
 
 const ISSUE_TIMEOUT_MS = 60_000;
 
@@ -64,7 +68,7 @@ export function IssueConsumableDialog({
   const [departmentId, setDepartmentId] = useState("");
   const [projectId, setProjectId] = useState("");
   const [lotId, setLotId] = useState("");
-  const [quantity, setQuantity] = useState(1);
+  const [quantity, setQuantity] = useState("1");
   const [receivedBy, setReceivedBy] = useState("");
   const [requestedByName, setRequestedByName] = useState("");
   const [notes, setNotes] = useState("");
@@ -105,7 +109,7 @@ export function IssueConsumableDialog({
   useEffect(() => {
     if (!isOpen) return;
     setError("");
-    setQuantity(1);
+    setQuantity("1");
     setReceivedBy("");
     setRequestedByName("");
     setNotes("");
@@ -146,7 +150,7 @@ export function IssueConsumableDialog({
     if (!isOpen || !selectedItemId) return;
     if (initialLotId && lockedItem?.id === selectedItemId) return;
     setLotId("");
-    setQuantity(1);
+    setQuantity("1");
   }, [isOpen, selectedItemId, initialLotId, lockedItem?.id]);
 
   // Prefill first available lot when lots load
@@ -205,7 +209,12 @@ export function IssueConsumableDialog({
       setError("Select a purchase lot to issue from.");
       return;
     }
-    if (quantity > selectedLot.quantityRemaining) {
+    const qty = parseUnsignedInt(quantity, 0);
+    if (qty < 1) {
+      setError("Quantity must be at least 1.");
+      return;
+    }
+    if (qty > selectedLot.quantityRemaining) {
       setError(
         `Selected lot only has ${selectedLot.quantityRemaining} ${selectedItem.unit} remaining.`
       );
@@ -219,7 +228,7 @@ export function IssueConsumableDialog({
       );
       return;
     }
-    if (quantity > freeQty) {
+    if (qty > freeQty) {
       setError(
         `Not on hand. Available: ${freeQty} ${selectedItem.unit}${(selectedItem.reservedQty ?? 0) > 0 ? ` (${selectedItem.reservedQty} reserved)` : ""}.`
       );
@@ -229,7 +238,7 @@ export function IssueConsumableDialog({
     setPending(true);
     try {
       const payload: Record<string, unknown> = {
-        quantity,
+        quantity: qty,
         lotId,
       };
       if (destinationKind === "department") {
@@ -254,7 +263,7 @@ export function IssueConsumableDialog({
         "projects",
       ]);
       onSuccess?.(
-        `${selectedItem.itemCode} issued (${quantity} ${selectedItem.unit}).`
+        `${selectedItem.itemCode} issued (${qty} ${selectedItem.unit}).`
       );
       onClose();
     } catch (err) {
@@ -487,13 +496,16 @@ export function IssueConsumableDialog({
               )}
             </div>
             <input
-              type="number"
-              min={1}
-              max={maxQty || undefined}
+              type="text"
+              inputMode="numeric"
               value={quantity}
-              onChange={(e) => setQuantity(Number(e.target.value))}
+              onChange={(e) => {
+                const next = filterUnsignedIntInput(e.target.value);
+                if (next !== null) setQuantity(next);
+              }}
               disabled={!selectedItem || !selectedLot}
-              className="w-full h-9 px-3 text-sm border border-border rounded-lg bg-bg disabled:opacity-50"
+              placeholder="1"
+              className="w-full h-9 px-3 text-sm border border-border rounded-lg bg-bg font-mono disabled:opacity-50"
               required
             />
           </label>

@@ -21,6 +21,12 @@ import { cn } from "@/lib/utils";
 import type { ConsumableItem } from "@/types/inventory";
 import type { Supplier } from "@/types/suppliers";
 import { formatPhp } from "@/components/projects/format-money";
+import {
+  filterMoneyInput,
+  filterUnsignedIntInput,
+  parseMoney,
+  parseUnsignedInt,
+} from "@/lib/numeric-input";
 
 export type RestockConfirmInput = {
   itemId: string;
@@ -57,8 +63,8 @@ function RestockDialogForm({
   const [step, setStep] = useState<1 | 2>(1);
   const [selectedItemId, setSelectedItemId] = useState<string>(() => item?.id ?? "");
   const [searchQuery, setSearchQuery] = useState("");
-  const [qtyReceived, setQtyReceived] = useState(20);
-  const [unitCost, setUnitCost] = useState("0");
+  const [qtyReceived, setQtyReceived] = useState("20");
+  const [unitCost, setUnitCost] = useState("");
   const [supplierId, setSupplierId] = useState("");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
@@ -91,10 +97,11 @@ function RestockDialogForm({
     });
   }, [allItems, searchQuery]);
 
-  const total =
-    Number(qtyReceived) > 0 && Number(unitCost) >= 0
-      ? Number(qtyReceived) * Number(unitCost)
-      : 0;
+  const total = (() => {
+    const qty = parseUnsignedInt(qtyReceived, 0);
+    const cost = parseMoney(unitCost);
+    return qty > 0 && cost !== null && cost >= 0 ? qty * cost : 0;
+  })();
 
   const handleNextStep = () => {
     if (!selectedItemId) {
@@ -112,12 +119,13 @@ function RestockDialogForm({
       setError("Please select a consumable item to restock.");
       return;
     }
-    if (qtyReceived <= 0) {
+    const qty = parseUnsignedInt(qtyReceived, 0);
+    if (qty <= 0) {
       setError("Quantity received must be greater than zero.");
       return;
     }
-    const cost = Number(unitCost);
-    if (!Number.isFinite(cost) || cost < 0) {
+    const cost = parseMoney(unitCost);
+    if (cost === null || cost < 0) {
       setError("Unit cost must be a non-negative amount.");
       return;
     }
@@ -126,7 +134,7 @@ function RestockDialogForm({
     try {
       await onConfirmRestock({
         itemId: targetItem.id,
-        qtyReceived: Number(qtyReceived),
+        qtyReceived: qty,
         unitCost: cost,
         supplierId: supplierId || null,
         notes: notes.trim() || undefined,
@@ -445,13 +453,13 @@ function RestockDialogForm({
                     <div>
                       <span className="text-[10px] text-text-secondary block">Adding</span>
                       <span className="font-bold text-status-active-text font-mono">
-                        +{Number(qtyReceived) || 0} {targetItem.unit}
+                        +{parseUnsignedInt(qtyReceived, 0)} {targetItem.unit}
                       </span>
                     </div>
                     <div>
                       <span className="text-[10px] text-text-secondary block">New Total</span>
                       <span className="font-bold text-accent font-mono">
-                        {targetItem.currentQty + (Number(qtyReceived) || 0)} {targetItem.unit}
+                        {targetItem.currentQty + parseUnsignedInt(qtyReceived, 0)} {targetItem.unit}
                       </span>
                     </div>
                   </div>
@@ -469,13 +477,17 @@ function RestockDialogForm({
                   </label>
                   <input
                     id="qty-received-input"
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     value={qtyReceived}
                     onChange={(e) => {
-                      setQtyReceived(Number(e.target.value));
-                      if (error) setError("");
+                      const next = filterUnsignedIntInput(e.target.value);
+                      if (next !== null) {
+                        setQtyReceived(next);
+                        if (error) setError("");
+                      }
                     }}
-                    min={1}
+                    placeholder="0"
                     className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg font-bold font-mono text-text focus:outline-none focus:ring-2 focus:ring-accent"
                   />
                 </div>
@@ -488,14 +500,17 @@ function RestockDialogForm({
                   </label>
                   <input
                     id="unit-cost-input"
-                    type="number"
-                    min={0}
-                    step="0.01"
+                    type="text"
+                    inputMode="decimal"
                     value={unitCost}
                     onChange={(e) => {
-                      setUnitCost(e.target.value);
-                      if (error) setError("");
+                      const next = filterMoneyInput(e.target.value);
+                      if (next !== null) {
+                        setUnitCost(next);
+                        if (error) setError("");
+                      }
                     }}
+                    placeholder="0.00"
                     className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg font-bold font-mono text-text focus:outline-none focus:ring-2 focus:ring-accent"
                   />
                 </div>

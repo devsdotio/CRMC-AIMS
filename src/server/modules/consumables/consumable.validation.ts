@@ -17,17 +17,50 @@ export const listConsumablesQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional(),
 });
 
-export const createConsumableSchema = z.object({
-  itemCode: z.string().trim().min(1).max(64).optional(),
-  name: z.string().trim().min(1).max(255),
-  category: consumableCategorySchema,
-  unit: z.string().trim().min(1).max(40),
-  currentQty: z.number().int().min(0).optional().default(0),
-  minThreshold: z.number().int().min(0).optional().default(0),
-  location: z.string().trim().min(1).max(120),
-  supplier: z.string().trim().max(255).optional(),
-  notes: z.string().trim().max(2000).optional(),
-});
+export const createConsumableSchema = z
+  .object({
+    itemCode: z.string().trim().min(1).max(64).optional(),
+    name: z.string().trim().min(1).max(255),
+    category: consumableCategorySchema,
+    unit: z.string().trim().min(1).max(40),
+    currentQty: z.number().int().min(0).optional().default(0),
+    minThreshold: z.number().int().min(0).optional().default(0),
+    location: z.string().trim().min(1).max(120),
+    supplier: z.string().trim().max(255).optional(),
+    supplierId: z.string().uuid().optional().nullable(),
+    /** Required when currentQty > 0 — opening lot must have a real unit cost. */
+    unitCost: z.union([z.string(), z.number()]).optional(),
+    notes: z.string().trim().max(2000).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if ((data.currentQty ?? 0) <= 0) return;
+
+    if (!data.supplierId) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Supplier is required when adding initial stock.",
+        path: ["supplierId"],
+      });
+    }
+
+    const raw = data.unitCost;
+    if (raw === undefined || raw === null || raw === "") {
+      ctx.addIssue({
+        code: "custom",
+        message: "Unit cost is required when adding initial stock.",
+        path: ["unitCost"],
+      });
+      return;
+    }
+    const n = typeof raw === "number" ? raw : Number(raw);
+    if (!Number.isFinite(n) || n <= 0) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Unit cost must be greater than zero when adding initial stock.",
+        path: ["unitCost"],
+      });
+    }
+  });
 
 export const updateConsumableSchema = z
   .object({
