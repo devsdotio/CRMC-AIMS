@@ -3,12 +3,11 @@
 import { useMemo } from "react";
 import {
   DollarSign,
-  Package,
-  Layers,
-  Truck,
-  TrendingUp,
   Boxes,
+  Truck,
   ShieldCheck,
+  Clock,
+  PackageCheck,
 } from "lucide-react";
 import type { PurchaseLot } from "@/types/purchase-lots";
 import { cn } from "@/lib/utils";
@@ -20,47 +19,38 @@ interface PurchaseOrdersStatsProps {
 export function PurchaseOrdersStats({ lots }: PurchaseOrdersStatsProps) {
   const stats = useMemo(() => {
     let totalSpend = 0;
-    let totalUnitsReceived = 0;
-    let totalUnitsRemaining = 0;
-    let consumableCount = 0;
-    let assetCount = 0;
+    let pendingCount = 0;
+    let approvedCount = 0;
+    let orderedCount = 0;
+    let deliveredCount = 0;
     const suppliers = new Set<string>();
 
     for (const lot of lots) {
       const totalCostNum = parseFloat(lot.totalCost) || 0;
       totalSpend += totalCostNum;
-      totalUnitsReceived += lot.quantity;
-      totalUnitsRemaining += lot.quantityRemaining;
 
-      if (lot.itemType === "asset") {
-        assetCount += 1;
-      } else {
-        consumableCount += 1;
-      }
+      if (lot.status === "pending_approval") pendingCount += 1;
+      else if (lot.status === "approved") approvedCount += 1;
+      else if (lot.status === "ordered") orderedCount += 1;
+      else if (lot.status === "delivered") deliveredCount += 1;
 
       if (lot.supplierName?.trim()) {
         suppliers.add(lot.supplierName.trim());
       }
     }
 
-    const totalLots = lots.length;
-    const stockUtilizationPercent =
-      totalUnitsReceived > 0
-        ? Math.round((totalUnitsRemaining / totalUnitsReceived) * 100)
-        : 0;
-
-    const avgLotCost = totalLots > 0 ? totalSpend / totalLots : 0;
+    const totalOrders = lots.length;
+    const activeInPipeline = pendingCount + approvedCount + orderedCount;
 
     return {
       totalSpend,
-      totalLots,
-      consumableCount,
-      assetCount,
-      totalUnitsReceived,
-      totalUnitsRemaining,
-      stockUtilizationPercent,
+      totalOrders,
+      pendingCount,
+      approvedCount,
+      orderedCount,
+      deliveredCount,
+      activeInPipeline,
       supplierCount: suppliers.size,
-      avgLotCost,
     };
   }, [lots]);
 
@@ -71,40 +61,30 @@ export function PurchaseOrdersStats({ lots }: PurchaseOrdersStatsProps) {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       })}`,
-      subtitle: `Avg. ₱${stats.avgLotCost.toLocaleString("en-US", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })} / batch`,
+      subtitle: `${stats.totalOrders} total purchase orders filed`,
       icon: DollarSign,
       iconColor: "text-status-active-text bg-status-active-bg/15 border-status-active-bg/30",
-      accentGlow: "hover:border-status-active-bg/40",
     },
     {
-      title: "Intake Batches Recorded",
-      value: stats.totalLots.toLocaleString(),
-      subtitle: `${stats.consumableCount} Consumables · ${stats.assetCount} Fixed Assets`,
-      icon: Boxes,
-      iconColor: "text-category-av-bg bg-category-av-bg/15 border-category-av-bg/30",
-      accentGlow: "hover:border-category-av-bg/40",
+      title: "Pending Review / Approval",
+      value: stats.pendingCount.toLocaleString(),
+      subtitle: "Awaiting Custodian authority sign-off",
+      icon: Clock,
+      iconColor: "text-amber-600 dark:text-amber-400 bg-amber-500/15 border-amber-500/30",
     },
     {
-      title: "Units Remaining in Lots",
-      value: `${stats.totalUnitsRemaining.toLocaleString()} units`,
-      subtitle: `${stats.totalUnitsReceived.toLocaleString()} received (${stats.stockUtilizationPercent}% in stock)`,
-      icon: Layers,
-      iconColor: "text-category-transport-bg bg-category-transport-bg/15 border-category-transport-bg/30",
-      accentGlow: "hover:border-category-transport-bg/40",
-      progressBar: {
-        percent: stats.stockUtilizationPercent,
-      },
-    },
-    {
-      title: "Procurement Partners",
-      value: stats.supplierCount.toLocaleString(),
-      subtitle: "Active vendors & supply channels",
+      title: "Approved & In-Transit",
+      value: `${stats.approvedCount + stats.orderedCount}`,
+      subtitle: `${stats.approvedCount} approved · ${stats.orderedCount} ordered`,
       icon: Truck,
-      iconColor: "text-amber-600 bg-amber-500/15 border-amber-500/30",
-      accentGlow: "hover:border-amber-500/40",
+      iconColor: "text-blue-600 dark:text-blue-400 bg-blue-500/15 border-blue-500/30",
+    },
+    {
+      title: "Delivered & Stocked",
+      value: stats.deliveredCount.toLocaleString(),
+      subtitle: "Received & active in inventory",
+      icon: PackageCheck,
+      iconColor: "text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 border-emerald-500/30",
     },
   ];
 
@@ -115,10 +95,7 @@ export function PurchaseOrdersStats({ lots }: PurchaseOrdersStatsProps) {
         return (
           <div
             key={card.title}
-            className={cn(
-              "p-4 rounded-xl border border-border bg-card shadow-xs transition-all duration-200 flex flex-col justify-between group",
-              card.accentGlow
-            )}
+            className="p-4 rounded-xl border border-border bg-card shadow-xs transition-all duration-200 flex flex-col justify-between group hover:border-accent/40"
           >
             <div className="flex items-start justify-between gap-2">
               <div className="space-y-1">
@@ -139,30 +116,9 @@ export function PurchaseOrdersStats({ lots }: PurchaseOrdersStatsProps) {
               </span>
             </div>
 
-            {card.progressBar ? (
-              <div className="mt-3 space-y-1.5">
-                <div className="flex items-center justify-between text-[11px] font-medium text-text-secondary">
-                  <span>{card.subtitle}</span>
-                </div>
-                <div className="h-1.5 w-full rounded-full bg-bg-subtle overflow-hidden border border-border/50">
-                  <div
-                    className={cn(
-                      "h-full rounded-full transition-all duration-500",
-                      card.progressBar.percent > 20
-                        ? "bg-category-transport-bg"
-                        : card.progressBar.percent > 0
-                        ? "bg-amber-500"
-                        : "bg-status-retired-bg"
-                    )}
-                    style={{ width: `${Math.min(100, Math.max(0, card.progressBar.percent))}%` }}
-                  />
-                </div>
-              </div>
-            ) : (
-              <p className="text-[11px] font-medium text-text-secondary mt-3 truncate">
-                {card.subtitle}
-              </p>
-            )}
+            <p className="text-[11px] font-medium text-text-secondary mt-3 truncate">
+              {card.subtitle}
+            </p>
           </div>
         );
       })}

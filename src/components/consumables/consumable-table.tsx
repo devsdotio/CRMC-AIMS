@@ -8,7 +8,6 @@ export interface ConsumableTableProps {
   items: ConsumableItem[];
   loading?: boolean;
   onSelect: (item: ConsumableItem) => void;
-  onRestock?: (item: ConsumableItem) => void;
   onAdjust?: (item: ConsumableItem) => void;
 }
 
@@ -36,7 +35,6 @@ function SkeletonTableRow() {
       <td className="px-5 py-4 text-right">
         <div className="flex justify-end gap-2">
           <div className="h-7 w-16 bg-border rounded" />
-          <div className="h-7 w-20 bg-border rounded" />
         </div>
       </td>
     </tr>
@@ -47,7 +45,6 @@ export function ConsumableTable({
   items,
   loading = false,
   onSelect,
-  onRestock,
   onAdjust,
 }: ConsumableTableProps) {
   if (loading) {
@@ -107,7 +104,6 @@ export function ConsumableTable({
               key={item.id}
               item={item}
               onSelect={onSelect}
-              onRestock={onRestock}
               onAdjust={onAdjust}
             />
           ))}

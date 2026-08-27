@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   X,
-  PlusCircle,
+  FilePlus2,
   SlidersHorizontal,
   MapPin,
   Truck,
@@ -36,7 +36,7 @@ export interface ConsumableDetailPanelProps {
   item: ConsumableItem | null;
   isOpen: boolean;
   onClose: () => void;
-  onRestock?: (item: ConsumableItem) => void;
+  onOrderPO?: (item: ConsumableItem) => void;
   onAdjust?: (item: ConsumableItem) => void;
   onRelease?: (item: ConsumableItem, lot?: PurchaseLot | null) => void;
   onEdit?: (item: ConsumableItem) => void;
@@ -94,7 +94,7 @@ export function ConsumableDetailPanel({
   item,
   isOpen,
   onClose,
-  onRestock,
+  onOrderPO,
   onAdjust,
   onRelease,
   onEdit,
@@ -230,17 +230,25 @@ export function ConsumableDetailPanel({
             )}
           </div>
 
-          {(onRestock || onRelease || onAdjust || onEdit) && (
+          {(onOrderPO || onRelease || onAdjust || onEdit) && (
           <div className="grid grid-cols-2 gap-2">
-            {onRestock && (
+            {onOrderPO ? (
             <button
               type="button"
-              onClick={() => onRestock(displayItem)}
+              onClick={() => onOrderPO(displayItem)}
               className="inline-flex items-center justify-center gap-1.5 p-2.5 rounded-lg text-xs font-bold bg-accent text-accent-foreground hover:opacity-90 cursor-pointer shadow-xs"
             >
-              <PlusCircle className="h-4 w-4" />
-              Restock
+              <FilePlus2 className="h-4 w-4" />
+              Order via PO
             </button>
+            ) : (
+            <Link
+              href="/purchase-orders"
+              className="inline-flex items-center justify-center gap-1.5 p-2.5 rounded-lg text-xs font-bold bg-accent text-accent-foreground hover:opacity-90 cursor-pointer shadow-xs"
+            >
+              <FilePlus2 className="h-4 w-4" />
+              Order via PO
+            </Link>
             )}
             {onRelease && (
             <button

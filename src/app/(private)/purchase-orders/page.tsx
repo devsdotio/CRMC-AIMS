@@ -4,7 +4,6 @@ import React, { useState, useMemo } from "react";
 import {
   Boxes,
   FilePlus2,
-  QrCode,
 } from "lucide-react";
 import { usePurchaseLotsQuery } from "@/features/purchase-lots/client/use-purchase-lots";
 import { useAssetOperator } from "@/hooks/use-asset-operator";
@@ -21,7 +20,6 @@ import { PurchaseOrdersGrid } from "@/components/purchase-orders/purchase-orders
 import { PurchaseOrderDetailSheet } from "@/components/purchase-orders/purchase-order-detail-sheet";
 import { POPrintSlipDialog } from "@/components/purchase-orders/po-print-slip-dialog";
 import { FileNewPODialog } from "@/components/purchase-orders/file-new-po-dialog";
-import { LotQuickScanDialog } from "@/components/purchase-orders/lot-quick-scan-dialog";
 import { LotPrintTagDialog } from "@/components/purchase-orders/lot-print-tag-dialog";
 import { LotReleaseDialog } from "@/components/purchase-orders/lot-release-dialog";
 
@@ -38,12 +36,13 @@ export default function PurchaseOrdersPage() {
   const [filters, setFilters] = useState<PurchaseOrderFilterState>({
     search: "",
     itemType: "all",
+    status: "all",
     stockStatus: "all",
     supplierId: "",
     datePreset: "all",
     startDate: "",
     endDate: "",
-    viewMode: "grid",
+    viewMode: "table",
   });
 
   const [selectedLot, setSelectedLot] = useState<PurchaseLot | null>(null);
@@ -51,7 +50,6 @@ export default function PurchaseOrdersPage() {
   const [printTagLot, setPrintTagLot] = useState<PurchaseLot | null>(null);
   const [releaseLot, setReleaseLot] = useState<PurchaseLot | null>(null);
   const [isFileNewPOOpen, setIsFileNewPOOpen] = useState(false);
-  const [isScanOpen, setIsScanOpen] = useState(false);
 
   const uniqueLots = useMemo(() => {
     const map = new Map<string, PurchaseLot>();
@@ -91,9 +89,11 @@ export default function PurchaseOrdersPage() {
 
   const filteredLots = useMemo(() => {
     return uniqueLots.filter((lot) => {
+      // 1. Search Query
       if (filters.search.trim()) {
         const q = filters.search.toLowerCase();
-        const matchCode = lot.lotCode.toLowerCase().includes(q);
+        const matchCode = (lot.poNumber || lot.lotCode).toLowerCase().includes(q);
+        const matchLot = lot.lotCode.toLowerCase().includes(q);
         const matchItem =
           lot.itemName.toLowerCase().includes(q) ||
           lot.itemCode.toLowerCase().includes(q);
@@ -101,22 +101,32 @@ export default function PurchaseOrdersPage() {
         const matchRecorder = lot.recordedByName?.toLowerCase().includes(q);
         const matchRef = lot.reference?.toLowerCase().includes(q);
         const matchNotes = lot.notes?.toLowerCase().includes(q);
+        const matchPurpose = lot.purpose?.toLowerCase().includes(q);
         if (
           !matchCode &&
+          !matchLot &&
           !matchItem &&
           !matchSupplier &&
           !matchRecorder &&
           !matchRef &&
-          !matchNotes
+          !matchNotes &&
+          !matchPurpose
         ) {
           return false;
         }
       }
 
+      // 2. Workflow Status Filter
+      if (filters.status !== "all" && lot.status !== filters.status) {
+        return false;
+      }
+
+      // 3. Item Type Filter
       if (filters.itemType !== "all" && lot.itemType !== filters.itemType) {
         return false;
       }
 
+      // 4. Stock Status Filter
       if (filters.stockStatus === "in_stock" && lot.quantityRemaining <= 0) {
         return false;
       }
@@ -131,6 +141,7 @@ export default function PurchaseOrdersPage() {
         }
       }
 
+      // 5. Supplier Filter
       if (
         filters.supplierId &&
         (lot.supplierName || "") !== filters.supplierId
@@ -138,6 +149,7 @@ export default function PurchaseOrdersPage() {
         return false;
       }
 
+      // 6. Date Range
       const lotDate = lot.purchasedOn || lot.createdAt.split("T")[0];
       if (filters.startDate && lotDate < filters.startDate) {
         return false;
@@ -158,6 +170,7 @@ export default function PurchaseOrdersPage() {
     setFilters({
       search: "",
       itemType: "all",
+      status: "all",
       stockStatus: "all",
       supplierId: "",
       datePreset: "all",
@@ -169,36 +182,27 @@ export default function PurchaseOrdersPage() {
 
   return (
     <div className="h-full flex flex-col min-h-0 overflow-hidden bg-bg-subtle">
+      {/* Header Bar */}
       <div className="px-4 md:px-6 pt-5 pb-3 bg-bg shrink-0 flex flex-wrap items-center justify-between gap-4 border-b border-border">
         <div>
           <div className="flex items-center gap-2.5">
             <h1 className="text-xl font-bold tracking-tight text-text flex items-center gap-2">
               <Boxes className="h-5 w-5 text-accent" strokeWidth={2.2} />
-              Purchase Orders & Intake Batches
+              Purchase Orders & Acquisition
             </h1>
             <span className="px-2.5 py-0.5 text-xs font-bold bg-bg-subtle text-text-secondary rounded-full border border-border">
               {isLoading
-                ? "Loading lots…"
-                : `${filteredLots.length} of ${uniqueLots.length} lots`}
+                ? "Loading orders…"
+                : `${filteredLots.length} of ${uniqueLots.length} orders`}
               {isFetching && !isLoading ? " · updating…" : ""}
             </span>
           </div>
           <p className="text-xs text-text-secondary mt-0.5">
-            Vendor intake lots, acquisition costs, printable tags, and lot-locked
-            stock release.
+            Official PO workflow, stock intake batches, supplier costs, and delivery tracking.
           </p>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          <button
-            type="button"
-            onClick={() => setIsScanOpen(true)}
-            className="inline-flex items-center gap-2 px-3 py-2 text-xs font-bold rounded-lg border border-border bg-bg text-text hover:bg-bg-subtle transition-colors cursor-pointer"
-          >
-            <QrCode className="h-4 w-4" strokeWidth={2.5} />
-            <span>Scan / lookup</span>
-          </button>
-
           {canOperate && (
             <button
               type="button"
@@ -221,16 +225,18 @@ export default function PurchaseOrdersPage() {
         />
       )}
 
-      <main className="flex-1 overflow-y-auto min-h-0 p-4 md:p-6 space-y-4 bg-bg-subtle">
-        <PurchaseOrdersFilters
-          filters={filters}
-          onFilterChange={handleFilterChange}
-          onResetFilters={handleResetFilters}
-          supplierOptions={supplierOptions}
-          totalCount={uniqueLots.length}
-          filteredCount={filteredLots.length}
-        />
+      {/* Filters Toolbar */}
+      <PurchaseOrdersFilters
+        filters={filters}
+        onFilterChange={handleFilterChange}
+        onResetFilters={handleResetFilters}
+        supplierOptions={supplierOptions}
+        totalCount={uniqueLots.length}
+        filteredCount={filteredLots.length}
+      />
 
+      {/* Main Content Area */}
+      <main className="flex-1 overflow-y-auto min-h-0 bg-bg">
         {filters.viewMode === "table" ? (
           <PurchaseOrdersTable
             lots={filteredLots}
@@ -239,15 +245,18 @@ export default function PurchaseOrdersPage() {
             onPrintSlip={setPrintSlipLot}
           />
         ) : (
-          <PurchaseOrdersGrid
-            lots={filteredLots}
-            loading={isLoading && !error}
-            onSelectLot={setSelectedLot}
-            onPrintSlip={setPrintSlipLot}
-          />
+          <div className="p-4 md:p-6">
+            <PurchaseOrdersGrid
+              lots={filteredLots}
+              loading={isLoading && !error}
+              onSelectLot={setSelectedLot}
+              onPrintSlip={setPrintSlipLot}
+            />
+          </div>
         )}
       </main>
 
+      {/* Detail Slide-Out Sheet with Workflow Stepper & Audit Logs */}
       <PurchaseOrderDetailSheet
         lot={selectedLotSynced}
         isOpen={Boolean(selectedLotSynced)}
@@ -258,28 +267,21 @@ export default function PurchaseOrdersPage() {
         canOperate={canOperate}
       />
 
+      {/* Official CRMC PO Printable Form Slip */}
       <POPrintSlipDialog
         lot={printSlipLot}
         isOpen={Boolean(printSlipLot)}
         onClose={() => setPrintSlipLot(null)}
       />
 
+      {/* Physical Bin / Lot Tag */}
       <LotPrintTagDialog
         lot={printTagLot}
         isOpen={Boolean(printTagLot)}
         onClose={() => setPrintTagLot(null)}
       />
 
-      <LotQuickScanDialog
-        lots={uniqueLots}
-        isOpen={isScanOpen}
-        onClose={() => setIsScanOpen(false)}
-        onSelectLot={setSelectedLot}
-        onPrintTag={setPrintTagLot}
-        onReleaseStock={canOperate ? setReleaseLot : undefined}
-        canOperate={canOperate}
-      />
-
+      {/* Staff Operator Modals */}
       {canOperate && (
         <>
           <LotReleaseDialog

@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { Plus, PlusCircle, PackageMinus } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Plus, PackageMinus } from "lucide-react";
 import {
   useConsumablesQuery,
   useCreateConsumableMutation,
   useUpdateConsumableMutation,
-  useRestockConsumableMutation,
   useAdjustConsumableMutation,
   type StockAdjustPayload,
 } from "@/features/consumables/client/use-consumables";
@@ -18,16 +18,15 @@ import { ConsumableGrid } from "@/components/consumables/consumable-grid";
 import { ConsumableTable } from "@/components/consumables/consumable-table";
 import { ConsumableDetailPanel } from "@/components/consumables/consumable-detail-panel";
 import { AddEditConsumableDialog } from "@/components/consumables/add-edit-consumable-dialog";
-import { RestockDialog } from "@/components/consumables/restock-dialog";
 import { AdjustStockDialog } from "@/components/consumables/adjust-stock-dialog";
 import { IssueConsumableDialog } from "@/components/consumables/issue-consumable-dialog";
-import { useSuppliersQuery } from "@/features/suppliers/client";
 import { QueryErrorBanner } from "@/components/shared/query-error-banner";
 import { OperatorReadOnlyBanner } from "@/components/shared/operator-read-only-banner";
 import { useToast } from "@/components/providers/toast-context";
 import { useAssetOperator } from "@/hooks/use-asset-operator";
 
 export default function ConsumablesPage() {
+  const router = useRouter();
   const { data: paginatedData, isLoading: isConsumablesLoading, isError, error, refetch } =
     useConsumablesQuery({ limit: 100 });
   const items = useMemo(
@@ -37,14 +36,12 @@ export default function ConsumablesPage() {
 
   const createMutation = useCreateConsumableMutation();
   const updateMutation = useUpdateConsumableMutation();
-  const restockMutation = useRestockConsumableMutation();
   const adjustMutation = useAdjustConsumableMutation();
   const toast = useToast();
   const { canOperate } = useAssetOperator();
 
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
 
-  // Grid/table only need the consumables list; suppliers load when restock opens.
   const isLoading = isConsumablesLoading;
 
   const [filters, setFilters] = useState<ConsumableFilterState>({
@@ -64,10 +61,6 @@ export default function ConsumablesPage() {
     isOpen: boolean;
     item: ConsumableItem | null;
   }>({ isOpen: false, item: null });
-  const [restockState, setRestockState] = useState<{
-    isOpen: boolean;
-    item: ConsumableItem | null;
-  }>({ isOpen: false, item: null });
   const [adjustState, setAdjustState] = useState<{
     isOpen: boolean;
     item: ConsumableItem | null;
@@ -75,12 +68,6 @@ export default function ConsumablesPage() {
   const [issueItem, setIssueItem] = useState<ConsumableItem | null>(null);
   const [issueLotId, setIssueLotId] = useState<string | undefined>(undefined);
   const [issueOpen, setIssueOpen] = useState(false);
-
-  // Suppliers only matter for Restock dialog (add/edit loads its own registry list).
-  const { data: suppliers = [] } = useSuppliersQuery({
-    activeOnly: true,
-    enabled: restockState.isOpen,
-  });
 
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -211,30 +198,6 @@ export default function ConsumablesPage() {
     }
   };
 
-  const handleConfirmRestock = async (input: {
-    itemId: string;
-    qtyReceived: number;
-    unitCost: number;
-    supplierId?: string | null;
-    notes?: string;
-  }) => {
-    try {
-      await restockMutation.mutateAsync({
-        id: input.itemId,
-        payload: {
-          quantity: input.qtyReceived,
-          unitCost: input.unitCost,
-          supplierId: input.supplierId,
-          notes: input.notes,
-        },
-      });
-      toast.success("Stock restocked successfully.");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Restock failed.");
-      throw err;
-    }
-  };
-
   const handleConfirmAdjust = async (
     itemId: string,
     payload: StockAdjustPayload
@@ -262,15 +225,14 @@ export default function ConsumablesPage() {
             <h1 className="text-xl font-bold tracking-tight text-text">
               Consumables Inventory
             </h1>
-            <span className="px-2 py-0.5 text-xs font-bold bg-bg-subtle text-text-secondary rounded-full border border-border">
+            <span className="px-2.5 py-0.5 text-xs font-bold bg-bg-subtle text-text-secondary rounded-full border border-border">
               {isConsumablesLoading
                 ? "Loading supply items…"
                 : `${filteredItems.length} of ${items.length} supply items`}
             </span>
           </div>
           <p className="text-xs text-text-secondary mt-0.5 max-w-xl">
-            Non-serialized stock (paper, ink, cleaning). Issue from a specific
-            purchase lot so cost stays on the movement.
+            Non-serialized stock (paper, ink, cleaning). Issue from lots; all restocks are handled via official Purchase Orders.
           </p>
         </div>
 
@@ -288,15 +250,6 @@ export default function ConsumablesPage() {
           >
             <PackageMinus className="h-4 w-4 text-primary" />
             <span>Issue</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setRestockState({ isOpen: true, item: null })}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-border bg-bg text-text hover:border-primary transition-colors cursor-pointer"
-          >
-            <PlusCircle className="h-4 w-4 text-accent" />
-            <span>Restock</span>
           </button>
 
           <button
@@ -343,11 +296,6 @@ export default function ConsumablesPage() {
             items={filteredItems}
             loading={isLoading && !isError}
             onSelect={(item) => setSelectedId(item.id)}
-            onRestock={
-              canOperate
-                ? (item) => setRestockState({ isOpen: true, item })
-                : undefined
-            }
             onAdjust={
               canOperate
                 ? (item) => setAdjustState({ isOpen: true, item })
@@ -359,11 +307,6 @@ export default function ConsumablesPage() {
             items={filteredItems}
             loading={isLoading && !isError}
             onSelect={(item) => setSelectedId(item.id)}
-            onRestock={
-              canOperate
-                ? (item) => setRestockState({ isOpen: true, item })
-                : undefined
-            }
             onAdjust={
               canOperate
                 ? (item) => setAdjustState({ isOpen: true, item })
@@ -377,11 +320,7 @@ export default function ConsumablesPage() {
         item={selectedItem}
         isOpen={Boolean(selectedItem)}
         onClose={() => setSelectedId(null)}
-        onRestock={
-          canOperate
-            ? (item) => setRestockState({ isOpen: true, item })
-            : undefined
-        }
+        onOrderPO={() => router.push("/purchase-orders")}
         onAdjust={
           canOperate
             ? (item) => setAdjustState({ isOpen: true, item })
@@ -410,15 +349,6 @@ export default function ConsumablesPage() {
         initialItem={addEditState.item}
         onClose={() => setAddEditState({ isOpen: false, item: null })}
         onSave={handleSaveConsumable}
-      />
-
-      <RestockDialog
-        item={restockState.item}
-        allItems={items}
-        suppliers={suppliers}
-        isOpen={restockState.isOpen}
-        onClose={() => setRestockState({ isOpen: false, item: null })}
-        onConfirmRestock={handleConfirmRestock}
       />
 
       <AdjustStockDialog

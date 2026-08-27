@@ -1,21 +1,38 @@
+import { eq } from "drizzle-orm";
 import type { PurchaseLotRow } from "@/server/db/schema";
+import {
+  assets,
+  consumables,
+  stockMovements,
+} from "@/server/db/schema";
+import { auditLogs } from "@/server/db/schema/audit-logs";
+import { getDb } from "@/server/db";
 import type { DbSession } from "@/server/db/transaction";
+import { withTransaction } from "@/server/db/transaction";
 import { generateOperationalCode } from "@/server/shared/codes";
 import {
   BadRequestError,
   NotFoundError,
 } from "@/server/shared/errors";
 import { encodeLotQr, parseScanPayload } from "@/server/shared/qr";
+import type { ActorContext } from "@/server/shared/auth";
 import { SupplierRepository } from "@/server/modules/suppliers/supplier.repository";
 
 import { PurchaseLotRepository } from "./purchase-lot.repository";
 import type {
   CreatePurchaseLotInput,
+  CreatePurchaseOrderInput,
   PurchaseLotDTO,
+  PurchaseOrderStatus,
+  UpdatePurchaseOrderInput,
+  UpdatePurchaseOrderStatusInput,
 } from "./purchase-lot.types";
 import {
+  createPurchaseOrderSchema,
   listPurchaseLotsQuerySchema,
   purchaseLotIdSchema,
+  updatePurchaseOrderSchema,
+  updatePurchaseOrderStatusSchema,
 } from "./purchase-lot.validation";
 
 function formatMoney(value: string | number): string {
@@ -50,13 +67,99 @@ export function deriveLotCode(lotCode: string): string {
   return lotCode.startsWith("PO-") ? lotCode.replace(/^PO-/, "LOT-") : lotCode;
 }
 
+export function parseNotesMetadata(rawNotes?: string | null): {
+  cleanNotes: string | null;
+  status: PurchaseOrderStatus;
+  purpose: string | null;
+  approvedByName: string | null;
+  approvedAt: string | null;
+  orderedAt: string | null;
+  deliveredAt: string | null;
+} {
+  let status: PurchaseOrderStatus = "delivered";
+  let purpose: string | null = null;
+  let approvedByName: string | null = null;
+  let approvedAt: string | null = null;
+  let orderedAt: string | null = null;
+  let deliveredAt: string | null = null;
+  let cleanNotes = rawNotes ?? null;
+
+  if (rawNotes) {
+    if (rawNotes.startsWith("{") && rawNotes.includes('"status"')) {
+      try {
+        const meta = JSON.parse(rawNotes);
+        if (meta.status) status = meta.status;
+        if (meta.purpose) purpose = meta.purpose;
+        if (meta.approvedByName) approvedByName = meta.approvedByName;
+        if (meta.approvedAt) approvedAt = meta.approvedAt;
+        if (meta.orderedAt) orderedAt = meta.orderedAt;
+        if (meta.deliveredAt) deliveredAt = meta.deliveredAt;
+        cleanNotes = meta.notes ?? null;
+      } catch {
+        // use raw
+      }
+    } else {
+      const statusMatch = rawNotes.match(/\[STATUS:\s*([a-z_]+)\]/i);
+      if (
+        statusMatch &&
+        ["pending_approval", "approved", "ordered", "delivered", "cancelled"].includes(
+          statusMatch[1].toLowerCase()
+        )
+      ) {
+        status = statusMatch[1].toLowerCase() as PurchaseOrderStatus;
+      }
+      const purposeMatch = rawNotes.match(/\[PURPOSE:\s*([^\]]+)\]/i);
+      if (purposeMatch) {
+        purpose = purposeMatch[1].trim();
+      }
+      const approvedMatch = rawNotes.match(/\[APPROVED_BY:\s*([^\]]+)\]/i);
+      if (approvedMatch) {
+        approvedByName = approvedMatch[1].trim();
+      }
+    }
+  }
+
+  return {
+    cleanNotes,
+    status,
+    purpose,
+    approvedByName,
+    approvedAt,
+    orderedAt,
+    deliveredAt,
+  };
+}
+
+export function serializeNotesMetadata(data: {
+  notes?: string | null;
+  status: PurchaseOrderStatus;
+  purpose?: string | null;
+  approvedByName?: string | null;
+  approvedAt?: string | null;
+  orderedAt?: string | null;
+  deliveredAt?: string | null;
+}): string {
+  return JSON.stringify({
+    notes: data.notes || "",
+    status: data.status,
+    purpose: data.purpose || "",
+    approvedByName: data.approvedByName || null,
+    approvedAt: data.approvedAt || null,
+    orderedAt: data.orderedAt || null,
+    deliveredAt: data.deliveredAt || null,
+  });
+}
+
 export function toPurchaseLotDTO(row: PurchaseLotRow): PurchaseLotDTO {
   const poNumber = derivePONumber(row.lotCode, row.reference);
   const lotCode = deriveLotCode(row.lotCode);
+  const meta = parseNotesMetadata(row.notes);
+
   return {
     id: row.id,
     poNumber,
     lotCode,
+    status: meta.status,
     itemType: row.itemType,
     consumableId: row.consumableId ?? null,
     assetId: row.assetId ?? null,
@@ -70,19 +173,20 @@ export function toPurchaseLotDTO(row: PurchaseLotRow): PurchaseLotDTO {
     totalCost: formatMoney(row.totalCost),
     purchasedOn: row.purchasedOn,
     reference: row.reference ?? null,
-    notes: row.notes ?? null,
+    purpose: meta.purpose,
+    notes: meta.cleanNotes,
     recordedByUserId: row.recordedByUserId,
     recordedByName: row.recordedByName,
+    approvedByName: meta.approvedByName,
+    approvedAt: meta.approvedAt,
+    orderedAt: meta.orderedAt,
+    deliveredAt: meta.deliveredAt,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     qrPayload: encodeLotQr(lotCode),
   };
 }
 
-/**
- * Shared write path for consumable restocks and asset acquisitions.
- * Also owns lot draw-down (specific lot or FIFO) so checkout can freeze costs.
- */
 export class PurchaseLotService {
   constructor(
     private readonly repo = new PurchaseLotRepository(),
@@ -92,24 +196,511 @@ export class PurchaseLotService {
   async list(rawQuery: unknown): Promise<PurchaseLotDTO[]> {
     const filters = listPurchaseLotsQuerySchema.parse(rawQuery ?? {});
     const rows = await this.repo.list(filters);
-    return rows.map(toPurchaseLotDTO);
+    const dtos = rows.map(toPurchaseLotDTO);
+
+    if (filters.status) {
+      return dtos.filter((d) => d.status === filters.status);
+    }
+    return dtos;
   }
 
   async getById(rawId: string): Promise<PurchaseLotDTO> {
     const id = purchaseLotIdSchema.parse(rawId);
     const row = await this.repo.findById(id);
-    if (!row) throw new NotFoundError("Purchase lot", id);
+    if (!row) throw new NotFoundError("Purchase lot / PO", id);
     return toPurchaseLotDTO(row);
   }
 
   async getByCode(rawCode: string): Promise<PurchaseLotDTO> {
     const parsed = parseScanPayload(rawCode);
     if (!parsed.code) {
-      throw new BadRequestError("Lot code is required.");
+      throw new BadRequestError("Lot / PO code is required.");
     }
     const row = await this.repo.findByLotCode(parsed.code);
-    if (!row) throw new NotFoundError("Purchase lot", parsed.code);
+    if (!row) throw new NotFoundError("Purchase lot / PO", parsed.code);
     return toPurchaseLotDTO(row);
+  }
+
+  /**
+   * Main CRUD: File New Purchase Order (Multi-line items, stock selection or new item creation).
+   */
+  async createPurchaseOrder(
+    rawBody: unknown,
+    actor: ActorContext
+  ): Promise<PurchaseLotDTO[]> {
+    const body: CreatePurchaseOrderInput = createPurchaseOrderSchema.parse(rawBody);
+    const poNumber = generateOperationalCode("PO");
+
+    return withTransaction(async (session) => {
+      const results: PurchaseLotDTO[] = [];
+      const db = session ?? getDb();
+
+      let resolvedSupplierName = body.supplierName?.trim() || null;
+      const supplierId = body.supplierId ?? null;
+
+      if (supplierId) {
+        const sup = await this.suppliers.findById(supplierId, session);
+        if (sup) {
+          resolvedSupplierName = sup.name;
+        }
+      }
+
+      const initialStatus: PurchaseOrderStatus = body.status || "pending_approval";
+      const nowIso = new Date().toISOString();
+
+      const approvedByName =
+        initialStatus === "approved" || initialStatus === "delivered"
+          ? actor.displayName
+          : null;
+      const approvedAt =
+        initialStatus === "approved" || initialStatus === "delivered"
+          ? nowIso
+          : null;
+      const orderedAt =
+        initialStatus === "ordered" || initialStatus === "delivered"
+          ? nowIso
+          : null;
+      const deliveredAt = initialStatus === "delivered" ? nowIso : null;
+
+      for (const item of body.items) {
+        let consumableId: string | null = item.consumableId ?? null;
+        let assetId: string | null = item.assetId ?? null;
+        let itemCode = "";
+        let itemName = item.name.trim();
+
+        // 1. Handle Consumable
+        if (item.itemType === "consumable") {
+          if (consumableId) {
+            const [existing] = await db
+              .select()
+              .from(consumables)
+              .where(eq(consumables.id, consumableId))
+              .limit(1);
+            if (!existing) {
+              throw new NotFoundError("Consumable", consumableId);
+            }
+            itemCode = existing.itemCode;
+            itemName = existing.name;
+
+            // If created directly in "delivered" state, restock stock immediately
+            if (initialStatus === "delivered") {
+              await db
+                .update(consumables)
+                .set({
+                  currentQty: existing.currentQty + item.quantity,
+                  lastRestocked: new Date(),
+                  updatedAt: new Date(),
+                })
+                .where(eq(consumables.id, consumableId));
+
+              // Record stock movement
+              await db.insert(stockMovements).values({
+                movementCode: generateOperationalCode("MOV"),
+                consumableId,
+                qty: item.quantity,
+                direction: "in",
+                reason: "restock",
+                unitCost: formatMoney(item.unitCost),
+                lineTotal: formatMoney(Number(item.unitCost) * item.quantity),
+                notes: `PO Received: ${poNumber}`,
+                actorUserId: actor.userId,
+                actorName: actor.displayName,
+              });
+            }
+          } else {
+            // New consumable registration
+            itemCode = generateOperationalCode("ITM");
+            const initialQty = initialStatus === "delivered" ? item.quantity : 0;
+            const [newConsumable] = await db
+              .insert(consumables)
+              .values({
+                itemCode,
+                name: itemName,
+                category: item.category || "General Supply",
+                unit: item.unit || "pcs",
+                currentQty: initialQty,
+                minThreshold: item.minThreshold ?? 5,
+                location: item.location || "Main Property Storage",
+                supplier: resolvedSupplierName || item.suggestedDealer || undefined,
+                lastRestocked: initialStatus === "delivered" ? new Date() : undefined,
+                notes: body.notes,
+              })
+              .returning();
+            consumableId = newConsumable.id;
+
+            if (initialStatus === "delivered") {
+              await db.insert(stockMovements).values({
+                movementCode: generateOperationalCode("MOV"),
+                consumableId,
+                qty: item.quantity,
+                direction: "in",
+                reason: "restock",
+                unitCost: formatMoney(item.unitCost),
+                lineTotal: formatMoney(Number(item.unitCost) * item.quantity),
+                notes: `PO Initial Intake: ${poNumber}`,
+                actorUserId: actor.userId,
+                actorName: actor.displayName,
+              });
+            }
+          }
+        }
+
+        // 2. Handle Fixed Asset
+        if (item.itemType === "asset") {
+          if (assetId) {
+            const [existing] = await db
+              .select()
+              .from(assets)
+              .where(eq(assets.id, assetId))
+              .limit(1);
+            if (!existing) {
+              throw new NotFoundError("Asset", assetId);
+            }
+            itemCode = existing.assetCode;
+            itemName = existing.name;
+          } else {
+            // New Asset registration
+            itemCode = generateOperationalCode("AST");
+            const [newAsset] = await db
+              .insert(assets)
+              .values({
+                assetCode: itemCode,
+                name: itemName,
+                category: item.category || "Equipment",
+                status: initialStatus === "delivered" ? "active" : "needs_repair",
+                assignmentType: item.assignmentType || "borrowable",
+                location: item.location || "Property Custodian Depot",
+                purchaseDate: body.poDate,
+                value: formatMoney(item.unitCost),
+                supplierId: supplierId || undefined,
+                notes: `Acquired via PO ${poNumber}`,
+              })
+              .returning();
+            assetId = newAsset.id;
+          }
+        }
+
+        const unitCost = formatMoney(item.unitCost);
+        const totalCost = formatMoney(Number(unitCost) * item.quantity);
+        const lotCode = generateOperationalCode("PO");
+
+        const serializedNotes = serializeNotesMetadata({
+          notes: body.notes,
+          status: initialStatus,
+          purpose: item.purpose || body.purpose,
+          approvedByName,
+          approvedAt,
+          orderedAt,
+          deliveredAt,
+        });
+
+        const row = await this.repo.create(
+          {
+            lotCode,
+            itemType: item.itemType,
+            consumableId,
+            assetId,
+            itemCode,
+            itemName,
+            supplierId,
+            supplierName: resolvedSupplierName || item.suggestedDealer || null,
+            quantity: item.quantity,
+            quantityRemaining: initialStatus === "delivered" ? item.quantity : 0,
+            unitCost,
+            totalCost,
+            purchasedOn: body.poDate,
+            reference: poNumber,
+            notes: serializedNotes,
+            recordedByUserId: actor.userId,
+            recordedByName: body.requestedBy || actor.displayName,
+          },
+          session
+        );
+
+        results.push(toPurchaseLotDTO(row));
+      }
+
+      // Write Audit Log for PO Creation
+      await db.insert(auditLogs).values({
+        entityType: "purchase_order",
+        entityId: poNumber,
+        action: "purchase_order_created",
+        actorName: actor.displayName,
+        actorUserId: actor.userId,
+        notes: `Generated Purchase Order ${poNumber} with ${body.items.length} line item(s) (Status: ${initialStatus}).`,
+        metadata: {
+          poNumber,
+          status: initialStatus,
+          itemCount: body.items.length,
+          totalCost: results.reduce((sum, r) => sum + parseFloat(r.totalCost), 0).toFixed(2),
+          supplierName: resolvedSupplierName,
+        },
+      });
+
+      return results;
+    });
+  }
+
+  /**
+   * Transition Workflow Status (Pending Approval -> Approved -> Ordered -> Delivered -> Cancelled).
+   */
+  async updatePOStatus(
+    id: string,
+    rawBody: unknown,
+    actor: ActorContext
+  ): Promise<PurchaseLotDTO> {
+    const body: UpdatePurchaseOrderStatusInput = updatePurchaseOrderStatusSchema.parse(
+      rawBody
+    );
+
+    return withTransaction(async (session) => {
+      const db = session ?? getDb();
+      const lot = await this.repo.findByIdForUpdate(id, session);
+      if (!lot) {
+        throw new NotFoundError("Purchase Order lot", id);
+      }
+
+      const currentMeta = parseNotesMetadata(lot.notes);
+      const nextStatus = body.status;
+      const nowIso = new Date().toISOString();
+
+      const approvedByName =
+        nextStatus === "approved" || nextStatus === "delivered"
+          ? body.approvedBy || currentMeta.approvedByName || actor.displayName
+          : currentMeta.approvedByName;
+      const approvedAt =
+        (nextStatus === "approved" || nextStatus === "delivered") &&
+        !currentMeta.approvedAt
+          ? nowIso
+          : currentMeta.approvedAt;
+      const orderedAt =
+        (nextStatus === "ordered" || nextStatus === "delivered") &&
+        !currentMeta.orderedAt
+          ? nowIso
+          : currentMeta.orderedAt;
+      const deliveredAt =
+        nextStatus === "delivered" && !currentMeta.deliveredAt
+          ? nowIso
+          : currentMeta.deliveredAt;
+
+      // Handle Delivery Stock Intake if transitioning to delivered for the first time
+      let nextRemaining = lot.quantityRemaining;
+      if (nextStatus === "delivered" && currentMeta.status !== "delivered") {
+        nextRemaining = lot.quantity;
+
+        if (lot.itemType === "consumable" && lot.consumableId) {
+          const [consumable] = await db
+            .select()
+            .from(consumables)
+            .where(eq(consumables.id, lot.consumableId))
+            .limit(1);
+
+          if (consumable) {
+            await db
+              .update(consumables)
+              .set({
+                currentQty: consumable.currentQty + lot.quantity,
+                lastRestocked: new Date(),
+                updatedAt: new Date(),
+              })
+              .where(eq(consumables.id, lot.consumableId));
+
+            // Record stock movement
+            await db.insert(stockMovements).values({
+              movementCode: generateOperationalCode("MOV"),
+              consumableId: lot.consumableId,
+              purchaseLotId: lot.id,
+              lotCode: lot.lotCode,
+              qty: lot.quantity,
+              direction: "in",
+              reason: "restock",
+              unitCost: lot.unitCost,
+              lineTotal: lot.totalCost,
+              notes: `Delivered via PO ${lot.reference || lot.lotCode}`,
+              actorUserId: actor.userId,
+              actorName: actor.displayName,
+            });
+          }
+        }
+
+        if (lot.itemType === "asset" && lot.assetId) {
+          await db
+            .update(assets)
+            .set({
+              status: "active",
+              updatedAt: new Date(),
+            })
+            .where(eq(assets.id, lot.assetId));
+        }
+      }
+
+      const nextNotes = serializeNotesMetadata({
+        notes: body.notes || currentMeta.cleanNotes,
+        status: nextStatus,
+        purpose: currentMeta.purpose,
+        approvedByName,
+        approvedAt,
+        orderedAt,
+        deliveredAt,
+      });
+
+      const updated = await this.repo.update(
+        lot.id,
+        {
+          notes: nextNotes,
+          quantityRemaining: nextRemaining,
+        },
+        session
+      );
+
+      // Record Audit Log for Status Change
+      const actionKey =
+        nextStatus === "approved"
+          ? "purchase_order_approved"
+          : nextStatus === "ordered"
+          ? "purchase_order_ordered"
+          : nextStatus === "delivered"
+          ? "purchase_order_delivered"
+          : nextStatus === "cancelled"
+          ? "purchase_order_cancelled"
+          : "purchase_order_updated";
+
+      const poCode = lot.reference || lot.lotCode;
+
+      await db.insert(auditLogs).values({
+        entityType: "purchase_order",
+        entityId: poCode,
+        action: actionKey,
+        actorName: actor.displayName,
+        actorUserId: actor.userId,
+        notes: `PO ${poCode} status transitioned from ${currentMeta.status} to ${nextStatus}.${
+          body.notes ? ` Notes: ${body.notes}` : ""
+        }`,
+        metadata: {
+          poNumber: poCode,
+          lotCode: lot.lotCode,
+          previousStatus: currentMeta.status,
+          newStatus: nextStatus,
+          approvedByName,
+        },
+      });
+
+      return toPurchaseLotDTO(updated ?? lot);
+    });
+  }
+
+  /**
+   * Update PO Details (supplier, reference, notes, purpose).
+   */
+  async updatePurchaseOrder(
+    id: string,
+    rawBody: unknown,
+    actor: ActorContext
+  ): Promise<PurchaseLotDTO> {
+    const body: UpdatePurchaseOrderInput = updatePurchaseOrderSchema.parse(
+      rawBody
+    );
+
+    return withTransaction(async (session) => {
+      const db = session ?? getDb();
+      const lot = await this.repo.findByIdForUpdate(id, session);
+      if (!lot) {
+        throw new NotFoundError("Purchase Order lot", id);
+      }
+
+      const currentMeta = parseNotesMetadata(lot.notes);
+      let supplierName = lot.supplierName;
+      const supplierId =
+        body.supplierId !== undefined ? body.supplierId : lot.supplierId;
+
+      if (supplierId && supplierId !== lot.supplierId) {
+        const sup = await this.suppliers.findById(supplierId, session);
+        if (sup) supplierName = sup.name;
+      } else if (body.supplierName !== undefined) {
+        supplierName = body.supplierName;
+      }
+
+      const updatedNotes = serializeNotesMetadata({
+        notes: body.notes !== undefined ? body.notes : currentMeta.cleanNotes,
+        status: currentMeta.status,
+        purpose:
+          body.purpose !== undefined ? body.purpose : currentMeta.purpose,
+        approvedByName: currentMeta.approvedByName,
+        approvedAt: currentMeta.approvedAt,
+        orderedAt: currentMeta.orderedAt,
+        deliveredAt: currentMeta.deliveredAt,
+      });
+
+      const updated = await this.repo.update(
+        lot.id,
+        {
+          supplierId,
+          supplierName,
+          reference:
+            body.reference !== undefined ? body.reference : lot.reference,
+          purchasedOn: body.purchasedOn || lot.purchasedOn,
+          notes: updatedNotes,
+        },
+        session
+      );
+
+      const poCode = lot.reference || lot.lotCode;
+      await db.insert(auditLogs).values({
+        entityType: "purchase_order",
+        entityId: poCode,
+        action: "purchase_order_updated",
+        actorName: actor.displayName,
+        actorUserId: actor.userId,
+        notes: `Updated details for Purchase Order ${poCode}.`,
+        metadata: {
+          poNumber: poCode,
+          lotCode: lot.lotCode,
+        },
+      });
+
+      return toPurchaseLotDTO(updated ?? lot);
+    });
+  }
+
+  /**
+   * Delete or Cancel PO.
+   */
+  async deletePurchaseOrder(id: string, actor: ActorContext): Promise<boolean> {
+    return withTransaction(async (session) => {
+      const db = session ?? getDb();
+      const lot = await this.repo.findByIdForUpdate(id, session);
+      if (!lot) {
+        throw new NotFoundError("Purchase Order lot", id);
+      }
+
+      const poCode = lot.reference || lot.lotCode;
+      const meta = parseNotesMetadata(lot.notes);
+
+      // If delivered and already drawn down, prevent hard delete
+      if (meta.status === "delivered" && lot.quantityRemaining < lot.quantity) {
+        throw new BadRequestError(
+          "Cannot delete a delivered PO that has already been drawn or issued. Cancel the order instead."
+        );
+      }
+
+      const ok = await this.repo.delete(id, session);
+
+      await db.insert(auditLogs).values({
+        entityType: "purchase_order",
+        entityId: poCode,
+        action: "purchase_order_cancelled",
+        actorName: actor.displayName,
+        actorUserId: actor.userId,
+        notes: `Deleted / Removed Purchase Order line ${poCode} (${lot.itemName}).`,
+        metadata: {
+          poNumber: poCode,
+          lotCode: lot.lotCode,
+          itemName: lot.itemName,
+        },
+      });
+
+      return ok;
+    });
   }
 
   /** Exposed for project FIFO / repo-level callers. */
@@ -130,7 +721,6 @@ export class PurchaseLotService {
 
   /**
    * Draw quantity from a single lot (QR scan path for multi-supplier pricing).
-   * Returns DTO + allocation snapshot for history / expense reporting.
    */
   async consumeFromLot(
     lotCode: string,
@@ -291,7 +881,6 @@ export class PurchaseLotService {
 
   /**
    * FIFO draw across available lots for a consumable (generic checkout).
-   * Uncosted remainder is recorded if no lot qty remains (legacy stock).
    */
   async consumeFifo(
     consumableId: string,
@@ -373,6 +962,16 @@ export class PurchaseLotService {
 
     const unitCost = formatMoney(input.unitCost);
     const total = formatMoney(Number(unitCost) * input.quantity);
+    const status = input.status || "delivered";
+
+    const serializedNotes = serializeNotesMetadata({
+      notes: input.notes,
+      status,
+      purpose: input.purpose,
+      approvedByName: input.recordedByName,
+      approvedAt: new Date().toISOString(),
+      deliveredAt: new Date().toISOString(),
+    });
 
     const row = await this.repo.create(
       {
@@ -385,12 +984,12 @@ export class PurchaseLotService {
         supplierId,
         supplierName,
         quantity: input.quantity,
-        quantityRemaining: input.quantity,
+        quantityRemaining: status === "delivered" ? input.quantity : 0,
         unitCost,
         totalCost: total,
         purchasedOn: input.purchasedOn,
         reference: input.reference ?? null,
-        notes: input.notes ?? null,
+        notes: serializedNotes,
         recordedByUserId: input.recordedByUserId,
         recordedByName: input.recordedByName,
       },

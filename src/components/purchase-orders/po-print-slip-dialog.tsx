@@ -25,6 +25,14 @@ export function POPrintSlipDialog({
   onClose,
 }: POPrintSlipDialogProps) {
   const printRef = useRef<HTMLDivElement>(null);
+  const [requestedBy, setRequestedBy] = useState("");
+  const [requestedByTitle, setRequestedByTitle] = useState("Staff / Requester");
+
+  useEffect(() => {
+    if (lot) {
+      setRequestedBy(lot.recordedByName || "");
+    }
+  }, [lot]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -41,6 +49,7 @@ export function POPrintSlipDialog({
   const poDate = lot.purchasedOn || lot.createdAt.split("T")[0];
   const unitCostNum = parseFloat(lot.unitCost) || 0;
   const totalCostNum = parseFloat(lot.totalCost) || 0;
+  const effectiveRequestedBy = requestedBy.trim() || lot.recordedByName || "Authorized Staff";
 
   const handlePrint = () => {
     const printWindow = window.open("", "_blank", "width=850,height=900");
@@ -239,8 +248,8 @@ export function POPrintSlipDialog({
             <div class="signatures-container">
               <div class="sig-block">
                 <div class="sig-label">Requested by:</div>
-                <div class="sig-line">${lot.recordedByName}</div>
-                <div class="sig-title">Staff / Requester</div>
+                <div class="sig-line">${effectiveRequestedBy}</div>
+                <div class="sig-title">${requestedByTitle}</div>
               </div>
               <div class="sig-block">
                 <div class="sig-label">Approved by:</div>
@@ -268,7 +277,7 @@ export function POPrintSlipDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="official-po-title"
-        className="relative w-full max-w-3xl rounded-2xl border border-border bg-bg shadow-2xl z-10 overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200"
+        className="relative w-full max-w-3xl h-[680px] max-h-[90vh] rounded-2xl border border-border bg-bg shadow-2xl z-10 overflow-hidden flex flex-col animate-in zoom-in-95 duration-200"
       >
         {/* Modal Top Bar */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-bg-subtle/50 shrink-0">
@@ -286,6 +295,42 @@ export function POPrintSlipDialog({
           >
             <X className="h-4 w-4" />
           </button>
+        </div>
+
+        {/* Customization Options Toolbar */}
+        <div className="px-6 py-2.5 bg-bg-subtle/80 border-b border-border flex items-center justify-between gap-3 shrink-0 flex-wrap">
+          <div className="flex items-center gap-2 flex-1 min-w-48 flex-wrap">
+            <span className="text-[11px] font-bold text-text-secondary whitespace-nowrap">
+              Requested by:
+            </span>
+            <input
+              type="text"
+              value={requestedBy}
+              onChange={(e) => setRequestedBy(e.target.value)}
+              placeholder="Requester name…"
+              className="h-8 px-2.5 text-xs rounded-lg border border-border bg-bg text-text focus:bg-bg focus:border-accent focus:ring-1 focus:ring-accent focus:outline-hidden transition-colors flex-1 min-w-36 max-w-xs font-semibold"
+            />
+            <input
+              type="text"
+              value={requestedByTitle}
+              onChange={(e) => setRequestedByTitle(e.target.value)}
+              placeholder="Title / Role"
+              className="h-8 px-2.5 text-xs rounded-lg border border-border bg-bg text-text focus:bg-bg focus:border-accent focus:ring-1 focus:ring-accent focus:outline-hidden transition-colors w-36"
+            />
+          </div>
+
+          {(requestedBy !== (lot.recordedByName || "") || requestedByTitle !== "Staff / Requester") && (
+            <button
+              type="button"
+              onClick={() => {
+                setRequestedBy(lot.recordedByName || "");
+                setRequestedByTitle("Staff / Requester");
+              }}
+              className="text-[11px] font-semibold text-accent hover:underline cursor-pointer"
+            >
+              Reset to default
+            </button>
+          )}
         </div>
 
         {/* Document Body (matching physical form) */}
@@ -376,10 +421,10 @@ export function POPrintSlipDialog({
                   Requested by:
                 </span>
                 <div className="pt-2 border-b border-text/80 text-center">
-                  <span className="font-bold text-xs text-text">{lot.recordedByName}</span>
+                  <span className="font-bold text-xs text-text">{effectiveRequestedBy}</span>
                 </div>
                 <p className="text-[10px] text-text-secondary text-center -mt-4">
-                  Requester / Recorded Staff
+                  {requestedByTitle}
                 </p>
               </div>
 

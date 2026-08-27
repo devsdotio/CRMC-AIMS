@@ -9,14 +9,12 @@ import { useCategoryStyleMap } from "@/features/categories/client/use-categories
 export interface ConsumableTableRowProps {
   item: ConsumableItem;
   onSelect: (item: ConsumableItem) => void;
-  onRestock?: (item: ConsumableItem) => void;
   onAdjust?: (item: ConsumableItem) => void;
 }
 
 export function ConsumableTableRow({
   item,
   onSelect,
-  onRestock,
   onAdjust,
 }: ConsumableTableRowProps) {
   const { getCategoryStyle } = useCategoryStyleMap();
@@ -84,32 +82,22 @@ export function ConsumableTableRow({
       </td>
 
       {/* Actions */}
-      {(onAdjust || onRestock) && (
-      <td className="px-5 py-3.5 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-end gap-2">
-          {onAdjust && (
-          <button
-            type="button"
-            onClick={() => onAdjust(item)}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-border bg-bg text-xs font-semibold text-text-secondary hover:text-text hover:bg-bg-subtle transition-colors cursor-pointer"
-          >
-            <SlidersHorizontal className="h-3.5 w-3.5" />
-            Adjust
-          </button>
-          )}
-
-          {onRestock && (
-          <button
-            type="button"
-            onClick={() => onRestock(item)}
-            className="inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-bold bg-accent text-accent-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-2xs"
-          >
-            <PlusCircle className="h-3.5 w-3.5" />
-            Restock
-          </button>
-          )}
-        </div>
-      </td>
+      {onAdjust && (
+        <td
+          className="px-5 py-3.5 text-right whitespace-nowrap"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => onAdjust(item)}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-border bg-bg text-xs font-semibold text-text-secondary hover:text-text hover:bg-bg-subtle transition-colors cursor-pointer"
+            >
+              <SlidersHorizontal className="h-3.5 w-3.5" />
+              Adjust
+            </button>
+          </div>
+        </td>
       )}
     </tr>
   );

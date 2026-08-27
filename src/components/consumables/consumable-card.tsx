@@ -9,14 +9,12 @@ import { useCategoryStyleMap } from "@/features/categories/client/use-categories
 export interface ConsumableCardProps {
   item: ConsumableItem;
   onSelect: (item: ConsumableItem) => void;
-  onRestock?: (item: ConsumableItem) => void;
   onAdjust?: (item: ConsumableItem) => void;
 }
 
 export function ConsumableCard({
   item,
   onSelect,
-  onRestock,
   onAdjust,
 }: ConsumableCardProps) {
   const { getCategoryStyle } = useCategoryStyleMap();
@@ -77,32 +75,20 @@ export function ConsumableCard({
       </div>
 
       {/* Card Footer Actions */}
-      {(onAdjust || onRestock) && (
-      <div className="px-4 py-2.5 bg-bg-subtle border-t border-border flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
-        {onAdjust ? (
-        <button
-          type="button"
-          onClick={() => onAdjust(item)}
-          className="inline-flex items-center gap-1 text-[11px] font-semibold text-text-secondary hover:text-text cursor-pointer"
+      {onAdjust && (
+        <div
+          className="px-4 py-2.5 bg-bg-subtle border-t border-border flex items-center justify-between"
+          onClick={(e) => e.stopPropagation()}
         >
-          <SlidersHorizontal className="h-3 w-3" />
-          Adjust
-        </button>
-        ) : (
-          <span />
-        )}
-
-        {onRestock && (
-        <button
-          type="button"
-          onClick={() => onRestock(item)}
-          className="inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-bold bg-accent text-accent-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-2xs"
-        >
-          <PlusCircle className="h-3.5 w-3.5" />
-          Restock
-        </button>
-        )}
-      </div>
+          <button
+            type="button"
+            onClick={() => onAdjust(item)}
+            className="inline-flex items-center gap-1 text-[11px] font-semibold text-text-secondary hover:text-text cursor-pointer"
+          >
+            <SlidersHorizontal className="h-3 w-3" />
+            Adjust
+          </button>
+        </div>
       )}
     </div>
   );

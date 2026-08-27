@@ -33,6 +33,9 @@ export class AuditLogService {
 
     const logs = await this.repo.list(filters);
 
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const isUuid = (id: string) => UUID_REGEX.test(id);
+
     // Group IDs by entity type to resolve human-readable codes
     const borrowRequestIds = Array.from(new Set(logs.filter(l => l.entityType === 'borrow_request').map(l => l.entityId)));
     const consumableRequestIds = Array.from(new Set(logs.filter(l => l.entityType === 'consumable_request').map(l => l.entityId)));
@@ -45,38 +48,52 @@ export class AuditLogService {
     const db = getDb();
     const codeMap = new Map<string, string>();
 
-    if (borrowRequestIds.length > 0) {
-      const rows = await db.select({ id: borrowRequests.id, code: borrowRequests.requestCode }).from(borrowRequests).where(inArray(borrowRequests.id, borrowRequestIds));
+    // For any ID that is already a code (non-UUID), initialize it directly in codeMap
+    for (const log of logs) {
+      if (!isUuid(log.entityId)) {
+        codeMap.set(log.entityId, log.entityId);
+      }
+    }
+
+    const validBorrowUuids = borrowRequestIds.filter(isUuid);
+    if (validBorrowUuids.length > 0) {
+      const rows = await db.select({ id: borrowRequests.id, code: borrowRequests.requestCode }).from(borrowRequests).where(inArray(borrowRequests.id, validBorrowUuids));
       for (const r of rows) codeMap.set(r.id, r.code);
     }
 
-    if (consumableRequestIds.length > 0) {
-      const rows = await db.select({ id: consumableRequests.id, code: consumableRequests.requestCode }).from(consumableRequests).where(inArray(consumableRequests.id, consumableRequestIds));
+    const validConsumableReqUuids = consumableRequestIds.filter(isUuid);
+    if (validConsumableReqUuids.length > 0) {
+      const rows = await db.select({ id: consumableRequests.id, code: consumableRequests.requestCode }).from(consumableRequests).where(inArray(consumableRequests.id, validConsumableReqUuids));
       for (const r of rows) codeMap.set(r.id, r.code);
     }
 
-    if (assetIds.length > 0) {
-      const rows = await db.select({ id: assets.id, code: assets.assetCode }).from(assets).where(inArray(assets.id, assetIds));
+    const validAssetUuids = assetIds.filter(isUuid);
+    if (validAssetUuids.length > 0) {
+      const rows = await db.select({ id: assets.id, code: assets.assetCode }).from(assets).where(inArray(assets.id, validAssetUuids));
       for (const r of rows) codeMap.set(r.id, r.code);
     }
 
-    if (consumableIds.length > 0) {
-      const rows = await db.select({ id: consumables.id, code: consumables.itemCode }).from(consumables).where(inArray(consumables.id, consumableIds));
+    const validConsumableUuids = consumableIds.filter(isUuid);
+    if (validConsumableUuids.length > 0) {
+      const rows = await db.select({ id: consumables.id, code: consumables.itemCode }).from(consumables).where(inArray(consumables.id, validConsumableUuids));
       for (const r of rows) codeMap.set(r.id, r.code);
     }
 
-    if (lotIds.length > 0) {
-      const rows = await db.select({ id: purchaseLots.id, code: purchaseLots.lotCode }).from(purchaseLots).where(inArray(purchaseLots.id, lotIds));
+    const validLotUuids = lotIds.filter(isUuid);
+    if (validLotUuids.length > 0) {
+      const rows = await db.select({ id: purchaseLots.id, code: purchaseLots.lotCode }).from(purchaseLots).where(inArray(purchaseLots.id, validLotUuids));
       for (const r of rows) codeMap.set(r.id, r.code);
     }
 
-    if (maintenanceIds.length > 0) {
-      const rows = await db.select({ id: maintenanceLogs.id, code: maintenanceLogs.logCode }).from(maintenanceLogs).where(inArray(maintenanceLogs.id, maintenanceIds));
+    const validMaintenanceUuids = maintenanceIds.filter(isUuid);
+    if (validMaintenanceUuids.length > 0) {
+      const rows = await db.select({ id: maintenanceLogs.id, code: maintenanceLogs.logCode }).from(maintenanceLogs).where(inArray(maintenanceLogs.id, validMaintenanceUuids));
       for (const r of rows) codeMap.set(r.id, r.code);
     }
 
-    if (userIds.length > 0) {
-      const rows = await db.select({ id: profiles.userId, code: profiles.email, name: profiles.fullName }).from(profiles).where(inArray(profiles.userId, userIds));
+    const validUserUuids = userIds.filter(isUuid);
+    if (validUserUuids.length > 0) {
+      const rows = await db.select({ id: profiles.userId, code: profiles.email, name: profiles.fullName }).from(profiles).where(inArray(profiles.userId, validUserUuids));
       for (const r of rows) codeMap.set(r.id, r.code || r.name || r.id);
     }
 

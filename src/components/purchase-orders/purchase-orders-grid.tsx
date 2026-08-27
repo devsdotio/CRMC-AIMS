@@ -2,15 +2,20 @@
 
 import React, { useState } from "react";
 import {
-  ShoppingCart,
+  Boxes,
   Copy,
   Check,
   FileText,
+  Clock,
   ShieldCheck,
+  Truck,
+  PackageCheck,
+  Ban,
+  Building2,
 } from "lucide-react";
-import type { PurchaseLot } from "@/types/purchase-lots";
+import type { PurchaseLot, PurchaseOrderStatus } from "@/types/purchase-lots";
 import { cn } from "@/lib/utils";
-import { formatDateTime, formatRelativeTime } from "@/components/audit-logs/audit-log-utils";
+import { formatRelativeTime } from "@/components/audit-logs/audit-log-utils";
 
 interface PurchaseOrdersGridProps {
   lots: PurchaseLot[];
@@ -19,59 +24,62 @@ interface PurchaseOrdersGridProps {
   onPrintSlip: (lot: PurchaseLot) => void;
 }
 
+function StatusBadge({ status }: { status: PurchaseOrderStatus }) {
+  if (status === "delivered") {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+        <PackageCheck className="h-3 w-3" />
+        Delivered
+      </span>
+    );
+  }
+  if (status === "ordered") {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30">
+        <Truck className="h-3 w-3" />
+        Ordered
+      </span>
+    );
+  }
+  if (status === "approved") {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+        <ShieldCheck className="h-3 w-3" />
+        Approved
+      </span>
+    );
+  }
+  if (status === "cancelled") {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30">
+        <Ban className="h-3 w-3" />
+        Cancelled
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-bg-subtle text-text-secondary border border-border">
+      <Clock className="h-3 w-3" />
+      Pending Approval
+    </span>
+  );
+}
+
 function SkeletonCard() {
   return (
     <div className="rounded-xl border border-border bg-card p-4 shadow-xs flex flex-col justify-between animate-pulse space-y-3">
       <div className="space-y-2.5">
         <div className="flex items-center justify-between">
           <div className="h-4 w-28 bg-border rounded" />
-          <div className="flex items-center gap-1.5">
-            <div className="h-4 w-16 bg-border/60 rounded-full" />
-            <div className="h-4 w-16 bg-border/60 rounded-full" />
-          </div>
+          <div className="h-4 w-20 bg-border/60 rounded-full" />
         </div>
-
-        <div>
-          <div className="h-4.5 w-3/4 bg-border rounded mb-1.5" />
-          <div className="flex items-center justify-between">
-            <div className="h-3 w-20 bg-border/60 rounded" />
-            <div className="h-3 w-16 bg-border/60 rounded" />
-          </div>
-        </div>
-
-        <div className="space-y-1.5 pt-1">
-          <div className="flex justify-between">
-            <div className="h-3 w-24 bg-border/60 rounded" />
-            <div className="h-3 w-16 bg-border/60 rounded" />
-          </div>
-          <div className="h-1.5 w-full bg-border/60 rounded-full" />
-        </div>
-
+        <div className="h-4.5 w-3/4 bg-border rounded" />
         <div className="p-2.5 rounded-lg bg-bg-subtle/70 border border-border/70 space-y-2">
-          <div className="flex justify-between">
-            <div className="h-3 w-20 bg-border/60 rounded" />
-            <div className="h-3 w-24 bg-border rounded" />
-          </div>
-          <div className="flex justify-between">
-            <div className="h-3 w-16 bg-border/60 rounded" />
-            <div className="h-3 w-28 bg-border rounded" />
-          </div>
-          <div className="flex justify-between">
-            <div className="h-3 w-16 bg-border/60 rounded" />
-            <div className="h-3.5 w-20 bg-border rounded" />
-          </div>
-        </div>
-
-        <div className="flex justify-between pt-1">
-          <div className="h-3 w-24 bg-border/60 rounded" />
-          <div className="h-3 w-28 bg-border/60 rounded" />
+          <div className="h-3 w-full bg-border/60 rounded" />
+          <div className="h-3 w-full bg-border/60 rounded" />
         </div>
       </div>
-
-      <div className="flex items-center justify-between pt-3 border-t border-border">
-        <div className="h-7 w-24 bg-border rounded-lg" />
-        <div className="h-3 w-20 bg-border/60 rounded" />
-      </div>
+      <div className="h-7 w-full bg-border rounded-lg" />
     </div>
   );
 }
@@ -93,7 +101,7 @@ export function PurchaseOrdersGrid({
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" aria-label="Loading purchase orders cards">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {Array.from({ length: 6 }).map((_, i) => (
           <SkeletonCard key={i} />
         ))}
@@ -103,13 +111,13 @@ export function PurchaseOrdersGrid({
 
   if (lots.length === 0) {
     return (
-      <div className="flex h-full min-h-[300px] flex-col items-center justify-center p-8 text-center">
-        <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400 shadow-xs mb-3">
-          <ShoppingCart className="h-7 w-7" strokeWidth={1.8} />
-        </span>
-        <h3 className="text-base font-bold text-text">No Purchase Orders Found</h3>
+      <div className="flex-1 flex flex-col items-center justify-center p-12 text-center bg-card rounded-xl border border-border min-h-96">
+        <div className="p-3 rounded-2xl bg-accent/10 border border-accent/20 text-accent mb-3">
+          <Boxes className="h-6 w-6" />
+        </div>
+        <h3 className="text-sm font-bold text-text">No Purchase Orders Found</h3>
         <p className="text-xs text-text-secondary max-w-sm mt-1 leading-relaxed">
-          No purchase orders match your filter criteria. Try adjusting your filters or search query.
+          No purchase orders match your active search and filter criteria. File a new PO or reset your filters.
         </p>
       </div>
     );
@@ -118,152 +126,115 @@ export function PurchaseOrdersGrid({
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       {lots.map((lot) => {
-        const remainingRatio =
-          lot.quantity > 0 ? (lot.quantityRemaining / lot.quantity) * 100 : 0;
-        const isDepleted = lot.quantityRemaining === 0;
-        const isLowStock = !isDepleted && remainingRatio <= 20;
+        const displayPO = lot.poNumber || lot.lotCode;
         const poDate = lot.purchasedOn || lot.createdAt.split("T")[0];
+        const unitCostNum = parseFloat(lot.unitCost) || 0;
+        const totalCostNum = parseFloat(lot.totalCost) || 0;
 
         return (
           <div
             key={lot.id}
             onClick={() => onSelectLot(lot)}
-            className="rounded-xl border border-border bg-card p-4 shadow-xs hover:border-border hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col justify-between group relative"
+            className="rounded-xl border border-border bg-card p-4.5 shadow-2xs hover:shadow-md hover:border-accent/40 transition-all duration-200 cursor-pointer flex flex-col justify-between group"
           >
-            {/* Header: P.O Number & Badges */}
-            <div className="space-y-2.5">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-mono text-xs font-bold text-text bg-bg-subtle px-2 py-0.5 rounded border border-border">
-                      {lot.poNumber || lot.lotCode}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={(e) => handleCopyCode(e, lot.poNumber || lot.lotCode)}
-                      title="Copy P.O Number"
-                      className="p-1 rounded text-text-secondary hover:text-text hover:bg-border/60 transition-colors cursor-pointer"
-                    >
-                      {copiedCode === (lot.poNumber || lot.lotCode) ? (
-                        <Check className="h-3 w-3 text-status-active-text" />
-                      ) : (
-                        <Copy className="h-3 w-3" />
-                      )}
-                    </button>
-                  </div>
-                  <div className="text-[10px] text-text-secondary mt-0.5 font-mono">
-                    Lot: <strong className="text-text font-medium">{lot.lotCode}</strong>
-                  </div>
+            <div className="space-y-3">
+              {/* Top Row: PO Number & Status Badge */}
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="font-mono text-xs font-bold text-text group-hover:text-accent transition-colors truncate">
+                    {displayPO}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={(e) => handleCopyCode(e, displayPO)}
+                    title="Copy PO Number"
+                    className="p-1 rounded text-text-secondary hover:text-text hover:bg-border/60 transition-colors cursor-pointer shrink-0"
+                  >
+                    {copiedCode === displayPO ? (
+                      <Check className="h-3 w-3 text-status-active-text" />
+                    ) : (
+                      <Copy className="h-3 w-3" />
+                    )}
+                  </button>
                 </div>
 
-                <div className="flex items-center gap-1.5">
-                  <span
-                    className={cn(
-                      "px-2 py-0.5 rounded-full text-[10px] font-bold border capitalize",
-                      lot.itemType === "asset"
-                        ? "bg-category-computing-bg/10 text-category-computing-bg border-category-computing-bg/30"
-                        : "bg-category-av-bg/10 text-category-av-bg border-category-av-bg/30"
-                    )}
-                  >
-                    {lot.itemType}
-                  </span>
-                  <span
-                    className={cn(
-                      "px-2 py-0.5 rounded-full text-[10px] font-bold border",
-                      isDepleted
-                        ? "bg-status-retired-bg/15 text-status-retired-text border-status-retired-bg/30"
-                        : isLowStock
-                        ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30"
-                        : "bg-status-active-bg/15 text-status-active-text border-status-active-bg/30"
-                    )}
-                  >
-                    {isDepleted ? "Depleted" : isLowStock ? "Low Stock" : "In Stock"}
-                  </span>
-                </div>
+                <StatusBadge status={lot.status} />
               </div>
 
-              {/* Description & Quantity */}
+              {/* Item Info */}
               <div>
-                <h3 className="text-sm font-bold text-text truncate" title={lot.itemName}>
+                <h3 className="text-sm font-bold text-text group-hover:text-accent transition-colors line-clamp-1">
                   {lot.itemName}
                 </h3>
-                <div className="flex items-center justify-between text-xs text-text-secondary mt-0.5">
-                  <span className="font-mono text-[11px]">Code: {lot.itemCode}</span>
-                  <span className="font-bold text-text">Qty: {lot.quantity} units</span>
+                <div className="flex items-center justify-between text-[11px] text-text-secondary mt-0.5">
+                  <span className="font-mono">{lot.itemCode}</span>
+                  <span className="capitalize">{lot.itemType}</span>
                 </div>
               </div>
 
-              {/* Stock Progress Meter */}
-              <div className="space-y-1 pt-0.5">
-                <div className="flex items-center justify-between text-[11px]">
-                  <span className="text-text-secondary">Available Balance:</span>
-                  <span className="font-bold text-text">{lot.quantityRemaining} / {lot.quantity} units</span>
+              {/* Order Specs Box */}
+              <div className="p-3 rounded-lg bg-bg-subtle/70 border border-border/70 space-y-1.5 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-text-secondary font-medium">Quantity:</span>
+                  <span className="font-mono font-bold text-text">
+                    {lot.quantity} {lot.itemType === "asset" ? "unit" : "units"}
+                  </span>
                 </div>
-                <div className="h-1.5 w-full rounded-full bg-bg-subtle overflow-hidden border border-border/50">
-                  <div
-                    className={cn(
-                      "h-full rounded-full transition-all duration-300",
-                      isDepleted
-                        ? "bg-status-retired-bg"
-                        : isLowStock
-                        ? "bg-amber-500"
-                        : "bg-status-active-bg"
-                    )}
-                    style={{ width: `${Math.min(100, Math.max(0, remainingRatio))}%` }}
-                  />
-                </div>
-              </div>
 
-              {/* Suggested Dealer & Purpose Card */}
-              <div className="p-2.5 rounded-lg bg-bg-subtle/70 border border-border/70 text-xs space-y-1.5">
-                <div className="flex items-center justify-between gap-1">
-                  <span className="text-[10px] text-text-secondary font-medium uppercase tracking-wider">Suggested Dealer</span>
-                  <span className="font-semibold text-text truncate max-w-[150px] text-right">
-                    {lot.supplierName || "Direct / Internal"}
-                  </span>
+                <div className="flex justify-between">
+                  <span className="text-text-secondary font-medium">Unit Cost:</span>
+                  <span className="font-mono font-semibold text-text">₱{unitCostNum.toFixed(2)}</span>
                 </div>
-                <div className="flex items-start justify-between gap-1 pt-1 border-t border-border/50">
-                  <span className="text-[10px] text-text-secondary font-medium uppercase tracking-wider">Purpose</span>
-                  <span className="text-text-secondary truncate max-w-[160px] text-right text-[11px]">
-                    {lot.notes || "Operations & Inventory"}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between gap-1 pt-1 border-t border-border/50">
-                  <span className="text-[10px] text-text-secondary font-medium uppercase tracking-wider">Estimated</span>
+
+                <div className="flex justify-between pt-1 border-t border-border/50">
+                  <span className="text-text-secondary font-medium">Total PO Value:</span>
                   <span className="font-mono font-bold text-status-active-text">
-                    ₱{Number(lot.totalCost).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                    ₱{totalCostNum.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                   </span>
                 </div>
               </div>
 
-              {/* Signatures / Custodian */}
-              <div className="flex items-center justify-between text-[11px] text-text-secondary pt-0.5">
-                <span className="truncate">Req: <strong className="text-text">{lot.recordedByName}</strong></span>
-                <span className="flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold shrink-0">
-                  <ShieldCheck className="h-3 w-3" />
-                  Custodian Approved
-                </span>
+              {/* Supplier & Requester Info */}
+              <div className="space-y-1 text-[11px] text-text-secondary pt-0.5">
+                <div className="flex items-center justify-between truncate">
+                  <span className="flex items-center gap-1">
+                    <Building2 className="h-3 w-3" />
+                    <span>{lot.supplierName || "Internal / Direct"}</span>
+                  </span>
+                  <span>{poDate}</span>
+                </div>
+                <div className="truncate">
+                  <span>Req by: <strong className="text-text font-medium">{lot.recordedByName}</strong></span>
+                </div>
               </div>
             </div>
 
-            {/* Footer Action Strip */}
-            <div
-              className="flex items-center justify-between pt-3 mt-3 border-t border-border"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button
-                type="button"
-                onClick={() => onPrintSlip(lot)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-border bg-bg hover:bg-bg-subtle text-text transition-colors cursor-pointer"
-                title="Print Official PO Slip"
-              >
-                <FileText className="h-3.5 w-3.5 text-accent" />
-                <span>Print PO Slip</span>
-              </button>
-
-              <span className="text-[11px] text-text-secondary font-medium group-hover:text-accent transition-colors">
-                View Details →
+            {/* Bottom Actions */}
+            <div className="flex items-center justify-between pt-3.5 mt-3 border-t border-border/80">
+              <span className="text-[10px] text-text-secondary font-medium">
+                {formatRelativeTime(lot.createdAt)}
               </span>
+
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onPrintSlip(lot);
+                  }}
+                  title="Print Official Form Slip"
+                  className="p-1.5 rounded-lg border border-border bg-bg hover:bg-bg-subtle text-text-secondary hover:text-text transition-colors cursor-pointer"
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onSelectLot(lot)}
+                  className="px-3 py-1 text-[11px] font-bold rounded-lg border border-border bg-bg hover:bg-bg-subtle text-text transition-colors cursor-pointer"
+                >
+                  View Details
+                </button>
+              </div>
             </div>
           </div>
         );

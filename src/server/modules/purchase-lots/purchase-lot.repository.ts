@@ -57,7 +57,7 @@ export class PurchaseLotRepository implements IPurchaseLotRepository {
     const [row] = await db
       .select()
       .from(purchaseLots)
-      .where(or(eq(purchaseLots.lotCode, lotCode), eq(purchaseLots.lotCode, altCode)))
+      .where(or(eq(purchaseLots.lotCode, lotCode), eq(purchaseLots.lotCode, altCode), eq(purchaseLots.reference, lotCode)))
       .limit(1);
     return row ?? null;
   }
@@ -74,7 +74,7 @@ export class PurchaseLotRepository implements IPurchaseLotRepository {
     const [row] = await session
       .select()
       .from(purchaseLots)
-      .where(or(eq(purchaseLots.lotCode, lotCode), eq(purchaseLots.lotCode, altCode)))
+      .where(or(eq(purchaseLots.lotCode, lotCode), eq(purchaseLots.lotCode, altCode), eq(purchaseLots.reference, lotCode)))
       .for("update")
       .limit(1);
     return row ?? null;
@@ -107,7 +107,8 @@ export class PurchaseLotRepository implements IPurchaseLotRepository {
           ilike(purchaseLots.itemCode, q),
           ilike(purchaseLots.itemName, q),
           ilike(purchaseLots.supplierName, q),
-          ilike(purchaseLots.reference, q)
+          ilike(purchaseLots.reference, q),
+          ilike(purchaseLots.notes, q)
         )!
       );
     }
@@ -170,6 +171,29 @@ export class PurchaseLotRepository implements IPurchaseLotRepository {
       .where(eq(purchaseLots.id, id))
       .returning();
     return row ?? null;
+  }
+
+  async update(
+    id: string,
+    data: Partial<Omit<NewPurchaseLotRow, "id" | "createdAt">>,
+    session?: DbSession
+  ): Promise<PurchaseLotRow | null> {
+    const db = this.db(session);
+    const [row] = await db
+      .update(purchaseLots)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(purchaseLots.id, id))
+      .returning();
+    return row ?? null;
+  }
+
+  async delete(id: string, session?: DbSession): Promise<boolean> {
+    const db = this.db(session);
+    const [deleted] = await db
+      .delete(purchaseLots)
+      .where(eq(purchaseLots.id, id))
+      .returning();
+    return Boolean(deleted);
   }
 
   async create(

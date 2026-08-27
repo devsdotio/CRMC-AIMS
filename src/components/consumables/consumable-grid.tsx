@@ -8,7 +8,6 @@ export interface ConsumableGridProps {
   items: ConsumableItem[];
   loading?: boolean;
   onSelect: (item: ConsumableItem) => void;
-  onRestock?: (item: ConsumableItem) => void;
   onAdjust?: (item: ConsumableItem) => void;
 }
 
@@ -33,7 +32,6 @@ function SkeletonCard() {
       </div>
       <div className="px-4 py-2.5 bg-bg-subtle border-t border-border flex items-center justify-between">
         <div className="h-4 w-12 bg-border rounded" />
-        <div className="h-7 w-20 bg-border rounded-md" />
       </div>
     </div>
   );
@@ -43,7 +41,6 @@ export function ConsumableGrid({
   items,
   loading = false,
   onSelect,
-  onRestock,
   onAdjust,
 }: ConsumableGridProps) {
   if (loading) {
@@ -79,7 +76,6 @@ export function ConsumableGrid({
           key={item.id}
           item={item}
           onSelect={onSelect}
-          onRestock={onRestock}
           onAdjust={onAdjust}
         />
       ))}

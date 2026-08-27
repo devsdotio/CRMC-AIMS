@@ -8,13 +8,27 @@ import {
   Printer,
   Copy,
   Check,
-  Layers,
   Send,
   Tag,
+  CheckCircle2,
+  Clock,
+  Truck,
+  PackageCheck,
+  Ban,
+  Building2,
+  User,
+  History,
+  QrCode,
+  AlertCircle,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { PurchaseLot } from "@/types/purchase-lots";
+import type { PurchaseLot, PurchaseOrderStatus } from "@/types/purchase-lots";
 import { formatPhp } from "@/components/projects/format-money";
+import { useUpdatePOStatusMutation } from "@/features/purchase-lots/client";
+import { useAuditLogsQuery } from "@/features/audit-logs/client";
+import { formatDateTime, formatRelativeTime } from "@/components/audit-logs/audit-log-utils";
+import { useToast } from "@/components/providers/toast-context";
 
 interface PurchaseOrderDetailSheetProps {
   lot: PurchaseLot | null;
@@ -25,6 +39,38 @@ interface PurchaseOrderDetailSheetProps {
   onReleaseStock?: (lot: PurchaseLot) => void;
   canOperate?: boolean;
 }
+
+const WORKFLOW_STEPS: Array<{
+  status: PurchaseOrderStatus;
+  label: string;
+  desc: string;
+  icon: typeof Clock;
+}> = [
+  {
+    status: "pending_approval",
+    label: "Draft / Pending",
+    desc: "Awaiting Custodian review",
+    icon: Clock,
+  },
+  {
+    status: "approved",
+    label: "Approved",
+    desc: "Ready for supplier issuance",
+    icon: ShieldCheck,
+  },
+  {
+    status: "ordered",
+    label: "Ordered",
+    desc: "In transit from vendor",
+    icon: Truck,
+  },
+  {
+    status: "delivered",
+    label: "Delivered",
+    desc: "Received & stocked in inventory",
+    icon: PackageCheck,
+  },
+];
 
 export function PurchaseOrderDetailSheet({
   lot,
@@ -37,6 +83,19 @@ export function PurchaseOrderDetailSheet({
 }: PurchaseOrderDetailSheetProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [activeTab, setActiveTab] = useState<"specs" | "workflow" | "qr">("specs");
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [statusNote, setStatusNote] = useState("");
+  const [showStatusModal, setShowStatusModal] = useState<PurchaseOrderStatus | null>(null);
+
+  const updateStatusMutation = useUpdatePOStatusMutation();
+  const toast = useToast();
+
+  const entityCode = lot ? lot.poNumber || lot.lotCode : "";
+  const { data: auditLogs = [] } = useAuditLogsQuery({
+    entityId: entityCode,
+    entityType: "purchase_order",
+  });
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -51,7 +110,7 @@ export function PurchaseOrderDetailSheet({
   if (!isOpen || !lot) return null;
 
   const handleCopyCode = () => {
-    navigator.clipboard.writeText(lot.lotCode);
+    navigator.clipboard.writeText(lot.poNumber || lot.lotCode);
     setCopiedCode(true);
     setTimeout(() => setCopiedCode(false), 1500);
   };
@@ -62,11 +121,37 @@ export function PurchaseOrderDetailSheet({
   const consumedUnits = Math.max(0, lot.quantity - lot.quantityRemaining);
   const remainingValue = lot.quantityRemaining * unitCostNum;
   const remainingRatio = lot.quantity > 0 ? (lot.quantityRemaining / lot.quantity) * 100 : 0;
-  const isDepleted = lot.quantityRemaining === 0;
-  const isLowStock = !isDepleted && remainingRatio <= 20;
+  const isDepleted = lot.status === "delivered" && lot.quantityRemaining === 0;
+  const isLowStock = lot.status === "delivered" && !isDepleted && remainingRatio <= 20;
   const poDate = lot.purchasedOn || lot.createdAt.split("T")[0];
+
+  const currentStepIdx = WORKFLOW_STEPS.findIndex((s) => s.status === lot.status);
+
+  const handleTransitionStatus = async (nextStatus: PurchaseOrderStatus) => {
+    setIsUpdatingStatus(true);
+    try {
+      await updateStatusMutation.mutateAsync({
+        id: lot.id,
+        payload: {
+          status: nextStatus,
+          notes: statusNote.trim() || undefined,
+        },
+      });
+      toast.success(
+        `PO ${lot.poNumber || lot.lotCode} updated to ${nextStatus.replace("_", " ")}.`
+      );
+      setShowStatusModal(null);
+      setStatusNote("");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update status.");
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
   const canRelease =
     canOperate &&
+    lot.status === "delivered" &&
     lot.itemType === "consumable" &&
     lot.quantityRemaining > 0 &&
     Boolean(onReleaseStock);
@@ -81,7 +166,7 @@ export function PurchaseOrderDetailSheet({
         aria-modal="true"
         aria-labelledby="po-detail-heading"
         className={cn(
-          "relative flex flex-col w-full max-w-lg h-full bg-bg border-l border-border shadow-2xl z-10 overflow-hidden",
+          "relative flex flex-col w-full max-w-xl h-full bg-bg border-l border-border shadow-2xl z-10 overflow-hidden",
           "animate-in slide-in-from-right duration-250 ease-in-out"
         )}
       >
@@ -95,7 +180,7 @@ export function PurchaseOrderDetailSheet({
               <button
                 type="button"
                 onClick={handleCopyCode}
-                title="Copy P.O Number"
+                title="Copy PO Code"
                 className="p-1 rounded text-text-secondary hover:text-text hover:bg-border/60 transition-colors cursor-pointer"
               >
                 {copiedCode ? (
@@ -116,17 +201,23 @@ export function PurchaseOrderDetailSheet({
                 {lot.itemType}
               </span>
 
+              {/* Status Badge */}
               <span
                 className={cn(
-                  "px-2 py-0.5 rounded-full text-[10px] font-bold border",
-                  isDepleted
-                    ? "bg-status-retired-bg/15 text-status-retired-text border-status-retired-bg/30"
-                    : isLowStock
+                  "px-2.5 py-0.5 rounded-full text-[10px] font-bold border capitalize flex items-center gap-1",
+                  lot.status === "delivered"
+                    ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+                    : lot.status === "ordered"
+                    ? "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30"
+                    : lot.status === "approved"
                     ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30"
-                    : "bg-status-active-bg/15 text-status-active-text border-status-active-bg/30"
+                    : lot.status === "cancelled"
+                    ? "bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30"
+                    : "bg-bg-subtle text-text-secondary border-border"
                 )}
               >
-                {isDepleted ? "Depleted" : isLowStock ? "Low Stock" : "In Stock"}
+                <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                {lot.status.replace("_", " ")}
               </span>
             </div>
             <p className="text-xs text-text-secondary font-medium mt-0.5 space-x-1.5 truncate">
@@ -148,192 +239,487 @@ export function PurchaseOrderDetailSheet({
           </button>
         </div>
 
-        {/* Scrollable Body */}
+        {/* Tab Navigation */}
+        <div className="flex border-b border-border bg-bg-subtle/40 px-6 shrink-0 gap-6 text-xs font-semibold">
+          <button
+            type="button"
+            onClick={() => setActiveTab("specs")}
+            className={cn(
+              "py-3 border-b-2 transition-colors cursor-pointer flex items-center gap-1.5",
+              activeTab === "specs"
+                ? "border-accent text-accent font-bold"
+                : "border-transparent text-text-secondary hover:text-text"
+            )}
+          >
+            <FileText className="h-4 w-4" />
+            <span>Specifications & Order</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("workflow")}
+            className={cn(
+              "py-3 border-b-2 transition-colors cursor-pointer flex items-center gap-1.5",
+              activeTab === "workflow"
+                ? "border-accent text-accent font-bold"
+                : "border-transparent text-text-secondary hover:text-text"
+            )}
+          >
+            <History className="h-4 w-4" />
+            <span>Workflow & Activity Logs</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("qr")}
+            className={cn(
+              "py-3 border-b-2 transition-colors cursor-pointer flex items-center gap-1.5",
+              activeTab === "qr"
+                ? "border-accent text-accent font-bold"
+                : "border-transparent text-text-secondary hover:text-text"
+            )}
+          >
+            <QrCode className="h-4 w-4" />
+            <span>Tag & QR</span>
+          </button>
+        </div>
+
+        {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* CRMC PO Specifications Card */}
-          <div className="p-4 rounded-xl border border-border bg-card space-y-3 shadow-xs">
-            <div className="flex items-center justify-between border-b border-border pb-2.5">
-              <span className="text-xs font-bold uppercase tracking-wider text-text flex items-center gap-1.5">
-                <FileText className="h-3.5 w-3.5 text-accent" />
-                Purchase Order Details
+          {/* Visual Workflow Stepper Header */}
+          <div className="p-4 rounded-xl border border-border bg-card space-y-3 shadow-2xs">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-text flex items-center gap-1.5">
+                <ShieldCheck className="h-3.5 w-3.5 text-accent" />
+                PO Workflow Progression
               </span>
-              <button
-                type="button"
-                onClick={() => onPrintSlip(lot)}
-                className="inline-flex items-center gap-1 text-[11px] font-bold text-accent hover:underline cursor-pointer"
-              >
-                <Printer className="h-3 w-3" />
-                <span>Print Official PO Slip</span>
-              </button>
+              <span className="text-[10px] text-text-secondary">
+                {lot.status === "delivered" ? "Completed" : "Active Stage"}
+              </span>
             </div>
 
-            <div className="space-y-2 text-xs">
-              <div>
-                <span className="text-[11px] text-text-secondary font-medium block">Description / Item</span>
-                <span className="font-bold text-text text-sm block">{lot.itemName}</span>
-                <span className="font-mono text-[11px] text-text-secondary">Code: {lot.itemCode}</span>
-              </div>
+            {/* Stepper Bar */}
+            <div className="grid grid-cols-4 gap-2 pt-1">
+              {WORKFLOW_STEPS.map((step, idx) => {
+                const isPassed = currentStepIdx > idx;
+                const isCurrent = currentStepIdx === idx;
+                const Icon = step.icon;
 
-              <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border/60">
-                <div>
-                  <span className="text-[10px] text-text-secondary font-medium uppercase tracking-wider block">Quantity</span>
-                  <span className="font-bold text-text text-sm">{lot.quantity} units</span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-text-secondary font-medium uppercase tracking-wider block">Estimated Cost</span>
-                  <span className="font-mono font-bold text-status-active-text text-sm">
-                    ₱{totalCostNum.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                return (
+                  <div key={step.status} className="flex flex-col items-center text-center space-y-1">
+                    <div
+                      className={cn(
+                        "h-8 w-8 rounded-full flex items-center justify-center border transition-all",
+                        isPassed
+                          ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/40"
+                          : isCurrent
+                          ? "bg-accent text-accent-foreground border-accent shadow-xs scale-105"
+                          : "bg-bg-subtle text-text-secondary border-border"
+                      )}
+                    >
+                      {isPassed ? <Check className="h-4 w-4 stroke-3" /> : <Icon className="h-4 w-4" />}
+                    </div>
+                    <span
+                      className={cn(
+                        "text-[10px] leading-tight font-medium",
+                        isCurrent ? "font-bold text-text" : "text-text-secondary"
+                      )}
+                    >
+                      {step.label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Action Buttons Toolbar for Operators */}
+            {canOperate && (
+              <div className="pt-3 border-t border-border flex items-center gap-2 flex-wrap">
+                {lot.status === "pending_approval" && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setShowStatusModal("approved")}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors cursor-pointer shadow-2xs"
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      Approve PO
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowStatusModal("cancelled")}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-border bg-bg text-text-secondary hover:text-rose-600 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                    >
+                      <Ban className="h-3.5 w-3.5" />
+                      Cancel PO
+                    </button>
+                  </>
+                )}
+
+                {lot.status === "approved" && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => handleTransitionStatus("ordered")}
+                      disabled={isUpdatingStatus}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors cursor-pointer shadow-2xs"
+                    >
+                      <Truck className="h-3.5 w-3.5" />
+                      Mark as Ordered
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowStatusModal("delivered")}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors cursor-pointer shadow-2xs"
+                    >
+                      <PackageCheck className="h-3.5 w-3.5" />
+                      Receive & Stock
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowStatusModal("cancelled")}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-border bg-bg text-text-secondary hover:text-rose-600 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                    >
+                      <Ban className="h-3.5 w-3.5" />
+                      Cancel PO
+                    </button>
+                  </>
+                )}
+
+                {lot.status === "ordered" && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setShowStatusModal("delivered")}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors cursor-pointer shadow-2xs"
+                    >
+                      <PackageCheck className="h-3.5 w-3.5" />
+                      Receive & Intake into Stock
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowStatusModal("cancelled")}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-border bg-bg text-text-secondary hover:text-rose-600 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                    >
+                      <Ban className="h-3.5 w-3.5" />
+                      Cancel PO
+                    </button>
+                  </>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => onPrintSlip(lot)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-border bg-bg hover:bg-bg-subtle text-text transition-colors cursor-pointer ml-auto"
+                >
+                  <Printer className="h-3.5 w-3.5" />
+                  Print Official Form
+                </button>
+              </div>
+            )}
+          </div>
+
+          {activeTab === "specs" && (
+            <div className="space-y-6">
+              {/* Line Item & Cost Specifications */}
+              <div className="p-4 rounded-xl border border-border bg-card space-y-4 shadow-2xs">
+                <div className="flex items-center justify-between border-b border-border pb-2.5">
+                  <span className="text-xs font-bold uppercase tracking-wider text-text flex items-center gap-1.5">
+                    <FileText className="h-3.5 w-3.5 text-accent" />
+                    Item & Cost Specifications
                   </span>
                 </div>
-              </div>
 
-              <div className="pt-1 border-t border-border/60">
-                <span className="text-[10px] text-text-secondary font-medium uppercase tracking-wider block">Suggested Dealer</span>
-                <span className="font-semibold text-text">{lot.supplierName || "Direct / Internal Procurement"}</span>
-                {lot.reference && (
-                  <span className="font-mono text-[11px] text-text-secondary block">Ref / Invoice: {lot.reference}</span>
+                <div className="grid grid-cols-2 gap-4 text-xs">
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-text-secondary">Item Name</span>
+                    <p className="font-bold text-text text-sm leading-snug">{lot.itemName}</p>
+                    <span className="font-mono text-[10px] text-text-secondary">Code: {lot.itemCode}</span>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-text-secondary">Dealer / Supplier</span>
+                    <p className="font-semibold text-text">{lot.supplierName || "Internal / Direct"}</p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-text-secondary">Quantity Received</span>
+                    <p className="font-mono font-bold text-text text-sm">
+                      {lot.quantity} {lot.itemType === "asset" ? "unit" : "units"}
+                    </p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-text-secondary">Unit Acquisition Cost</span>
+                    <p className="font-mono font-bold text-text">₱{unitCostNum.toFixed(2)}</p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-text-secondary">Purpose / Usage</span>
+                    <p className="font-medium text-text">{lot.purpose || "General Operations Replenishment"}</p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-text-secondary">Total PO Valuation</span>
+                    <p className="font-mono font-bold text-base text-status-active-text">
+                      {formatPhp(totalCostNum)}
+                    </p>
+                  </div>
+                </div>
+
+                {lot.notes && (
+                  <div className="p-3 rounded-lg bg-bg-subtle/80 border border-border/60 text-xs">
+                    <span className="font-bold text-text-secondary uppercase text-[10px] block mb-1">
+                      Notes & Observations
+                    </span>
+                    <p className="text-text leading-relaxed">{lot.notes}</p>
+                  </div>
                 )}
               </div>
 
-              <div className="pt-1 border-t border-border/60">
-                <span className="text-[10px] text-text-secondary font-medium uppercase tracking-wider block">Purpose</span>
-                <p className="text-text font-medium mt-0.5 leading-relaxed bg-bg-subtle/70 p-2 rounded-md border border-border/60">
-                  {lot.notes || "Institutional Inventory & Operations"}
-                </p>
+              {/* Stock Availability Card (for delivered consumable lots) */}
+              {lot.itemType === "consumable" && lot.status === "delivered" && (
+                <div className="p-4 rounded-xl border border-border bg-card space-y-3 shadow-2xs">
+                  <div className="flex items-center justify-between border-b border-border pb-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-text flex items-center gap-1.5">
+                      <Tag className="h-3.5 w-3.5 text-accent" />
+                      Lot Remaining Stock Status
+                    </span>
+                    <span
+                      className={cn(
+                        "px-2 py-0.5 rounded-full text-[10px] font-bold border",
+                        isDepleted
+                          ? "bg-status-retired-bg/15 text-status-retired-text border-status-retired-bg/30"
+                          : isLowStock
+                          ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                          : "bg-status-active-bg/15 text-status-active-text border-status-active-bg/30"
+                      )}
+                    >
+                      {isDepleted ? "Depleted" : isLowStock ? "Low Stock" : "In Stock"}
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs font-medium">
+                      <span className="text-text-secondary">Units Remaining / Available:</span>
+                      <span className="font-mono font-bold text-text">
+                        {lot.quantityRemaining} of {lot.quantity}
+                      </span>
+                    </div>
+                    <div className="w-full h-2 rounded-full bg-border overflow-hidden">
+                      <div
+                        className={cn(
+                          "h-full rounded-full transition-all duration-300",
+                          isDepleted
+                            ? "bg-status-retired-bg"
+                            : isLowStock
+                            ? "bg-amber-500"
+                            : "bg-status-active-bg"
+                        )}
+                        style={{ width: `${Math.min(100, Math.max(0, remainingRatio))}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {canRelease && (
+                    <div className="pt-2">
+                      <button
+                        type="button"
+                        onClick={() => onReleaseStock?.(lot)}
+                        className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold rounded-lg bg-accent text-accent-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+                      >
+                        <Send className="h-4 w-4" />
+                        <span>Issue / Release From This Lot</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === "workflow" && (
+            <div className="space-y-4">
+              <div className="p-4 rounded-xl border border-border bg-card shadow-2xs space-y-4">
+                <div className="flex items-center justify-between border-b border-border pb-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-text flex items-center gap-1.5">
+                    <History className="h-3.5 w-3.5 text-accent" />
+                    Activity & Audit Trail
+                  </span>
+                  <span className="text-[10px] text-text-secondary">
+                    {auditLogs.length} audit event(s) recorded
+                  </span>
+                </div>
+
+                {/* Audit Timeline */}
+                <ol className="relative border-l-2 border-border/80 ml-3 space-y-5">
+                  {/* Step 1: Created */}
+                  <li className="pl-5 relative group">
+                    <span className="absolute -left-2.5 top-1 h-4 w-4 rounded-full border-2 bg-accent border-bg" />
+                    <div className="text-xs space-y-0.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-text">Purchase Order Created</span>
+                        <time className="text-[10px] text-text-secondary font-mono">{formatDateTime(lot.createdAt)}</time>
+                      </div>
+                      <p className="text-text-secondary text-[11px]">
+                        Filed by <strong className="text-text">{lot.recordedByName}</strong>
+                      </p>
+                    </div>
+                  </li>
+
+                  {/* Step 2: Approved if applicable */}
+                  {lot.approvedAt && (
+                    <li className="pl-5 relative group">
+                      <span className="absolute -left-2.5 top-1 h-4 w-4 rounded-full border-2 bg-emerald-500 border-bg" />
+                      <div className="text-xs space-y-0.5">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-emerald-600 dark:text-emerald-400">PO Approved</span>
+                          <time className="text-[10px] text-text-secondary font-mono">{formatDateTime(lot.approvedAt)}</time>
+                        </div>
+                        <p className="text-text-secondary text-[11px]">
+                          Approved by <strong className="text-text">{lot.approvedByName || "Head Property Custodian"}</strong>
+                        </p>
+                      </div>
+                    </li>
+                  )}
+
+                  {/* Step 3: Ordered if applicable */}
+                  {lot.orderedAt && (
+                    <li className="pl-5 relative group">
+                      <span className="absolute -left-2.5 top-1 h-4 w-4 rounded-full border-2 bg-blue-500 border-bg" />
+                      <div className="text-xs space-y-0.5">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-blue-600 dark:text-blue-400">Marked as Ordered / In-Transit</span>
+                          <time className="text-[10px] text-text-secondary font-mono">{formatDateTime(lot.orderedAt)}</time>
+                        </div>
+                        <p className="text-text-secondary text-[11px]">
+                          Vendor: <strong className="text-text">{lot.supplierName || "Internal Supplier"}</strong>
+                        </p>
+                      </div>
+                    </li>
+                  )}
+
+                  {/* Step 4: Delivered if applicable */}
+                  {lot.deliveredAt && (
+                    <li className="pl-5 relative group">
+                      <span className="absolute -left-2.5 top-1 h-4 w-4 rounded-full border-2 bg-emerald-600 border-bg" />
+                      <div className="text-xs space-y-0.5">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-emerald-600 dark:text-emerald-400">Goods Delivered & Stocked</span>
+                          <time className="text-[10px] text-text-secondary font-mono">{formatDateTime(lot.deliveredAt)}</time>
+                        </div>
+                        <p className="text-text-secondary text-[11px]">
+                          Received {lot.quantity} units into active inventory.
+                        </p>
+                      </div>
+                    </li>
+                  )}
+                </ol>
               </div>
             </div>
-          </div>
+          )}
 
-          {/* Stock Utilization & Holding Gauge */}
-          <div className="p-4 rounded-xl border border-border bg-card space-y-3 shadow-xs">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
-                <Layers className="h-3.5 w-3.5" />
-                Inventory Stock Balance
-              </span>
-              <span className="text-xs font-bold text-text">
-                {Math.round(remainingRatio)}% Available
-              </span>
-            </div>
+          {activeTab === "qr" && (
+            <div className="space-y-4">
+              <div className="p-5 rounded-xl border border-border bg-card text-center space-y-4 shadow-2xs">
+                <div className="flex flex-col items-center justify-center p-4 bg-white rounded-xl border border-border/80 w-fit mx-auto shadow-xs">
+                  <div className="font-mono text-[10px] font-bold text-slate-800 mb-2 tracking-wider uppercase">
+                    CRMC PROPERTY LOT TAG
+                  </div>
+                  <div className="p-2 border border-slate-200 rounded-lg">
+                    <QrCode className="h-32 w-32 text-slate-900" />
+                  </div>
+                  <div className="font-mono text-xs font-black text-slate-900 mt-2">
+                    {lot.lotCode}
+                  </div>
+                </div>
 
-            {/* Progress Bar */}
-            <div className="h-2.5 w-full rounded-full bg-bg-subtle overflow-hidden border border-border">
-              <div
-                className={cn(
-                  "h-full rounded-full transition-all duration-500",
-                  isDepleted
-                    ? "bg-status-retired-bg"
-                    : isLowStock
-                    ? "bg-amber-500"
-                    : "bg-status-active-bg"
+                <div className="space-y-1">
+                  <p className="font-semibold text-text text-xs">Official Physical Intake Batch QR</p>
+                  <p className="text-[11px] text-text-secondary max-w-xs mx-auto">
+                    Scan with mobile camera or handheld scanner to instantly lookup valuation and release lot stock.
+                  </p>
+                </div>
+
+                {onPrintTag && (
+                  <button
+                    type="button"
+                    onClick={() => onPrintTag(lot)}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg border border-border bg-bg hover:bg-bg-subtle text-text transition-colors cursor-pointer"
+                  >
+                    <Printer className="h-3.5 w-3.5" />
+                    <span>Print Printable Bin Tag</span>
+                  </button>
                 )}
-                style={{ width: `${Math.min(100, Math.max(0, remainingRatio))}%` }}
-              />
-            </div>
-
-            <div className="grid grid-cols-3 gap-2 pt-1 text-center">
-              <div className="p-2.5 rounded-lg bg-bg-subtle/80 border border-border/80">
-                <span className="text-[10px] text-text-secondary block font-medium">Order Quantity</span>
-                <span className="text-sm font-bold text-text block">{lot.quantity}</span>
-              </div>
-              <div className="p-2.5 rounded-lg bg-bg-subtle/80 border border-border/80">
-                <span className="text-[10px] text-text-secondary block font-medium">Available</span>
-                <span className="text-sm font-bold text-status-active-text block">{lot.quantityRemaining}</span>
-              </div>
-              <div className="p-2.5 rounded-lg bg-bg-subtle/80 border border-border/80">
-                <span className="text-[10px] text-text-secondary block font-medium">Dispatched</span>
-                <span className="text-sm font-bold text-text-secondary block">{consumedUnits}</span>
               </div>
             </div>
-
-            <div className="flex items-center justify-between text-[11px] pt-1 border-t border-border/60">
-              <span className="text-text-secondary">Remaining value</span>
-              <span className="font-mono font-bold text-text">
-                {formatPhp(remainingValue)}
-              </span>
-            </div>
-            <p className="text-[10px] text-text-secondary font-mono truncate" title={payload}>
-              QR: {payload}
-            </p>
-          </div>
-
-          {/* Official Sign-Off Block */}
-          <div className="space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
-              <ShieldCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-              Signatures & Authorizations
-            </h3>
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              <div className="p-3.5 rounded-xl border border-border bg-card space-y-1 text-center">
-                <span className="text-[10px] text-text-secondary font-bold uppercase tracking-wider block">
-                  Requested By
-                </span>
-                <div className="pt-2 border-b border-border font-bold text-text text-sm">
-                  {lot.recordedByName}
-                </div>
-                <span className="text-[10px] text-text-secondary block pt-0.5">Staff / Requester</span>
-              </div>
-
-              <div className="p-3.5 rounded-xl border border-border bg-card space-y-1 text-center">
-                <span className="text-[10px] text-text-secondary font-bold uppercase tracking-wider block">
-                  Approved By
-                </span>
-                <div className="pt-2 border-b border-border font-bold text-text text-xs">
-                  JACINTO ANTONIO R. LEPITEN JR.
-                </div>
-                <span className="text-[10px] text-text-secondary block pt-0.5">Head Property Custodian</span>
-              </div>
-            </div>
-          </div>
+          )}
         </div>
 
-        {/* Action Footer */}
-        <div className="p-4 border-t border-border bg-bg-subtle flex items-center justify-between shrink-0 gap-2 flex-wrap">
-          <span className="text-xs text-text-secondary font-medium">
-            Lot actions
-          </span>
+        {/* Modal for Status Confirmation / Notes */}
+        {showStatusModal && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+            <div className="w-full max-w-sm rounded-xl border border-border bg-bg p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
+              <div className="flex items-center justify-between border-b border-border pb-2">
+                <h3 className="font-bold text-text text-sm capitalize flex items-center gap-1.5">
+                  <CheckCircle2 className="h-4 w-4 text-accent" />
+                  Confirm {showStatusModal.replace("_", " ")}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowStatusModal(null)}
+                  className="p-1 rounded text-text-secondary hover:text-text"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
 
-          <div className="flex items-center gap-2 flex-wrap justify-end">
-            {onPrintTag && (
-              <button
-                type="button"
-                onClick={() => onPrintTag(lot)}
-                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg border border-border bg-bg text-text hover:bg-bg-subtle transition-colors cursor-pointer"
-              >
-                <Tag className="h-3.5 w-3.5" />
-                <span>Print tag</span>
-              </button>
-            )}
+              <p className="text-xs text-text-secondary">
+                {showStatusModal === "delivered"
+                  ? "Marking this PO as delivered will immediately conduct inventory stock intake, adding the item units to current inventory."
+                  : showStatusModal === "approved"
+                  ? "Approve this purchase order to authorize supplier issuance and procurement."
+                  : `Are you sure you want to transition this purchase order to ${showStatusModal.replace("_", " ")}?`}
+              </p>
 
-            {canRelease && (
-              <button
-                type="button"
-                onClick={() => onReleaseStock?.(lot)}
-                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg bg-category-transport-bg/10 text-category-transport-bg border border-category-transport-bg/30 hover:bg-category-transport-bg/20 transition-colors cursor-pointer"
-              >
-                <Send className="h-3.5 w-3.5" />
-                <span>Release stock</span>
-              </button>
-            )}
+              <div className="space-y-1">
+                <label className="text-[11px] font-semibold text-text">Optional Audit Notes</label>
+                <textarea
+                  value={statusNote}
+                  onChange={(e) => setStatusNote(e.target.value)}
+                  placeholder="Enter remarks or approval references..."
+                  rows={2}
+                  className="w-full p-2 text-xs rounded-lg border border-border bg-bg text-text focus:ring-1 focus:ring-accent focus:outline-hidden resize-none"
+                />
+              </div>
 
-            <button
-              type="button"
-              onClick={() => onPrintSlip(lot)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg bg-primary text-primary-foreground hover:bg-accent transition-colors cursor-pointer shadow-2xs"
-            >
-              <FileText className="h-3.5 w-3.5" />
-              <span>Print PO slip</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-xs font-bold rounded-lg border border-border bg-bg text-text hover:bg-bg-subtle transition-colors cursor-pointer"
-            >
-              Close
-            </button>
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
+                <button
+                  type="button"
+                  onClick={() => setShowStatusModal(null)}
+                  className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-border hover:bg-bg-subtle text-text cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleTransitionStatus(showStatusModal)}
+                  disabled={isUpdatingStatus}
+                  className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold rounded-lg bg-accent text-accent-foreground hover:opacity-90 cursor-pointer disabled:opacity-50"
+                >
+                  {isUpdatingStatus ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Updating...</span>
+                    </>
+                  ) : (
+                    <span>Confirm</span>
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
+        )}
       </aside>
     </div>
   );
