@@ -93,7 +93,6 @@ export class AssetRepository implements IAssetRepository {
     if (filters?.availableOnly) {
       conditions.push(eq(assets.status, "active"));
       conditions.push(isNull(assets.currentHolder));
-      conditions.push(isNull(assets.reservedForRequestId));
       // Must match release checks: open project or borrow custody blocks issue/assign.
       conditions.push(
         sql`not exists (

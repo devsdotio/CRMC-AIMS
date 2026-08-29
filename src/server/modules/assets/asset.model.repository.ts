@@ -166,7 +166,6 @@ export class AssetModelRepository {
           eq(assets.modelId, modelId),
           eq(assets.status, "active"),
           sql`${assets.currentHolder} is null`,
-          sql`${assets.reservedForRequestId} is null`,
           sql`not exists (
             select 1 from ${projectAssetAssignments}
             where ${projectAssetAssignments.assetId} = ${assets.id}

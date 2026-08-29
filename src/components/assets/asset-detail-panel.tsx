@@ -1007,9 +1007,7 @@ export function AssetDetailPanel({
                 >
                   {asset.currentHolder
                     ? "Borrowed / In-Use"
-                    : asset.reservedForRequestId
-                      ? "Reserved"
-                      : statusMeta.label}
+                    : statusMeta.label}
                 </span>
               )}
             </div>
@@ -1019,7 +1017,7 @@ export function AssetDetailPanel({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {onIssue && !asset.currentHolder && !asset.reservedForRequestId && asset.status === "active" && (
+            {onIssue && !asset.currentHolder && asset.status === "active" && (
               <button
                 type="button"
                 onClick={() => onIssue(asset)}
@@ -1041,7 +1039,7 @@ export function AssetDetailPanel({
                 <span>Missing</span>
               </button>
             )}
-            {onIssue && !asset.currentHolder && !asset.reservedForRequestId && asset.status === "active" && onEdit && (
+            {onIssue && !asset.currentHolder && asset.status === "active" && onEdit && (
               <div className="h-4 w-px bg-border mx-0.5" aria-hidden="true" />
             )}
             {onEdit && (
@@ -1084,10 +1082,6 @@ export function AssetDetailPanel({
                   {asset.currentHolder ? (
                     <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-primary text-white uppercase tracking-wider">
                       {custodyBadgeLabel(asset.currentHolder)}
-                    </span>
-                  ) : asset.reservedForRequestId ? (
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-status-repair-bg/20 text-status-repair-text uppercase tracking-wider border border-status-repair-bg/30">
-                      Reserved
                     </span>
                   ) : (
                     <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-status-active-bg text-white uppercase tracking-wider">
@@ -1151,10 +1145,6 @@ export function AssetDetailPanel({
                         title={`${asset.currentHolder} ${asset.department ? `(${asset.department})` : ""}`}
                       >
                         {asset.currentHolder}
-                      </span>
-                    ) : asset.reservedForRequestId ? (
-                      <span className="text-status-repair-text">
-                        Reserved for approved request
                       </span>
                     ) : (
                       <span className="text-status-active-text">

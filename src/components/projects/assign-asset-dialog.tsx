@@ -29,7 +29,6 @@ export function AssignAssetDialog({
         (a) =>
           a.status === "active" &&
           !a.currentHolder &&
-          !a.reservedForRequestId &&
           a.assignmentType === "assignable"
       ),
     [assets]

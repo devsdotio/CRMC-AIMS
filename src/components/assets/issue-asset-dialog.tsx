@@ -242,8 +242,7 @@ export function IssueAssetDialog({
             disabled={
               releaseMutation.isPending ||
               asset.status !== "active" ||
-              Boolean(asset.currentHolder) ||
-              Boolean(asset.reservedForRequestId)
+              Boolean(asset.currentHolder)
             }
             className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg bg-primary text-primary-foreground disabled:opacity-50"
           >

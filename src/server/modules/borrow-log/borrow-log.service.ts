@@ -283,14 +283,6 @@ export class BorrowLogService {
     if (asset.status !== "active" || asset.currentHolder) {
       throw new ConflictError("Asset is not available for release.");
     }
-    if (
-      asset.reservedForRequestId &&
-      asset.reservedForRequestId !== (input.requestId ?? null)
-    ) {
-      throw new ConflictError(
-        "Asset is reserved for an approved request. Issue that request, or unrelease it first."
-      );
-    }
 
     const destination = await this.resolveDestination(input, tx);
 
@@ -470,11 +462,13 @@ export class BorrowLogService {
     rawId: string,
     rawInput: unknown,
     actor: ActorContext,
-    session?: DbSession
+    session?: DbSession,
+    options?: { skipRequestClosure?: boolean }
   ): Promise<BorrowLogDTO> {
     const id = borrowLogIdSchema.parse(rawId);
     const input = returnBorrowSchema.parse(rawInput);
-    const run = (tx: DbSession) => this.returnLogInTx(id, input, actor, tx);
+    const run = (tx: DbSession) =>
+      this.returnLogInTx(id, input, actor, tx, options);
     if (session) return run(session);
     return withTransaction(run);
   }
@@ -483,7 +477,8 @@ export class BorrowLogService {
     id: string,
     input: ReturnType<typeof returnBorrowSchema.parse>,
     actor: ActorContext,
-    tx: DbSession
+    tx: DbSession,
+    options?: { skipRequestClosure?: boolean }
   ): Promise<BorrowLogDTO> {
       const existing = await this.repo.findByIdForUpdate(id, tx);
       if (!existing) throw new NotFoundError("Borrow log", id);
@@ -641,7 +636,7 @@ export class BorrowLogService {
         }
       }
 
-      if (existing.requestId) {
+      if (existing.requestId && !options?.skipRequestClosure) {
         const req = await this.requests.findById(existing.requestId, tx);
         if (req && (req.status === "released" || req.status === "approved")) {
           await this.requests.update(
