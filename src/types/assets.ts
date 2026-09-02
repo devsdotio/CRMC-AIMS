@@ -2,7 +2,12 @@ import type { AssetCategory } from './shared';
 export type { AssetCategory };
 import type { BaseFilterState } from "./filters";
 
-export type AssetStatus = "active" | "needs_repair" | "out_of_service" | "retired";
+export type AssetStatus =
+  | "active"
+  | "needs_repair"
+  | "out_of_service"
+  | "retired"
+  | "missing";
 export type AssetAssignmentType = "borrowable" | "assignable";
 
 export interface MaintenanceLogEntry {
@@ -44,6 +49,10 @@ export interface Asset {
 export interface AssetFilterState extends BaseFilterState {
   categories: AssetCategory[];
   statuses: AssetStatus[];
+  /** When "available", only units not in custody and not reserved. */
+  availability: "all" | "available";
+  /** Filter by borrowable vs assignable custody model. */
+  assignmentType: "all" | AssetAssignmentType;
   sortBy: "name" | "code" | "date";
   sortOrder: "asc" | "desc";
 }

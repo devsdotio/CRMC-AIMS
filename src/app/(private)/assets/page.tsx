@@ -16,10 +16,12 @@ import { AssetDetailPanel } from "@/components/assets/asset-detail-panel";
 import { AddEditAssetDialog } from "@/components/assets/add-edit-asset-dialog";
 import { ScanAssetDialog } from "@/components/assets/scan-asset-dialog";
 import { IssueAssetDialog } from "@/components/assets/issue-asset-dialog";
+import { ReportMissingDialog } from "@/components/assets/report-missing-dialog";
 import { QueryErrorBanner } from "@/components/shared/query-error-banner";
 import { OperatorReadOnlyBanner } from "@/components/shared/operator-read-only-banner";
 import { useToast } from "@/components/providers/toast-context";
 import { useAssetOperator } from "@/hooks/use-asset-operator";
+import { isAssetAvailableForRequest } from "@/lib/assets-custody";
 
 export default function AssetsPage() {
   const {
@@ -41,6 +43,8 @@ export default function AssetsPage() {
     searchQuery: "",
     categories: [],
     statuses: [],
+    availability: "all",
+    assignmentType: "all",
     sortBy: "name",
     sortOrder: "asc",
   });
@@ -53,6 +57,7 @@ export default function AssetsPage() {
   });
   const [scanOpen, setScanOpen] = useState(false);
   const [issueAsset, setIssueAsset] = useState<Asset | null>(null);
+  const [missingAsset, setMissingAsset] = useState<Asset | null>(null);
 
   // Filter & Sort Assets
   const filteredAssets = useMemo(() => {
@@ -73,6 +78,22 @@ export default function AssetsPage() {
 
       // 3. Status Filter (multi-select)
       if (filters.statuses.length > 0 && !filters.statuses.includes(asset.status)) {
+        return false;
+      }
+
+      // 4. Availability — not borrowed or assigned
+      if (
+        filters.availability === "available" &&
+        !isAssetAvailableForRequest(asset)
+      ) {
+        return false;
+      }
+
+      // 5. Assignment type (borrowable vs assignable)
+      if (
+        filters.assignmentType !== "all" &&
+        asset.assignmentType !== filters.assignmentType
+      ) {
         return false;
       }
 
@@ -103,10 +124,21 @@ export default function AssetsPage() {
       searchQuery: "",
       categories: [],
       statuses: [],
+      availability: "all",
+      assignmentType: "all",
       sortBy: "name",
       sortOrder: "asc",
     });
   };
+
+  const assignmentTypeCounts = useMemo(
+    () => ({
+      all: assets.length,
+      borrowable: assets.filter((a) => a.assignmentType === "borrowable").length,
+      assignable: assets.filter((a) => a.assignmentType === "assignable").length,
+    }),
+    [assets]
+  );
 
   const handleSaveAsset = async (assetData: Partial<Asset>) => {
     try {
@@ -174,7 +206,9 @@ export default function AssetsPage() {
               Institutional Assets Registry
             </h1>
             <span className="px-2 py-0.5 text-xs font-bold bg-bg-subtle text-text-secondary rounded-full border border-border">
-              {filteredAssets.length} of {assets.length} items
+              {isLoading
+                ? "Loading items…"
+                : `${filteredAssets.length} of ${assets.length} items`}
             </span>
           </div>
           <p className="text-xs text-text-secondary mt-0.5">
@@ -214,6 +248,7 @@ export default function AssetsPage() {
         onResetFilters={handleResetFilters}
         totalAssetsCount={assets.length}
         filteredAssetsCount={filteredAssets.length}
+        assignmentTypeCounts={assignmentTypeCounts}
       />
 
       {!canOperate && <OperatorReadOnlyBanner />}
@@ -263,12 +298,27 @@ export default function AssetsPage() {
               }
             : undefined
         }
+        onReportMissing={
+          canOperate
+            ? (asset) => {
+                setSelectedAsset(null);
+                setMissingAsset(asset);
+              }
+            : undefined
+        }
       />
 
       <IssueAssetDialog
         asset={issueAsset}
         isOpen={Boolean(issueAsset)}
         onClose={() => setIssueAsset(null)}
+        onSuccess={(message) => toast.success(message)}
+      />
+
+      <ReportMissingDialog
+        asset={missingAsset}
+        isOpen={Boolean(missingAsset)}
+        onClose={() => setMissingAsset(null)}
         onSuccess={(message) => toast.success(message)}
       />
 

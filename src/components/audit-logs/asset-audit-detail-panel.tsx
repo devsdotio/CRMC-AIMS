@@ -22,7 +22,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getCategoryStyle } from "@/constants/categories";
+import { useCategoryStyleMap } from "@/features/categories/client/use-categories";
 import { LoadingState } from "@/components/providers/loading-context";
 import { useAssetLifecycleQuery, type AssetLifecycleEvent } from "@/features/assets/client";
 import { formatDateTime, formatRelativeTime } from "./audit-log-utils";
@@ -94,9 +94,10 @@ export function AssetAuditDetailPanel({
   onClose,
 }: AssetAuditDetailPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
-
-  const { data: lifecycleEvents = [], isLoading: isLifecycleLoading } =
-    useAssetLifecycleQuery(asset?.id || "", 50);
+  const { getCategoryStyle } = useCategoryStyleMap();
+  const { data: lifecycleEvents = [], isLoading: isLifecycleLoading } = useAssetLifecycleQuery(
+    isOpen && asset?.id ? asset.id : ""
+  );
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {

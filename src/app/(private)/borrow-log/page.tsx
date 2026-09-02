@@ -2,13 +2,28 @@
 
 import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Repeat, Search } from "lucide-react";
+import { motion } from "framer-motion";
+import {
+  Repeat,
+  Search,
+  Box,
+  Building2,
+  Calendar,
+  User,
+  RotateCcw,
+  Download,
+  RefreshCw,
+  X,
+  ArrowUpRight,
+  Clock,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getCategoryStyle } from "@/constants/categories";
 import { OverdueBadge } from "@/components/ui/overdue-badge";
 import { QueryErrorBanner } from "@/components/shared/query-error-banner";
 import { OperatorReadOnlyBanner } from "@/components/shared/operator-read-only-banner";
 import { ReturnLogDialog } from "@/components/borrow-log/return-log-dialog";
+import { BorrowLogDetailSheet } from "@/components/borrow-log/borrow-log-detail-sheet";
 import { useToast } from "@/components/providers/toast-context";
 import { useAssetOperator } from "@/hooks/use-asset-operator";
 import {
@@ -18,9 +33,10 @@ import {
 } from "@/features/borrow-log/client";
 
 type LogTab = "all" | "active" | "overdue" | "returned";
+type CustodyFilter = "all" | "borrowable" | "assignable";
 
 const TABS: { id: LogTab; label: string }[] = [
-  { id: "all", label: "All" },
+  { id: "all", label: "All Custodies" },
   { id: "active", label: "Active" },
   { id: "overdue", label: "Overdue" },
   { id: "returned", label: "Returned" },
@@ -38,34 +54,91 @@ function BorrowLogContent() {
 
   const [tab, setTab] = useState<LogTab>(initialTab);
   const [search, setSearch] = useState("");
+  const [departmentFilter, setDepartmentFilter] = useState("all");
+  const [custodyFilter, setCustodyFilter] = useState<CustodyFilter>("all");
   const [returnTarget, setReturnTarget] = useState<BorrowLogRecord | null>(null);
+  const [selectedRecord, setSelectedRecord] = useState<BorrowLogRecord | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+
   const toast = useToast();
   const { canOperate } = useAssetOperator();
 
   const {
-    data: records = [],
+    data: allRecords = [],
     isLoading,
     isError,
     error,
     refetch,
-  } = useBorrowLogQuery(
-    tab === "all" ? undefined : { status: tab }
-  );
+    isRefetching,
+  } = useBorrowLogQuery();
+
   const returnMutation = useReturnBorrowMutation();
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return records;
-    return records.filter((row) => {
-      return (
-        row.assetName.toLowerCase().includes(q) ||
-        row.assetCode.toLowerCase().includes(q) ||
-        row.borrowerName.toLowerCase().includes(q) ||
-        row.department.toLowerCase().includes(q) ||
-        row.logCode.toLowerCase().includes(q)
+  // Extract unique departments for dropdown
+  const departments = useMemo(() => {
+    const set = new Set<string>();
+    allRecords.forEach((r) => r.department && set.add(r.department));
+    return Array.from(set).sort();
+  }, [allRecords]);
+
+  // Tab counts
+  const counts = useMemo(() => {
+    return {
+      all: allRecords.length,
+      active: allRecords.filter((r) => r.status === "active").length,
+      overdue: allRecords.filter((r) => r.status === "overdue").length,
+      returned: allRecords.filter((r) => r.status === "returned").length,
+    };
+  }, [allRecords]);
+
+  // Filter pipeline
+  const filteredRecords = useMemo(() => {
+    let result = allRecords;
+
+    // Status Tab filter
+    if (tab !== "all") {
+      result = result.filter((r) => r.status === tab);
+    }
+
+    // Department filter
+    if (departmentFilter !== "all") {
+      result = result.filter(
+        (r) => r.department?.toLowerCase() === departmentFilter.toLowerCase()
       );
-    });
-  }, [records, search]);
+    }
+
+    // Custody type filter
+    if (custodyFilter === "borrowable") {
+      result = result.filter((r) => r.custodyKind !== "assignment");
+    } else if (custodyFilter === "assignable") {
+      result = result.filter((r) => r.custodyKind === "assignment");
+    }
+
+    // Search filter
+    const q = search.trim().toLowerCase();
+    if (q) {
+      result = result.filter(
+        (r) =>
+          r.logCode.toLowerCase().includes(q) ||
+          r.assetCode.toLowerCase().includes(q) ||
+          r.assetName.toLowerCase().includes(q) ||
+          r.borrowerName.toLowerCase().includes(q) ||
+          r.department.toLowerCase().includes(q) ||
+          (r.requestCode ?? "").toLowerCase().includes(q) ||
+          (r.borrowerEmail ?? "").toLowerCase().includes(q)
+      );
+    }
+
+    return result;
+  }, [allRecords, tab, departmentFilter, custodyFilter, search]);
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredRecords.length / pageSize) || 1;
+  const paginatedRecords = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filteredRecords.slice(start, start + pageSize);
+  }, [filteredRecords, page, pageSize]);
 
   const handleReturn = async (payload: {
     condition: "good" | "damaged" | "needs_repair";
@@ -79,206 +152,552 @@ function BorrowLogContent() {
         payload,
       });
       toast.success(`${returnTarget.assetCode} marked returned.`);
+      if (selectedRecord?.id === returnTarget.id) {
+        setSelectedRecord(null);
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to record return.");
       throw err;
     }
   };
 
+  const handleRefresh = async () => {
+    await refetch();
+    toast.success("Borrow log updated.");
+  };
+
+  const handleExportCSV = () => {
+    if (filteredRecords.length === 0) {
+      toast.info("No records available to export.");
+      return;
+    }
+
+    const headers = [
+      "Log Code",
+      "Asset Code",
+      "Asset Name",
+      "Category",
+      "Custody Type",
+      "Borrower / Holder",
+      "Department",
+      "Released Date",
+      "Due Date",
+      "Status",
+      "Returned Date",
+      "Condition",
+      "Released By",
+    ];
+
+    const rowsData = filteredRecords.map((r) => [
+      r.logCode,
+      r.assetCode,
+      `"${(r.assetName || "").replace(/"/g, '""')}"`,
+      r.category || "",
+      r.custodyKind === "assignment" ? "Assignable" : "Borrowable",
+      `"${(r.borrowerName || "").replace(/"/g, '""')}"`,
+      `"${(r.department || "").replace(/"/g, '""')}"`,
+      r.releasedAt ? new Date(r.releasedAt).toISOString() : "",
+      r.dueDate ? new Date(r.dueDate).toISOString() : "",
+      r.status,
+      r.returnedAt ? new Date(r.returnedAt).toISOString() : "",
+      r.conditionOnReturn || "",
+      `"${(r.releasedBy || "").replace(/"/g, '""')}"`,
+    ]);
+
+    const csvContent =
+      "data:text/csv;charset=utf-8," +
+      [headers.join(","), ...rowsData.map((e) => e.join(","))].join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `borrow-log-${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success(`Exported ${filteredRecords.length} borrow records to CSV.`);
+  };
+
   return (
     <div className="h-full flex flex-col min-h-0 overflow-hidden bg-bg-subtle rounded-md">
-      <div className="px-4 md:px-6 pt-5 pb-3 bg-bg shrink-0 border-b border-border space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+      {/* Top Banner Header */}
+      <div className="px-4 md:px-6 pt-5 pb-4 bg-bg shrink-0 border-b border-border space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold tracking-tight text-text flex items-center gap-2">
-                <Repeat className="h-5 w-5 text-accent" />
-                Borrow & Return Log
-              </h1>
-              <span className="px-2 py-0.5 text-xs font-bold bg-bg-subtle text-text-secondary rounded-full border border-border">
-                {filtered.length} records
-              </span>
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent/10 text-accent shrink-0">
+                <Repeat className="h-5 w-5" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold tracking-tight text-text leading-tight">
+                  Borrow & Return Log
+                </h1>
+                <p className="text-xs text-text-secondary mt-0.5">
+                  Track physical asset custody, active borrows, overdue returns, and check-ins (<span className="font-mono font-bold">LOG-</span>).
+                </p>
+              </div>
             </div>
-            <p className="text-xs text-text-secondary mt-0.5">
-              Custody log with visible <span className="font-mono">LOG-</span> codes. Borrowable (due date) and assignable (open) issues.
-            </p>
+          </div>
+
+          <div className="flex items-center gap-2 self-end sm:self-center">
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={isRefetching || isLoading}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-border bg-bg text-text hover:bg-bg-subtle transition-colors cursor-pointer disabled:opacity-50"
+              title="Refresh borrow records"
+            >
+              <RefreshCw className={cn("h-3.5 w-3.5", isRefetching && "animate-spin")} />
+              <span>Refresh</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExportCSV}
+              disabled={filteredRecords.length === 0}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-lg bg-accent text-accent-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs disabled:opacity-50"
+            >
+              <Download className="h-3.5 w-3.5" />
+              <span>Export CSV</span>
+            </button>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex gap-1 rounded-lg border border-border p-1 bg-bg-subtle">
-            {TABS.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setTab(item.id)}
-                className={cn(
-                  "px-3 py-1.5 text-xs font-semibold rounded-md",
-                  tab === item.id
-                    ? "bg-bg text-text shadow-xs"
-                    : "text-text-secondary hover:text-text"
-                )}
-              >
-                {item.label}
-              </button>
-            ))}
+        {/* Filter Controls Row */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+          {/* Segmented Status Tabs with Label */}
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-xs font-bold text-text-secondary uppercase tracking-wider shrink-0">
+              Status:
+            </span>
+            <div className="flex gap-1 rounded-xl border border-border p-1 bg-bg-subtle shrink-0 relative">
+              {TABS.map((item) => {
+                const isSelected = tab === item.id;
+                const count = counts[item.id];
+
+                const dotColor =
+                  item.id === "active"
+                    ? "bg-blue-500"
+                    : item.id === "overdue"
+                      ? "bg-destructive"
+                      : item.id === "returned"
+                        ? "bg-emerald-500"
+                        : "bg-text-secondary/70";
+
+                const badgeColor =
+                  item.id === "active"
+                    ? isSelected ? "bg-blue-500/20 text-blue-700 dark:text-blue-300 font-bold border border-blue-500/30" : "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
+                    : item.id === "overdue"
+                      ? isSelected ? "bg-destructive/20 text-destructive font-bold border border-destructive/30" : "bg-destructive/10 text-destructive border border-destructive/20"
+                      : item.id === "returned"
+                        ? isSelected ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-500/30" : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                        : isSelected ? "bg-bg-subtle text-text font-bold border border-border/80" : "bg-bg-subtle text-text-secondary border border-border";
+
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      setTab(item.id);
+                      setPage(1);
+                    }}
+                    className={cn(
+                      "relative inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors duration-150 cursor-pointer select-none",
+                      isSelected
+                        ? "text-text"
+                        : "text-text-secondary hover:text-text"
+                    )}
+                  >
+                    {isSelected && (
+                      <motion.span
+                        layoutId="borrow-log-active-tab"
+                        className="absolute inset-0 rounded-lg bg-bg shadow-xs border border-border/80"
+                        transition={{ type: "spring", stiffness: 500, damping: 38 }}
+                      />
+                    )}
+                    <span
+                      className={cn("h-1.5 w-1.5 rounded-full relative z-10 shrink-0", dotColor)}
+                      aria-hidden="true"
+                    />
+                    <span className="relative z-10">{item.label}</span>
+                    <span
+                      className={cn(
+                        "relative z-10 px-1.5 py-0.2 rounded-full text-[10px] font-mono font-semibold transition-colors duration-150",
+                        badgeColor
+                      )}
+                    >
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
-          <div className="relative flex-1 min-w-52">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-secondary" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search asset, borrower, or log code"
-              className="w-full h-9 pl-8 pr-3 text-xs bg-bg border border-border rounded-lg"
-            />
+
+          {/* Search and Dropdowns */}
+          <div className="flex items-center gap-2 flex-1 min-w-72 justify-end">
+            {/* Search Input */}
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-secondary pointer-events-none" />
+              <input
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
+                placeholder="Search asset, borrower, code, or department…"
+                className="w-full h-9 pl-8.5 pr-8 text-xs bg-bg border border-border rounded-lg text-text placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-text-secondary hover:text-text"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Department Filter with Label */}
+            {departments.length > 0 && (
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span className="text-xs font-semibold text-text-secondary shrink-0">
+                  Dept:
+                </span>
+                <select
+                  value={departmentFilter}
+                  onChange={(e) => {
+                    setDepartmentFilter(e.target.value);
+                    setPage(1);
+                  }}
+                  className="h-9 px-2.5 text-xs bg-bg border border-border rounded-lg text-text font-semibold focus:outline-none focus:ring-2 focus:ring-accent shrink-0 cursor-pointer"
+                >
+                  <option value="all">All Departments</option>
+                  {departments.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Custody Type Filter with Label */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="text-xs font-semibold text-text-secondary shrink-0">
+                Type:
+              </span>
+              <select
+                value={custodyFilter}
+                onChange={(e) => {
+                  setCustodyFilter(e.target.value as CustodyFilter);
+                  setPage(1);
+                }}
+                className="h-9 px-2.5 text-xs bg-bg border border-border rounded-lg text-text font-semibold focus:outline-none focus:ring-2 focus:ring-accent shrink-0 cursor-pointer"
+              >
+                <option value="all">All Types</option>
+                <option value="borrowable">Temporary Borrow</option>
+                <option value="assignable">Fixed Assignment</option>
+              </select>
+            </div>
           </div>
         </div>
       </div>
 
       {!canOperate && <OperatorReadOnlyBanner />}
 
+      {/* Error State Banner */}
       {isError && (
         <QueryErrorBanner
-          message={error?.message || "Failed to load borrow log."}
+          message={error?.message || "Failed to load borrow logs. Please check your network."}
           onRetry={() => void refetch()}
         />
       )}
 
-      <main className="flex-1 overflow-y-auto min-h-0 bg-bg">
+      {/* Main Table Content */}
+      <main className="flex-1 overflow-y-auto min-h-0 bg-bg flex flex-col">
         {isLoading ? (
-          <div className="p-6 space-y-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="h-14 animate-pulse rounded-lg bg-border" />
+          <div className="p-5 space-y-2.5">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div
+                key={i}
+                className="h-14 animate-pulse rounded-xl bg-card border border-border flex items-center justify-between px-4"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="h-6 w-24 bg-border/70 rounded" />
+                  <div className="h-4 w-40 bg-border/50 rounded" />
+                </div>
+                <div className="h-4 w-28 bg-border/50 rounded" />
+              </div>
             ))}
           </div>
-        ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <p className="text-sm font-semibold text-text">No borrow records</p>
-            <p className="text-xs text-text-secondary mt-1">
-              Released assets will appear here until they are returned.
+        ) : filteredRecords.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center px-4">
+            <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-500/10 border border-blue-500/25 text-blue-600 dark:text-blue-400 shadow-xs mb-3">
+              <Repeat className="h-7 w-7" strokeWidth={1.8} />
+            </span>
+            <p className="text-base font-bold text-text">No Borrow Records Found</p>
+            <p className="text-xs text-text-secondary mt-1 max-w-sm leading-relaxed">
+              {search || departmentFilter !== "all" || custodyFilter !== "all" || tab !== "all"
+                ? "No custody logs match your active filter criteria. Try resetting your search or filters."
+                : "Released institutional assets will appear here until they are returned."}
             </p>
+            {(search || departmentFilter !== "all" || custodyFilter !== "all" || tab !== "all") && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch("");
+                  setDepartmentFilter("all");
+                  setCustodyFilter("all");
+                  setTab("all");
+                }}
+                className="mt-4 px-3.5 py-1.5 text-xs font-bold rounded-lg border border-border bg-bg hover:bg-bg-subtle transition-colors cursor-pointer text-text"
+              >
+                Reset Filters
+              </button>
+            )}
           </div>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-bg-subtle border-b border-border">
-              <tr>
-                <th className="px-5 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-text-secondary">
-                  Code
-                </th>
-                <th className="px-5 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-text-secondary">
-                  Asset
-                </th>
-                <th className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-text-secondary">
-                  Holder
-                </th>
-                <th className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-text-secondary hidden lg:table-cell">
-                  Kind
-                </th>
-                <th className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-text-secondary hidden md:table-cell">
-                  Due
-                </th>
-                <th className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-text-secondary">
-                  Status
-                </th>
-                <th className="px-5 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-text-secondary">
-                  Action
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {filtered.map((row) => {
-                const category = getCategoryStyle(row.category);
-                return (
-                  <tr key={row.id} className="hover:bg-bg-subtle/60">
-                    <td className="px-5 py-3.5">
-                      <p className="font-mono text-xs font-semibold text-text">
-                        {row.logCode}
-                      </p>
-                      {row.requestCode ? (
-                        <p className="text-[10px] font-mono text-text-secondary">
-                          {row.requestCode}
+          <div className="flex flex-col min-h-full">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead className="sticky top-0 bg-bg-subtle/95 backdrop-blur-xs border-b border-border z-10 select-none">
+                <tr>
+                  <th className="px-5 py-3 text-[10px] font-bold uppercase tracking-wider text-text-secondary">
+                    Log Code
+                  </th>
+                  <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-text-secondary">
+                    Asset Details
+                  </th>
+                  <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-text-secondary">
+                    Borrower / Department
+                  </th>
+                  <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-text-secondary hidden lg:table-cell">
+                    Custody Type
+                  </th>
+                  <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-text-secondary hidden md:table-cell">
+                    Due Date
+                  </th>
+                  <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-text-secondary">
+                    Status
+                  </th>
+                  <th className="px-4 py-3 text-right text-[10px] font-bold uppercase tracking-wider text-text-secondary">
+                    Action
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {paginatedRecords.map((row) => {
+                  const category = getCategoryStyle(row.category || "office");
+                  const isOverdue = row.status === "overdue";
+                  const isReturned = row.status === "returned";
+
+                  return (
+                    <tr
+                      key={row.id}
+                      onClick={() => setSelectedRecord(row)}
+                      className="hover:bg-bg-subtle/70 transition-colors cursor-pointer group"
+                    >
+                      {/* Log Code */}
+                      <td className="px-5 py-3.5 align-middle">
+                        <div className="flex items-center gap-2">
+                          <span className="p-1.5 rounded-lg shrink-0 bg-blue-500/15 text-blue-600 dark:text-blue-400">
+                            <Box className="h-3.5 w-3.5" />
+                          </span>
+                          <div>
+                            <span className="font-mono font-bold text-xs text-text group-hover:text-accent transition-colors">
+                              {row.logCode}
+                            </span>
+                            {row.requestCode ? (
+                              <p className="text-[10px] font-mono text-text-secondary mt-0.5">
+                                Req: {row.requestCode}
+                              </p>
+                            ) : (
+                              <p className="text-[10px] text-text-secondary mt-0.5">
+                                Direct Issue
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Asset Details */}
+                      <td className="px-4 py-3.5 align-middle">
+                        <p className="font-bold text-text truncate max-w-[200px]">
+                          {row.assetName}
                         </p>
-                      ) : (
-                        <p className="text-[10px] text-text-secondary">
-                          {row.source === "admin_manual"
-                            ? "Manual issue"
-                            : row.source === "project_legacy"
-                              ? "Project"
-                              : "Portal"}
-                        </p>
-                      )}
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <p className="font-medium text-text">{row.assetName}</p>
-                      <p className="text-xs font-mono text-text-secondary">
-                        {row.assetCode}
-                        <span className="mx-1.5 opacity-40">·</span>
-                        {category.label}
-                      </p>
-                    </td>
-                    <td className="px-3 py-3.5">
-                      <p className="text-text">{row.department}</p>
-                      {row.requestedByName ? (
-                        <p className="text-xs text-text-secondary">
-                          Requested by {row.requestedByName}
-                        </p>
-                      ) : (
-                        <p className="text-xs text-text-secondary">
-                          {row.borrowerName}
-                        </p>
-                      )}
-                    </td>
-                    <td className="px-3 py-3.5 hidden lg:table-cell">
-                      <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border bg-bg-subtle text-text-secondary border-border">
-                        {row.custodyKind === "assignment" ? "Assignable" : "Borrowable"}
-                      </span>
-                    </td>
-                    <td className="px-3 py-3.5 text-xs text-text-secondary hidden md:table-cell">
-                      {row.dueDate ?? "—"}
-                    </td>
-                    <td className="px-3 py-3.5">
-                      {row.status === "overdue" ? (
-                        <OverdueBadge daysOverdue={row.daysOverdue ?? 1} />
-                      ) : (
-                        <span
-                          className={cn(
-                            "inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border",
-                            row.status === "active"
-                              ? "bg-status-active-bg/15 text-status-active-text border-status-active-bg/30"
-                              : "bg-bg-subtle text-text-secondary border-border"
-                          )}
-                        >
-                          {row.status === "returned" ? "Returned" : "Active"}
+                        <div className="flex items-center gap-1.5 text-[11px] font-mono text-text-secondary mt-0.5">
+                          <span>{row.assetCode}</span>
+                          <span className="opacity-40">·</span>
+                          <span className={cn("text-[10px] px-1.5 py-0.2 rounded font-sans font-semibold", category.bg, category.text)}>
+                            {category.label}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* Borrower & Department */}
+                      <td className="px-4 py-3.5 align-middle">
+                        <div className="flex items-center gap-1.5 font-semibold text-text">
+                          <User className="h-3 w-3 text-text-secondary shrink-0" />
+                          <span className="truncate max-w-[170px]">{row.borrowerName}</span>
+                        </div>
+                        <div className="flex items-center gap-1 text-[11px] text-text-secondary mt-0.5">
+                          <Building2 className="h-3 w-3 text-text-secondary/70 shrink-0" />
+                          <span className="truncate max-w-[150px]">{row.department}</span>
+                        </div>
+                      </td>
+
+                      {/* Custody Type */}
+                      <td className="px-4 py-3.5 align-middle hidden lg:table-cell">
+                        <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border bg-bg-subtle text-text-secondary border-border">
+                          {row.custodyKind === "assignment" ? "Assignable" : "Borrowable"}
                         </span>
-                      )}
-                    </td>
-                    <td className="px-5 py-3.5 text-right">
-                      {canOperate && row.status !== "returned" && (
-                        <button
-                          type="button"
-                          onClick={() => setReturnTarget(row)}
-                          className="inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-lg border border-border hover:border-primary hover:text-text text-text-secondary"
-                        >
-                          Record return
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      </td>
+
+                      {/* Due Date */}
+                      <td className="px-4 py-3.5 align-middle hidden md:table-cell">
+                        {row.dueDate ? (
+                          <div className="flex items-center gap-1 text-text">
+                            <Calendar className="h-3.5 w-3.5 text-text-secondary" />
+                            <span>
+                              {new Date(row.dueDate).toLocaleDateString("en-PH", {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              })}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-text-secondary">—</span>
+                        )}
+                      </td>
+
+                      {/* Status */}
+                      <td className="px-4 py-3.5 align-middle">
+                        {isOverdue ? (
+                          <OverdueBadge daysOverdue={row.daysOverdue ?? 1} />
+                        ) : isReturned ? (
+                          <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border bg-bg-subtle text-text-secondary border-border">
+                            Returned
+                          </span>
+                        ) : (
+                          <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border bg-status-active-bg/15 text-status-active-text border-status-active-bg/30">
+                            Active
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Actions */}
+                      <td className="px-4 py-3.5 align-middle text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {canOperate && !isReturned && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setReturnTarget(row);
+                              }}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg border border-border bg-bg hover:border-primary hover:text-text text-text-secondary transition-colors cursor-pointer"
+                            >
+                              <RotateCcw className="h-3 w-3" />
+                              <span>Return</span>
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedRecord(row);
+                            }}
+                            className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-semibold text-text-secondary group-hover:text-accent rounded-md border border-border group-hover:border-accent/40 bg-bg transition-colors"
+                          >
+                            <span>Details</span>
+                            <ArrowUpRight className="h-3 w-3" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+
+            {/* Pagination Controls */}
+            {filteredRecords.length > 0 && (
+              <div className="flex items-center justify-between px-6 py-3.5 border-t border-border bg-bg shrink-0 mt-auto">
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-text-secondary">
+                    Showing{" "}
+                    <span className="font-bold text-text">
+                      {Math.min((page - 1) * pageSize + 1, filteredRecords.length)}
+                    </span>{" "}
+                    to{" "}
+                    <span className="font-bold text-text">
+                      {Math.min(page * pageSize, filteredRecords.length)}
+                    </span>{" "}
+                    of <span className="font-bold text-text">{filteredRecords.length}</span> results
+                  </span>
+
+                  <select
+                    value={pageSize}
+                    onChange={(e) => {
+                      setPageSize(Number(e.target.value));
+                      setPage(1);
+                    }}
+                    className="h-7 px-2 text-xs bg-bg-subtle border border-border rounded text-text font-semibold focus:outline-none"
+                  >
+                    <option value={10}>10 per page</option>
+                    <option value={25}>25 per page</option>
+                    <option value={50}>50 per page</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page <= 1}
+                    className="px-3 py-1.5 text-xs font-semibold text-text bg-bg border border-border rounded-md hover:bg-bg-subtle disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-xs font-mono font-bold text-text px-2">
+                    {page} / {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page >= totalPages}
+                    className="px-3 py-1.5 text-xs font-semibold text-text bg-bg border border-border rounded-md hover:bg-bg-subtle disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </main>
 
+      {/* Record Return Dialog */}
       {canOperate && (
-      <ReturnLogDialog
-        record={returnTarget}
-        isOpen={Boolean(returnTarget)}
-        onClose={() => setReturnTarget(null)}
-        onConfirm={handleReturn}
-      />
+        <ReturnLogDialog
+          record={returnTarget}
+          isOpen={Boolean(returnTarget)}
+          onClose={() => setReturnTarget(null)}
+          onConfirm={handleReturn}
+        />
       )}
+
+      {/* Custody Detail Slide-over Sheet */}
+      <BorrowLogDetailSheet
+        record={selectedRecord}
+        isOpen={Boolean(selectedRecord)}
+        onClose={() => setSelectedRecord(null)}
+        onRecordReturn={(r) => setReturnTarget(r)}
+        canOperate={canOperate}
+      />
     </div>
   );
 }
@@ -287,7 +706,7 @@ export default function BorrowLogPage() {
   return (
     <Suspense
       fallback={
-        <div className="h-full flex items-center justify-center text-xs text-text-secondary">
+        <div className="h-full flex items-center justify-center text-xs text-text-secondary bg-bg-subtle">
           Loading borrow log…
         </div>
       }

@@ -2,4 +2,5 @@ export const dashboardQueryKeys = {
   all: ["dashboard"] as const,
   snapshot: () => [...dashboardQueryKeys.all, "snapshot"] as const,
   sidebarSummary: () => [...dashboardQueryKeys.all, "sidebar-summary"] as const,
+  notifications: () => [...dashboardQueryKeys.all, "notifications"] as const,
 };

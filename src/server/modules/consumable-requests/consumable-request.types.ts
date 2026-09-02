@@ -97,6 +97,13 @@ export interface IConsumableRequestRepository {
   listLinesByRequestId(
     requestId: string
   ): Promise<ConsumableRequestLineRow[]>;
+  updateLine(
+    id: string,
+    data: Partial<
+      Omit<ConsumableRequestLineRow, "id" | "createdAt" | "requestId">
+    >,
+    session?: unknown
+  ): Promise<ConsumableRequestLineRow | null>;
   createAllocations(
     rows: Omit<NewConsumableRequestReleaseAllocationRow, "id" | "createdAt">[]
   ): Promise<ConsumableRequestReleaseAllocationRow[]>;

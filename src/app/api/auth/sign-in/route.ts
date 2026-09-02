@@ -31,6 +31,10 @@ import { authController } from "@/server/modules/auth";
  *                 format: password
  *                 minLength: 6
  *                 example: custodianadmin
+ *               rememberMe:
+ *                 type: boolean
+ *                 description: When true, keep the session across browser restarts. When false, session cookies end when the browser closes.
+ *                 default: false
  *     responses:
  *       200:
  *         description: Authenticated session

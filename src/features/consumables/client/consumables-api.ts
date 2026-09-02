@@ -12,6 +12,9 @@ export type CreateConsumablePayload = {
   minThreshold?: number;
   location: string;
   supplier?: string;
+  supplierId?: string | null;
+  /** Required when currentQty > 0. */
+  unitCost?: string | number;
   notes?: string;
 };
 

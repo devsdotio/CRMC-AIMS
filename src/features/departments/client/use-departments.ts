@@ -35,7 +35,10 @@ export type UpdateDepartmentPayload = {
 };
 
 async function fetchDepartments(): Promise<DepartmentDTO[]> {
-  const result = await fetchJson<ApiResponse<DepartmentDTO[]>>("/api/departments");
+  const result = await fetchJson<ApiResponse<DepartmentDTO[]>>("/api/departments", {
+    method: "GET",
+    timeoutMs: 60_000,
+  });
   return result.data;
 }
 

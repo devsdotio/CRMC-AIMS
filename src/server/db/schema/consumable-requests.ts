@@ -40,7 +40,8 @@ export type ConsumableRequestHistoryEntry = {
     | "approved"
     | "rejected"
     | "released"
-    | "cancelled";
+    | "cancelled"
+    | "edited";
   actor: string;
   timestamp: string;
   note?: string;
@@ -105,6 +106,7 @@ export const consumableRequests = pgTable(
     index("consumable_requests_project_id_idx").on(table.projectId),
     index("consumable_requests_requested_at_idx").on(table.requestedAt),
     index("consumable_requests_requester_user_id_idx").on(table.requesterUserId),
+    index("consumable_requests_status_user_idx").on(table.status, table.requesterUserId),
   ]
 );
 

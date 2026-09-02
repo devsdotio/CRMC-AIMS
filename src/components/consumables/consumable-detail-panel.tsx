@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   X,
-  PlusCircle,
+  FilePlus2,
   SlidersHorizontal,
   MapPin,
   Truck,
@@ -29,12 +29,14 @@ import type { StockMovement } from "@/features/stock-movements/client";
 import { formatPhp } from "@/components/projects/format-money";
 import { StockLevelBar } from "./stock-level-bar";
 import { LotQrCodeDisplay } from "./lot-qr-code-display";
+import { AuditNoteDisplay } from "@/components/audit-logs/audit-log-utils";
+import { useCategoryStyleMap } from "@/features/categories/client/use-categories";
 
 export interface ConsumableDetailPanelProps {
   item: ConsumableItem | null;
   isOpen: boolean;
   onClose: () => void;
-  onRestock?: (item: ConsumableItem) => void;
+  onOrderPO?: (item: ConsumableItem) => void;
   onAdjust?: (item: ConsumableItem) => void;
   onRelease?: (item: ConsumableItem, lot?: PurchaseLot | null) => void;
   onEdit?: (item: ConsumableItem) => void;
@@ -92,12 +94,13 @@ export function ConsumableDetailPanel({
   item,
   isOpen,
   onClose,
-  onRestock,
+  onOrderPO,
   onAdjust,
   onRelease,
   onEdit,
 }: ConsumableDetailPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const { getCategoryStyle } = useCategoryStyleMap();
   const [expandedLotId, setExpandedLotId] = useState<string | null>(null);
   const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
 
@@ -142,6 +145,8 @@ export function ConsumableDetailPanel({
 
   if (!isOpen || !item || !displayItem) return null;
 
+  const categoryMeta = getCategoryStyle(displayItem.category);
+
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs transition-opacity duration-200">
       <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
@@ -167,6 +172,16 @@ export function ConsumableDetailPanel({
               </h2>
               <span
                 className={cn(
+                  "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shadow-2xs",
+                  categoryMeta.bg,
+                  categoryMeta.text
+                )}
+              >
+                <Tag className="h-2.5 w-2.5 shrink-0" />
+                {categoryMeta.label}
+              </span>
+              <span
+                className={cn(
                   "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border",
                   displayItem.currentQty === 0
                     ? "bg-status-outofservice-bg/20 text-status-outofservice-text border-status-outofservice-bg/30"
@@ -182,8 +197,8 @@ export function ConsumableDetailPanel({
                   : "In Stock"}
               </span>
             </div>
-            <p className="text-xs text-text-secondary font-medium mt-0.5 truncate">
-              {displayItem.category.replace(/_/g, " ")} • <strong className="text-text font-semibold">{displayItem.name}</strong>
+            <p className="text-xs text-text-secondary font-medium mt-1 truncate">
+              <strong className="text-text font-semibold">{displayItem.name}</strong>
             </p>
           </div>
 
@@ -215,17 +230,25 @@ export function ConsumableDetailPanel({
             )}
           </div>
 
-          {(onRestock || onRelease || onAdjust || onEdit) && (
+          {(onOrderPO || onRelease || onAdjust || onEdit) && (
           <div className="grid grid-cols-2 gap-2">
-            {onRestock && (
+            {onOrderPO ? (
             <button
               type="button"
-              onClick={() => onRestock(displayItem)}
+              onClick={() => onOrderPO(displayItem)}
               className="inline-flex items-center justify-center gap-1.5 p-2.5 rounded-lg text-xs font-bold bg-accent text-accent-foreground hover:opacity-90 cursor-pointer shadow-xs"
             >
-              <PlusCircle className="h-4 w-4" />
-              Restock
+              <FilePlus2 className="h-4 w-4" />
+              Order via PO
             </button>
+            ) : (
+            <Link
+              href="/purchase-orders"
+              className="inline-flex items-center justify-center gap-1.5 p-2.5 rounded-lg text-xs font-bold bg-accent text-accent-foreground hover:opacity-90 cursor-pointer shadow-xs"
+            >
+              <FilePlus2 className="h-4 w-4" />
+              Order via PO
+            </Link>
             )}
             {onRelease && (
             <button
@@ -550,9 +573,7 @@ export function ConsumableDetailPanel({
                               </div>
                             )}
                             {m.notes && (
-                              <p className="text-xs text-text bg-bg-subtle p-2 rounded mt-1.5 border border-border">
-                                {m.notes}
-                              </p>
+                              <AuditNoteDisplay action={m.reason} note={m.notes} />
                             )}
                           </li>
                         );

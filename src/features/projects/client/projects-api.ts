@@ -37,6 +37,7 @@ export type UpdateProjectExpensePayload = Partial<CreateProjectExpensePayload>;
 export type UseProjectMaterialPayload = {
   consumableId: string;
   quantity: number;
+  purchaseLotId?: string;
   description?: string | null;
   incurredOn?: string;
   notes?: string | null;

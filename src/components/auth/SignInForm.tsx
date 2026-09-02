@@ -164,6 +164,7 @@ export function SignInForm() {
         body: JSON.stringify({
           email: formValues.email.trim(),
           password: formValues.password,
+          rememberMe: formValues.rememberMe,
         }),
       });
 
@@ -184,12 +185,19 @@ export function SignInForm() {
 
       queryClient.clear();
 
+      const role = body.data.profile.role;
       let nextPath = safeNextPath(searchParams.get('next'));
-      if (nextPath === '/') {
-        nextPath =
-          body.data.profile.role === 'borrower'
-            ? '/borrower-db/dashboard'
-            : '/dashboard';
+
+      if (role === 'borrower') {
+        // If nextPath is missing, '/', or points to a staff route, always route to borrower dashboard
+        if (!nextPath || nextPath === '/' || !nextPath.startsWith('/borrower-db')) {
+          nextPath = '/borrower-db/dashboard';
+        }
+      } else {
+        // Staff user: if nextPath is missing, '/', or points to borrower portal, route to staff dashboard
+        if (!nextPath || nextPath === '/' || nextPath.startsWith('/borrower-db')) {
+          nextPath = '/dashboard';
+        }
       }
 
       setFormState({

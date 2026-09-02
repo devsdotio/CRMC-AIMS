@@ -189,7 +189,9 @@ export default function UsersPage() {
               Users & Department Accounts
             </h1>
             <span className="px-2 py-0.5 text-xs font-bold bg-bg-subtle text-text-secondary rounded-full border border-border">
-              {filteredUsers.length} of {users.length} accounts
+              {isLoading
+                ? "Loading accounts…"
+                : `${filteredUsers.length} of ${users.length} accounts`}
               {isFetching && !isLoading ? " · updating…" : ""}
             </span>
           </div>
@@ -231,6 +233,9 @@ export default function UsersPage() {
           users={filteredUsers}
           currentUserId={currentUserId}
           loading={isLoading && !usersError}
+          reactivatingUserId={
+            reactivateUser.isPending ? reactivateUser.variables : null
+          }
           onSelect={setSelectedUser}
           onEdit={setEditDialogUser}
           onDeactivate={setDeactivateDialogUser}

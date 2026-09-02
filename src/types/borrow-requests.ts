@@ -17,7 +17,8 @@ export interface ActionHistoryLog {
     | "released"
     | "unreleased"
     | "returned"
-    | "cancelled";
+    | "cancelled"
+    | "edited";
   actor: string;
   timestamp: string;
   note?: string;
@@ -30,6 +31,9 @@ export interface BorrowRequest {
   requesterEmail: string;
   requesterPhone: string;
   department: string;
+  departmentId?: string | null;
+  requestType?: "borrowable" | "assignable" | null;
+  requestedByName?: string | null;
   items: {
     itemDescription: string;
     assetId?: string;
@@ -38,9 +42,11 @@ export interface BorrowRequest {
     category: AssetCategory;
     quantity: number;
     itemType: "asset" | "consumable";
+    unit?: string;
   }[];
   purpose: string;
   requestedAt: string;
+  relativeTime?: string;
   expectedReturnDate?: string | null;
   status: RequestStatus;
   notes?: string;

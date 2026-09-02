@@ -1,5 +1,5 @@
 "use client";
-import { getCategoryStyle } from "@/constants/categories";
+import { useCategoryStyleMap } from "@/features/categories/client/use-categories";
 import { BarChart2 } from "lucide-react";
 import {
   BarChart,
@@ -71,26 +71,34 @@ export function AssetsByCategoryChart({
   data,
   loading = false,
 }: AssetsByCategoryChartProps) {
+  const { getCategoryStyle } = useCategoryStyleMap();
   const total = data.reduce((sum, d) => sum + d.count, 0);
 
   return (
     <section
-      className="flex flex-col rounded-lg border border-border bg-bg overflow-hidden"
+      className="flex flex-col rounded-lg border border-border bg-card overflow-hidden shadow-xs"
       aria-labelledby="assets-by-category-heading"
     >
       {/* Header */}
-      <div className="px-5 py-4 border-b border-border">
-        <h2
-          id="assets-by-category-heading"
-          className="text-sm font-semibold text-text"
-        >
-          Assets by Category
-        </h2>
-        {!loading && (
-          <p className="text-xs text-text-secondary mt-0.5">
-            {total.toLocaleString()} fixed assets total
-          </p>
-        )}
+      <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-card">
+        <div className="flex items-center gap-2.5">
+          <div className="h-7 w-7 rounded-lg bg-category-av-bg/15 border border-category-av-bg/30 flex items-center justify-center text-category-av-bg shrink-0">
+            <BarChart2 className="h-4 w-4" aria-hidden="true" />
+          </div>
+          <div>
+            <h2
+              id="assets-by-category-heading"
+              className="text-sm font-bold text-text leading-none"
+            >
+              Assets by Category
+            </h2>
+            {!loading && (
+              <p className="text-xs text-text-secondary mt-1">
+                {total.toLocaleString()} fixed assets total
+              </p>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Body */}
@@ -111,11 +119,16 @@ export function AssetsByCategoryChart({
             ))}
           </div>
         ) : data.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
-            <BarChart2 className="h-8 w-8 text-border" />
-            <p className="text-sm text-text-secondary">
-              No asset data to display yet.
-            </p>
+          <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-bg-subtle border border-border text-text-secondary shadow-xs">
+              <BarChart2 className="h-6 w-6" strokeWidth={1.8} />
+            </span>
+            <div>
+              <p className="text-sm font-bold text-text">No category data available</p>
+              <p className="text-xs text-text-secondary mt-1 max-w-xs leading-relaxed">
+                Add fixed assets with category tags to visualize department and equipment distribution.
+              </p>
+            </div>
           </div>
         ) : (
           <>

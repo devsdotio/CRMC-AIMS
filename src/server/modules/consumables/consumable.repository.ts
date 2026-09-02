@@ -124,7 +124,7 @@ export class ConsumableRepository implements IConsumableRepository {
       .select(consumableListColumns)
       .from(consumables)
       .where(whereClause)
-      .orderBy(desc(consumables.updatedAt))
+      .orderBy(asc(consumables.currentQty), asc(consumables.name))
       .limit(limit)
       .offset(offset);
 

@@ -54,7 +54,7 @@ export function PendingApprovalsWidget({
 }: PendingApprovalsWidgetProps) {
   return (
     <section
-      className="flex flex-col rounded-xl border border-border bg-card overflow-hidden shadow-xs"
+      className="flex flex-col rounded-lg border border-border bg-card overflow-hidden shadow-xs"
       aria-labelledby="pending-approvals-heading"
     >
       {/* Header */}
@@ -71,9 +71,11 @@ export function PendingApprovalsWidget({
               Pending Approvals
             </h2>
             <p className="text-xs text-text-secondary mt-1">
-              {!loading && requests.length === 0
-                ? "All requests reviewed"
-                : `${requests.length} awaiting custodian review`}
+              {loading
+                ? "Checking the queue…"
+                : requests.length === 0
+                  ? "All requests reviewed"
+                  : `${requests.length} awaiting custodian review`}
             </p>
           </div>
         </div>
@@ -95,14 +97,18 @@ export function PendingApprovalsWidget({
           </div>
         ) : requests.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 py-12 px-5 text-center">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-status-active-bg/15 border border-status-active-bg/30 text-status-active-text">
-              <Check className="h-5 w-5" strokeWidth={2.5} />
+            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-status-active-bg/15 border border-status-active-bg/30 text-status-active-text shadow-xs">
+              <Check className="h-6 w-6" strokeWidth={2.5} />
             </span>
             <div>
-              <p className="text-sm font-semibold text-text">No pending requests</p>
-              <p className="text-xs text-text-secondary mt-0.5">
-                All requests have been reviewed.
+              <p className="text-sm font-bold text-text">All requests reviewed</p>
+              <p className="text-xs text-text-secondary mt-1 max-w-xs leading-relaxed">
+                No borrow, assignment, or supply requests are awaiting custodian review.
               </p>
+              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-status-active-text bg-status-active-bg/10 border border-status-active-bg/25 px-2.5 py-0.5 rounded-full mt-3">
+                <Check className="h-3 w-3" strokeWidth={2.5} />
+                Queue Clear
+              </span>
             </div>
           </div>
         ) : (

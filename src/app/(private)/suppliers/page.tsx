@@ -10,6 +10,7 @@ import {
   AddEditSupplierDialog,
   type SupplierFormInput,
 } from "@/components/suppliers/add-edit-supplier-dialog";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import {
   useCreateSupplierMutation,
   useDeactivateSupplierMutation,
@@ -41,6 +42,7 @@ export default function SuppliersPage() {
   const [editTarget, setEditTarget] = useState<Supplier | null | undefined>(
     undefined
   );
+  const [deactivateTarget, setDeactivateTarget] = useState<Supplier | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
@@ -96,13 +98,18 @@ export default function SuppliersPage() {
     }
   };
 
-  const handleDeactivate = async (s: Supplier) => {
-    if (!window.confirm(`Deactivate "${s.name}"? History is kept.`)) return;
+  const handleDeactivate = (s: Supplier) => {
+    setDeactivateTarget(s);
+  };
+
+  const handleConfirmDeactivate = async () => {
+    if (!deactivateTarget) return;
     setPageError(null);
     try {
-      const saved = await deactivateSupplier.mutateAsync(s.id);
+      const saved = await deactivateSupplier.mutateAsync(deactivateTarget.id);
       setSelected((prev) => (prev?.id === saved.id ? saved : prev));
-      toast.success(`${s.name} deactivated.`);
+      toast.success(`Supplier "${deactivateTarget.name}" deactivated.`);
+      setDeactivateTarget(null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to deactivate supplier.");
     }
@@ -118,8 +125,10 @@ export default function SuppliersPage() {
             <h1 className="text-xl font-bold tracking-tight text-text">
               Suppliers
             </h1>
-            <span className="px-2 py-0.5 text-xs font-bold bg-bg-subtle text-text-secondary rounded-full border border-border">
-              {filtered.length} of {suppliers.length}
+            <span className="px-2.5 py-0.5 text-xs font-bold bg-bg-subtle text-text-secondary rounded-full border border-border">
+              {isLoading
+                ? "Loading suppliers…"
+                : `${filtered.length} of ${suppliers.length}`}
               {isFetching && !isLoading ? " · updating…" : ""}
             </span>
           </div>
@@ -129,14 +138,14 @@ export default function SuppliersPage() {
           </p>
         </div>
         {canOperate && (
-        <button
-          type="button"
-          onClick={() => setEditTarget(null)}
-          className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg bg-accent text-accent-foreground hover:opacity-90 cursor-pointer shadow-xs"
-        >
-          <Truck className="h-4 w-4" strokeWidth={2.5} />
-          Add Supplier
-        </button>
+          <button
+            type="button"
+            onClick={() => setEditTarget(null)}
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg bg-accent text-accent-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+          >
+            <Truck className="h-4 w-4" strokeWidth={2.5} />
+            Add Supplier
+          </button>
         )}
       </div>
 
@@ -159,15 +168,12 @@ export default function SuppliersPage() {
         <SupplierTable
           suppliers={filtered}
           loading={isLoading && !error}
+          deactivatingSupplierId={
+            deactivateSupplier.isPending ? deactivateSupplier.variables : null
+          }
           onSelect={setSelected}
           onEdit={canOperate ? (s) => setEditTarget(s) : undefined}
-          onDeactivate={
-            canOperate
-              ? (s) => {
-                  void handleDeactivate(s);
-                }
-              : undefined
-          }
+          onDeactivate={canOperate ? handleDeactivate : undefined}
         />
       </main>
 
@@ -186,13 +192,28 @@ export default function SuppliersPage() {
       />
 
       {canOperate && (
-      <AddEditSupplierDialog
-        isOpen={editTarget !== undefined}
-        supplier={editTarget ?? null}
-        onClose={() => setEditTarget(undefined)}
-        onSubmit={handleSubmit}
-      />
+        <AddEditSupplierDialog
+          isOpen={editTarget !== undefined}
+          supplier={editTarget ?? null}
+          onClose={() => setEditTarget(undefined)}
+          onSubmit={handleSubmit}
+        />
       )}
+
+      <ConfirmDialog
+        isOpen={Boolean(deactivateTarget)}
+        title="Deactivate Supplier"
+        description={
+          deactivateTarget
+            ? `Are you sure you want to deactivate "${deactivateTarget.name}" (${deactivateTarget.supplierCode})? Purchase lot and restock history will remain intact.`
+            : ""
+        }
+        confirmLabel="Deactivate"
+        variant="warning"
+        isLoading={deactivateSupplier.isPending}
+        onConfirm={handleConfirmDeactivate}
+        onClose={() => setDeactivateTarget(null)}
+      />
     </div>
   );
 }

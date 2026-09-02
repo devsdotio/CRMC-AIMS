@@ -31,7 +31,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getCategoryStyle } from "@/constants/categories";
+import { useCategoryStyleMap } from "@/features/categories/client/use-categories";
 import { LoadingState } from "@/components/providers/loading-context";
 import { useConsumableQuery } from "@/features/consumables/client/use-consumables";
 import { useAuditLogsQuery } from "@/features/audit-logs/client/use-audit-logs";
@@ -141,6 +141,7 @@ export function ConsumableAuditDetailPanel({
   onClose,
 }: ConsumableAuditDetailPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const { getCategoryStyle } = useCategoryStyleMap();
 
   // List queries omit the bulky history JSONB for performance. Fetch full record with full history on panel open.
   const { data: detailItem, isLoading: detailLoading } = useConsumableQuery(

@@ -32,6 +32,7 @@ export default function DashboardPage() {
       icon: Box,
       variant: "default",
       loading,
+      href: "/borrow-log?status=active",
     },
     {
       label: "Pending Approvals",
@@ -40,6 +41,7 @@ export default function DashboardPage() {
       icon: ClipboardList,
       variant: "default",
       loading,
+      href: "/borrow-requests?status=pending",
     },
     {
       label: "Overdue Returns",
@@ -48,6 +50,7 @@ export default function DashboardPage() {
       icon: AlertCircle,
       variant: "danger",
       loading,
+      href: "/borrow-log?status=overdue",
     },
     {
       label: "Low Stock Items",
@@ -56,6 +59,7 @@ export default function DashboardPage() {
       icon: AlertCircle,
       variant: "warning",
       loading,
+      href: "/consumables",
     },
   ];
 

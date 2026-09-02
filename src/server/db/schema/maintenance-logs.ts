@@ -26,7 +26,8 @@ export const maintenanceSourceEnum = pgEnum("maintenance_source", [
 
 /**
  * First-class maintenance ledger (replaces jsonb-only history for new work).
- * Asset.maintenanceHistory remains for legacy compatibility / embedded UI.
+ * Asset.maintenanceHistory JSONB is legacy and no longer written.
+ * Use this table + asset_lifecycle_events for maintenance accountability.
  */
 export const maintenanceLogs = pgTable(
   "maintenance_logs",

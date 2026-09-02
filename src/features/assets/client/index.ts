@@ -10,6 +10,7 @@ export {
   type AssetLifecycleEventPayload,
   type FlagMaintenanceInput,
   type ReleaseAssetInput,
+  type ReportMissingInput,
   type ScanResolveResult,
 } from "./assets-api";
 export { assetQueryKeys } from "./query-keys";
@@ -21,6 +22,7 @@ export {
   useDeleteAssetMutation,
   useFlagMaintenanceMutation,
   useReleaseAssetMutation,
+  useReportMissingMutation,
   useResolveScanMutation,
   useReturnAssetMutation,
   useScanReleaseMutation,

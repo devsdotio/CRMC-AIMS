@@ -1,4 +1,4 @@
-import { and, count, desc, eq, ilike, isNotNull, lt, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, ilike, inArray, isNotNull, lt, or, sql } from "drizzle-orm";
 
 import { getDb } from "@/server/db";
 import type { DbSession } from "@/server/db/transaction";
@@ -61,6 +61,34 @@ export class BorrowLogRepository implements IBorrowLogRepository {
       )
       .limit(1);
     return row ?? null;
+  }
+
+  /** Holder display names for active custody logs, keyed by asset id. */
+  async findActiveHolderLabelsByAssetIds(
+    assetIds: string[],
+    session?: DbSession
+  ): Promise<Map<string, string>> {
+    const out = new Map<string, string>();
+    if (assetIds.length === 0) return out;
+
+    const db = this.db(session);
+    const rows = await db
+      .select({
+        assetId: borrowTransactions.assetId,
+        borrowerName: borrowTransactions.borrowerName,
+      })
+      .from(borrowTransactions)
+      .where(
+        and(
+          inArray(borrowTransactions.assetId, assetIds),
+          eq(borrowTransactions.status, "active")
+        )
+      );
+
+    for (const row of rows) {
+      if (row.assetId) out.set(row.assetId, row.borrowerName);
+    }
+    return out;
   }
 
   async list(

@@ -1,7 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, AlertTriangle, Check, Wrench } from "lucide-react";
+import {
+  X,
+  AlertTriangle,
+  Check,
+  Wrench,
+  Loader2,
+  AlertCircle,
+  Package,
+  PowerOff,
+  StickyNote,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ProjectAssetAssignment } from "@/types/projects";
 import { formatPhp } from "./format-money";
@@ -70,13 +80,13 @@ export function ReportDamageDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!notes.trim()) {
-      setError("Describe the damage or loss (required).");
+      setError("Please describe the damage or loss details (required).");
       return;
     }
     if (mode === "write_off" && amount.trim() !== "") {
       const n = Number(amount);
       if (!Number.isFinite(n) || n < 0) {
-        setError("Amount must be a non-negative number.");
+        setError("Charge amount must be a non-negative number.");
         return;
       }
     }
@@ -100,7 +110,7 @@ export function ReportDamageDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
+    <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
       <div
         className="absolute inset-0"
         onClick={isSubmitting ? undefined : onClose}
@@ -109,17 +119,20 @@ export function ReportDamageDialog({
       <div
         role="dialog"
         aria-modal="true"
-        className="relative w-full max-w-md bg-bg border border-border rounded-xl shadow-2xl z-10 overflow-hidden my-4"
+        aria-labelledby="damage-dialog-heading"
+        className="relative w-full max-w-md bg-bg border border-border rounded-xl shadow-2xl z-10 overflow-hidden my-4 animate-in fade-in zoom-in-95 duration-150"
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-bg-subtle/50">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-status-outofservice-bg/40 text-status-outofservice-text">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-status-repair-bg/15 text-status-repair-text shrink-0">
               <AlertTriangle className="h-4 w-4" />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-text">Report damage</h2>
+              <h2 id="damage-dialog-heading" className="text-sm font-bold text-text">
+                Report Asset Damage
+              </h2>
               <p className="text-[11px] text-text-secondary">
-                {assignment.assetCode} — {assignment.assetName}
+                Flag asset for repair or charge project with write-off expense
               </p>
             </div>
           </div>
@@ -128,105 +141,131 @@ export function ReportDamageDialog({
             onClick={onClose}
             disabled={isSubmitting}
             aria-label="Close"
-            className="p-1.5 rounded-lg text-text-secondary hover:text-text hover:bg-border disabled:opacity-50 cursor-pointer"
+            className="p-1.5 rounded-lg text-text-secondary hover:text-text hover:bg-border transition-colors disabled:opacity-50 cursor-pointer"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          {error && (
-            <p className="text-[11px] text-status-outofservice-text">{error}</p>
-          )}
-
-          <div className="space-y-2">
-            <span className={labelClass}>Outcome</span>
-            <label
-              className={cn(
-                "flex items-start gap-2.5 p-3 rounded-lg border cursor-pointer",
-                mode === "maintenance"
-                  ? "border-accent bg-accent/10"
-                  : "border-border bg-bg-subtle/40"
-              )}
-            >
-              <input
-                type="radio"
-                name="damage-mode"
-                className="mt-0.5"
-                checked={mode === "maintenance"}
-                onChange={() => setMode("maintenance")}
-                disabled={isSubmitting}
-              />
-              <span className="min-w-0">
-                <span className="flex items-center gap-1.5 text-xs font-bold text-text">
-                  <Wrench className="h-3.5 w-3.5" />
-                  Flag for repair
-                </span>
-                <span className="block text-[10px] text-text-secondary mt-0.5">
-                  Keeps asset on project; creates maintenance log; status
-                  needs_repair. No write-off charge.
-                </span>
-              </span>
-            </label>
-            <label
-              className={cn(
-                "flex items-start gap-2.5 p-3 rounded-lg border cursor-pointer",
-                mode === "write_off"
-                  ? "border-accent bg-accent/10"
-                  : "border-border bg-bg-subtle/40"
-              )}
-            >
-              <input
-                type="radio"
-                name="damage-mode"
-                className="mt-0.5"
-                checked={mode === "write_off"}
-                onChange={() => setMode("write_off")}
-                disabled={isSubmitting}
-              />
-              <span className="min-w-0">
-                <span className="flex items-center gap-1.5 text-xs font-bold text-text">
-                  <AlertTriangle className="h-3.5 w-3.5" />
-                  Write off (expense)
-                </span>
-                <span className="block text-[10px] text-text-secondary mt-0.5">
-                  Closes assignment as written off, charges project spend, and
-                  marks the asset out of service/retired.
-                </span>
-              </span>
-            </label>
+          {/* Asset Summary Badge Card */}
+          <div className="p-3 rounded-lg border border-border bg-bg-subtle/60 flex items-center justify-between gap-2 text-xs">
+            <div className="flex items-center gap-2 min-w-0">
+              <Package className="h-4 w-4 text-text-secondary shrink-0" />
+              <span className="font-bold text-text truncate">{assignment.assetName}</span>
+            </div>
+            <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-md bg-bg border border-border text-text-secondary shrink-0">
+              {assignment.assetCode}
+            </span>
           </div>
 
+          {/* Outcome Choice Cards */}
+          <div className="space-y-2">
+            <span className={labelClass}>
+              Select Outcome <span className="text-accent">*</span>
+            </span>
+            <div className="grid grid-cols-1 gap-2">
+              {/* Flag Repair Card */}
+              <label
+                className={cn(
+                  "flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all",
+                  mode === "maintenance"
+                    ? "border-status-repair-bg/50 bg-status-repair-bg/10 shadow-2xs"
+                    : "border-border bg-bg hover:bg-bg-subtle/50"
+                )}
+              >
+                <input
+                  type="radio"
+                  name="damage-mode"
+                  className="mt-0.5 accent-status-repair-bg"
+                  checked={mode === "maintenance"}
+                  onChange={() => setMode("maintenance")}
+                  disabled={isSubmitting}
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-text">
+                    <Wrench className="h-3.5 w-3.5 text-status-repair-text" />
+                    <span>Flag for repair</span>
+                    <span className="ml-auto text-[10px] font-bold px-1.5 py-0.2 rounded bg-status-repair-bg/20 text-status-repair-text">
+                      Needs Repair
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-text-secondary mt-1 leading-snug">
+                    Keeps asset on project custody; creates maintenance log; status
+                    set to needs_repair with zero write-off charges.
+                  </p>
+                </div>
+              </label>
+
+              {/* Write-off Card */}
+              <label
+                className={cn(
+                  "flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all",
+                  mode === "write_off"
+                    ? "border-status-outofservice-bg/50 bg-status-outofservice-bg/10 shadow-2xs"
+                    : "border-border bg-bg hover:bg-bg-subtle/50"
+                )}
+              >
+                <input
+                  type="radio"
+                  name="damage-mode"
+                  className="mt-0.5 accent-status-outofservice-bg"
+                  checked={mode === "write_off"}
+                  onChange={() => setMode("write_off")}
+                  disabled={isSubmitting}
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-text">
+                    <AlertTriangle className="h-3.5 w-3.5 text-status-outofservice-text" />
+                    <span>Write off (expense charge)</span>
+                    <span className="ml-auto text-[10px] font-bold px-1.5 py-0.2 rounded bg-status-outofservice-bg/20 text-status-outofservice-text">
+                      Write-off
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-text-secondary mt-1 leading-snug">
+                    Closes custody assignment as written-off, charges project budget spend,
+                    and updates asset to out of service or retired.
+                  </p>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          {/* Write-off Specific Inputs */}
           {mode === "write_off" && (
-            <>
+            <div className="space-y-3 p-3 rounded-lg border border-status-outofservice-bg/20 bg-status-outofservice-bg/5">
               <div>
-                <label htmlFor="wo-amount" className={labelClass}>
-                  Charge amount (₱)
+                <div className="flex items-center justify-between mb-1">
+                  <label htmlFor="wo-amount" className={labelClass}>
+                    Charge amount (₱)
+                  </label>
                   {defaultValue != null && (
-                    <span className="font-normal text-text-secondary">
-                      {" "}
-                      · book value {formatPhp(defaultValue)}
+                    <span className="text-[10px] text-text-secondary">
+                      Book value: <strong className="font-mono text-text">{formatPhp(defaultValue)}</strong>
                     </span>
                   )}
-                </label>
-                <input
-                  id="wo-amount"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  disabled={isSubmitting}
-                  className={fieldClass}
-                  placeholder="0.00"
-                />
-                <p className="text-[10px] text-text-secondary mt-1">
-                  Leave blank to use book value (or ₱0 if none).
-                </p>
+                </div>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-xs font-bold text-text-secondary">
+                    ₱
+                  </span>
+                  <input
+                    id="wo-amount"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    disabled={isSubmitting}
+                    className={cn(fieldClass, "pl-7 font-mono tabular-nums")}
+                    placeholder="0.00 (or leave blank for book value)"
+                  />
+                </div>
               </div>
+
               <div>
                 <label htmlFor="wo-status" className={labelClass}>
-                  Asset status after write-off
+                  Asset status post write-off
                 </label>
                 <select
                   id="wo-status"
@@ -237,18 +276,19 @@ export function ReportDamageDialog({
                     )
                   }
                   disabled={isSubmitting}
-                  className={fieldClass}
+                  className={cn(fieldClass, "cursor-pointer")}
                 >
                   <option value="out_of_service">Out of service</option>
                   <option value="retired">Retired</option>
                 </select>
               </div>
-            </>
+            </div>
           )}
 
+          {/* Damage / Loss Notes */}
           <div>
             <label htmlFor="damage-notes" className={labelClass}>
-              Damage / loss notes
+              Damage / incident description <span className="text-accent">*</span>
             </label>
             <textarea
               id="damage-notes"
@@ -258,31 +298,50 @@ export function ReportDamageDialog({
               maxLength={4000}
               required
               disabled={isSubmitting}
-              className={cn(fieldClass, "h-auto py-2 resize-y min-h-9")}
-              placeholder="What happened, and when…"
+              className={cn(fieldClass, "h-auto py-2 resize-y min-h-16")}
+              placeholder="Detail what happened, when it occurred, and current physical condition…"
             />
           </div>
 
-          <div className="flex justify-end gap-2 pt-1">
+          {error && (
+            <div className="flex items-start gap-2 text-xs text-status-outofservice-text bg-status-outofservice-bg/10 border border-status-outofservice-bg/30 rounded-lg p-2.5">
+              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="h-9 px-4 text-xs font-bold rounded-lg border border-border bg-bg text-text hover:bg-bg-subtle disabled:opacity-50 cursor-pointer"
+              className="h-9 px-4 text-xs font-bold rounded-lg border border-border bg-bg text-text hover:bg-bg-subtle transition-colors disabled:opacity-50 cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="inline-flex items-center gap-1.5 h-9 px-4 text-xs font-bold rounded-lg bg-accent text-accent-foreground hover:opacity-90 disabled:opacity-50 cursor-pointer"
+              className={cn(
+                "inline-flex items-center gap-1.5 h-9 px-4 text-xs font-bold rounded-lg text-white transition-opacity disabled:opacity-50 cursor-pointer shadow-xs",
+                mode === "write_off"
+                  ? "bg-status-outofservice-bg hover:opacity-90"
+                  : "bg-status-repair-bg hover:opacity-90"
+              )}
             >
-              <Check className="h-3.5 w-3.5" />
+              {isSubmitting ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : mode === "write_off" ? (
+                <AlertTriangle className="h-3.5 w-3.5" />
+              ) : (
+                <Wrench className="h-3.5 w-3.5" />
+              )}
               {isSubmitting
-                ? "Saving…"
+                ? "Submitting…"
                 : mode === "write_off"
-                  ? "Write off"
-                  : "Flag repair"}
+                  ? "Write Off Asset"
+                  : "Flag For Repair"}
             </button>
           </div>
         </form>

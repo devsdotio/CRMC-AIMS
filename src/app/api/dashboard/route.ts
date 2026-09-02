@@ -14,12 +14,17 @@ import { dashboardController } from "@/server/modules/dashboard";
  *           enum: [full, sidebar]
  *         description: |
  *           `sidebar` returns only summary counts (for nav badges).
+ *           `notifications` returns overdue / pending / low-stock alerts for the header bell.
  *           Default / omitted = full dashboard snapshot widgets.
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  if (url.searchParams.get("scope") === "sidebar") {
+  const scope = url.searchParams.get("scope");
+  if (scope === "sidebar") {
     return dashboardController.sidebarSummary();
+  }
+  if (scope === "notifications") {
+    return dashboardController.notifications();
   }
   return dashboardController.snapshot();
 }

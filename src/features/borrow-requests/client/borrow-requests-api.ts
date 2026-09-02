@@ -26,13 +26,42 @@ export type CreateBorrowRequestPayload = {
 
 export type ApproveBorrowRequestPayload = {
   note?: string;
-  assetId?: string;
-  assetCode?: string;
+  items?: {
+    itemDescription: string;
+    category: BorrowRequest["items"][number]["category"];
+    quantity: number;
+    itemType: "asset";
+  }[];
 };
 
 export type ReleaseBorrowRequestPayload = {
   pickedUpBy: string;
   note?: string;
+  lineAllocations: {
+    lineIndex: number;
+    assetIds: string[];
+  }[];
+};
+
+export type UpdateBorrowRequestPayload = {
+  requesterName?: string;
+  requesterEmail?: string;
+  requesterPhone?: string;
+  departmentId?: string;
+  requestType?: "borrowable" | "assignable";
+  requestedByName?: string;
+  items?: {
+    itemDescription: string;
+    assetId?: string;
+    assetCode?: string;
+    category: BorrowRequest["items"][number]["category"];
+    quantity: number;
+    itemType: "asset";
+  }[];
+  purpose?: string;
+  expectedReturnDate?: string | null;
+  notes?: string | null;
+  editReason: string;
 };
 
 export const borrowRequestsApi = {
@@ -75,6 +104,17 @@ export const borrowRequestsApi = {
     const res = await fetchJson<ApiResponse<BorrowRequest>>(
       "/api/requests",
       { method: "POST", body: JSON.stringify(payload) }
+    );
+    return res.data;
+  },
+
+  async update(
+    id: string,
+    payload: UpdateBorrowRequestPayload
+  ): Promise<BorrowRequest> {
+    const res = await fetchJson<ApiResponse<BorrowRequest>>(
+      `/api/requests/${id}`,
+      { method: "PATCH", body: JSON.stringify(payload) }
     );
     return res.data;
   },

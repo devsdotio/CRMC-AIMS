@@ -20,19 +20,36 @@ import {
   StickyNote,
   Minus,
   Plus,
+  Laptop,
+  Video,
+  Truck,
+  Armchair,
+  HeartPulse,
+  Printer,
+  FlaskConical,
+  Wrench,
+  Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getCategoryStyle } from "@/constants/categories";
-import type { BrowseItem, WizardFormValues, RequestWizardStep, PortalBorrowRequest } from "./types";
+import type {
+  BrowseItem,
+  BrowseAssetItem,
+  BrowseConsumableItem,
+  WizardFormValues,
+  RequestWizardStep,
+  PortalBorrowRequest,
+} from "./types";
+import { useCategoriesQuery } from "@/features/categories/client/use-categories";
 import { useCreateBorrowRequestMutation } from "@/features/borrow-requests/client/use-borrow-requests";
 import { useCreateConsumableRequestMutation } from "@/features/consumable-requests/client";
-import { useAssetsQuery } from "@/features/assets/client/use-assets";
 import { useConsumablesQuery } from "@/features/consumables/client/use-consumables";
+import { availableQty } from "@/components/consumables/utils";
 import { useMeQuery } from "@/features/users/client/use-users";
 import type { MeProfile } from "@/features/users/client/users-api";
 import { LoadingState } from "@/components/providers/loading-context";
-import { isAssetAvailableForRequest } from "@/lib/assets-custody";
-import { availableQty } from "@/components/consumables/utils";
+import { useToast } from "@/components/providers/toast-context";
+import { formatQuantityWithUnit } from "@/lib/sanitize-display";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -46,17 +63,48 @@ function nextWeek() {
   return d.toISOString().split("T")[0];
 }
 
+function formatFriendlyErrorMessage(rawMessage?: string): string {
+  if (!rawMessage) return "Failed to submit request. Please check your form and try again.";
+  const lower = rawMessage.toLowerCase();
+
+  if (lower.includes("invalid uuid") || lower.includes("uuid")) {
+    return "An item or department reference is invalid. Please select your categories again.";
+  }
+  if (lower.includes("department") && (lower.includes("link") || lower.includes("not found"))) {
+    return "Your account is not linked to a department. Please ask an administrator to assign your department.";
+  }
+  if (lower.includes("expectedreturndate") || (lower.includes("return date") && lower.includes("required"))) {
+    return "Please specify an expected return date for this borrow request.";
+  }
+  if (lower.includes("failed to fetch") || lower.includes("network")) {
+    return "Connection error. Please verify your network and try again.";
+  }
+  if (lower.includes("invalid input") || lower.includes("invalid literal") || lower.includes("expected string")) {
+    return "Some details were formatted incorrectly. Please review your request form.";
+  }
+
+  return rawMessage;
+}
+
 // ─── Step Indicators ─────────────────────────────────────────────────────────
 
 const STEPS: { key: RequestWizardStep; label: string; stepNumber: number }[] = [
   { key: "type", label: "Request Type", stepNumber: 1 },
-  { key: "select", label: "Select Items", stepNumber: 2 },
+  { key: "select", label: "Select Category", stepNumber: 2 },
   { key: "details", label: "Request Details", stepNumber: 3 },
   { key: "review", label: "Review & Submit", stepNumber: 4 },
 ];
 
-function MilestoneStepIndicator({ current }: { current: RequestWizardStep }) {
+function MilestoneStepIndicator({
+  current,
+  requestType,
+}: {
+  current: RequestWizardStep;
+  requestType?: WizardFormValues["requestType"];
+}) {
   const currentIdx = STEPS.findIndex((s) => s.key === current);
+  const selectLabel =
+    requestType === "consumable" ? "Select Supplies" : "Select Category";
 
   return (
     <nav aria-label="Request Progress" className="w-full">
@@ -109,7 +157,7 @@ function MilestoneStepIndicator({ current }: { current: RequestWizardStep }) {
                         : "font-medium text-text-secondary"
                     )}
                   >
-                    {step.label}
+                    {step.key === "select" ? selectLabel : step.label}
                   </p>
                 </div>
               </div>
@@ -347,14 +395,109 @@ function StepType({
   );
 }
 
-// ─── Step 1: Select Item (with LoadingState & Pagination) ────────────────────
+// ─── Step 2: Select Asset Category (Color Coded Cards View) ──────────────────
 
-const SELECT_PAGE_SIZE = 6;
+interface AssetCategoryCardMeta {
+  id: string;
+  title: string;
+  subtitle: string;
+  description: string;
+  icon: React.ElementType;
+  style: ReturnType<typeof getCategoryStyle>;
+}
+
+const ASSET_CATEGORIES: AssetCategoryCardMeta[] = [
+  {
+    id: "computing",
+    title: "Computing & IT",
+    subtitle: "Laptops & PCs",
+    description: "Workstations, monitors, keyboards & IT units.",
+    icon: Laptop,
+    style: getCategoryStyle("computing"),
+  },
+  {
+    id: "av",
+    title: "Audio & Visual",
+    subtitle: "Cameras & AV",
+    description: "Projectors, cameras, microphones & sound gear.",
+    icon: Video,
+    style: getCategoryStyle("av"),
+  },
+  {
+    id: "transport",
+    title: "Transport",
+    subtitle: "Vehicles & Carts",
+    description: "Service vans, utility carts & mobility units.",
+    icon: Truck,
+    style: getCategoryStyle("transport"),
+  },
+  {
+    id: "furniture",
+    title: "Furniture",
+    subtitle: "Chairs & Desks",
+    description: "Office chairs, conference tables & cabinets.",
+    icon: Armchair,
+    style: getCategoryStyle("furniture"),
+  },
+  {
+    id: "medical",
+    title: "Medical",
+    subtitle: "Clinical Units",
+    description: "Diagnostic sets, monitors & clinical units.",
+    icon: HeartPulse,
+    style: getCategoryStyle("medical"),
+  },
+  {
+    id: "office",
+    title: "Office Eqpt",
+    subtitle: "Printers & Scanners",
+    description: "Laser printers, copiers & document scanners.",
+    icon: Printer,
+    style: getCategoryStyle("office"),
+  },
+  {
+    id: "electronics",
+    title: "Electronics",
+    subtitle: "Power & UPS",
+    description: "UPS units, power supplies & analyzers.",
+    icon: Zap,
+    style: getCategoryStyle("electronics"),
+  },
+  {
+    id: "laboratory",
+    title: "Laboratory",
+    subtitle: "Lab & Testing",
+    description: "Centrifuges, incubators & testing gear.",
+    icon: FlaskConical,
+    style: getCategoryStyle("laboratory"),
+  },
+  {
+    id: "tools",
+    title: "Tools",
+    subtitle: "Toolkits & Repair",
+    description: "Power drills, toolkit cases & safety gear.",
+    icon: Wrench,
+    style: getCategoryStyle("tools"),
+  },
+];
+
+function getCategoryIcon(catKeyOrName: string): React.ElementType {
+  const norm = (catKeyOrName || "").toLowerCase();
+  if (norm.includes("comput") || norm.includes("it") || norm.includes("tech") || norm.includes("laptop")) return Laptop;
+  if (norm.includes("av") || norm.includes("audio") || norm.includes("video") || norm.includes("camera") || norm.includes("projector")) return Video;
+  if (norm.includes("transport") || norm.includes("vehicle") || norm.includes("mobility") || norm.includes("car") || norm.includes("truck")) return Truck;
+  if (norm.includes("furnit") || norm.includes("chair") || norm.includes("table") || norm.includes("desk")) return Armchair;
+  if (norm.includes("medic") || norm.includes("clinic") || norm.includes("health") || norm.includes("care") || norm.includes("pharma")) return HeartPulse;
+  if (norm.includes("print") || norm.includes("office") || norm.includes("scan") || norm.includes("copi")) return Printer;
+  if (norm.includes("electr") || norm.includes("power") || norm.includes("ups") || norm.includes("generat")) return Zap;
+  if (norm.includes("lab") || norm.includes("scien") || norm.includes("research") || norm.includes("chem")) return FlaskConical;
+  if (norm.includes("tool") || norm.includes("maint") || norm.includes("machin") || norm.includes("repair")) return Wrench;
+  return Tag;
+}
 
 function StepSelect({
   value,
   onChange,
-  initialType,
   requestType,
 }: {
   value: BrowseItem[];
@@ -363,209 +506,461 @@ function StepSelect({
   requestType?: "borrowable" | "assignable" | "consumable" | null;
 }) {
   const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
+  const { data: dbCategories = [], isLoading } = useCategoriesQuery();
 
-  const { data: assets = [], isLoading: assetsLoading } = useAssetsQuery();
-  const { data: paginatedData, isLoading: consumablesLoading } = useConsumablesQuery();
-  const consumables = useMemo(() => paginatedData?.data ?? [], [paginatedData?.data]);
-  const loading = assetsLoading || consumablesLoading;
-
-  // Reset page when search or request type changes
-  useEffect(() => {
-    setPage(1);
-  }, [search, requestType]);
-
-  const BROWSE_ITEMS = useMemo(() => {
-    return [
-      ...assets.map(a => ({
-        id: a.id,
-        name: a.name,
-        category: a.category,
-        type: "asset" as const,
-        status: a.status,
-        assignmentType: a.assignmentType,
-        assetCode: a.assetCode,
-        location: a.location,
-        reservedForRequestId: a.reservedForRequestId,
-        currentHolder: a.currentHolder,
-      })),
-      ...consumables.map(c => {
-        const free = c.availableQty ?? availableQty(c);
+  // Build category cards dynamically from the Admin Categories
+  const categoryCards = useMemo<AssetCategoryCardMeta[]>(() => {
+    const adminAssetCats = dbCategories.filter((c) => c.type === "asset" || !c.type);
+    if (adminAssetCats.length > 0) {
+      return adminAssetCats.map((c) => {
+        const style = getCategoryStyle(c.name, c.name, c.colorToken);
+        const Icon = getCategoryIcon(c.name);
         return {
+          id: c.id,
+          title: c.name,
+          subtitle: `${c.name} Category`,
+          description: `Equipment and units registered under ${c.name}.`,
+          icon: Icon,
+          style,
+        };
+      });
+    }
+    return ASSET_CATEGORIES;
+  }, [dbCategories]);
+
+  const filteredCategories = useMemo(() => {
+    if (!search.trim()) return categoryCards;
+    const q = search.toLowerCase();
+    return categoryCards.filter(
+      (c) =>
+        c.title.toLowerCase().includes(q) ||
+        c.subtitle.toLowerCase().includes(q) ||
+        c.description.toLowerCase().includes(q) ||
+        c.id.toLowerCase().includes(q)
+    );
+  }, [categoryCards, search]);
+
+  const toggleCategory = (cat: AssetCategoryCardMeta) => {
+    const syntheticId = `cat-${cat.id}`;
+    const isSelected = value.some((v) => v.id === syntheticId);
+    if (isSelected) {
+      onChange(value.filter((v) => v.id !== syntheticId));
+    } else {
+      const categoryItem: BrowseItem = {
+        id: syntheticId,
+        name: `${cat.title} Equipment`,
+        category: cat.title,
+        type: "asset",
+        status: "active",
+        assignmentType: requestType === "assignable" ? "assignable" : "borrowable",
+        assetCode: `CAT-${cat.id.toUpperCase()}`,
+        location: "Central Storage",
+      };
+      onChange([...value, categoryItem]);
+    }
+  };
+
+  const isAssignable = requestType === "assignable";
+
+  return (
+    <div className="space-y-3.5 h-full flex flex-col min-h-0">
+      {/* Search & Filter Header Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0 pb-1">
+        <div>
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-bold text-text">
+              {isAssignable ? "Choose Equipment Categories for Assignment" : "Choose Asset Categories to Borrow"}
+            </h3>
+            {value.length > 0 && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-accent/15 text-accent border border-accent/25">
+                <Check className="h-3 w-3 stroke-3" />
+                {value.length} selected
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-text-secondary mt-0.5">
+            Select one or more categories. You will configure item quantities in the next step.
+          </p>
+        </div>
+
+        <div className="relative w-full sm:w-60">
+          <label htmlFor="search-categories" className="sr-only">
+            Search asset categories
+          </label>
+          <Search
+            className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-secondary"
+            aria-hidden
+          />
+          <input
+            id="search-categories"
+            type="search"
+            placeholder="Search categories…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full h-8.5 rounded-lg border border-border bg-white pl-8.5 pr-8 text-xs text-text placeholder:text-text-secondary/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent shadow-2xs transition-all"
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-secondary hover:text-text cursor-pointer"
+              title="Clear search"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Category Cards Grid */}
+      <div className="flex-1 min-h-60 overflow-y-auto pr-1">
+        {isLoading ? (
+          <LoadingState
+            variant="inline"
+            icon="package"
+            message="Loading asset categories..."
+            subtitle="Fetching latest inventory data..."
+            className="py-12"
+          />
+        ) : filteredCategories.length === 0 ? (
+          <div className="p-8 text-center my-auto rounded-lg border border-dashed border-border bg-white">
+            <Package className="h-8 w-8 text-text-secondary/40 mx-auto mb-2" />
+            <p className="text-sm font-semibold text-text">No matching category found</p>
+            <p className="text-xs text-text-secondary mt-0.5">
+              No categories match &quot;{search}&quot;. Try another search term.
+            </p>
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="mt-3 text-xs text-accent font-semibold hover:underline cursor-pointer"
+              >
+                Reset search
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {filteredCategories.map((cat) => {
+              const isSelected = value.some((v) => v.id === `cat-${cat.id}`);
+              const style = cat.style;
+
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => toggleCategory(cat)}
+                  className={cn(
+                    "flex flex-col text-left p-3.5 rounded-lg border transition-all duration-200 relative cursor-pointer group select-none shadow-2xs",
+                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+                    isSelected
+                      ? "border-accent bg-accent/4 ring-2 ring-accent/25 shadow-xs"
+                      : "border-border bg-white hover:border-accent/40 hover:bg-bg-subtle/40 hover:shadow-xs"
+                  )}
+                  aria-pressed={isSelected}
+                >
+                  {/* Card Header: Category Title + Subtitle Tag + Checkbox */}
+                  <div className="flex items-start justify-between gap-2 w-full mb-1.5">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <h4 className="text-sm font-bold text-text truncate group-hover:text-accent transition-colors">
+                          {cat.title}
+                        </h4>
+                        <span className={cn("px-1.5 py-0.5 rounded font-bold text-[9px] uppercase tracking-wider", style.bg, style.text)}>
+                          {cat.subtitle}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div
+                      className={cn(
+                        "h-5 w-5 rounded-md flex items-center justify-center shrink-0 border transition-all duration-200 mt-0.5",
+                        isSelected
+                          ? "bg-accent border-accent text-accent-foreground shadow-2xs"
+                          : "border-border bg-bg-subtle/80 group-hover:border-accent/50"
+                      )}
+                    >
+                      {isSelected ? (
+                        <Check className="h-3.5 w-3.5 stroke-3" />
+                      ) : (
+                        <span className="h-1.5 w-1.5 rounded-full bg-border group-hover:bg-text-secondary/40" />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Description */}
+                  <p className="text-xs text-text-secondary leading-relaxed line-clamp-2 flex-1 mb-2.5">
+                    {cat.description}
+                  </p>
+
+                  {/* Card Footer Tag */}
+                  <div className="flex items-center justify-between pt-2 border-t border-border/50 text-[11px] w-full mt-auto">
+                    <span className="text-text-secondary font-medium text-[11px]">
+                      {cat.title}
+                    </span>
+                    <span className="text-text-secondary font-medium flex items-center gap-1 text-[11px]">
+                      <span className="h-1.5 w-1.5 rounded-full bg-status-active-bg" />
+                      {isAssignable ? "Assignable" : "Borrowable"}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function StepSelectConsumables({
+  value,
+  onChange,
+}: {
+  value: BrowseItem[];
+  onChange: (items: BrowseItem[]) => void;
+}) {
+  const [search, setSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const { data: paginatedData, isLoading } = useConsumablesQuery({ limit: 100 });
+  const consumables = useMemo(
+    () => paginatedData?.data ?? [],
+    [paginatedData?.data]
+  );
+
+  const supplyItems = useMemo(() => {
+    return consumables.map((c) => {
+      const free = c.availableQty ?? availableQty(c);
+      return {
         id: c.id,
         name: c.name,
         category: c.category,
         type: "consumable" as const,
-        status: free <= 0 ? "out_of_stock" : free <= c.minThreshold ? "low_stock" : "available",
+        status: "available" as const,
         itemCode: c.itemCode,
-        currentQty: free,
         unit: c.unit,
+        currentQty: free,
         location: c.location,
       };
-      })
-    ] as BrowseItem[];
-  }, [assets, consumables]);
-
-  const items = useMemo(() => {
-    return BROWSE_ITEMS.filter((item) => {
-      // 0. Filter by explicit requestType
-      if (requestType === "borrowable") {
-        if (item.type !== "asset") return false;
-        if (item.assignmentType !== "borrowable") return false;
-      }
-      if (requestType === "assignable") {
-        if (item.type !== "asset") return false;
-        if (item.assignmentType !== "assignable") return false;
-      }
-      if (requestType === "consumable" && item.type !== "consumable") return false;
-
-      // 1. Filter by requested type (legacy initialType fallback)
-      if (!requestType) {
-        if (initialType === "borrow" && item.type !== "asset") return false;
-        if (initialType === "requisition" && item.type !== "consumable") return false;
-      }
-
-      // 2. Filter by status (available for assets, not out_of_stock for consumables)
-      const isAvailable =
-        item.type === "asset"
-          ? isAssetAvailableForRequest(item)
-          : item.status !== "out_of_stock";
-      if (!isAvailable) return false;
-
-      // 3. Filter by search term
-      return item.name.toLowerCase().includes(search.toLowerCase()) ||
-        (item.type === "asset" ? item.assetCode : item.itemCode).toLowerCase().includes(search.toLowerCase());
     });
-  }, [BROWSE_ITEMS, requestType, initialType, search]);
+  }, [consumables]);
 
-  const totalPages = Math.max(1, Math.ceil(items.length / SELECT_PAGE_SIZE));
-  const paginatedItems = useMemo(() => {
-    const start = (page - 1) * SELECT_PAGE_SIZE;
-    return items.slice(start, start + SELECT_PAGE_SIZE);
-  }, [items, page]);
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    supplyItems.forEach((i) => {
+      if (i.category) set.add(i.category);
+    });
+    return Array.from(set);
+  }, [supplyItems]);
 
-  const renderItem = (item: BrowseItem) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const categoryMeta = getCategoryStyle(item.category as any);
-    const code = item.type === "asset" ? item.assetCode : item.itemCode;
-    const isSelected = value.some(v => v.id === item.id);
-    return (
-      <button
-        key={item.id}
-        type="button"
-        onClick={() => {
-          if (isSelected) {
-            onChange(value.filter(v => v.id !== item.id));
-          } else {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            onChange([...value, item as any]);
-          }
-        }}
-        className={cn(
-          "w-full flex items-center gap-3 px-3.5 py-2.5 text-left transition-colors",
-          "focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset",
-          isSelected ? "bg-accent/10" : "hover:bg-bg-subtle"
-        )}
-        aria-pressed={isSelected}
-      >
-        <div
-          className={cn(
-            "flex items-center justify-center w-4.5 h-4.5 rounded-md border transition-all shrink-0",
-            isSelected
-              ? "bg-accent border-accent text-accent-foreground"
-              : "border-border bg-card"
-          )}
-        >
-          {isSelected && <Check className="h-3 w-3 stroke-3" />}
-        </div>
-        <div
-          className={cn("h-8 w-8 shrink-0 rounded-lg flex items-center justify-center border", categoryMeta.bg, "border-transparent")}
-        >
-          <Tag className={cn("h-3.5 w-3.5", categoryMeta.text)} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-text truncate">{item.name}</p>
-          <p className="text-xs text-text-secondary font-mono">
-            {code} · <span className="capitalize">{categoryMeta.label}</span>
-          </p>
-        </div>
-      </button>
+  const filtered = useMemo(() => {
+    let list = supplyItems;
+    if (selectedCategory !== "all") {
+      list = list.filter((item) => item.category?.toLowerCase() === selectedCategory.toLowerCase());
+    }
+    if (!search.trim()) return list;
+    const q = search.toLowerCase();
+    return list.filter(
+      (item) =>
+        item.name.toLowerCase().includes(q) ||
+        item.itemCode.toLowerCase().includes(q) ||
+        item.category.toLowerCase().includes(q)
     );
+  }, [supplyItems, search, selectedCategory]);
+
+  const toggleItem = (item: (typeof supplyItems)[number]) => {
+    const isSelected = value.some((v) => v.id === item.id);
+    if (isSelected) {
+      onChange(value.filter((v) => v.id !== item.id));
+    } else {
+      onChange([...value, item]);
+    }
   };
 
   return (
-    <div className="space-y-3 h-full flex flex-col">
-      {/* Search Bar */}
-      <div className="relative shrink-0">
-        <label htmlFor="search-items" className="sr-only">Search items</label>
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary" aria-hidden />
-        <input
-          id="search-items"
-          type="search"
-          placeholder="Search items by name or code…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full h-9 rounded-lg border border-border bg-card pl-9 pr-3 text-sm text-text placeholder:text-text-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-        />
+    <div className="space-y-3.5 h-full flex flex-col min-h-0">
+      {/* Header Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0 pb-1">
+        <div>
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-bold text-text">Select Supplies & Materials</h3>
+            {value.length > 0 && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-accent/15 text-accent border border-accent/25">
+                <Check className="h-3 w-3 stroke-3" />
+                {value.length} selected
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-text-secondary mt-0.5">
+            Select items from available consumable inventory for your department.
+          </p>
+        </div>
+
+        <div className="relative w-full sm:w-60">
+          <label htmlFor="search-supplies" className="sr-only">
+            Search supplies
+          </label>
+          <Search
+            className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-secondary"
+            aria-hidden
+          />
+          <input
+            id="search-supplies"
+            type="search"
+            placeholder="Search supplies…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full h-8.5 rounded-lg border border-border bg-white pl-8.5 pr-8 text-xs text-text placeholder:text-text-secondary/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent shadow-2xs transition-all"
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-secondary hover:text-text cursor-pointer"
+              title="Clear search"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Item List Container */}
-      <div className="flex-1 min-h-65 overflow-y-auto rounded-xl border border-border bg-card flex flex-col justify-between">
-        {loading ? (
+      {/* Category Pills (Clean Light Theme with subtle active badge) */}
+      {categories.length > 1 && (
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 shrink-0 scrollbar-none">
+          <button
+            type="button"
+            onClick={() => setSelectedCategory("all")}
+            className={cn(
+              "px-3 py-1 rounded-full text-[11px] font-semibold border transition-all cursor-pointer shrink-0",
+              selectedCategory === "all"
+                ? "bg-accent/15 text-accent border-accent/40 font-bold shadow-2xs"
+                : "bg-white border-border text-text-secondary hover:border-accent/40 hover:text-text hover:bg-bg-subtle"
+            )}
+          >
+            All Categories ({supplyItems.length})
+          </button>
+          {categories.map((cat) => {
+            const count = supplyItems.filter((i) => i.category === cat).length;
+            const isCatActive = selectedCategory.toLowerCase() === cat.toLowerCase();
+            const catStyle = getCategoryStyle(cat);
+            return (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setSelectedCategory(isCatActive ? "all" : cat)}
+                className={cn(
+                  "px-3 py-1 rounded-full text-[11px] font-semibold border transition-all cursor-pointer shrink-0 flex items-center gap-1.5",
+                  isCatActive
+                    ? "bg-accent/15 text-accent border-accent/40 font-bold shadow-2xs"
+                    : "bg-white border-border text-text-secondary hover:border-accent/40 hover:text-text hover:bg-bg-subtle"
+                )}
+              >
+                <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", catStyle.bg)} />
+                {cat} ({count})
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Supplies Grid */}
+      <div className="flex-1 min-h-60 overflow-y-auto pr-1">
+        {isLoading ? (
           <LoadingState
             variant="inline"
             icon="package"
-            message="Loading available items..."
-            subtitle="Fetching latest inventory records..."
+            message="Loading supplies..."
+            subtitle="Fetching consumable inventory..."
             className="py-12"
           />
-        ) : items.length === 0 ? (
-          <div className="p-8 text-center my-auto">
-            <Package className="h-8 w-8 text-text-secondary/50 mx-auto mb-2" />
-            <p className="text-sm font-semibold text-text">No items found</p>
-            <p className="text-xs text-text-secondary mt-0.5">Try searching with a different term or change request type.</p>
+        ) : filtered.length === 0 ? (
+          <div className="p-8 text-center my-auto rounded-lg border border-dashed border-border bg-white">
+            <FlaskConical className="h-8 w-8 text-text-secondary/40 mx-auto mb-2" />
+            <p className="text-sm font-semibold text-text">No supplies found</p>
+            <p className="text-xs text-text-secondary mt-0.5">
+              No items match &quot;{search}&quot;. Try another filter.
+            </p>
+            {(search || selectedCategory !== "all") && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch("");
+                  setSelectedCategory("all");
+                }}
+                className="mt-3 text-xs text-accent font-semibold hover:underline cursor-pointer"
+              >
+                Reset filters
+              </button>
+            )}
           </div>
         ) : (
-          <div className="divide-y divide-border">
-            {paginatedItems.map(renderItem)}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {filtered.map((item) => {
+              const isSelected = value.some((v) => v.id === item.id);
+              const style = getCategoryStyle(item.category);
+
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => toggleItem(item)}
+                  className={cn(
+                    "flex flex-col text-left p-3.5 rounded-lg border transition-all duration-200 relative cursor-pointer group select-none shadow-2xs",
+                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+                    isSelected
+                      ? "border-accent bg-accent/4 ring-2 ring-accent/25 shadow-xs"
+                      : "border-border bg-white hover:border-accent/40 hover:bg-bg-subtle/40 hover:shadow-xs"
+                  )}
+                  aria-pressed={isSelected}
+                >
+                  <div className="flex items-start justify-between gap-2 w-full mb-1.5">
+                    <div className="min-w-0 flex-1">
+                      <h4 className="text-sm font-bold text-text truncate group-hover:text-accent transition-colors">
+                        {item.name}
+                      </h4>
+                      <p className="text-[11px] font-mono text-text-secondary truncate mt-0.5">
+                        {item.itemCode}
+                      </p>
+                    </div>
+
+                    <div
+                      className={cn(
+                        "h-5 w-5 rounded-md flex items-center justify-center shrink-0 border transition-all duration-200 mt-0.5",
+                        isSelected
+                          ? "bg-accent border-accent text-accent-foreground shadow-2xs"
+                          : "border-border bg-bg-subtle/80 group-hover:border-accent/50"
+                      )}
+                    >
+                      {isSelected ? (
+                        <Check className="h-3.5 w-3.5 stroke-3" />
+                      ) : (
+                        <span className="h-1.5 w-1.5 rounded-full bg-border group-hover:bg-text-secondary/40" />
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2 text-[11px] pt-2 border-t border-border/50 mt-auto w-full">
+                    <span
+                      className={cn(
+                        "rounded px-1.5 py-0.5 font-bold text-[9px] uppercase tracking-wider",
+                        style.bg,
+                        style.text
+                      )}
+                    >
+                      {item.category || "Consumable"}
+                    </span>
+                    <span className="text-text-secondary font-medium flex items-center gap-1 text-[11px]">
+                      <span className="h-1.5 w-1.5 rounded-full bg-status-active-bg" />
+                      {item.unit ? `Per ${item.unit}` : "Available"}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
-
-      {/* Pagination Footer */}
-      {!loading && items.length > 0 && (
-        <div className="flex items-center justify-between px-1 shrink-0 text-xs text-text-secondary">
-          <p>
-            Showing <span className="font-semibold text-text">{(page - 1) * SELECT_PAGE_SIZE + 1}</span> to{" "}
-            <span className="font-semibold text-text">{Math.min(page * SELECT_PAGE_SIZE, items.length)}</span> of{" "}
-            <span className="font-semibold text-text">{items.length}</span> items
-          </p>
-
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page <= 1}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-border text-xs font-semibold text-text disabled:opacity-40 disabled:cursor-not-allowed hover:bg-bg-subtle transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />
-              Prev
-            </button>
-            <span className="px-2 font-medium">
-              {page} / {totalPages}
-            </span>
-            <button
-              type="button"
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page >= totalPages}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-border text-xs font-semibold text-text disabled:opacity-40 disabled:cursor-not-allowed hover:bg-bg-subtle transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-            >
-              Next
-              <ChevronRight className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -589,13 +984,12 @@ function StepDetails({
   // Primary/single item quantity handler for unified 1-row control
   const primaryItem = items[0];
   const primaryQty = primaryItem ? values.quantities[primaryItem.id] || 1 : 1;
-  const maxPrimaryQty = primaryItem && primaryItem.type === "consumable" ? primaryItem.currentQty : undefined;
 
   const setPrimaryQty = useCallback((qty: number) => {
     if (!primaryItem) return;
-    const clamped = Math.max(1, maxPrimaryQty ? Math.min(maxPrimaryQty, qty) : qty);
+    const clamped = Math.max(1, qty);
     onChange({ quantities: { ...values.quantities, [primaryItem.id]: clamped } });
-  }, [primaryItem, maxPrimaryQty, values.quantities, onChange]);
+  }, [primaryItem, values.quantities, onChange]);
 
   return (
     <div className="space-y-4">
@@ -618,7 +1012,6 @@ function StepDetails({
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const catMeta = getCategoryStyle(item.category as any);
             const itemQty = values.quantities[item.id] || 1;
-            const maxItemQty = item.type === "consumable" ? item.currentQty : undefined;
 
             return (
               <div key={item.id} className="p-3 flex items-center justify-between gap-3 hover:bg-bg-subtle/30 transition-colors">
@@ -636,7 +1029,7 @@ function StepDetails({
 
                 {/* Multi-item inline quantity control if more than 1 item */}
                 {items.length > 1 && (
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex items-center gap-2 shrink-0">
                     <span className="text-[11px] text-text-secondary font-semibold">Qty:</span>
                     <div className="flex items-center rounded-lg border border-border bg-bg-subtle p-0.5">
                       <button
@@ -651,22 +1044,26 @@ function StepDetails({
                       >
                         <Minus className="h-3 w-3" />
                       </button>
-                      <span className="w-7 text-center text-xs font-bold text-text">
+                      <span className="min-w-7 px-1 text-center text-xs font-bold text-text">
                         {itemQty}
                       </span>
                       <button
                         type="button"
                         onClick={() => {
-                          const newQ = maxItemQty ? Math.min(maxItemQty, itemQty + 1) : itemQty + 1;
+                          const newQ = itemQty + 1;
                           onChange({ quantities: { ...values.quantities, [item.id]: newQ } });
                         }}
-                        disabled={maxItemQty ? itemQty >= maxItemQty : false}
-                        className="h-6 w-6 rounded-md flex items-center justify-center text-text-secondary hover:text-text hover:bg-card transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        className="h-6 w-6 rounded-md flex items-center justify-center text-text-secondary hover:text-text hover:bg-card transition-colors"
                         aria-label="Increase quantity"
                       >
                         <Plus className="h-3 w-3" />
                       </button>
                     </div>
+                    {item.type === "consumable" && (item as BrowseConsumableItem).unit && (
+                      <span className="text-xs font-semibold text-accent px-2 py-0.5 rounded-md bg-accent/10 border border-accent/20">
+                        {formatQuantityWithUnit(itemQty, (item as BrowseConsumableItem).unit, item.type).replace(/^\d+\s*/, "")}
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
@@ -755,7 +1152,14 @@ function StepDetails({
           {/* Column 3: Quantity Input / Stepper */}
           <div className="space-y-1.5">
             <label htmlFor="primary-qty" className="flex items-center justify-between text-xs font-bold text-text">
-              <span>Quantity</span>
+              <span>
+                Quantity{" "}
+                {primaryItem?.type === "consumable" && (primaryItem as BrowseConsumableItem).unit ? (
+                  <span className="text-accent font-semibold">
+                    ({formatQuantityWithUnit(primaryQty, (primaryItem as BrowseConsumableItem).unit, primaryItem.type)})
+                  </span>
+                ) : null}
+              </span>
               <span className="text-status-outofservice-bg">*</span>
             </label>
 
@@ -770,20 +1174,25 @@ function StepDetails({
                 >
                   <Minus className="h-3.5 w-3.5" />
                 </button>
-                <input
-                  id="primary-qty"
-                  type="number"
-                  min={1}
-                  max={maxPrimaryQty}
-                  value={primaryQty}
-                  onChange={(e) => setPrimaryQty(Number(e.target.value))}
-                  className="w-full text-center bg-transparent text-sm font-bold text-text focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                />
+                <div className="flex-1 flex items-center justify-center gap-1.5 px-2">
+                  <input
+                    id="primary-qty"
+                    type="number"
+                    min={1}
+                    value={primaryQty}
+                    onChange={(e) => setPrimaryQty(Number(e.target.value))}
+                    className="w-12 text-center bg-transparent text-sm font-bold text-text focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                  {primaryItem?.type === "consumable" && (primaryItem as BrowseConsumableItem).unit && (
+                    <span className="text-xs font-semibold text-text-secondary select-none">
+                      {formatQuantityWithUnit(primaryQty, (primaryItem as BrowseConsumableItem).unit, primaryItem.type).replace(/^\d+\s*/, "")}
+                    </span>
+                  )}
+                </div>
                 <button
                   type="button"
                   onClick={() => setPrimaryQty(primaryQty + 1)}
-                  disabled={maxPrimaryQty ? primaryQty >= maxPrimaryQty : false}
-                  className="h-8 w-8 rounded-lg flex items-center justify-center text-text-secondary hover:text-text hover:bg-bg-subtle transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                  className="h-8 w-8 rounded-lg flex items-center justify-center text-text-secondary hover:text-text hover:bg-bg-subtle transition-colors"
                   aria-label="Increase quantity"
                 >
                   <Plus className="h-3.5 w-3.5" />
@@ -791,9 +1200,9 @@ function StepDetails({
               </div>
             ) : (
               <div className="h-10 rounded-xl border border-border bg-bg-subtle/30 px-3 flex items-center justify-between text-xs text-text-secondary">
-                <span>Total Items</span>
+                <span>Total Lines</span>
                 <span className="font-bold text-text bg-card px-2 py-0.5 rounded-md border border-border">
-                  {Object.values(values.quantities).reduce((a, b) => a + b, 0) || items.length} units
+                  {items.length} item{items.length > 1 ? "s" : ""}
                 </span>
               </div>
             )}
@@ -821,7 +1230,7 @@ function StepDetails({
           placeholder="Briefly state the reason, project name, or clinical task for this request…"
           className={cn(
             "w-full rounded-xl border bg-bg-subtle/50 p-3 text-sm text-text placeholder:text-text-secondary transition-all resize-none",
-            "focus:outline-none focus:bg-card focus:border-accent focus:ring-2 focus:ring-accent/20",
+            "focus:outline-none focus-bg focus:border-accent focus:ring-2 focus:ring-accent/20",
             errors.purpose ? "border-status-outofservice-bg bg-status-outofservice-bg/5" : "border-border"
           )}
           aria-describedby={errors.purpose ? "purpose-err" : undefined}
@@ -943,7 +1352,13 @@ function StepReview({ values, me }: { values: WizardFormValues, me?: MeProfile }
                  </div>
                  <div className="text-right px-2">
                    <p className="text-[10px] uppercase tracking-wider text-text-secondary font-semibold">Qty</p>
-                   <p className="font-medium text-text">{values.quantities[item.id] || 1}</p>
+                   <p className="font-bold text-xs text-text">
+                     {formatQuantityWithUnit(
+                       values.quantities[item.id] || 1,
+                       item.type === "consumable" ? (item as BrowseConsumableItem).unit : null,
+                       item.type
+                     )}
+                   </p>
                  </div>
                </div>
              )
@@ -1099,20 +1514,29 @@ export function NewBorrowRequestWizard({
     setErrorMessage("");
   }
 
+  const toast = useToast();
+
   async function handleSubmit() {
     setErrorMessage("");
 
     try {
-      const items = values.selectedItems.map(item => ({
-        itemDescription: item.name,
-        assetId: item.type === "asset" ? item.id : undefined,
-        assetCode: item.type === "asset" ? item.assetCode : undefined,
-        consumableId: item.type === "consumable" ? item.id : undefined,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        category: item.category as any,
-        quantity: values.quantities[item.id] || 1,
-        itemType: item.type,
-      }));
+      const isValidUuid = (str?: string | null) =>
+        Boolean(str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str));
+
+      const items = values.selectedItems.map((item) => {
+        const isRealAssetUuid = item.type === "asset" && isValidUuid(item.id);
+        const isRealConsumableUuid = item.type === "consumable" && isValidUuid(item.id);
+        return {
+          itemDescription: item.name,
+          assetId: isRealAssetUuid ? item.id : undefined,
+          assetCode: isRealAssetUuid ? item.assetCode : undefined,
+          consumableId: isRealConsumableUuid ? item.id : undefined,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          category: item.category as any,
+          quantity: values.quantities[item.id] || 1,
+          itemType: item.type,
+        };
+      });
 
       if (!me?.id || !me.email) {
         setErrorMessage("Your profile could not be loaded. Sign in again and retry.");
@@ -1128,20 +1552,24 @@ export function NewBorrowRequestWizard({
       const hasAsset = items.some((item) => item.itemType === "asset");
 
       if (values.requestType === "consumable") {
+        const supplyLines = items.filter((item) => item.consumableId);
+        if (supplyLines.length === 0) {
+          setErrorMessage("Select at least one supply item before submitting.");
+          return;
+        }
         const created = await createConsumableRequest({
-          requesterUserId: me.id,
+          requesterUserId: isValidUuid(me.id) ? me.id : undefined,
           requesterName: me.name,
           requesterEmail: me.email,
           departmentId: me.departmentId,
           purpose: values.purpose,
           notes: values.notes || undefined,
-          lines: items
-            .filter((item) => item.consumableId)
-            .map((item) => ({
+          lines: supplyLines.map((item) => ({
               consumableId: item.consumableId!,
               quantity: item.quantity,
             })),
         });
+        toast.success(`Requisition request ${created.requestCode} submitted successfully.`);
         onSuccess({
           id: created.id,
           requestCode: created.requestCode,
@@ -1176,16 +1604,14 @@ export function NewBorrowRequestWizard({
       }
 
       const createdRequest = await createRequest({
-        requesterUserId: me.id,
+        requesterUserId: isValidUuid(me.id) ? me.id : undefined,
         requesterName: me.name,
         requesterEmail: me.email,
-        departmentId: me.departmentId,
+        departmentId: isValidUuid(me.departmentId) ? me.departmentId : undefined,
         requestType:
           values.requestType === "assignable"
             ? "assignable"
-            : values.requestType === "borrowable"
-              ? "borrowable"
-              : undefined,
+            : "borrowable",
         items: items
           .filter((item) => item.itemType === "asset")
           .map((item) => ({
@@ -1204,12 +1630,15 @@ export function NewBorrowRequestWizard({
         notes: values.notes || undefined,
       });
 
+      toast.success(
+        `Borrow request ${createdRequest.requestCode} submitted successfully.`
+      );
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       onSuccess(createdRequest as any);
       onOpenChange(false);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
-      setErrorMessage(e.message || "Failed to submit request.");
+      setErrorMessage(formatFriendlyErrorMessage(e.message));
     }
   }
 
@@ -1274,7 +1703,7 @@ export function NewBorrowRequestWizard({
 
           {/* Milestone Stepper */}
           <div className="pt-1">
-            <MilestoneStepIndicator current={step} />
+            <MilestoneStepIndicator current={step} requestType={values.requestType} />
           </div>
         </div>
 
@@ -1288,14 +1717,20 @@ export function NewBorrowRequestWizard({
               }}
             />
           )}
-          {step === "select" && (
-            <StepSelect
-              value={values.selectedItems}
-              onChange={(items) => patchValues({ selectedItems: items })}
-              initialType={initialType}
-              requestType={values.requestType}
-            />
-          )}
+          {step === "select" &&
+            (values.requestType === "consumable" ? (
+              <StepSelectConsumables
+                value={values.selectedItems}
+                onChange={(items) => patchValues({ selectedItems: items })}
+              />
+            ) : (
+              <StepSelect
+                value={values.selectedItems}
+                onChange={(items) => patchValues({ selectedItems: items })}
+                initialType={initialType}
+                requestType={values.requestType}
+              />
+            ))}
           {step === "details" && values.selectedItems.length > 0 && (
             <StepDetails
               items={values.selectedItems}

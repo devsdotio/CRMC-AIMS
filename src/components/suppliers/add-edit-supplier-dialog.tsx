@@ -1,7 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Truck, Save } from "lucide-react";
+import {
+  X,
+  Truck,
+  Pencil,
+  Building2,
+  User,
+  Phone,
+  Mail,
+  MapPin,
+  AlertCircle,
+  Loader2,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Supplier, SupplierStatus } from "@/types/suppliers";
 
@@ -106,21 +117,22 @@ export function AddEditSupplierDialog({
       <div
         role="dialog"
         aria-modal="true"
-        className="relative w-full max-w-lg bg-bg border border-border rounded-xl shadow-2xl z-10 overflow-hidden my-4"
+        aria-labelledby="supplier-dialog-heading"
+        className="relative w-full max-w-lg bg-bg border border-border rounded-xl shadow-2xl z-10 overflow-hidden my-4 animate-in fade-in zoom-in-95 duration-150"
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-bg-subtle/50">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/15 text-accent">
-              {isEdit ? <Save className="h-4 w-4" /> : <Truck className="h-4 w-4" />}
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/15 text-accent shrink-0">
+              {isEdit ? <Pencil className="h-4 w-4" /> : <Truck className="h-4 w-4" />}
             </div>
             <div>
-              <h2 className="text-sm font-bold text-text">
-                {isEdit ? "Edit supplier" : "Add supplier"}
+              <h2 id="supplier-dialog-heading" className="text-sm font-bold text-text">
+                {isEdit ? "Edit Supplier" : "Add Supplier"}
               </h2>
-              <p className="text-[11px] text-text-secondary">
+              <p className="text-[11px] font-mono text-text-secondary">
                 {isEdit
                   ? supplier?.supplierCode
-                  : "Code is assigned automatically (SUP-YYYY-…)."}
+                  : "Auto-generated: SUP-YYYY-XXXX"}
               </p>
             </div>
           </div>
@@ -128,99 +140,149 @@ export function AddEditSupplierDialog({
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="p-1.5 rounded-lg text-text-secondary hover:bg-border cursor-pointer"
+            className="p-1.5 rounded-lg text-text-secondary hover:text-text hover:bg-border transition-colors cursor-pointer disabled:opacity-50"
             aria-label="Close"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-3.5">
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          {/* Supplier Name */}
           <div>
             <label htmlFor="sup-name" className={labelClass}>
-              Name *
+              Supplier / Vendor Name <span className="text-accent">*</span>
             </label>
-            <input
-              id="sup-name"
-              value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              className={fieldClass}
-              placeholder="e.g. PaperLine Philippines"
-              autoFocus
-            />
+            <div className="relative">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-text-secondary">
+                <Building2 className="h-4 w-4" />
+              </span>
+              <input
+                id="sup-name"
+                value={form.name}
+                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                className={cn(fieldClass, "pl-9")}
+                placeholder="e.g. PaperLine Philippines Inc."
+                autoFocus
+              />
+            </div>
           </div>
+
+          {/* Status Pill Toggle */}
+          <div>
+            <label className={labelClass}>Status</label>
+            <div className="grid grid-cols-2 gap-1.5 p-1 rounded-lg bg-bg-subtle border border-border">
+              <button
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, status: "active" }))}
+                className={cn(
+                  "inline-flex items-center justify-center h-8 px-3 rounded-md text-xs font-bold transition-all cursor-pointer",
+                  form.status === "active"
+                    ? "bg-accent text-accent-foreground shadow-2xs"
+                    : "text-text-secondary hover:text-text hover:bg-bg"
+                )}
+              >
+                Active
+              </button>
+              <button
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, status: "inactive" }))}
+                className={cn(
+                  "inline-flex items-center justify-center h-8 px-3 rounded-md text-xs font-bold transition-all cursor-pointer",
+                  form.status === "inactive"
+                    ? "bg-accent text-accent-foreground shadow-2xs"
+                    : "text-text-secondary hover:text-text hover:bg-bg"
+                )}
+              >
+                Inactive
+              </button>
+            </div>
+          </div>
+
+          {/* Contact Person & Phone */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label htmlFor="sup-contact" className={labelClass}>
                 Contact person
               </label>
-              <input
-                id="sup-contact"
-                value={form.contactName}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, contactName: e.target.value }))
-                }
-                className={fieldClass}
-              />
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-text-secondary">
+                  <User className="h-3.5 w-3.5" />
+                </span>
+                <input
+                  id="sup-contact"
+                  value={form.contactName}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, contactName: e.target.value }))
+                  }
+                  className={cn(fieldClass, "pl-8.5")}
+                  placeholder="Account Rep Name"
+                />
+              </div>
             </div>
             <div>
               <label htmlFor="sup-phone" className={labelClass}>
-                Phone
+                Phone number
               </label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-text-secondary">
+                  <Phone className="h-3.5 w-3.5" />
+                </span>
+                <input
+                  id="sup-phone"
+                  value={form.contactPhone}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, contactPhone: e.target.value }))
+                  }
+                  className={cn(fieldClass, "pl-8.5")}
+                  placeholder="Landline / Mobile"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Email Address */}
+          <div>
+            <label htmlFor="sup-email" className={labelClass}>
+              Email address
+            </label>
+            <div className="relative">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-text-secondary">
+                <Mail className="h-3.5 w-3.5" />
+              </span>
               <input
-                id="sup-phone"
-                value={form.contactPhone}
+                id="sup-email"
+                type="email"
+                value={form.contactEmail}
                 onChange={(e) =>
-                  setForm((f) => ({ ...f, contactPhone: e.target.value }))
+                  setForm((f) => ({ ...f, contactEmail: e.target.value }))
                 }
-                className={fieldClass}
+                className={cn(fieldClass, "pl-8.5")}
+                placeholder="sales@vendor.com.ph"
               />
             </div>
           </div>
-          <div>
-            <label htmlFor="sup-email" className={labelClass}>
-              Email
-            </label>
-            <input
-              id="sup-email"
-              type="email"
-              value={form.contactEmail}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, contactEmail: e.target.value }))
-              }
-              className={fieldClass}
-            />
-          </div>
+
+          {/* Business Address */}
           <div>
             <label htmlFor="sup-address" className={labelClass}>
-              Address
+              Business address
             </label>
-            <input
-              id="sup-address"
-              value={form.address}
-              onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
-              className={fieldClass}
-            />
+            <div className="relative">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-text-secondary">
+                <MapPin className="h-3.5 w-3.5" />
+              </span>
+              <input
+                id="sup-address"
+                value={form.address}
+                onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
+                className={cn(fieldClass, "pl-8.5")}
+                placeholder="Office or warehouse address"
+              />
+            </div>
           </div>
-          <div>
-            <label htmlFor="sup-status" className={labelClass}>
-              Status
-            </label>
-            <select
-              id="sup-status"
-              value={form.status}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  status: e.target.value as SupplierStatus,
-                }))
-              }
-              className={cn(fieldClass, "cursor-pointer")}
-            >
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-          </div>
+
+          {/* Notes */}
           <div>
             <label htmlFor="sup-notes" className={labelClass}>
               Notes
@@ -231,29 +293,39 @@ export function AddEditSupplierDialog({
               onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
               rows={2}
               className={cn(fieldClass, "h-auto py-2 resize-y min-h-14")}
+              placeholder="Payment terms, delivery schedules, warranty contacts…"
             />
           </div>
 
           {error && (
-            <p className="text-xs text-status-outofservice-text bg-status-outofservice-bg/10 border border-status-outofservice-bg/30 rounded-lg px-3 py-2">
-              {error}
-            </p>
+            <div className="flex items-start gap-2 text-xs text-status-outofservice-text bg-status-outofservice-bg/10 border border-status-outofservice-bg/30 rounded-lg p-2.5">
+              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
           )}
 
-          <div className="flex justify-end gap-2 pt-1">
+          {/* Actions */}
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="h-9 px-4 text-xs font-bold rounded-lg border border-border cursor-pointer"
+              className="h-9 px-4 text-xs font-bold rounded-lg border border-border bg-bg text-text hover:bg-bg-subtle transition-colors cursor-pointer disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="inline-flex items-center gap-1.5 h-9 px-4 text-xs font-bold rounded-lg bg-accent text-accent-foreground cursor-pointer disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 h-9 px-4 text-xs font-bold rounded-lg bg-accent text-accent-foreground hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 shadow-xs"
             >
+              {isSubmitting ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : isEdit ? (
+                <Pencil className="h-3.5 w-3.5" />
+              ) : (
+                <Truck className="h-3.5 w-3.5" />
+              )}
               {isSubmitting ? "Saving…" : isEdit ? "Save changes" : "Create supplier"}
             </button>
           </div>

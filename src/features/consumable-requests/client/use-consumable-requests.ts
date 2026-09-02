@@ -10,25 +10,27 @@ import {
 } from "@tanstack/react-query";
 
 import type { PaginatedResponse } from "@/features/shared/fetch-json";
-import { consumableQueryKeys } from "@/features/consumables/client/query-keys";
-import { purchaseLotQueryKeys } from "@/features/purchase-lots/client/query-keys";
-import { dashboardQueryKeys } from "@/features/dashboard/client/query-keys";
-import { stockMovementQueryKeys } from "@/features/stock-movements/client/query-keys";
+import {
+  STOCK_DOMAINS,
+  invalidateDomains,
+} from "@/features/shared/cache-invalidation";
 
 import {
   consumableRequestsApi,
+  type ApproveConsumableRequestPayload,
   type ConsumableRequest,
   type CreateConsumableRequestPayload,
   type ReleaseConsumableRequestPayload,
+  type UpdateConsumableRequestPayload,
 } from "./consumable-requests-api";
 import { consumableRequestQueryKeys } from "./query-keys";
 
+/**
+ * Every requisition decision either reserves, frees or issues stock, so the
+ * whole stock chain refreshes alongside the queue itself.
+ */
 function invalidate(qc: ReturnType<typeof useQueryClient>) {
-  qc.invalidateQueries({ queryKey: consumableRequestQueryKeys.all });
-  qc.invalidateQueries({ queryKey: consumableQueryKeys.all });
-  qc.invalidateQueries({ queryKey: purchaseLotQueryKeys.all });
-  qc.invalidateQueries({ queryKey: dashboardQueryKeys.all });
-  qc.invalidateQueries({ queryKey: stockMovementQueryKeys.all });
+  void invalidateDomains(qc, STOCK_DOMAINS);
 }
 
 export function useConsumableRequests(filters?: {
@@ -53,19 +55,38 @@ export function useCreateConsumableRequestMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (payload) => consumableRequestsApi.create(payload),
-    onSuccess: () => invalidate(qc),
+    onSettled: () => invalidate(qc),
+  });
+}
+
+export function useUpdateConsumableRequestMutation(): UseMutationResult<
+  ConsumableRequest,
+  Error,
+  { id: string; payload: UpdateConsumableRequestPayload }
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }) => consumableRequestsApi.update(id, payload),
+    onSuccess: (updated) => {
+      qc.setQueriesData<ConsumableRequest>(
+        { queryKey: consumableRequestQueryKeys.detail(updated.id) },
+        () => updated
+      );
+      invalidate(qc);
+    },
   });
 }
 
 export function useApproveConsumableRequestMutation(): UseMutationResult<
   ConsumableRequest,
   Error,
-  { id: string; note?: string }
+  { id: string; payload?: ApproveConsumableRequestPayload; note?: string }
 > {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, note }) => consumableRequestsApi.approve(id, note),
-    onSuccess: () => invalidate(qc),
+    mutationFn: ({ id, payload, note }) =>
+      consumableRequestsApi.approve(id, payload ?? (note ? { note } : undefined)),
+    onSettled: () => invalidate(qc),
   });
 }
 
@@ -77,7 +98,7 @@ export function useRejectConsumableRequestMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, reason }) => consumableRequestsApi.reject(id, reason),
-    onSuccess: () => invalidate(qc),
+    onSettled: () => invalidate(qc),
   });
 }
 
@@ -89,7 +110,7 @@ export function useCancelConsumableRequestMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, note }) => consumableRequestsApi.cancel(id, note),
-    onSuccess: () => invalidate(qc),
+    onSettled: () => invalidate(qc),
   });
 }
 
@@ -101,6 +122,6 @@ export function useReleaseConsumableRequestMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, payload }) => consumableRequestsApi.release(id, payload),
-    onSuccess: () => invalidate(qc),
+    onSettled: () => invalidate(qc),
   });
 }

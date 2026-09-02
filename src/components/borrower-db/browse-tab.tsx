@@ -3,9 +3,8 @@
 import { useState, useMemo, useEffect } from "react";
 import { Search, LayoutGrid, List, SlidersHorizontal, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { BrowseItemCard } from "./browse-item-card";
+import { BrowseItemCard, BrowseItemCardSkeleton } from "./browse-item-card";
 import type { BrowseItem } from "./types";
-import { LoadingState } from "@/components/providers/loading-context";
 
 import { useAssetsQuery } from "@/features/assets/client/use-assets";
 import { useConsumablesQuery } from "@/features/consumables/client/use-consumables";
@@ -195,10 +194,10 @@ export function BrowseTab() {
             onClick={() => setCategory(f.key)}
             aria-pressed={category === f.key}
             className={cn(
-              "px-3 py-1 rounded-full text-xs font-semibold border transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+              "px-3 py-1 rounded-full text-xs font-semibold border transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent cursor-pointer",
               category === f.key
-                ? "bg-accent text-accent-foreground border-accent"
-                : "bg-card border-border text-text-secondary hover:border-text-secondary/50 hover:text-text"
+                ? "bg-accent/15 text-accent border-accent/40 font-bold shadow-2xs"
+                : "bg-white border-border text-text-secondary hover:border-accent/40 hover:text-text hover:bg-bg-subtle"
             )}
           >
             {f.label}
@@ -225,13 +224,19 @@ export function BrowseTab() {
 
       {/* Grid/List */}
       {loading ? (
-        <LoadingState
-          variant="card"
-          icon="package"
-          message="Loading inventory catalog..."
-          subtitle="Fetching assets and consumable supplies..."
-          className="min-h-75"
-        />
+        viewMode === "grid" ? (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <BrowseItemCardSkeleton key={i} viewMode="grid" />
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <BrowseItemCardSkeleton key={i} viewMode="list" />
+            ))}
+          </div>
+        )
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center rounded-xl border border-border bg-card">
           <div className="h-12 w-12 rounded-full bg-bg-subtle flex items-center justify-center mb-4">

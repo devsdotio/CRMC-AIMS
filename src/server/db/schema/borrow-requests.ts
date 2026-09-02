@@ -42,7 +42,8 @@ export type BorrowRequestHistoryEntry = {
     | "released"
     | "unreleased"
     | "returned"
-    | "cancelled";
+    | "cancelled"
+    | "edited";
   actor: string;
   timestamp: string;
   note?: string;
@@ -79,6 +80,7 @@ export const borrowRequests = pgTable(
         category: string;
         quantity: number;
         itemType: "asset" | "consumable";
+        unit?: string;
       }[]>()
       .notNull()
       .default(sql`'[]'::jsonb`),
@@ -112,6 +114,7 @@ export const borrowRequests = pgTable(
     index("requests_department_id_idx").on(table.departmentId),
     index("requests_request_type_idx").on(table.requestType),
     index("requests_requested_at_idx").on(table.requestedAt),
+    index("requests_status_user_idx").on(table.status, table.requesterUserId),
   ]
 );
 

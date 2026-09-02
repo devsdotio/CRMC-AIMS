@@ -8,6 +8,7 @@ export interface UserTableProps {
   users: UserAccount[];
   currentUserId: string;
   loading?: boolean;
+  reactivatingUserId?: string | null;
   onSelect: (user: UserAccount) => void;
   onEdit: (user: UserAccount) => void;
   onDeactivate: (user: UserAccount) => void;
@@ -47,6 +48,7 @@ export function UserTable({
   users,
   currentUserId,
   loading = false,
+  reactivatingUserId = null,
   onSelect,
   onEdit,
   onDeactivate,
@@ -79,13 +81,13 @@ export function UserTable({
   if (users.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-16 px-6 text-center">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-bg-subtle text-text-secondary border border-border">
-          <Users className="h-6 w-6" />
-        </div>
+        <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent/10 border border-accent/25 text-accent shadow-xs">
+          <Users className="h-7 w-7" strokeWidth={1.8} />
+        </span>
         <div>
-          <h3 className="text-base font-bold text-text">No staff accounts found</h3>
-          <p className="text-xs text-text-secondary mt-1 max-w-sm">
-            No user accounts match your current search, role filter, or status filter.
+          <h3 className="text-base font-bold text-text">No user accounts found</h3>
+          <p className="text-xs text-text-secondary mt-1 max-w-sm leading-relaxed">
+            No institutional user or custodian accounts match your current search query, role filter, or status.
           </p>
         </div>
       </div>
@@ -111,6 +113,7 @@ export function UserTable({
               key={user.id}
               user={user}
               currentUserId={currentUserId}
+              reactivating={reactivatingUserId === user.id}
               onSelect={onSelect}
               onEdit={onEdit}
               onDeactivate={onDeactivate}

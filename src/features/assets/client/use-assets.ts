@@ -13,11 +13,15 @@ import {
   type AssetLifecycleEvent,
   type FlagMaintenanceInput,
   type ReleaseAssetInput,
+  type ReportMissingInput,
   type ScanResolveResult,
 } from "@/features/assets/client/assets-api";
 import { assetQueryKeys } from "@/features/assets/client/query-keys";
-import { borrowLogQueryKeys } from "@/features/borrow-log/client/query-keys";
-import { dashboardQueryKeys } from "@/features/dashboard/client/query-keys";
+import {
+  CUSTODY_DOMAINS,
+  invalidateDomains,
+  type CacheDomain,
+} from "@/features/shared/cache-invalidation";
 import type {
   Asset,
   AssetStatus,
@@ -26,23 +30,60 @@ import type {
   UpdateAssetInput,
 } from "@/types/assets";
 
-function invalidateAssetCaches(
+/** Registry edits: the asset row, its lifecycle feed and dashboard rollups. */
+const REGISTRY_DOMAINS = [
+  "assets",
+  "dashboard",
+  "auditLogs",
+] as const satisfies readonly CacheDomain[];
+
+/** Creating an asset with a value also opens a purchase lot server-side. */
+const REGISTRY_CREATE_DOMAINS = [
+  ...REGISTRY_DOMAINS,
+  "purchaseLots",
+] as const satisfies readonly CacheDomain[];
+
+/** Flagging writes a maintenance log and flips asset status. */
+const MAINTENANCE_FLAG_DOMAINS = [
+  "assets",
+  "maintenance",
+  "dashboard",
+  "auditLogs",
+] as const satisfies readonly CacheDomain[];
+
+/** Lists are cached per status filter, so update each one that is loaded. */
+function updateCachedAssetLists(
   queryClient: ReturnType<typeof useQueryClient>,
-  assetId?: string
+  updater: (assets: Asset[], status?: AssetStatus) => Asset[]
 ) {
-  queryClient.invalidateQueries({ queryKey: assetQueryKeys.all });
-  queryClient.invalidateQueries({ queryKey: borrowLogQueryKeys.all });
-  queryClient.invalidateQueries({ queryKey: dashboardQueryKeys.all });
-  if (assetId) {
-    queryClient.invalidateQueries({ queryKey: assetQueryKeys.lifecycle(assetId) });
-  }
+  const entries = queryClient.getQueriesData<Asset[]>({
+    queryKey: assetQueryKeys.lists(),
+  });
+
+  entries.forEach(([queryKey, assets]) => {
+    if (!assets) return;
+    const status = (queryKey[2] as { status?: AssetStatus } | undefined)?.status;
+    queryClient.setQueryData<Asset[]>(queryKey, updater(assets, status));
+  });
+
+  return entries;
+}
+
+function restoreCachedAssetLists(
+  queryClient: ReturnType<typeof useQueryClient>,
+  entries?: ReturnType<typeof updateCachedAssetLists>
+) {
+  entries?.forEach(([queryKey, assets]) => {
+    queryClient.setQueryData(queryKey, assets);
+  });
 }
 
 export function useAssetsQuery(status?: AssetStatus): UseQueryResult<Asset[], Error> {
   return useQuery({
     queryKey: assetQueryKeys.list(status),
     queryFn: () => assetsApi.listAssets(status),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    // Custody changes constantly, so fall back to the global 30s stale window
+    // and let the cached list render while the refresh runs behind it.
     // Surface timeouts quickly — default multi-retry looked like infinite skeleton
     retry: 0,
   });
@@ -75,9 +116,7 @@ export function useCreateAssetMutation(): UseMutationResult<Asset, Error, Create
   return useMutation({
     mutationFn: (payload) => assetsApi.createAsset(payload),
     onMutate: async (newAsset) => {
-      await queryClient.cancelQueries({ queryKey: assetQueryKeys.list() });
-
-      const previousAssets = queryClient.getQueryData<Asset[]>(assetQueryKeys.list());
+      await queryClient.cancelQueries({ queryKey: assetQueryKeys.lists() });
 
       const optimisticAsset: Asset = {
         id: `temp-${Date.now()}`,
@@ -96,22 +135,21 @@ export function useCreateAssetMutation(): UseMutationResult<Asset, Error, Create
         maintenanceHistory: [],
       };
 
-      queryClient.setQueryData<Asset[]>(assetQueryKeys.list(), (old) => {
-        return old ? [...old, optimisticAsset] : [optimisticAsset];
-      });
+      const previousLists = updateCachedAssetLists(
+        queryClient,
+        (assets, status) =>
+          status && status !== optimisticAsset.status
+            ? assets
+            : [...assets, optimisticAsset]
+      );
 
-      return { previousAssets };
+      return { previousLists };
     },
-    onError: (err, newAsset, context) => {
-      if (context?.previousAssets) {
-        queryClient.setQueryData(assetQueryKeys.list(), context.previousAssets);
-      }
+    onError: (_err, _newAsset, context) => {
+      restoreCachedAssetLists(queryClient, context?.previousLists);
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: assetQueryKeys.all });
-    },
-    onSuccess: (asset) => {
-      invalidateAssetCaches(queryClient, asset.id);
+      void invalidateDomains(queryClient, REGISTRY_CREATE_DOMAINS);
     },
   });
 }
@@ -126,20 +164,18 @@ export function useUpdateAssetMutation(): UseMutationResult<
   return useMutation({
     mutationFn: ({ id, payload }) => assetsApi.updateAsset(id, payload),
     onMutate: async ({ id, payload }) => {
-      await queryClient.cancelQueries({ queryKey: assetQueryKeys.list() });
+      await queryClient.cancelQueries({ queryKey: assetQueryKeys.lists() });
       await queryClient.cancelQueries({ queryKey: assetQueryKeys.detail(id) });
 
-      const previousAssets = queryClient.getQueryData<Asset[]>(assetQueryKeys.list());
       const previousAsset = queryClient.getQueryData<Asset>(assetQueryKeys.detail(id));
 
-      if (previousAssets) {
-        queryClient.setQueryData<Asset[]>(assetQueryKeys.list(), (old) => {
-          if (!old) return old;
-          return old.map((asset) =>
-            asset.id === id ? { ...asset, ...payload, lastUpdated: new Date().toISOString() } : asset
-          );
-        });
-      }
+      const previousLists = updateCachedAssetLists(queryClient, (assets) =>
+        assets.map((asset) =>
+          asset.id === id
+            ? { ...asset, ...payload, lastUpdated: new Date().toISOString() }
+            : asset
+        )
+      );
 
       if (previousAsset) {
         queryClient.setQueryData<Asset>(assetQueryKeys.detail(id), {
@@ -149,23 +185,19 @@ export function useUpdateAssetMutation(): UseMutationResult<
         });
       }
 
-      return { previousAssets, previousAsset };
+      return { previousLists, previousAsset };
     },
-    onError: (err, variables, context) => {
-      if (context?.previousAssets) {
-        queryClient.setQueryData(assetQueryKeys.list(), context.previousAssets);
-      }
+    onError: (_err, variables, context) => {
+      restoreCachedAssetLists(queryClient, context?.previousLists);
       if (context?.previousAsset) {
         queryClient.setQueryData(assetQueryKeys.detail(variables.id), context.previousAsset);
       }
     },
-    onSettled: (data, error, variables) => {
-      queryClient.invalidateQueries({ queryKey: assetQueryKeys.all });
-      queryClient.invalidateQueries({ queryKey: assetQueryKeys.detail(variables.id) });
-    },
     onSuccess: (asset) => {
-      invalidateAssetCaches(queryClient, asset.id);
       queryClient.setQueryData(assetQueryKeys.detail(asset.id), asset);
+    },
+    onSettled: () => {
+      void invalidateDomains(queryClient, REGISTRY_DOMAINS);
     },
   });
 }
@@ -176,7 +208,10 @@ export function useDeleteAssetMutation(): UseMutationResult<void, Error, string>
   return useMutation({
     mutationFn: (id) => assetsApi.deleteAsset(id),
     onSuccess: (_void, id) => {
-      invalidateAssetCaches(queryClient, id);
+      queryClient.removeQueries({ queryKey: assetQueryKeys.detail(id) });
+    },
+    onSettled: () => {
+      void invalidateDomains(queryClient, REGISTRY_DOMAINS);
     },
   });
 }
@@ -191,8 +226,10 @@ export function useReleaseAssetMutation(): UseMutationResult<
   return useMutation({
     mutationFn: ({ id, payload }) => assetsApi.releaseAsset(id, payload),
     onSuccess: (asset) => {
-      invalidateAssetCaches(queryClient, asset.id);
       queryClient.setQueryData(assetQueryKeys.detail(asset.id), asset);
+    },
+    onSettled: () => {
+      void invalidateDomains(queryClient, CUSTODY_DOMAINS);
     },
   });
 }
@@ -207,8 +244,10 @@ export function useReturnAssetMutation(): UseMutationResult<
   return useMutation({
     mutationFn: ({ id, payload }) => assetsApi.returnAsset(id, payload),
     onSuccess: (asset) => {
-      invalidateAssetCaches(queryClient, asset.id);
       queryClient.setQueryData(assetQueryKeys.detail(asset.id), asset);
+    },
+    onSettled: () => {
+      void invalidateDomains(queryClient, CUSTODY_DOMAINS);
     },
   });
 }
@@ -223,8 +262,28 @@ export function useFlagMaintenanceMutation(): UseMutationResult<
   return useMutation({
     mutationFn: ({ id, payload }) => assetsApi.flagForMaintenance(id, payload),
     onSuccess: (asset) => {
-      invalidateAssetCaches(queryClient, asset.id);
       queryClient.setQueryData(assetQueryKeys.detail(asset.id), asset);
+    },
+    onSettled: () => {
+      void invalidateDomains(queryClient, MAINTENANCE_FLAG_DOMAINS);
+    },
+  });
+}
+
+export function useReportMissingMutation(): UseMutationResult<
+  Asset,
+  Error,
+  { id: string; payload: ReportMissingInput }
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, payload }) => assetsApi.reportMissing(id, payload),
+    onSuccess: (asset) => {
+      queryClient.setQueryData(assetQueryKeys.detail(asset.id), asset);
+    },
+    onSettled: () => {
+      void invalidateDomains(queryClient, MAINTENANCE_FLAG_DOMAINS);
     },
   });
 }
@@ -249,8 +308,10 @@ export function useScanReleaseMutation(): UseMutationResult<
   return useMutation({
     mutationFn: (payload) => assetsApi.scanRelease(payload),
     onSuccess: (asset) => {
-      invalidateAssetCaches(queryClient, asset.id);
       queryClient.setQueryData(assetQueryKeys.detail(asset.id), asset);
+    },
+    onSettled: () => {
+      void invalidateDomains(queryClient, CUSTODY_DOMAINS);
     },
   });
 }
@@ -265,8 +326,10 @@ export function useScanReturnMutation(): UseMutationResult<
   return useMutation({
     mutationFn: (payload) => assetsApi.scanReturn(payload),
     onSuccess: (asset) => {
-      invalidateAssetCaches(queryClient, asset.id);
       queryClient.setQueryData(assetQueryKeys.detail(asset.id), asset);
+    },
+    onSettled: () => {
+      void invalidateDomains(queryClient, CUSTODY_DOMAINS);
     },
   });
 }

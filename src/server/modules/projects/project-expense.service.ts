@@ -1,7 +1,6 @@
 import type {
   ProjectExpenseLineRow,
   ProjectExpenseMetadata,
-  StockHistoryEntry,
 } from "@/server/db/schema";
 import type { ActorContext } from "@/server/shared/auth";
 import { todayDateString } from "@/server/shared/codes";
@@ -13,6 +12,10 @@ import {
 import { withTransaction } from "@/server/db/transaction";
 import { ConsumableRepository } from "@/server/modules/consumables/consumable.repository";
 import { PurchaseLotRepository } from "@/server/modules/purchase-lots/purchase-lot.repository";
+import {
+  StockMovementService,
+  allocationsToMovementLines,
+} from "@/server/modules/stock-movements/stock-movement.service";
 
 import { ProjectRepository } from "./project.repository";
 import { ProjectExpenseRepository } from "./project-expense.repository";
@@ -57,22 +60,25 @@ function toDTO(row: ProjectExpenseLineRow): ProjectExpenseLineDTO {
   };
 }
 
-function stockHistoryEntry(
-  type: StockHistoryEntry["type"],
-  quantityChange: number,
-  actor: string,
-  reason?: string,
-  notes?: string
-): StockHistoryEntry {
-  return {
-    id: crypto.randomUUID(),
-    date: todayDateString(),
-    type,
-    quantityChange,
-    actor,
-    ...(reason ? { reason } : {}),
-    ...(notes ? { notes } : {}),
-  };
+/** Normalize project expense lot rows into stock-movement line payloads. */
+function expenseAllocationsToMovementLines(
+  allocations: Array<{
+    lotId?: string | null;
+    lotCode?: string | null;
+    quantity: number;
+    unitCost: string;
+    total: string;
+  }>
+) {
+  return allocationsToMovementLines(
+    allocations.map((a) => ({
+      lotId: a.lotId ?? null,
+      lotCode: a.lotCode ?? null,
+      quantity: a.quantity,
+      unitCost: a.unitCost,
+      total: a.total,
+    }))
+  );
 }
 
 export class ProjectExpenseService {
@@ -80,7 +86,8 @@ export class ProjectExpenseService {
     private readonly expenses = new ProjectExpenseRepository(),
     private readonly projects = new ProjectRepository(),
     private readonly consumables = new ConsumableRepository(),
-    private readonly lots = new PurchaseLotRepository()
+    private readonly lots = new PurchaseLotRepository(),
+    private readonly movements = new StockMovementService()
   ) {}
 
   private async requireMutableProject(projectId: string) {
@@ -175,44 +182,77 @@ export class ProjectExpenseService {
         ProjectExpenseMetadata["lotAllocations"]
       > = [];
 
-      const availableLots = await this.lots.listAvailableForConsumableFifo(
-        item.id,
-        tx
-      );
-
-      for (const lot of availableLots) {
-        if (remaining <= 0) break;
-        const take = Math.min(remaining, lot.quantityRemaining);
-        if (take <= 0) continue;
+      if (input.purchaseLotId) {
+        const lot = await this.lots.findById(input.purchaseLotId, tx);
+        if (!lot) throw new NotFoundError("Purchase lot", input.purchaseLotId);
+        if (lot.consumableId !== item.id) {
+          throw new BadRequestError(
+            "Selected purchase lot does not belong to this consumable."
+          );
+        }
+        if (lot.quantityRemaining < input.quantity) {
+          throw new BadRequestError(
+            `Selected lot only has ${lot.quantityRemaining} ${item.unit} remaining.`
+          );
+        }
 
         const unit = Number(lot.unitCost);
-        const lineTotal = unit * take;
-        totalCost += lineTotal;
+        const lineTotal = unit * input.quantity;
+        totalCost = lineTotal;
         lotAllocations.push({
           lotId: lot.id,
           lotCode: lot.lotCode,
-          quantity: take,
+          quantity: input.quantity,
           unitCost: unit.toFixed(2),
           total: lineTotal.toFixed(2),
         });
 
         await this.lots.updateRemaining(
           lot.id,
-          lot.quantityRemaining - take,
+          lot.quantityRemaining - input.quantity,
           tx
         );
-        remaining -= take;
-      }
+        remaining = 0;
+      } else {
+        const availableLots = await this.lots.listAvailableForConsumableFifo(
+          item.id,
+          tx
+        );
 
-      if (remaining > 0) {
-        lotAllocations.push({
-          lotId: null,
-          lotCode: null,
-          quantity: remaining,
-          unitCost: "0.00",
-          total: "0.00",
-          uncosted: true,
-        });
+        for (const lot of availableLots) {
+          if (remaining <= 0) break;
+          const take = Math.min(remaining, lot.quantityRemaining);
+          if (take <= 0) continue;
+
+          const unit = Number(lot.unitCost);
+          const lineTotal = unit * take;
+          totalCost += lineTotal;
+          lotAllocations.push({
+            lotId: lot.id,
+            lotCode: lot.lotCode,
+            quantity: take,
+            unitCost: unit.toFixed(2),
+            total: lineTotal.toFixed(2),
+          });
+
+          await this.lots.updateRemaining(
+            lot.id,
+            lot.quantityRemaining - take,
+            tx
+          );
+          remaining -= take;
+        }
+
+        if (remaining > 0) {
+          lotAllocations.push({
+            lotId: null,
+            lotCode: null,
+            quantity: remaining,
+            unitCost: "0.00",
+            total: "0.00",
+            uncosted: true,
+          });
+        }
       }
 
       const averageUnit =
@@ -232,23 +272,28 @@ export class ProjectExpenseService {
         input.description?.trim() ||
         `${item.name} (${item.itemCode}) × ${input.quantity} ${item.unit}`;
 
-      const history = [
-        ...(Array.isArray(item.history) ? item.history : []),
-        stockHistoryEntry(
-          "checkout",
-          -input.quantity,
-          actor.displayName,
-          "Project material use",
-          input.notes ??
-            `Charged to ${project.projectCode} — ${project.name}`
-        ),
-      ];
-
       await this.consumables.update(
         item.id,
         {
           currentQty: item.currentQty - input.quantity,
-          history,
+        },
+        tx
+      );
+
+      await this.movements.record(
+        {
+          consumableId: item.id,
+          direction: "out",
+          reason: "issue",
+          actor,
+          projectId,
+          notes:
+            input.notes ??
+            `Charged to ${project.projectCode} — ${project.name}`,
+          lines:
+            lotAllocations.length > 0
+              ? expenseAllocationsToMovementLines(lotAllocations)
+              : [{ qty: input.quantity }],
         },
         tx
       );
@@ -346,7 +391,7 @@ export class ProjectExpenseService {
   async delete(
     rawProjectId: string,
     rawExpenseId: string,
-    actor?: ActorContext
+    actor: ActorContext
   ): Promise<void> {
     const projectId = projectIdSchema.parse(rawProjectId);
     const expenseId = expenseIdSchema.parse(rawExpenseId);
@@ -378,7 +423,7 @@ export class ProjectExpenseService {
 
   private async reverseConsumableExpense(
     existing: ProjectExpenseLineRow,
-    actor?: ActorContext
+    actor: ActorContext
   ): Promise<void> {
     const qty = Math.round(Number(existing.quantity ?? 0));
     if (!existing.consumableId || !Number.isFinite(qty) || qty <= 0) {
@@ -411,23 +456,29 @@ export class ProjectExpenseService {
         );
       }
 
-      const actorName = actor?.displayName ?? "System";
-      const history = [
-        ...(Array.isArray(item.history) ? item.history : []),
-        stockHistoryEntry(
-          "restock",
-          qty,
-          actorName,
-          "Project material line removed",
-          `Reversed expense ${existing.id}`
-        ),
-      ];
+      const returnNote = `Project material line removed — stock returned to inventory`;
 
       await this.consumables.update(
         item.id,
         {
           currentQty: item.currentQty + qty,
-          history,
+        },
+        tx
+      );
+
+      // Issue-history / stock_movements ledger must mirror the stock return.
+      await this.movements.record(
+        {
+          consumableId: item.id,
+          direction: "in",
+          reason: "restock",
+          actor,
+          projectId: existing.projectId,
+          notes: returnNote,
+          lines:
+            allocations.length > 0
+              ? expenseAllocationsToMovementLines(allocations)
+              : [{ qty }],
         },
         tx
       );

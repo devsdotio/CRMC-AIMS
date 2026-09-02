@@ -26,6 +26,9 @@ function SkeletonTableRow() {
         <div className="h-5 w-20 bg-border rounded-full" />
       </td>
       <td className="px-3 py-4">
+        <div className="h-5 w-20 bg-border rounded-full" />
+      </td>
+      <td className="px-3 py-4">
         <div className="h-5 w-24 bg-border rounded-full" />
       </td>
       <td className="px-3 py-4">
@@ -59,6 +62,7 @@ export function AssetTable({
               <th scope="col" className="px-5 py-3">Code</th>
               <th scope="col" className="px-3 py-3">Asset Name</th>
               <th scope="col" className="px-3 py-3">Category</th>
+              <th scope="col" className="px-3 py-3">Type</th>
               <th scope="col" className="px-3 py-3">Status</th>
               <th scope="col" className="px-3 py-3">Holder / Location</th>
               <th scope="col" className="px-3 py-3 hidden sm:table-cell">Updated</th>
@@ -78,13 +82,13 @@ export function AssetTable({
   if (assets.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-16 px-6 text-center">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-bg-subtle text-text-secondary border border-border">
-          <PackageSearch className="h-6 w-6" />
-        </div>
+        <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-category-computing-bg/10 border border-category-computing-bg/25 text-category-computing-bg shadow-xs">
+          <PackageSearch className="h-7 w-7" strokeWidth={1.8} />
+        </span>
         <div>
           <h3 className="text-base font-bold text-text">No assets found</h3>
-          <p className="text-xs text-text-secondary mt-1 max-w-sm">
-            No institutional assets match your current search, category, or status filters.
+          <p className="text-xs text-text-secondary mt-1 max-w-sm leading-relaxed">
+            No institutional fixed assets match your current search query, category, or status filters.
           </p>
         </div>
       </div>
@@ -99,6 +103,7 @@ export function AssetTable({
             <th scope="col" className="px-5 py-3">Code</th>
             <th scope="col" className="px-3 py-3">Asset Name</th>
             <th scope="col" className="px-3 py-3">Category</th>
+            <th scope="col" className="px-3 py-3">Type</th>
             <th scope="col" className="px-3 py-3">Status</th>
             <th scope="col" className="px-3 py-3">Holder / Location</th>
             <th scope="col" className="px-3 py-3 hidden sm:table-cell">Updated</th>

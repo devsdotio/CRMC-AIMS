@@ -20,9 +20,10 @@ import {
   type ReturnBorrowPayload,
 } from "./borrow-log-api";
 import { borrowLogQueryKeys } from "./query-keys";
-import { assetQueryKeys } from "@/features/assets/client/query-keys";
-import { borrowRequestQueryKeys } from "@/features/borrow-requests/client/query-keys";
-import { maintenanceQueryKeys } from "@/features/maintenance-logs/client/query-keys";
+import {
+  CUSTODY_DOMAINS,
+  invalidateDomains,
+} from "@/features/shared/cache-invalidation";
 
 export function useBorrowLogQuery(filters?: {
   status?: BorrowLogRecord["status"];
@@ -53,10 +54,8 @@ export function useReleaseBorrowMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (payload) => borrowLogApi.release(payload),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: borrowLogQueryKeys.all });
-      qc.invalidateQueries({ queryKey: assetQueryKeys.all });
-      qc.invalidateQueries({ queryKey: borrowRequestQueryKeys.all });
+    onSettled: () => {
+      void invalidateDomains(qc, CUSTODY_DOMAINS);
     },
   });
 }
@@ -69,11 +68,8 @@ export function useReturnBorrowMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, payload }) => borrowLogApi.returnLog(id, payload),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: borrowLogQueryKeys.all });
-      qc.invalidateQueries({ queryKey: assetQueryKeys.all });
-      qc.invalidateQueries({ queryKey: borrowRequestQueryKeys.all });
-      qc.invalidateQueries({ queryKey: maintenanceQueryKeys.all });
+    onSettled: () => {
+      void invalidateDomains(qc, CUSTODY_DOMAINS);
     },
   });
 }

@@ -34,6 +34,7 @@ export const assetStatusEnum = pgEnum("asset_status", [
   "needs_repair",
   "out_of_service",
   "retired",
+  "missing",
 ]);
 
 /**

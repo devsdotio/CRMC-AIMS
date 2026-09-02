@@ -2,7 +2,6 @@ import type {
   ProjectAssetAssignmentRow,
   ProjectExpenseMetadata,
 } from "@/server/db/schema";
-import type { MaintenanceLogEntry } from "@/types/assets";
 import type { ActorContext } from "@/server/shared/auth";
 import {
   generateOperationalCode,
@@ -16,7 +15,6 @@ import {
 import { withTransaction } from "@/server/db/transaction";
 import { AssetRepository } from "@/server/modules/assets/asset.repository";
 import { AssetLifecycleService } from "@/server/modules/assets/asset.lifecycle.service";
-import { AuditLogRepository } from "@/server/modules/audit-logs/audit-logs.repository";
 import { MaintenanceRepository } from "@/server/modules/maintenance/maintenance.repository";
 
 import { ProjectRepository } from "./project.repository";
@@ -72,19 +70,12 @@ function parseMoney(value: string | null | undefined): string | null {
   return n.toFixed(2);
 }
 
-function normalizeMaintenanceHistory(
-  value: MaintenanceLogEntry[] | null | undefined
-): MaintenanceLogEntry[] {
-  return Array.isArray(value) ? value : [];
-}
-
 export class ProjectAssetService {
   constructor(
     private readonly assignments = new ProjectAssetAssignmentRepository(),
     private readonly projects = new ProjectRepository(),
     private readonly assets = new AssetRepository(),
     private readonly lifecycle = new AssetLifecycleService(),
-    private readonly auditLogs = new AuditLogRepository(),
     private readonly maintenance = new MaintenanceRepository(),
     private readonly expenses = new ProjectExpenseRepository(),
     private readonly borrowLogs = new BorrowLogService(),
@@ -128,58 +119,30 @@ export class ProjectAssetService {
     const project = await this.requireMutableProject(projectId);
     const input = assignAssetToProjectSchema.parse(rawInput);
 
-    await this.borrowLogs.release(
-      {
-        assetId: input.assetId,
-        projectId,
-        custodyKind: "assignment",
-        source: "project_legacy",
-        borrowerName: holderLabel(project.projectCode, project.name),
-        notes: input.notes,
-      },
-      actor
-    );
-
+    // Single TX: release creates borrow log + holder + project_asset_assignments.
     return withTransaction(async (tx) => {
-      const asset = await this.assets.findById(input.assetId, tx);
-      if (!asset) throw new NotFoundError("Asset", input.assetId);
-
-      const assignment = await this.assignments.create(
+      await this.borrowLogs.release(
         {
+          assetId: input.assetId,
           projectId,
-          assetId: asset.id,
-          assetCode: asset.assetCode,
-          assetName: asset.name,
-          status: "assigned",
-          assignedAt: new Date(),
-          returnedAt: null,
-          assignedByUserId: actor.userId,
-          assignedByName: actor.displayName,
-          returnedByUserId: null,
-          returnedByName: null,
-          notes: input.notes ?? null,
-          returnNotes: null,
+          custodyKind: "assignment",
+          source: "project_legacy",
+          borrowerName: holderLabel(project.projectCode, project.name),
+          notes: input.notes,
         },
+        actor,
         tx
       );
 
-      await this.auditLogs.create(
-        {
-          entityType: "project_asset_assignment",
-          entityId: assignment.id,
-          action: "assigned",
-          actorName: actor.displayName,
-          actorUserId: actor.userId,
-          notes: input.notes ?? undefined,
-          metadata: {
-            projectId: project.id,
-            projectCode: project.projectCode,
-            assetId: asset.id,
-            assetCode: asset.assetCode,
-          },
-        },
+      const assignment = await this.assignments.findOpenByAssetId(
+        input.assetId,
         tx
       );
+      if (!assignment) {
+        throw new ConflictError(
+          "Project assignment was not created. Try again or check asset availability."
+        );
+      }
 
       return toDTO(assignment);
     });
@@ -210,44 +173,42 @@ export class ProjectAssetService {
         tx
       );
       if (openLog) {
+        // Closes borrow log + assignment + clears holder in one nested path.
         await this.borrowLogs.returnLog(
           openLog.id,
           {
             condition: "good",
             conditionNotes: input.notes,
           },
-          actor
+          actor,
+          tx
         );
       }
 
-      const updated = await this.assignments.update(
-        assignment.id,
-        {
-          status: "returned",
-          returnedAt: new Date(),
-          returnedByUserId: actor.userId,
-          returnedByName: actor.displayName,
-          returnNotes: input.notes ?? null,
-        },
-        tx
-      );
-
-      await this.auditLogs.create(
-        {
-          entityType: "project_asset_assignment",
-          entityId: assignment.id,
-          action: "returned",
-          actorName: actor.displayName,
-          actorUserId: actor.userId,
-          notes: input.notes ?? undefined,
-          metadata: {
-            projectId,
-            assetId: assignment.assetId,
-            assetCode: assignment.assetCode,
+      let updated = await this.assignments.findById(assignmentId, tx);
+      if (updated?.status === "assigned") {
+        updated = await this.assignments.update(
+          assignment.id,
+          {
+            status: "returned",
+            returnedAt: new Date(),
+            returnedByUserId: actor.userId,
+            returnedByName: actor.displayName,
+            returnNotes: input.notes ?? null,
           },
-        },
-        tx
-      );
+          tx
+        );
+      }
+
+      // Always clear holder even if borrow log was already missing (legacy orphan).
+      const asset = await this.assets.findById(assignment.assetId, tx);
+      if (asset?.currentHolder) {
+        await this.assets.update(
+          assignment.assetId,
+          { currentHolder: null, lastUpdated: new Date() },
+          tx
+        );
+      }
 
       if (!updated) throw new NotFoundError("Project asset assignment", assignmentId);
       return toDTO(updated);
@@ -297,21 +258,12 @@ export class ProjectAssetService {
           : `Damaged on ${project.projectCode}: ${asset.name}`);
 
       if (input.mode === "maintenance") {
-        const entry: MaintenanceLogEntry = {
-          id: crypto.randomUUID(),
-          date: todayDateString(),
-          type: "flagged",
-          description: notes,
-          technician: actor.displayName,
-        };
-        const history = normalizeMaintenanceHistory(asset.maintenanceHistory);
         const nextStatus = "needs_repair" as const;
 
         await this.assets.update(
           asset.id,
           {
             status: nextStatus,
-            maintenanceHistory: [...history, entry],
             lastUpdated: new Date(),
           },
           tx
@@ -406,6 +358,14 @@ export class ProjectAssetService {
         parseMoney(asset.value) ??
         "0.00";
 
+      // Close active borrow log first so borrow-log UI doesn't keep a ghost custody.
+      await this.borrowLogs.closeActiveBorrowLogOnlyInTx(
+        asset.id,
+        actor,
+        `Write-off on project ${project.projectCode}: ${notes}`,
+        tx
+      );
+
       const updated = await this.assignments.update(
         assignment.id,
         {
@@ -421,22 +381,11 @@ export class ProjectAssetService {
         throw new NotFoundError("Project asset assignment", assignmentId);
       }
 
-      const entry: MaintenanceLogEntry = {
-        id: crypto.randomUUID(),
-        date: todayDateString(),
-        type: "flagged",
-        description: notes,
-        technician: actor.displayName,
-        cost: Number(amount) || undefined,
-      };
-      const history = normalizeMaintenanceHistory(asset.maintenanceHistory);
-
       await this.assets.update(
         asset.id,
         {
           status: disposition,
           currentHolder: null,
-          maintenanceHistory: [...history, entry],
           lastUpdated: new Date(),
         },
         tx

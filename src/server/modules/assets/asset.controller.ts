@@ -26,6 +26,7 @@ export class AssetController {
         modelId: url.searchParams.get("modelId") ?? undefined,
         category: url.searchParams.get("category") ?? undefined,
         search: url.searchParams.get("search") ?? undefined,
+        assignmentType: url.searchParams.get("assignmentType") ?? undefined,
         availableOnly:
           url.searchParams.get("availableOnly") ?? undefined,
       });
@@ -183,6 +184,17 @@ export class AssetController {
         body,
         session.actor
       );
+      return ok(data);
+    } catch (error) {
+      return handleError(error);
+    }
+  }
+
+  async reportMissing(request: NextRequest | Request, id: string) {
+    try {
+      const session = await requireAssetOperator();
+      const body = await request.json();
+      const data = await this.assetService.reportMissing(id, body, session.actor);
       return ok(data);
     } catch (error) {
       return handleError(error);

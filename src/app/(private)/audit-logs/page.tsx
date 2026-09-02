@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * TEMP: Audit Logs UI is hidden. Writes are disabled in AuditLogRepository.create.
- * Restore the previous page contents to re-enable the screen.
+ * Audit Logs UI is unused. Operational history is Borrow Log + Issue History.
+ * The audit_logs table is not written.
  */
 export type AuditLogTab =
   | "assets"

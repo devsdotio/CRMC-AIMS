@@ -1,19 +1,67 @@
 "use client";
 
-import { useState } from "react";
-import { Tag, Calendar, ChevronDown, ChevronUp, AlertTriangle, History, Wrench, FileText, User } from "lucide-react";
+import { useState, useMemo } from "react";
+import { motion } from "framer-motion";
+import {
+  Tag,
+  Calendar,
+  ChevronDown,
+  ChevronUp,
+  AlertTriangle,
+  History,
+  Wrench,
+  Search,
+  CheckCircle2,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getCategoryStyle } from "@/constants/categories";
+import { useCategoryStyleMap } from "@/features/categories/client/use-categories";
 import { OverdueBadge } from "@/components/ui/overdue-badge";
 import {
   getActionStyle,
   getActionIcon,
-  formatDateTime,
   formatRelativeTime,
-  parseAuditNote,
+  AuditNoteDisplay,
 } from "@/components/audit-logs/audit-log-utils";
-import type { PortalBorrowLogRecord } from "./types";
 import { useBorrowLogQuery } from "@/features/borrow-log/client/use-borrow-log";
+
+type HistoryStatusFilter = "all" | "active" | "overdue" | "returned";
+
+const STATUS_FILTERS: {
+  key: HistoryStatusFilter;
+  label: string;
+  dot: string;
+  badge: string;
+  activeBadge: string;
+}[] = [
+  {
+    key: "all",
+    label: "All Records",
+    dot: "bg-text-secondary/70",
+    badge: "bg-bg-subtle text-text-secondary border border-border",
+    activeBadge: "bg-bg-subtle text-text font-bold border border-border/80",
+  },
+  {
+    key: "active",
+    label: "Active Custody",
+    dot: "bg-emerald-500",
+    badge: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20",
+    activeBadge: "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-500/30",
+  },
+  {
+    key: "overdue",
+    label: "Overdue",
+    dot: "bg-destructive",
+    badge: "bg-destructive/10 text-destructive border border-destructive/20",
+    activeBadge: "bg-destructive/20 text-destructive font-bold border border-destructive/30",
+  },
+  {
+    key: "returned",
+    label: "Returned",
+    dot: "bg-teal-500",
+    badge: "bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20",
+    activeBadge: "bg-teal-500/20 text-teal-700 dark:text-teal-300 font-bold border border-teal-500/30",
+  },
+];
 
 function ConditionBadge({ condition }: { condition?: string }) {
   if (!condition) return null;
@@ -35,7 +83,7 @@ function ConditionBadge({ condition }: { condition?: string }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border whitespace-nowrap",
+        "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border whitespace-nowrap",
         meta.className
       )}
     >
@@ -57,31 +105,132 @@ function RowSkeleton() {
 }
 
 export function BorrowHistoryTab() {
+  const { getCategoryStyle } = useCategoryStyleMap();
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<HistoryStatusFilter>("all");
+  const [search, setSearch] = useState("");
   const { data: records = [], isLoading: loading } = useBorrowLogQuery();
 
   const toggleExpand = (id: string) => {
     setExpandedId((prev) => (prev === id ? null : id));
   };
 
+  const filteredRecords = useMemo(() => {
+    return records
+      .filter((r) => {
+        if (statusFilter === "all") return true;
+        if (statusFilter === "active") return r.status === "active";
+        if (statusFilter === "overdue") return r.status === "overdue";
+        if (statusFilter === "returned") return r.status === "returned";
+        return true;
+      })
+      .filter((r) => {
+        if (!search.trim()) return true;
+        const q = search.toLowerCase();
+        const code = (r.logCode || "").toLowerCase();
+        const assetName = (r.assetName || "").toLowerCase();
+        const assetCode = (r.assetCode || "").toLowerCase();
+        return code.includes(q) || assetName.includes(q) || assetCode.includes(q);
+      });
+  }, [records, statusFilter, search]);
+
   return (
-    <div>
-      <div className="rounded-xl border border-border overflow-hidden">
+    <div className="rounded-xl border border-border overflow-hidden bg-bg shadow-xs flex flex-col min-h-0">
+      {/* Toolbar */}
+      <div className="px-4 md:px-6 py-3 bg-bg border-b border-border flex flex-wrap items-center justify-between gap-3 shrink-0">
+        {/* Status Tabs */}
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-xs font-bold text-text-secondary uppercase tracking-wider shrink-0">
+            Status:
+          </span>
+          <div className="flex gap-1 rounded-xl border border-border p-1 bg-bg-subtle shrink-0 overflow-x-auto scrollbar-none relative">
+            {STATUS_FILTERS.map((f) => {
+              const count =
+                f.key === "all"
+                  ? records.length
+                  : records.filter((r) => {
+                      if (f.key === "active") return r.status === "active";
+                      if (f.key === "overdue") return r.status === "overdue";
+                      if (f.key === "returned") return r.status === "returned";
+                      return true;
+                    }).length;
+
+              const isSelected = statusFilter === f.key;
+
+              return (
+                <button
+                  key={f.key}
+                  type="button"
+                  onClick={() => setStatusFilter(f.key)}
+                  className={cn(
+                    "relative inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors duration-150 cursor-pointer whitespace-nowrap select-none",
+                    isSelected
+                      ? "text-text"
+                      : "text-text-secondary hover:text-text"
+                  )}
+                >
+                  {isSelected && (
+                    <motion.span
+                      layoutId="borrower-history-active-tab"
+                      className="absolute inset-0 rounded-lg bg-bg shadow-xs border border-border/80"
+                      transition={{ type: "spring", stiffness: 500, damping: 38 }}
+                    />
+                  )}
+                  <span
+                    className={cn("h-1.5 w-1.5 rounded-full relative z-10 shrink-0", f.dot)}
+                    aria-hidden="true"
+                  />
+                  <span className="relative z-10">{f.label}</span>
+                  <span
+                    className={cn(
+                      "relative z-10 px-1.5 py-0.2 rounded-full text-[10px] font-mono font-semibold transition-colors duration-150",
+                      isSelected ? f.activeBadge : f.badge
+                    )}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Search Field */}
+        <div className="relative flex-1 min-w-48 max-w-sm">
+          <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-text-secondary">
+            <Search className="h-3.5 w-3.5" />
+          </span>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search asset, LOG code, or serial…"
+            className={cn(
+              "w-full h-9 pl-8.5 pr-3 text-xs bg-bg border border-border rounded-lg text-text placeholder:text-text-secondary/60",
+              "focus:outline-none focus:ring-2 focus:ring-accent transition-colors"
+            )}
+          />
+        </div>
+      </div>
+
+      {/* List */}
+      <div className="flex-1 overflow-y-auto min-h-0 bg-bg divide-y divide-border">
         {loading ? (
           Array.from({ length: 4 }).map((_, i) => <RowSkeleton key={i} />)
-        ) : records.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="h-12 w-12 rounded-full bg-bg-subtle flex items-center justify-center mb-4">
-              <History className="h-5 w-5 text-text-secondary" aria-hidden />
-            </div>
-            <h3 className="text-sm font-semibold text-text">No borrow history yet</h3>
-            <p className="text-xs text-text-secondary mt-1 max-w-xs">
-              Your completed and active borrowings will appear here once you
-              start borrowing items.
+        ) : filteredRecords.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+            <span className="flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-bg-subtle text-text-secondary shadow-xs mb-3">
+              <History className="h-7 w-7" strokeWidth={1.8} aria-hidden />
+            </span>
+            <h3 className="text-base font-bold text-text">No borrow history records</h3>
+            <p className="text-xs text-text-secondary mt-1 max-w-sm leading-relaxed">
+              {statusFilter === "all"
+                ? "Your completed and active borrowings will appear here once assets are released."
+                : "No records match the selected status filter."}
             </p>
           </div>
         ) : (
-          records.map((record) => {
+          filteredRecords.map((record) => {
             const categoryMeta = getCategoryStyle(record.category);
             const isExpanded = expandedId === record.id;
             const isOverdue = record.status === "overdue";
@@ -97,13 +246,12 @@ export function BorrowHistoryTab() {
                   isOverdue
                     ? "border-l-status-outofservice-bg bg-status-outofservice-bg/5"
                     : record.status === "active"
-                    ? "border-l-status-active-bg/60 bg-card hover:bg-bg-subtle/60"
+                    ? "border-l-status-active-bg/60 bg-bg hover:bg-bg-subtle/60"
                     : record.conditionOnReturn === "needs_repair"
-                    ? "border-l-status-repair-bg/60 bg-card hover:bg-bg-subtle/60"
+                    ? "border-l-status-repair-bg/60 bg-bg hover:bg-bg-subtle/60"
                     : record.conditionOnReturn === "damaged"
-                    ? "border-l-status-outofservice-bg/60 bg-card hover:bg-bg-subtle/60"
-                    : "border-l-transparent bg-card hover:bg-bg-subtle/60",
-                  "pl-0"
+                    ? "border-l-status-outofservice-bg/60 bg-bg hover:bg-bg-subtle/60"
+                    : "border-l-transparent bg-bg hover:bg-bg-subtle/60"
                 )}
               >
                 {/* Main row */}
@@ -113,34 +261,38 @@ export function BorrowHistoryTab() {
                   aria-expanded={isExpanded}
                   aria-controls={`history-detail-${record.id}`}
                   className={cn(
-                    "w-full flex flex-col sm:flex-row sm:items-center gap-2.5 p-4 md:px-5 text-left cursor-pointer",
+                    "w-full flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 md:px-6 text-left cursor-pointer select-none",
                     "focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset"
                   )}
                 >
                   <div className="flex-1 min-w-0 space-y-1">
                     {/* Code + Category */}
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-mono text-xs font-semibold text-text-secondary">
+                    <div className="flex items-center gap-2 flex-wrap text-xs">
+                      <span className="font-mono font-semibold text-text-secondary">
                         {record.logCode}
                       </span>
+                      <span className="text-text-secondary/40">·</span>
+                      <span className="font-mono text-text-secondary text-[11px]">
+                        {record.assetCode}
+                      </span>
+                      <span className="text-text-secondary/40">·</span>
                       <span
                         className={cn(
-                          "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide border",
+                          "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
                           categoryMeta.bg,
-                          categoryMeta.text,
-                          "border-transparent"
+                          categoryMeta.text
                         )}
                       >
                         <Tag className="h-2.5 w-2.5" />
                         {categoryMeta.label}
                       </span>
-                      {isOverdue && (
-                        <span className="sr-only">Overdue item</span>
+                      {record.conditionOnReturn && (
+                        <ConditionBadge condition={record.conditionOnReturn} />
                       )}
                     </div>
 
                     {/* Asset name */}
-                    <p className="text-sm font-semibold text-text truncate">
+                    <p className="text-sm font-bold text-text truncate">
                       {record.assetName}
                       {isOverdue && (
                         <AlertTriangle
@@ -153,7 +305,7 @@ export function BorrowHistoryTab() {
                     {/* Dates row */}
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-text-secondary">
                       <span className="flex items-center gap-1">
-                        <Calendar className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        <Calendar className="h-3.5 w-3.5 shrink-0 text-text-secondary/70" aria-hidden />
                         Borrowed:{" "}
                         <span className="font-medium text-text">
                           {new Date(record.releasedAt).toLocaleDateString(
@@ -162,171 +314,117 @@ export function BorrowHistoryTab() {
                           )}
                         </span>
                       </span>
-                      <span className="flex items-center gap-1">
-                        Due:{" "}
-                        <span
-                          className={cn(
-                            "font-medium",
-                            isOverdue ? "text-status-outofservice-bg font-bold" : "text-text"
-                          )}
-                        >
-                          {record.dueDate}
+                      {record.dueDate && (
+                        <span className="flex items-center gap-1">
+                          Due:{" "}
+                          <span
+                            className={cn(
+                              "font-medium",
+                              isOverdue ? "text-status-outofservice-bg font-bold" : "text-text"
+                            )}
+                          >
+                            {record.dueDate}
+                          </span>
                         </span>
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Right column: status + expand toggle */}
-                  <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                    {isOverdue && record.daysOverdue ? (
-                      <OverdueBadge daysOverdue={record.daysOverdue} />
-                    ) : record.status === "active" ? (
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-status-active-bg/20 text-status-active-text border border-status-active-bg/30">
-                        Active
-                      </span>
-                    ) : (
-                      <ConditionBadge condition={record.conditionOnReturn} />
-                    )}
-                    {isExpanded ? (
-                      <ChevronUp className="h-4 w-4 text-text-secondary" aria-hidden />
-                    ) : (
-                      <ChevronDown className="h-4 w-4 text-text-secondary" aria-hidden />
-                    )}
-                  </div>
-                </button>
-
-                {/* Expanded detail panel */}
-                {isExpanded && (
-                  <div
-                    id={`history-detail-${record.id}`}
-                    className="px-4 md:px-5 pb-4 space-y-4 border-t border-border bg-bg-subtle/30"
-                  >
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 text-xs">
-                      <div className="p-2.5 rounded-lg bg-card border border-border">
-                        <p className="text-[10px] text-text-secondary uppercase tracking-wider font-semibold mb-0.5">Asset Code</p>
-                        <p className="font-mono font-bold text-text">{record.assetCode}</p>
-                      </div>
-                      <div className="p-2.5 rounded-lg bg-card border border-border">
-                        <p className="text-[10px] text-text-secondary uppercase tracking-wider font-semibold mb-0.5">Released By</p>
-                        <p className="font-medium text-text">{record.releasedBy}</p>
-                      </div>
+                      )}
                       {record.returnedAt && (
-                        <div className="p-2.5 rounded-lg bg-card border border-border">
-                          <p className="text-[10px] text-text-secondary uppercase tracking-wider font-semibold mb-0.5">Returned On</p>
-                          <p className="font-medium text-text">
+                        <span className="flex items-center gap-1">
+                          Returned:{" "}
+                          <span className="font-medium text-text">
                             {new Date(record.returnedAt).toLocaleDateString(
                               "en-PH",
                               { month: "short", day: "numeric", year: "numeric" }
                             )}
-                          </p>
-                        </div>
-                      )}
-                      {record.receivedBy && (
-                        <div className="p-2.5 rounded-lg bg-card border border-border">
-                          <p className="text-[10px] text-text-secondary uppercase tracking-wider font-semibold mb-0.5">Received By</p>
-                          <p className="font-medium text-text">{record.receivedBy}</p>
-                        </div>
+                          </span>
+                        </span>
                       )}
                     </div>
+                  </div>
 
-                    {/* Condition notes */}
-                    {record.conditionNotes && (
-                      <div
-                        className={cn(
-                          "flex items-start gap-2 rounded-xl p-3 text-xs shadow-xs",
-                          hasDamageNote
-                            ? "bg-status-repair-bg/10 border border-status-repair-bg/30"
-                            : "bg-status-active-bg/10 border border-status-active-bg/30"
-                        )}
-                      >
-                        {hasDamageNote ? (
-                          <Wrench
-                            className="h-4 w-4 shrink-0 text-status-repair-bg mt-0.5"
-                            aria-label="Damage note"
-                          />
-                        ) : null}
+                  {/* Right column: status + expand toggle */}
+                  <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-center">
+                    {record.status === "active" ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                        Active Loan
+                      </span>
+                    ) : record.status === "overdue" ? (
+                      <OverdueBadge daysOverdue={record.daysOverdue ?? 0} />
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-bg-subtle text-text-secondary border border-border">
+                        <CheckCircle2 className="h-3 w-3 text-status-active-text shrink-0" />
+                        Returned
+                      </span>
+                    )}
+
+                    <div className="p-1 rounded-lg text-text-secondary hover:bg-bg-subtle">
+                      {isExpanded ? (
+                        <ChevronUp className="h-4 w-4" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4" />
+                      )}
+                    </div>
+                  </div>
+                </button>
+
+                {/* Expanded audit trail */}
+                {isExpanded && (
+                  <div
+                    id={`history-detail-${record.id}`}
+                    className="p-4 md:px-6 bg-bg-subtle/50 border-t border-border space-y-3"
+                  >
+                    {hasDamageNote && (
+                      <div className="p-3 rounded-lg bg-status-outofservice-bg/10 border border-status-outofservice-bg/20 text-xs flex items-start gap-2">
+                        <Wrench className="h-4 w-4 text-status-outofservice-bg shrink-0 mt-0.5" />
                         <div>
-                          <p className="font-bold text-text mb-0.5">Condition Remarks</p>
-                          <p className="text-text-secondary leading-relaxed">{record.conditionNotes}</p>
+                          <p className="font-bold text-text">Return Condition Flag</p>
+                          <p className="text-text-secondary mt-0.5">
+                            This asset was recorded as{" "}
+                            <span className="font-bold">
+                              {record.conditionOnReturn?.replace("_", " ")}
+                            </span>{" "}
+                            upon return.
+                          </p>
                         </div>
                       </div>
                     )}
 
-                    {/* Accountability Audit History Timeline (Replicated Admin UI) */}
-                    <div className="space-y-2.5 pt-1">
-                      <p className="text-xs font-bold text-text-secondary uppercase tracking-wider flex items-center gap-1.5">
-                        <History className="h-3.5 w-3.5 text-accent" />
-                        Accountability Audit Trail ({record.history.length})
+                    <div>
+                      <p className="text-xs font-bold text-text mb-2 flex items-center gap-1.5">
+                        <History className="h-3.5 w-3.5 text-text-secondary" />
+                        Transaction Audit Log
                       </p>
+                      <div className="space-y-2 border-l-2 border-border pl-3 ml-1.5">
+                        {record.history?.map((step) => {
+                          const actionMeta = getActionStyle(step.action);
+                          const actionIcon = getActionIcon(step.action);
+                          const timeStr =
+                            step.timestamp instanceof Date
+                              ? step.timestamp.toISOString()
+                              : String(step.timestamp || "");
 
-                      <div className="p-4 rounded-xl border border-border bg-bg shadow-xs">
-                        <ol className="relative border-l-2 border-border/60 ml-3 space-y-6">
-                          {record.history.map((entry, idx) => {
-                            const style = getActionStyle(entry.action);
-                            const icon = getActionIcon(entry.action);
-                            const { picker, description } = parseAuditNote(entry.action, entry.notes);
-                            const timeStr = entry.timestamp instanceof Date ? entry.timestamp.toISOString() : String(entry.timestamp || "");
-
-                            return (
-                              <li key={entry.id || idx} className="pl-6 relative">
-                                {/* Timeline Circular Node */}
-                                <span
-                                  className={cn(
-                                    "absolute -left-3.25 top-1.5 h-6 w-6 rounded-full border-2 flex items-center justify-center bg-bg shadow-xs z-10",
-                                    style.bg,
-                                    (style as Record<string, string>).iconText || style.text
-                                  )}
-                                >
-                                  {icon}
+                          return (
+                            <div key={step.id} className="text-xs space-y-0.5">
+                              <div className="flex items-center gap-1.5">
+                                <span className={cn("p-0.5 rounded", actionMeta.bg, actionMeta.text)}>
+                                  {actionIcon}
                                 </span>
-
-                                <div className="flex flex-col gap-0.5 pt-1.5">
-                                  <div className="flex items-center justify-between text-xs flex-wrap gap-2">
-                                    <span className={cn("font-bold capitalize text-xs", style.text)}>
-                                      {style.label}
-                                    </span>
-                                    <div className="flex items-center gap-1.5 text-right">
-                                      <time className="text-[11px] text-text-secondary font-medium">
-                                        {formatDateTime(timeStr)}
-                                      </time>
-                                      <span className="text-[10px] text-text-secondary/80">
-                                        ({formatRelativeTime(timeStr)})
-                                      </span>
-                                    </div>
-                                  </div>
-
-                                  <p className="text-xs text-text-secondary font-medium">
-                                    By <span className="font-semibold text-text">{entry.actorName}</span>
-                                  </p>
+                                <span className="font-bold text-text">{actionMeta.label}</span>
+                                <span className="text-text-secondary">by</span>
+                                <span className="font-medium text-text">{step.actorName}</span>
+                                <span className="text-text-secondary/40">·</span>
+                                <span className="text-text-secondary">
+                                  {formatRelativeTime(timeStr)}
+                                </span>
+                              </div>
+                              {step.notes && (
+                                <div className="pl-5 text-text-secondary">
+                                  <AuditNoteDisplay action={step.action} note={step.notes} />
                                 </div>
-
-                                {/* Chips */}
-                                {(picker || description) && (
-                                  <div className="mt-2 flex flex-wrap gap-2">
-                                    {picker && (
-                                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-bg-subtle text-text-secondary border border-border shadow-xs">
-                                        <User className="h-3 w-3" />
-                                        {entry.action === "returned" ? "Returned by: " : "Picked up by: "} {picker}
-                                      </span>
-                                    )}
-                                    {description && (
-                                      <span
-                                        className={cn(
-                                          "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border shadow-xs max-w-full",
-                                          style.bg,
-                                          style.text
-                                        )}
-                                      >
-                                        <FileText className="h-3 w-3 shrink-0" />
-                                        <span className="truncate whitespace-normal leading-tight">{description}</span>
-                                      </span>
-                                    )}
-                                  </div>
-                                )}
-                              </li>
-                            );
-                          })}
-                        </ol>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   </div>

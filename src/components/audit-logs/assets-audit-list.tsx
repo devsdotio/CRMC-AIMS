@@ -9,7 +9,7 @@ import {
 } from "./audit-log-filters";
 import { AssetAuditDetailPanel } from "./asset-audit-detail-panel";
 import { formatDateTime, formatRelativeTime, exportToCSV } from "./audit-log-utils";
-import { getCategoryStyle } from "@/constants/categories";
+import { useCategoryStyleMap } from "@/features/categories/client/use-categories";
 import type { Asset, AssetCategory, AssetStatus } from "@/types/assets";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/providers/toast-context";
@@ -25,6 +25,7 @@ const STATUS_OPTIONS = [
 
 export function AssetsAuditList() {
   const { data: assets = [], isLoading, error } = useAssetsQuery();
+  const { getCategoryStyle } = useCategoryStyleMap();
   const toast = useToast();
 
   const [filters, setFilters] = useState<AuditLogFilterValues>({

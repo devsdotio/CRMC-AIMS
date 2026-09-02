@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronRight, PackageCheck } from "lucide-react";
+import { ChevronRight, PackageCheck, AlertTriangle, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -49,36 +49,41 @@ export function LowStockWidget({ items, loading = false }: LowStockWidgetProps) 
 
   return (
     <section
-      className="flex flex-col rounded-lg border border-border bg-bg overflow-hidden"
+      className="flex flex-col rounded-lg border border-border bg-card overflow-hidden shadow-xs"
       aria-labelledby="low-stock-heading"
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-        <div>
-          <h2 id="low-stock-heading" className="text-sm font-semibold text-text">
-            Low Stock
-          </h2>
-          {!loading && (
-            <p className="text-xs text-text-secondary mt-0.5">
-              {items.length === 0
-                ? "All items well-stocked"
-                : `${items.length} item${items.length !== 1 ? "s" : ""} at or near threshold`}
-            </p>
-          )}
+      <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-card">
+        <div className="flex items-center gap-2.5">
+          <div className="h-7 w-7 rounded-lg bg-status-repair-bg/15 border border-status-repair-bg/30 flex items-center justify-center text-status-repair-text shrink-0">
+            <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+          </div>
+          <div>
+            <h2 id="low-stock-heading" className="text-sm font-bold text-text leading-none">
+              Low Stock
+            </h2>
+            {!loading && (
+              <p className="text-xs text-text-secondary mt-1">
+                {items.length === 0
+                  ? "All items well-stocked"
+                  : `${items.length} item${items.length !== 1 ? "s" : ""} at or near threshold`}
+              </p>
+            )}
+          </div>
         </div>
         <Link
-          href="/consumables?filter=low-stock"
-          className="flex items-center gap-0.5 text-xs font-medium text-accent hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
+          href="/consumables"
+          className="flex items-center gap-1 text-xs font-semibold text-accent hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-md px-1.5 py-0.5"
         >
           View all <ChevronRight className="h-3.5 w-3.5" />
         </Link>
       </div>
 
       {/* Body */}
-      <div className="flex-1 divide-y divide-border">
+      <div className="flex-1 divide-y divide-border/60">
         {loading ? (
           <div className="px-5 py-1">
-            {Array.from({ length: 5 }).map((_, i) => (
+            {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="flex flex-col gap-2.5 py-3.5">
                 <div className="flex items-center justify-between">
                   <Skeleton className="h-3.5 w-36" />
@@ -90,14 +95,18 @@ export function LowStockWidget({ items, loading = false }: LowStockWidgetProps) 
           </div>
         ) : items.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 py-12 px-5 text-center">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-status-active-bg/15">
-              <PackageCheck className="h-5 w-5 text-status-active-bg" strokeWidth={2} />
+            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-status-active-bg/15 border border-status-active-bg/30 text-status-active-text shadow-xs">
+              <PackageCheck className="h-6 w-6" strokeWidth={2.2} />
             </span>
             <div>
-              <p className="text-sm font-medium text-text">All consumables are well-stocked</p>
-              <p className="text-xs text-text-secondary mt-0.5">
-                No items are currently at or below their minimum threshold.
+              <p className="text-sm font-bold text-text">All inventory well-stocked</p>
+              <p className="text-xs text-text-secondary mt-1 max-w-xs leading-relaxed">
+                No consumable items are currently at or below their reorder threshold.
               </p>
+              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-status-active-text bg-status-active-bg/10 border border-status-active-bg/25 px-2.5 py-0.5 rounded-full mt-3">
+                <Check className="h-3 w-3" strokeWidth={2.5} />
+                Healthy Inventory
+              </span>
             </div>
           </div>
         ) : (

@@ -6,18 +6,30 @@ import type { ConsumableItem, ConsumableCategory } from "@/types/inventory";
 import { useCategoriesQuery } from "@/features/categories/client/use-categories";
 import { useSuppliersQuery } from "@/features/suppliers/client";
 import Link from "next/link";
+import {
+  filterMoneyInput,
+  filterUnsignedIntInput,
+  parseMoney,
+  parseUnsignedInt,
+} from "@/lib/numeric-input";
+import { formatPhp } from "@/components/projects/format-money";
+
+export type SaveConsumablePayload = Partial<ConsumableItem> & {
+  unitCost?: string | number;
+  supplierId?: string | null;
+};
 
 export interface AddEditConsumableDialogProps {
   isOpen: boolean;
   initialItem?: ConsumableItem | null;
   onClose: () => void;
-  onSave: (itemData: Partial<ConsumableItem>) => void | Promise<void>;
+  onSave: (itemData: SaveConsumablePayload) => void | Promise<void>;
 }
 
 interface AddEditConsumableDialogFormProps {
   initialItem?: ConsumableItem | null;
   onClose: () => void;
-  onSave: (itemData: Partial<ConsumableItem>) => void | Promise<void>;
+  onSave: (itemData: SaveConsumablePayload) => void | Promise<void>;
 }
 
 function matchSupplierId(
@@ -66,12 +78,13 @@ function AddEditConsumableDialogForm({
     () => initialItem?.category ?? ""
   );
   const [unit, setUnit] = useState(() => initialItem?.unit ?? "reams");
-  const [currentQty, setCurrentQty] = useState(
-    () => initialItem?.currentQty ?? 0
+  const [currentQty, setCurrentQty] = useState(() =>
+    initialItem ? String(initialItem.currentQty) : "0"
   );
-  const [minThreshold, setMinThreshold] = useState(
-    () => initialItem?.minThreshold ?? 15
+  const [minThreshold, setMinThreshold] = useState(() =>
+    String(initialItem?.minThreshold ?? 15)
   );
+  const [unitCost, setUnitCost] = useState("");
   const [location, setLocation] = useState(
     () => initialItem?.location ?? "Supply Storage Bay A1"
   );
@@ -80,6 +93,14 @@ function AddEditConsumableDialogForm({
   const [notes, setNotes] = useState(() => initialItem?.notes ?? "");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const qtyValue = parseUnsignedInt(currentQty, 0);
+  const needsOpeningLot = !isEditing && qtyValue > 0;
+  const costValue = parseMoney(unitCost);
+  const openingTotal =
+    needsOpeningLot && costValue !== null && costValue > 0
+      ? qtyValue * costValue
+      : 0;
 
   // Map legacy free-text preferred supplier → registry option when list loads.
   useEffect(() => {
@@ -117,9 +138,24 @@ function AddEditConsumableDialogForm({
       );
       return;
     }
-    if (minThreshold < 1) {
+
+    const threshold = parseUnsignedInt(minThreshold, 0);
+    if (threshold < 1) {
       setError("Minimum reorder threshold must be at least 1.");
       return;
+    }
+
+    const qty = parseUnsignedInt(currentQty, 0);
+    if (!isEditing && qty > 0) {
+      if (!supplierId) {
+        setError("Select a supplier when adding initial stock.");
+        return;
+      }
+      const cost = parseMoney(unitCost);
+      if (cost === null || cost <= 0) {
+        setError("Unit cost must be greater than zero when adding initial stock.");
+        return;
+      }
     }
 
     const selectedSupplier = suppliers.find((s) => s.id === supplierId);
@@ -136,14 +172,15 @@ function AddEditConsumableDialogForm({
         name: name.trim(),
         category: category as ConsumableCategory,
         unit: unit.trim() || "units",
-        currentQty: Number(currentQty),
-        minThreshold: Number(minThreshold),
+        currentQty: qty,
+        minThreshold: threshold,
         location: location.trim() || "Supply Storage Bay",
-        // Registry-only: empty selection clears preferred supplier on edit
         supplier: supplierName ?? (isEditing ? null : undefined),
+        supplierId: needsOpeningLot ? supplierId : supplierId || null,
+        unitCost: needsOpeningLot ? unitCost : undefined,
         notes: notes.trim() || undefined,
         lastRestocked: new Date().toISOString().split("T")[0],
-      } as Partial<ConsumableItem>);
+      });
       onClose();
     } catch (err) {
       setError(
@@ -291,16 +328,21 @@ function AddEditConsumableDialogForm({
               </label>
               <input
                 id="qty-input"
-                type="number"
-                min={0}
+                type="text"
+                inputMode="numeric"
                 value={currentQty}
-                onChange={(e) => setCurrentQty(Number(e.target.value))}
+                onChange={(e) => {
+                  const next = filterUnsignedIntInput(e.target.value);
+                  if (next !== null) setCurrentQty(next);
+                }}
                 disabled={isSubmitting || isEditing}
-                className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-70"
+                placeholder="0"
+                className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text font-mono focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-70"
               />
               {!isEditing && (
                 <p className="text-[11px] text-text-secondary">
-                  Creates an opening purchase lot you can issue from.
+                  Leave 0 to register the SKU only. Any positive qty creates an
+                  opening purchase lot.
                 </p>
               )}
             </div>
@@ -313,15 +355,63 @@ function AddEditConsumableDialogForm({
               </label>
               <input
                 id="min-input"
-                type="number"
-                min={1}
+                type="text"
+                inputMode="numeric"
                 value={minThreshold}
-                onChange={(e) => setMinThreshold(Number(e.target.value))}
+                onChange={(e) => {
+                  const next = filterUnsignedIntInput(e.target.value);
+                  if (next !== null) setMinThreshold(next);
+                }}
                 disabled={isSubmitting}
-                className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent"
+                placeholder="15"
+                className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text font-mono focus:outline-none focus:ring-2 focus:ring-accent"
               />
             </div>
           </div>
+
+          {needsOpeningLot && (
+            <div className="space-y-3 rounded-xl border border-border bg-bg-subtle/40 p-3">
+              <p className="text-[11px] font-semibold text-text">
+                Opening stock details{" "}
+                <span className="text-accent">*</span>
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label
+                    htmlFor="unit-cost-input"
+                    className="block text-xs font-semibold text-text"
+                  >
+                    Unit cost (₱) <span className="text-accent">*</span>
+                  </label>
+                  <input
+                    id="unit-cost-input"
+                    type="text"
+                    inputMode="decimal"
+                    value={unitCost}
+                    onChange={(e) => {
+                      const next = filterMoneyInput(e.target.value);
+                      if (next !== null) setUnitCost(next);
+                    }}
+                    disabled={isSubmitting}
+                    placeholder="0.00"
+                    className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text font-mono focus:outline-none focus:ring-2 focus:ring-accent"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <span className="block text-xs font-semibold text-text">
+                    Line total
+                  </span>
+                  <div className="flex h-9 items-center px-3 rounded-lg border border-border bg-bg text-xs font-mono font-bold text-text">
+                    {formatPhp(openingTotal)}
+                  </div>
+                </div>
+              </div>
+              <p className="text-[11px] text-text-secondary">
+                Supplier is required below so the opening lot is cost-tracked
+                like a normal restock.
+              </p>
+            </div>
+          )}
 
           <div className="space-y-1">
             <label
@@ -345,7 +435,13 @@ function AddEditConsumableDialogForm({
               htmlFor="supplier-select"
               className="block text-xs font-semibold text-text"
             >
-              Preferred supplier
+              {needsOpeningLot ? (
+                <>
+                  Supplier <span className="text-accent">*</span>
+                </>
+              ) : (
+                "Preferred supplier"
+              )}
             </label>
             <select
               id="supplier-select"
@@ -354,7 +450,11 @@ function AddEditConsumableDialogForm({
               disabled={isSubmitting || suppliersLoading}
               className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent"
             >
-              <option value="">None / unspecified</option>
+              <option value="">
+                {needsOpeningLot
+                  ? "Select a supplier…"
+                  : "None / unspecified"}
+              </option>
               {suppliers.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
@@ -362,7 +462,6 @@ function AddEditConsumableDialogForm({
                 </option>
               ))}
             </select>
-            {/* Show legacy free-text when it doesn't match the registry */}
             {initialItem?.supplier &&
               !matchSupplierId(suppliers, initialItem.supplier) &&
               !supplierId && (
@@ -380,12 +479,13 @@ function AddEditConsumableDialogForm({
                 >
                   Add suppliers
                 </Link>{" "}
-                first. Multi-supplier cost tracking happens on{" "}
-                <strong className="font-semibold text-text">Restock</strong>, not
-                on the SKU alone.
+                first
+                {needsOpeningLot
+                  ? " before registering opening stock."
+                  : ". Multi-supplier cost tracking happens on Restock."}
               </p>
             )}
-            {suppliers.length > 0 && (
+            {suppliers.length > 0 && !needsOpeningLot && (
               <p className="text-[11px] text-text-secondary">
                 Preferred vendor for this item. Each restock can still use a
                 different supplier with its own unit cost (purchase lot).

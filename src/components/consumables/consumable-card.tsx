@@ -4,20 +4,22 @@ import { PlusCircle, SlidersHorizontal, Tag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ConsumableItem } from "@/types/inventory";
 import { StockLevelBar } from "./stock-level-bar";
+import { useCategoryStyleMap } from "@/features/categories/client/use-categories";
 
 export interface ConsumableCardProps {
   item: ConsumableItem;
   onSelect: (item: ConsumableItem) => void;
-  onRestock?: (item: ConsumableItem) => void;
   onAdjust?: (item: ConsumableItem) => void;
 }
 
 export function ConsumableCard({
   item,
   onSelect,
-  onRestock,
   onAdjust,
 }: ConsumableCardProps) {
+  const { getCategoryStyle } = useCategoryStyleMap();
+  const categoryMeta = getCategoryStyle(item.category);
+
   return (
     <div
       onClick={() => onSelect(item)}
@@ -34,14 +36,20 @@ export function ConsumableCard({
         "hover:shadow-md hover:border-primary/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       )}
     >
-      {/* Top Banner: Item Code & Category Tag (Neutral colors per design rule) */}
+      {/* Top Banner: Item Code & Category Tag */}
       <div className="flex items-center justify-between p-3.5 border-b border-border bg-bg-subtle/50">
         <span className="font-mono text-xs font-bold text-text bg-bg px-2 py-0.5 rounded border border-border">
           {item.itemCode}
         </span>
-        <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-bg-subtle text-text-secondary border border-border">
-          <Tag className="h-2.5 w-2.5" />
-          {item.category.replace("_", " ")}
+        <span
+          className={cn(
+            "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shadow-2xs",
+            categoryMeta.bg,
+            categoryMeta.text
+          )}
+        >
+          <Tag className="h-2.5 w-2.5 shrink-0" />
+          {categoryMeta.label}
         </span>
       </div>
 
@@ -67,32 +75,20 @@ export function ConsumableCard({
       </div>
 
       {/* Card Footer Actions */}
-      {(onAdjust || onRestock) && (
-      <div className="px-4 py-2.5 bg-bg-subtle border-t border-border flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
-        {onAdjust ? (
-        <button
-          type="button"
-          onClick={() => onAdjust(item)}
-          className="inline-flex items-center gap-1 text-[11px] font-semibold text-text-secondary hover:text-text cursor-pointer"
+      {onAdjust && (
+        <div
+          className="px-4 py-2.5 bg-bg-subtle border-t border-border flex items-center justify-between"
+          onClick={(e) => e.stopPropagation()}
         >
-          <SlidersHorizontal className="h-3 w-3" />
-          Adjust
-        </button>
-        ) : (
-          <span />
-        )}
-
-        {onRestock && (
-        <button
-          type="button"
-          onClick={() => onRestock(item)}
-          className="inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-bold bg-accent text-accent-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-2xs"
-        >
-          <PlusCircle className="h-3.5 w-3.5" />
-          Restock
-        </button>
-        )}
-      </div>
+          <button
+            type="button"
+            onClick={() => onAdjust(item)}
+            className="inline-flex items-center gap-1 text-[11px] font-semibold text-text-secondary hover:text-text cursor-pointer"
+          >
+            <SlidersHorizontal className="h-3 w-3" />
+            Adjust
+          </button>
+        </div>
       )}
     </div>
   );

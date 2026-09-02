@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, KeyboardEvent } from "react";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import type { TabFilter } from "@/types/borrow-requests";
 
@@ -21,6 +22,42 @@ interface TabItem {
   count: number;
   showBadge?: boolean;
 }
+
+const STATUS_THEMES: Record<
+  TabFilter,
+  { dot: string; badge: string; activeBadge: string }
+> = {
+  pending: {
+    dot: "bg-amber-500",
+    badge: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20",
+    activeBadge: "bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold border border-amber-500/30",
+  },
+  approved: {
+    dot: "bg-blue-500",
+    badge: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20",
+    activeBadge: "bg-blue-500/20 text-blue-700 dark:text-blue-300 font-bold border border-blue-500/30",
+  },
+  rejected: {
+    dot: "bg-destructive",
+    badge: "bg-destructive/10 text-destructive border border-destructive/20",
+    activeBadge: "bg-destructive/20 text-destructive font-bold border border-destructive/30",
+  },
+  released: {
+    dot: "bg-emerald-500",
+    badge: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20",
+    activeBadge: "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-500/30",
+  },
+  returned: {
+    dot: "bg-teal-500",
+    badge: "bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20",
+    activeBadge: "bg-teal-500/20 text-teal-700 dark:text-teal-300 font-bold border border-teal-500/30",
+  },
+  all: {
+    dot: "bg-text-secondary/70",
+    badge: "bg-bg-subtle text-text-secondary border border-border",
+    activeBadge: "bg-bg-subtle text-text font-bold border border-border/80",
+  },
+};
 
 export function BorrowRequestTabs({
   activeTab,
@@ -77,64 +114,59 @@ export function BorrowRequestTabs({
   };
 
   return (
-    <div className="border-b border-border bg-bg px-4 md:px-6 pt-2 shrink-0">
+    <div className="flex items-center gap-2 shrink-0">
+      <span className="text-xs font-bold text-text-secondary uppercase tracking-wider shrink-0">
+        Status:
+      </span>
       <nav
         role="tablist"
         aria-label="Borrow request status filters"
-        className="flex items-center gap-6 overflow-x-auto scrollbar-none"
+        className="flex gap-1 rounded-xl border border-border p-1 bg-bg-subtle shrink-0 overflow-x-auto scrollbar-none relative"
       >
-        {tabs.map((tab) => {
-          const isActive = activeTab === tab.id;
+        {tabs.map((item) => {
+          const isSelected = activeTab === item.id;
+          const theme = STATUS_THEMES[item.id];
+
           return (
             <button
-              key={tab.id}
+              key={item.id}
               ref={(el) => {
-                tabRefs.current[tab.id] = el;
+                tabRefs.current[item.id] = el;
               }}
               role="tab"
-              aria-selected={isActive}
-              aria-controls={`panel-${tab.id}`}
-              id={`tab-${tab.id}`}
-              tabIndex={isActive ? 0 : -1}
-              onClick={() => onTabChange(tab.id)}
-              onKeyDown={(e) => handleKeyDown(e, tab.id)}
+              aria-selected={isSelected}
+              aria-controls={`panel-${item.id}`}
+              id={`tab-${item.id}`}
+              tabIndex={isSelected ? 0 : -1}
+              onClick={() => onTabChange(item.id)}
+              onKeyDown={(e) => handleKeyDown(e, item.id)}
               className={cn(
-                "relative flex items-center gap-2 py-3 text-sm font-semibold whitespace-nowrap transition-colors duration-150 outline-none",
-                "focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 rounded-t-md",
-                isActive
+                "relative inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors duration-150 cursor-pointer whitespace-nowrap select-none",
+                isSelected
                   ? "text-text"
                   : "text-text-secondary hover:text-text"
               )}
             >
-              <span>{tab.label}</span>
-
-              {/* Count badge */}
-              {tab.showBadge && tab.count > 0 ? (
-                <span
-                  className={cn(
-                    "flex items-center justify-center min-w-5 h-5 px-1.5 text-[11px] font-bold rounded-full tabular-nums shrink-0",
-                    isActive
-                      ? "bg-accent text-accent-foreground"
-                      : "bg-status-repair-bg/20 text-text"
-                  )}
-                >
-                  {tab.count > 99 ? "99+" : tab.count}
-                </span>
-              ) : (
-                <span
-                  className={cn(
-                    "text-xs font-normal tabular-nums",
-                    isActive ? "text-text-secondary font-semibold" : "text-text-secondary/60"
-                  )}
-                >
-                  ({tab.count})
-                </span>
+              {isSelected && (
+                <motion.span
+                  layoutId="borrow-requests-active-tab"
+                  className="absolute inset-0 rounded-lg bg-bg shadow-xs border border-border/80"
+                  transition={{ type: "spring", stiffness: 500, damping: 38 }}
+                />
               )}
-
-              {/* Active underline indicator */}
-              {isActive && (
-                <span className="absolute bottom-0 left-0 right-0 h-0.75 bg-accent rounded-t-full" />
-              )}
+              <span
+                className={cn("h-1.5 w-1.5 rounded-full relative z-10 shrink-0", theme.dot)}
+                aria-hidden="true"
+              />
+              <span className="relative z-10">{item.label}</span>
+              <span
+                className={cn(
+                  "relative z-10 px-1.5 py-0.2 rounded-full text-[10px] font-mono font-semibold transition-colors duration-150",
+                  isSelected ? theme.activeBadge : theme.badge
+                )}
+              >
+                {item.count}
+              </span>
             </button>
           );
         })}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Tag, Check, Palette } from "lucide-react";
+import { X, Tag, Check, Palette, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { CategoryItem, CategoryType } from "@/types/settings";
 import {
@@ -14,7 +14,7 @@ export interface AddEditCategoryDialogProps {
   type: CategoryType;
   initialCategory?: CategoryItem | null;
   onClose: () => void;
-  onSave: (categoryData: Partial<CategoryItem>) => void;
+  onSave: (categoryData: Partial<CategoryItem>) => void | Promise<void>;
 }
 
 export function AddEditCategoryDialog({
@@ -28,6 +28,7 @@ export function AddEditCategoryDialog({
   const [name, setName] = useState("");
   const [colorToken, setColorToken] = useState("blue");
   const [error, setError] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
   const [prevOpenKey, setPrevOpenKey] = useState({ isOpen: false, id: initialCategory?.id });
   if (isOpen !== prevOpenKey.isOpen || initialCategory?.id !== prevOpenKey.id) {
@@ -58,21 +59,29 @@ export function AddEditCategoryDialog({
 
   const previewStyle = getCategoryStyle(name.trim() || "Category Preview", undefined, colorToken);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSaving) return;
     if (!name.trim()) {
       setError("Please enter the category name.");
       return;
     }
 
-    onSave({
-      id: initialCategory ? initialCategory.id : `cat-${Date.now()}`,
-      name: name.trim(),
-      type,
-      colorToken,
-      itemCount: initialCategory ? initialCategory.itemCount : 0,
-    });
-    onClose();
+    setIsSaving(true);
+    try {
+      await onSave({
+        id: initialCategory ? initialCategory.id : `cat-${Date.now()}`,
+        name: name.trim(),
+        type,
+        colorToken,
+        itemCount: initialCategory ? initialCategory.itemCount : 0,
+      });
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save category.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -114,7 +123,7 @@ export function AddEditCategoryDialog({
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
           {/* Category Name */}
           <div className="space-y-1.5">
             <label htmlFor="cat-name-input" className="block text-xs font-semibold text-text">
@@ -200,16 +209,26 @@ export function AddEditCategoryDialog({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-semibold text-text-secondary hover:text-text rounded-md border border-border bg-bg transition-colors cursor-pointer"
+              disabled={isSaving}
+              className="px-4 py-2 text-xs font-semibold text-text-secondary hover:text-text rounded-md border border-border bg-bg transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-md bg-accent text-accent-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+              disabled={isSaving}
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-md bg-accent text-accent-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <Check className="h-4 w-4" strokeWidth={2.5} />
-              {isEditing ? "Save Category Changes" : "Create Category"}
+              {isSaving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Check className="h-4 w-4" strokeWidth={2.5} />
+              )}
+              {isSaving
+                ? "Saving…"
+                : isEditing
+                  ? "Save Category Changes"
+                  : "Create Category"}
             </button>
           </div>
         </form>

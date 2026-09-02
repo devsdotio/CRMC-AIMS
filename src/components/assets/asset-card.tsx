@@ -1,5 +1,5 @@
 "use client";
-import { getCategoryStyle } from "@/constants/categories";
+import { useCategoryStyleMap } from "@/features/categories/client/use-categories";
 import { User, MapPin, Tag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -7,6 +7,7 @@ import {
   custodyDetailLabel,
 } from "@/lib/assets-custody";
 import type { Asset, AssetStatus } from "@/types/assets";
+import { AssignmentTypeBadge } from "./assignment-type-badge";
 
 export interface AssetCardProps {
   asset: Asset;
@@ -37,9 +38,15 @@ const STATUS_STYLES: Record<
     text: "text-white font-bold",
     label: "Retired",
   },
+  missing: {
+    bg: "bg-status-outofservice-bg",
+    text: "text-white font-bold",
+    label: "Missing",
+  },
 };
 
 export function AssetCard({ asset, onSelect }: AssetCardProps) {
+  const { getCategoryStyle } = useCategoryStyleMap();
   const categoryMeta = getCategoryStyle(asset.category);
   const statusMeta = STATUS_STYLES[asset.status];
 
@@ -65,14 +72,10 @@ export function AssetCard({ asset, onSelect }: AssetCardProps) {
           {asset.assetCode}
         </span>
         <div className="flex items-center gap-2">
+          <AssignmentTypeBadge type={asset.assignmentType} compact />
           {asset.currentHolder && (
             <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-primary text-white">
               {custodyBadgeLabel(asset.currentHolder)}
-            </span>
-          )}
-          {!asset.currentHolder && asset.reservedForRequestId && (
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-status-repair-bg/20 text-status-repair-text border border-status-repair-bg/30">
-              Reserved
             </span>
           )}
           <span
@@ -124,10 +127,7 @@ export function AssetCard({ asset, onSelect }: AssetCardProps) {
               )}
               title={asset.currentHolder || undefined}
             >
-              {custodyDetailLabel(
-                asset.currentHolder,
-                Boolean(asset.reservedForRequestId)
-              )}
+              {custodyDetailLabel(asset.currentHolder)}
             </span>
           </div>
         </div>

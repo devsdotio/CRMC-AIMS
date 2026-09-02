@@ -18,15 +18,18 @@ import {
   Send,
   RotateCcw,
   X,
+  Edit3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getCategoryStyle } from "@/constants/categories";
+import { useCategoryStyleMap } from "@/features/categories/client/use-categories";
+import { formatItemDescription, formatAssetCodeDisplay, formatQuantityWithUnit } from "@/lib/sanitize-display";
 import {
   getActionStyle,
   getActionIcon,
   formatDateTime,
   formatRelativeTime,
   parseAuditNote,
+  AuditNoteDisplay,
 } from "@/components/audit-logs/audit-log-utils";
 import type { PortalBorrowRequest } from "./types";
 
@@ -35,6 +38,7 @@ export interface RequestDetailSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCancel?: (request: PortalBorrowRequest) => void;
+  onEdit?: (request: PortalBorrowRequest) => void;
 }
 
 const STATUS_CONFIG: Record<
@@ -84,7 +88,9 @@ export function RequestDetailSheet({
   open,
   onOpenChange,
   onCancel,
+  onEdit,
 }: RequestDetailSheetProps) {
+  const { getCategoryStyle } = useCategoryStyleMap();
   const [copied, setCopied] = useState(false);
 
   // Close on escape key
@@ -129,9 +135,9 @@ export function RequestDetailSheet({
           {
             id: "sub-1",
             action: "submitted" as const,
-            actor: request.requesterName || "Borrower",
+            actor: request.requesterName || "Requester",
             timestamp: request.requestedAt || new Date().toISOString(),
-            note: request.purpose || "Borrow request submitted for review",
+            note: request.purpose || "Request submitted for review",
           },
           ...(request.status === "approved" || request.status === "released" || request.status === "returned"
             ? [
@@ -166,7 +172,7 @@ export function RequestDetailSheet({
                     ? `Released to: ${request.pickedUpBy}`
                     : isConsumable
                     ? "Supplies issued and deducted from stock"
-                    : "Items released to borrower",
+                    : "Items released to requester",
                 },
               ]
             : []),
@@ -232,16 +238,30 @@ export function RequestDetailSheet({
               )}
             </div>
 
-            {/* Highlighted Status Badge */}
-            <span
-              className={cn(
-                "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-extrabold border shadow-xs tracking-wide",
-                statusConfig.badge
+            {/* Highlighted Status Badge & Edit Action */}
+            <div className="flex items-center gap-2">
+              {onEdit && request.status === "pending" && (
+                <button
+                  type="button"
+                  onClick={() => onEdit(request)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border border-border bg-bg-subtle text-text hover:bg-accent/10 hover:text-accent hover:border-accent/30 transition-colors shadow-xs cursor-pointer"
+                  title="Edit request details"
+                >
+                  <Edit3 className="h-3.5 w-3.5" />
+                  Edit
+                </button>
               )}
-            >
-              <StatusIcon className="h-3.5 w-3.5 shrink-0" />
-              {statusConfig.label}
-            </span>
+
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-extrabold border shadow-xs tracking-wide",
+                  statusConfig.badge
+                )}
+              >
+                <StatusIcon className="h-3.5 w-3.5 shrink-0" />
+                {statusConfig.label}
+              </span>
+            </div>
           </div>
 
           <div className="flex items-center justify-between text-xs text-text-secondary pt-0.5">
@@ -332,20 +352,24 @@ export function RequestDetailSheet({
               {request.items?.map((item, idx) => {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const catMeta = getCategoryStyle(item.category as any);
+                const desc = formatItemDescription(item.itemDescription, catMeta.label, item.itemType);
+                const displayCode = formatAssetCodeDisplay(item.assetCode);
                 return (
                   <div key={idx} className="p-3.5 flex items-center gap-3.5 bg-card hover:bg-bg-subtle/40 transition-colors">
                     <div className={cn("h-9 w-9 shrink-0 rounded-lg flex items-center justify-center border", catMeta.bg, "border-transparent")}>
                       <Tag className={cn("h-4 w-4", catMeta.text)} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-text truncate">{item.itemDescription}</p>
+                      <p className="text-sm font-bold text-text truncate">{desc}</p>
                       <p className="text-xs text-text-secondary font-mono mt-0.5">
-                        {item.assetCode || "CONS-ITEM"} · <span className="capitalize">{catMeta.label}</span>
+                        {displayCode ? `${displayCode} · ` : ""}<span className="capitalize">{catMeta.label}</span>
                       </p>
                     </div>
                     <div className="text-right shrink-0 bg-bg-subtle px-2.5 py-1 rounded-md border border-border">
                       <p className="text-[10px] uppercase tracking-wider text-text-secondary font-semibold">Qty</p>
-                      <p className="font-bold text-xs text-text">{item.quantity} {item.itemType === "consumable" ? "units" : "units"}</p>
+                      <p className="font-bold text-xs text-text">
+                        {formatQuantityWithUnit(item.quantity, item.unit, item.itemType)}
+                      </p>
                     </div>
                   </div>
                 );
@@ -471,28 +495,7 @@ export function RequestDetailSheet({
                       </div>
 
                       {/* Action Chips: Picked up / Returned by & Notes */}
-                      {(picker || description) && (
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {picker && (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-bg-subtle text-text-secondary border border-border shadow-xs">
-                              <User className="h-3 w-3" />
-                              {h.action === "returned" ? "Returned by: " : "Picked up by: "} {picker}
-                            </span>
-                          )}
-                          {description && (
-                            <span
-                              className={cn(
-                                "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border shadow-xs max-w-full",
-                                style.bg,
-                                isRejected ? "text-white" : "text-text"
-                              )}
-                            >
-                              <FileText className="h-3 w-3 shrink-0" />
-                              <span className="truncate whitespace-normal leading-tight">{description}</span>
-                            </span>
-                          )}
-                        </div>
-                      )}
+                      <AuditNoteDisplay action={h.action} note={h.note} className="mt-2" />
                     </li>
                   );
                 })}

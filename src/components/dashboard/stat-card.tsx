@@ -86,7 +86,7 @@ export function StatCard({
 
   // Determine structural urgency tier based on label and variant
   const isOverdue = label.toLowerCase().includes("overdue") || variant === "danger";
-  const isLowStock = label.toLowerCase().includes("low-stock") || variant === "warning";
+  const isLowStock = label.toLowerCase().includes("low stock") || label.toLowerCase().includes("low-stock") || variant === "warning";
   const isPending = label.toLowerCase().includes("pending");
 
   const cardContent = (
@@ -100,7 +100,7 @@ export function StatCard({
           : isLowStock
           ? "border-status-repair-bg/50 hover:border-status-repair-bg"
           : isPending
-          ? "border-category-computing-text/30 hover:border-category-computing-text/60"
+          ? "border-category-computing-bg/40 hover:border-category-computing-bg"
           : "border-border hover:border-text-secondary/40"
       )}
       aria-label={`${label}: ${isLoading ? "loading" : displayValue}`}
@@ -126,7 +126,7 @@ export function StatCard({
                 : isLowStock
                 ? "bg-status-repair-bg/15 border-status-repair-bg/40 text-status-repair-bg"
                 : isPending
-                ? "bg-category-computing-bg border-category-computing-text/30 text-category-computing-text"
+                ? "bg-category-computing-bg/15 border-category-computing-bg/40 text-category-computing-bg"
                 : "bg-bg-subtle border-border text-text-secondary group-hover:text-text"
             )}
           >
@@ -163,7 +163,7 @@ export function StatCard({
                   : isLowStock
                   ? "text-status-repair-bg"
                   : isPending
-                  ? "text-category-computing-text"
+                  ? "text-category-computing-bg"
                   : "text-text"
               )}
             >
@@ -203,7 +203,7 @@ export function StatCard({
               ) : isLowStock ? (
                 <AlertCircle className="h-3.5 w-3.5 shrink-0 text-status-repair-bg" />
               ) : isPending ? (
-                <Clock className="h-3.5 w-3.5 shrink-0 text-category-computing-text" />
+                <Clock className="h-3.5 w-3.5 shrink-0 text-category-computing-bg" />
               ) : (
                 <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-status-active-bg" />
               )}

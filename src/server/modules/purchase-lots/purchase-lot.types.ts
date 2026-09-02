@@ -1,10 +1,14 @@
 import type { PurchaseLotRow } from "@/server/db/schema";
+import type { PurchaseOrderStatus, POLineItemDetail } from "@/types/purchase-lots";
 
+export type { PurchaseOrderStatus, POLineItemDetail };
 export type PurchaseLotItemType = "consumable" | "asset";
 
 export type PurchaseLotDTO = {
   id: string;
+  poNumber: string;
   lotCode: string;
+  status: PurchaseOrderStatus;
   itemType: PurchaseLotItemType;
   consumableId: string | null;
   assetId: string | null;
@@ -18,11 +22,17 @@ export type PurchaseLotDTO = {
   totalCost: string;
   purchasedOn: string;
   reference: string | null;
+  purpose?: string | null;
   notes: string | null;
   recordedByUserId: string;
   recordedByName: string;
+  approvedByName?: string | null;
+  approvedAt?: string | null;
+  orderedAt?: string | null;
+  deliveredAt?: string | null;
   createdAt: string;
   updatedAt: string;
+  items?: POLineItemDetail[];
   /** Print/scan payload: `CRMC-AIMS-LOT:{lotCode}` */
   qrPayload: string;
 };
@@ -32,6 +42,7 @@ export type ListPurchaseLotFilters = {
   assetId?: string;
   supplierId?: string;
   itemType?: PurchaseLotItemType;
+  status?: PurchaseOrderStatus;
   search?: string;
 };
 
@@ -47,9 +58,56 @@ export type CreatePurchaseLotInput = {
   unitCost: string;
   purchasedOn: string;
   reference?: string | null;
+  purpose?: string | null;
   notes?: string | null;
+  status?: PurchaseOrderStatus;
   recordedByUserId: string;
   recordedByName: string;
+};
+
+export type CreatePurchaseOrderItemInput = {
+  itemType: PurchaseLotItemType;
+  consumableId?: string;
+  assetId?: string;
+  isNewItem?: boolean;
+  name: string;
+  category: string;
+  unit?: string;
+  minThreshold?: number;
+  location?: string;
+  assignmentType?: "borrowable" | "assignable";
+  model?: string;
+  quantity: number;
+  unitCost: string | number;
+  purpose?: string;
+  suggestedDealer?: string;
+  supplierId?: string;
+};
+
+export type CreatePurchaseOrderInput = {
+  poDate: string;
+  requestedBy: string;
+  supplierId?: string;
+  supplierName?: string;
+  purpose?: string;
+  notes?: string;
+  status?: PurchaseOrderStatus;
+  items: CreatePurchaseOrderItemInput[];
+};
+
+export type UpdatePurchaseOrderInput = {
+  supplierId?: string | null;
+  supplierName?: string | null;
+  reference?: string | null;
+  notes?: string | null;
+  purpose?: string | null;
+  purchasedOn?: string;
+};
+
+export type UpdatePurchaseOrderStatusInput = {
+  status: PurchaseOrderStatus;
+  notes?: string;
+  approvedBy?: string;
 };
 
 export interface IPurchaseLotRepository {

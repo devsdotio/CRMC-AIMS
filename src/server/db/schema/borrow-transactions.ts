@@ -36,6 +36,8 @@ export const returnConditionEnum = pgEnum("return_condition", [
   "good",
   "damaged",
   "needs_repair",
+  "lost",
+  "stolen",
 ]);
 
 export const borrowTransactions = pgTable(

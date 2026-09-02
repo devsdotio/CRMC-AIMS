@@ -180,7 +180,7 @@ export function RecentActivityFeed({
 
   return (
     <section
-      className="rounded-xl border border-border bg-card overflow-hidden shadow-xs"
+      className="rounded-lg border border-border bg-card overflow-hidden shadow-xs"
       aria-labelledby="recent-activity-heading"
     >
       {/* Header */}
@@ -219,13 +219,13 @@ export function RecentActivityFeed({
           </div>
         ) : entries.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 py-12 px-5 text-center">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-bg-subtle border border-border text-text-secondary">
-              <History className="h-5 w-5" strokeWidth={1.75} />
+            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-bg-subtle border border-border text-text-secondary shadow-xs">
+              <History className="h-6 w-6" strokeWidth={1.8} />
             </span>
             <div>
-              <p className="text-sm font-semibold text-text">No recent activity</p>
-              <p className="text-xs text-text-secondary mt-0.5">
-                No events or lifecycle movements have been recorded yet.
+              <p className="text-sm font-bold text-text">No recent activity</p>
+              <p className="text-xs text-text-secondary mt-1 max-w-xs leading-relaxed">
+                No events or asset lifecycle movements have been recorded yet.
               </p>
             </div>
           </div>

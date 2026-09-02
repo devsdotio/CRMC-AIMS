@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Search, FilterX, ArrowUpDown, Tag, AlertCircle, ChevronDown, Check } from "lucide-react";
+import { Search, FilterX, ArrowUpDown, Tag, AlertCircle, ChevronDown, Check, PackageCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AssetFilterState, AssetStatus } from "@/types/assets";
 import { useCategoriesQuery } from "@/features/categories/client/use-categories";
 import { getCategoryStyle } from "@/constants/categories";
+import { ASSIGNMENT_TYPE_FILTER_OPTIONS } from "@/lib/asset-assignment-type";
 
 export interface AssetFiltersProps {
   filters: AssetFilterState;
@@ -13,6 +14,7 @@ export interface AssetFiltersProps {
   onResetFilters: () => void;
   totalAssetsCount: number;
   filteredAssetsCount: number;
+  assignmentTypeCounts?: Record<AssetFilterState["assignmentType"], number>;
 }
 
 const STATUSES: { id: AssetStatus; label: string; bg: string; text: string; dotBg: string }[] = [
@@ -20,6 +22,7 @@ const STATUSES: { id: AssetStatus; label: string; bg: string; text: string; dotB
   { id: "needs_repair",   label: "Needs Repair",   bg: "bg-status-repair-bg/20",     text: "text-status-repair-text",       dotBg: "bg-status-repair-bg" },
   { id: "out_of_service", label: "Out of Service", bg: "bg-status-outofservice-bg/20", text: "text-status-outofservice-text", dotBg: "bg-status-outofservice-bg" },
   { id: "retired",        label: "Retired",        bg: "bg-status-retired-bg/20",    text: "text-status-retired-text",      dotBg: "bg-status-retired-bg" },
+  { id: "missing",        label: "Missing",        bg: "bg-status-outofservice-bg/20", text: "text-status-outofservice-text", dotBg: "bg-status-outofservice-bg" },
 ];
 
 function MultiSelectDropdown({
@@ -116,6 +119,7 @@ export function AssetFilters({
   filters,
   onFilterChange,
   onResetFilters,
+  assignmentTypeCounts,
 }: AssetFiltersProps) {
   // Only needed for labels / category multi-select — defer until first dropdown open
   // so list /api/assets is not competing with another DB round-trip on paint.
@@ -127,7 +131,9 @@ export function AssetFilters({
   const activeCount =
     (filters.searchQuery ? 1 : 0) +
     filters.categories.length +
-    filters.statuses.length;
+    filters.statuses.length +
+    (filters.availability === "available" ? 1 : 0) +
+    (filters.assignmentType !== "all" ? 1 : 0);
 
   const toggleCategory = (catId: string) => {
     const exists = filters.categories.includes(catId);
@@ -200,6 +206,59 @@ export function AssetFilters({
               selectedIds={filters.statuses}
               onToggle={(id) => toggleStatus(id as AssetStatus)}
             />
+
+            <button
+              type="button"
+              onClick={() =>
+                onFilterChange({
+                  availability:
+                    filters.availability === "available" ? "all" : "available",
+                })
+              }
+              className={cn(
+                "inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors",
+                filters.availability === "available"
+                  ? "border-accent/50 bg-accent/5 text-text"
+                  : "border-border bg-bg-subtle text-text-secondary hover:bg-border/60 hover:text-text"
+              )}
+            >
+              <PackageCheck className="h-3.5 w-3.5" />
+              Available only
+            </button>
+
+            <div className="inline-flex items-center rounded-lg border border-border bg-bg-subtle p-0.5">
+              {ASSIGNMENT_TYPE_FILTER_OPTIONS.map((opt) => {
+                const isActive = filters.assignmentType === opt.id;
+                const count = assignmentTypeCounts?.[opt.id];
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => onFilterChange({ assignmentType: opt.id })}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors",
+                      isActive
+                        ? "bg-bg text-text shadow-xs"
+                        : "text-text-secondary hover:text-text"
+                    )}
+                  >
+                    {opt.label}
+                    {count !== undefined && (
+                      <span
+                        className={cn(
+                          "tabular-nums text-[10px] font-bold px-1.5 py-0.5 rounded-full",
+                          isActive
+                            ? "bg-accent/10 text-accent"
+                            : "bg-border/60 text-text-secondary"
+                        )}
+                      >
+                        {count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div className="w-px h-6 bg-border mx-1 hidden sm:block" />

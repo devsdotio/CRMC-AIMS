@@ -179,7 +179,11 @@ export default function MaintenanceLogsPage() {
             <h1 className="text-xl font-bold tracking-tight text-text">
               Condition & Maintenance Logs
             </h1>
-            {openCount > 0 ? (
+            {isLoading ? (
+              <span className="px-2 py-0.5 text-xs font-bold bg-bg-subtle text-text-secondary rounded-full border border-border">
+                Loading flags…
+              </span>
+            ) : openCount > 0 ? (
               <span className="px-2 py-0.5 text-xs font-bold bg-status-repair-bg/20 text-status-repair-text rounded-full border border-status-repair-bg/30">
                 {openCount} open attention items
               </span>

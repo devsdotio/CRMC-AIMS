@@ -74,6 +74,11 @@ export type FlagMaintenanceInput = {
   notes?: string;
 };
 
+export type ReportMissingInput = {
+  reason: "lost" | "stolen" | "missing";
+  notes: string;
+};
+
 export type ScanResolveResult = {
   kind: "asset";
   code: string;
@@ -91,6 +96,7 @@ export const assetsApi = {
       category?: string;
       search?: string;
       availableOnly?: boolean;
+      assignmentType?: "borrowable" | "assignable";
     }
   ): Promise<Asset[]> {
     const searchParams = new URLSearchParams();
@@ -102,6 +108,7 @@ export const assetsApi = {
     if (filters?.category) searchParams.set("category", filters.category);
     if (filters?.search) searchParams.set("search", filters.search);
     if (filters?.availableOnly) searchParams.set("availableOnly", "true");
+    if (filters?.assignmentType) searchParams.set("assignmentType", filters.assignmentType);
 
     const queryString = searchParams.toString();
     const path =
@@ -234,6 +241,20 @@ export const assetsApi = {
       }
     );
 
+    return response.data;
+  },
+
+  async reportMissing(
+    id: string,
+    payload: ReportMissingInput
+  ): Promise<Asset> {
+    const response = await fetchJson<ApiResponse<Asset>>(
+      `/api/assets/${id}/report-missing`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }
+    );
     return response.data;
   },
 

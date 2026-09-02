@@ -1,5 +1,5 @@
 "use client";
-
+import { useMemo } from "react";
 import {
   useMutation,
   useQuery,
@@ -9,6 +9,28 @@ import {
 } from "@tanstack/react-query";
 import type { CategoryItem } from "@/types/settings";
 import { fetchJson, type ApiResponse } from "@/features/shared/fetch-json";
+import { getCategoryStyle, type CategoryStyleMeta } from "@/constants/categories";
+import {
+  invalidateDomains,
+  type CacheDomain,
+} from "@/features/shared/cache-invalidation";
+import { categoryQueryKeys } from "./query-keys";
+
+/** Renaming or removing a category affects labels across inventory and requests. */
+const CATEGORY_CHANGE_DOMAINS = [
+  "categories",
+  "assets",
+  "consumables",
+  "borrowRequests",
+  "consumableRequests",
+  "dashboard",
+  "maintenance",
+] as const satisfies readonly CacheDomain[];
+
+function invalidateCategoryChange(queryClient: ReturnType<typeof useQueryClient>) {
+  void invalidateDomains(queryClient, CATEGORY_CHANGE_DOMAINS);
+  queryClient.invalidateQueries({ queryKey: ["asset-models"] });
+}
 
 async function fetchCategories(): Promise<CategoryItem[]> {
   const result = await fetchJson<ApiResponse<CategoryItem[]>>("/api/categories");
@@ -44,11 +66,38 @@ export function useCategoriesQuery(options?: {
   enabled?: boolean;
 }): UseQueryResult<CategoryItem[], Error> {
   return useQuery({
-    queryKey: ["categories"],
+    queryKey: categoryQueryKeys.list(),
     queryFn: fetchCategories,
     staleTime: 5 * 60 * 1000,
     enabled: options?.enabled ?? true,
   });
+}
+
+/**
+ * Returns a helper function that resolves CategoryStyleMeta using custom colors from Settings.
+ */
+export function useCategoryStyleMap() {
+  const { data: categories = [] } = useCategoriesQuery();
+
+  return useMemo(() => {
+    const tokenMap = new Map<string, string>();
+    for (const cat of categories) {
+      if (cat.name && cat.colorToken) {
+        tokenMap.set(cat.name.trim().toLowerCase(), cat.colorToken);
+      }
+    }
+
+    return {
+      categories,
+      getCategoryStyle: (
+        categoryName: string,
+        fallbackLabel?: string
+      ): CategoryStyleMeta => {
+        const token = tokenMap.get((categoryName || "").trim().toLowerCase());
+        return getCategoryStyle(categoryName, fallbackLabel, token);
+      },
+    };
+  }, [categories]);
 }
 
 export function useCreateCategoryMutation(): UseMutationResult<
@@ -61,11 +110,11 @@ export function useCreateCategoryMutation(): UseMutationResult<
   return useMutation({
     mutationFn: createCategory,
     onMutate: async (newCategory) => {
-      await queryClient.cancelQueries({ queryKey: ["categories"] });
-      const previousCategories = queryClient.getQueryData<CategoryItem[]>(["categories"]);
+      await queryClient.cancelQueries({ queryKey: categoryQueryKeys.all });
+      const previousCategories = queryClient.getQueryData<CategoryItem[]>(categoryQueryKeys.list());
 
       if (previousCategories) {
-        queryClient.setQueryData<CategoryItem[]>(["categories"], [
+        queryClient.setQueryData<CategoryItem[]>(categoryQueryKeys.list(), [
           ...previousCategories,
           { ...newCategory, id: newCategory.id || `temp-${Date.now()}` } as CategoryItem
         ]);
@@ -74,11 +123,14 @@ export function useCreateCategoryMutation(): UseMutationResult<
     },
     onError: (_err, _newCategory, context) => {
       if (context?.previousCategories) {
-        queryClient.setQueryData(["categories"], context.previousCategories);
+        queryClient.setQueryData(
+          categoryQueryKeys.list(),
+          context.previousCategories
+        );
       }
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["categories"] });
+      queryClient.invalidateQueries({ queryKey: categoryQueryKeys.all });
     },
   });
 }
@@ -93,12 +145,12 @@ export function useUpdateCategoryMutation(): UseMutationResult<
   return useMutation({
     mutationFn: updateCategory,
     onMutate: async (updatedCategory) => {
-      await queryClient.cancelQueries({ queryKey: ["categories"] });
-      const previousCategories = queryClient.getQueryData<CategoryItem[]>(["categories"]);
+      await queryClient.cancelQueries({ queryKey: categoryQueryKeys.all });
+      const previousCategories = queryClient.getQueryData<CategoryItem[]>(categoryQueryKeys.list());
 
       if (previousCategories) {
         queryClient.setQueryData<CategoryItem[]>(
-          ["categories"],
+          categoryQueryKeys.list(),
           previousCategories.map((cat) =>
             cat.id === updatedCategory.id ? { ...cat, ...updatedCategory } : cat
           )
@@ -108,11 +160,14 @@ export function useUpdateCategoryMutation(): UseMutationResult<
     },
     onError: (_err, _updatedCategory, context) => {
       if (context?.previousCategories) {
-        queryClient.setQueryData(["categories"], context.previousCategories);
+        queryClient.setQueryData(
+          categoryQueryKeys.list(),
+          context.previousCategories
+        );
       }
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["categories"] });
+      invalidateCategoryChange(queryClient);
     },
   });
 }
@@ -127,12 +182,12 @@ export function useDeleteCategoryMutation(): UseMutationResult<
   return useMutation({
     mutationFn: deleteCategory,
     onMutate: async (deletedId) => {
-      await queryClient.cancelQueries({ queryKey: ["categories"] });
-      const previousCategories = queryClient.getQueryData<CategoryItem[]>(["categories"]);
+      await queryClient.cancelQueries({ queryKey: categoryQueryKeys.all });
+      const previousCategories = queryClient.getQueryData<CategoryItem[]>(categoryQueryKeys.list());
 
       if (previousCategories) {
         queryClient.setQueryData<CategoryItem[]>(
-          ["categories"],
+          categoryQueryKeys.list(),
           previousCategories.filter((cat) => cat.id !== deletedId)
         );
       }
@@ -140,11 +195,14 @@ export function useDeleteCategoryMutation(): UseMutationResult<
     },
     onError: (_err, _deletedId, context) => {
       if (context?.previousCategories) {
-        queryClient.setQueryData(["categories"], context.previousCategories);
+        queryClient.setQueryData(
+          categoryQueryKeys.list(),
+          context.previousCategories
+        );
       }
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["categories"] });
+      invalidateCategoryChange(queryClient);
     },
   });
 }

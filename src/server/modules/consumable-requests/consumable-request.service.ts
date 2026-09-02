@@ -3,13 +3,11 @@ import type {
   ConsumableRequestLineRow,
   ConsumableRequestReleaseAllocationRow,
   ConsumableRequestRow,
-  StockHistoryEntry,
 } from "@/server/db/schema";
 import { formatRelativeTime } from "@/lib/format-relative-time";
 import {
   generateOperationalCode,
   isoNow,
-  todayDateString,
 } from "@/server/shared/codes";
 import type { ActorContext } from "@/server/shared/auth";
 import { resolveDepartmentSnapshot } from "@/server/shared/auth";
@@ -21,7 +19,6 @@ import {
   NotFoundError,
 } from "@/server/shared/errors";
 import { withTransaction } from "@/server/db/transaction";
-import { AuditLogRepository } from "@/server/modules/audit-logs/audit-logs.repository";
 import { ConsumableRepository } from "@/server/modules/consumables/consumable.repository";
 import {
   PurchaseLotService,
@@ -46,6 +43,7 @@ import {
   listConsumableRequestsQuerySchema,
   rejectConsumableRequestSchema,
   releaseConsumableRequestSchema,
+  updateConsumableRequestSchema,
 } from "./consumable-request.validation";
 
 function money(value: string | number): string {
@@ -153,37 +151,6 @@ function historyEntry(
   };
 }
 
-function stockHistoryEntry(
-  type: StockHistoryEntry["type"],
-  quantityChange: number,
-  actor: string,
-  reason?: string,
-  notes?: string,
-  extra?: Partial<
-    Pick<
-      StockHistoryEntry,
-      | "unitCost"
-      | "supplierId"
-      | "supplierName"
-      | "lotCode"
-      | "totalCost"
-      | "lotAllocations"
-      | "recipientName"
-    >
-  >
-): StockHistoryEntry {
-  return {
-    id: crypto.randomUUID(),
-    date: todayDateString(),
-    type,
-    quantityChange,
-    actor,
-    ...(reason ? { reason } : {}),
-    ...(notes ? { notes } : {}),
-    ...extra,
-  };
-}
-
 export interface PaginatedMeta {
   total: number;
   page: number;
@@ -197,7 +164,6 @@ export class ConsumableRequestService {
     private readonly repo = new ConsumableRequestRepository(),
     private readonly consumables = new ConsumableRepository(),
     private readonly purchaseLots = new PurchaseLotService(),
-    private readonly auditLogs = new AuditLogRepository(),
     private readonly movements = new StockMovementService()
   ) {}
 
@@ -365,23 +331,6 @@ export class ConsumableRequestService {
         tx
       );
 
-      await this.auditLogs.create(
-        {
-          entityType: "consumable_request",
-          entityId: created.id,
-          action: "submitted",
-          actorName: actor.displayName,
-          actorUserId: actor.userId,
-          notes: `${lines.length} line(s)`,
-          metadata: {
-            requestCode,
-            lineCount: lines.length,
-            department: dest.departmentName ?? "",
-          },
-        },
-        tx
-      );
-
       return toDTO(created, lines, []);
     });
 
@@ -401,18 +350,49 @@ export class ConsumableRequestService {
       throw new ConflictError("Only pending requests can be approved.");
     }
 
-    const history = [
-      ...(Array.isArray(existing.history) ? existing.history : []),
-      historyEntry("approved", actor.displayName, input.note),
-    ];
-
     const updated = await withTransaction(async (tx) => {
-      const lines = await this.repo.listLinesByRequestId(id, tx);
-      if (lines.length === 0) {
+      const existingLines = await this.repo.listLinesByRequestId(id, tx);
+      if (existingLines.length === 0) {
         throw new BadRequestError("Request has no product lines.");
       }
 
-      for (const line of lines) {
+      let quantityChanged = false;
+      const linesToProcess = existingLines.map((line) => {
+        const matchingInputLine = input.lines?.find(
+          (il) =>
+            (il.lineId && il.lineId === line.id) ||
+            il.consumableId === line.consumableId
+        );
+        if (
+          matchingInputLine &&
+          matchingInputLine.quantity !== line.quantityRequested
+        ) {
+          quantityChanged = true;
+          return {
+            ...line,
+            quantityRequested: matchingInputLine.quantity,
+            isModified: true,
+          };
+        }
+        return {
+          ...line,
+          isModified: false,
+        };
+      });
+
+      if (quantityChanged) {
+        for (const line of linesToProcess) {
+          if (line.isModified) {
+            await this.repo.updateLine(
+              line.id,
+              { quantityRequested: line.quantityRequested },
+              tx
+            );
+          }
+        }
+      }
+
+      for (const line of linesToProcess) {
         const item = await this.consumables.findByIdForUpdate(
           line.consumableId,
           tx
@@ -421,7 +401,7 @@ export class ConsumableRequestService {
         const freeQty = Math.max(0, item.currentQty - (item.reservedQty ?? 0));
         if (line.quantityRequested > freeQty) {
           throw new BadRequestError(
-            `Not enough unreserved stock for ${item.itemCode}. Available: ${freeQty} ${item.unit}, requested: ${line.quantityRequested}.`
+            `Not enough unreserved stock for ${item.itemCode}. Available: ${freeQty} ${item.unit}, requested/approved: ${line.quantityRequested}.`
           );
         }
         await this.consumables.update(
@@ -430,6 +410,18 @@ export class ConsumableRequestService {
           tx
         );
       }
+
+      const approveNote = input.note?.trim();
+      const historyNote = quantityChanged
+        ? approveNote
+          ? `${approveNote} (quantities adjusted at approval)`
+          : "Quantities adjusted at approval"
+        : approveNote;
+
+      const history = [
+        ...(Array.isArray(existing.history) ? existing.history : []),
+        historyEntry("approved", actor.displayName, historyNote),
+      ];
 
       const up = await this.repo.update(
         id,
@@ -443,18 +435,6 @@ export class ConsumableRequestService {
         tx
       );
       if (!up) throw new NotFoundError("Consumable request", id);
-
-      await this.auditLogs.create(
-        {
-          entityType: "consumable_request",
-          entityId: up.id,
-          action: "approved",
-          actorName: actor.displayName,
-          actorUserId: actor.userId,
-          notes: input.note,
-        },
-        tx
-      );
 
       return up;
     });
@@ -491,18 +471,6 @@ export class ConsumableRequestService {
         tx
       );
       if (!up) throw new NotFoundError("Consumable request", id);
-
-      await this.auditLogs.create(
-        {
-          entityType: "consumable_request",
-          entityId: up.id,
-          action: "rejected",
-          actorName: actor.displayName,
-          actorUserId: actor.userId,
-          notes: input.reason,
-        },
-        tx
-      );
 
       return up;
     });
@@ -566,18 +534,6 @@ export class ConsumableRequestService {
         tx
       );
       if (!up) throw new NotFoundError("Consumable request", id);
-
-      await this.auditLogs.create(
-        {
-          entityType: "consumable_request",
-          entityId: up.id,
-          action: "cancelled",
-          actorName: actor.displayName,
-          actorUserId: actor.userId,
-          notes: input.note,
-        },
-        tx
-      );
 
       return up;
     });
@@ -659,7 +615,7 @@ export class ConsumableRequestService {
 
         if (item.currentQty < line.quantityRequested) {
           throw new BadRequestError(
-            `Not on hand for ${item.itemCode}. Available: ${item.currentQty} ${item.unit}, requested: ${line.quantityRequested}. Restock first. Purchase orders will be added later.`
+            `Not on hand for ${item.itemCode}. Available: ${item.currentQty} ${item.unit}, requested: ${line.quantityRequested}. Restock or file a purchase order first.`
           );
         }
 
@@ -693,33 +649,6 @@ export class ConsumableRequestService {
           lotAllocations.push(result.allocation);
         }
 
-        const totalCost = lotAllocations.reduce(
-          (sum, a) => sum + Number(a.total),
-          0
-        );
-        const primary =
-          lotAllocations.find((a) => !a.uncosted) ?? lotAllocations[0];
-
-        const history = [
-          ...(Array.isArray(item.history) ? item.history : []),
-          stockHistoryEntry(
-            "checkout",
-            -line.quantityRequested,
-            actor.displayName,
-            `Request ${existing.requestCode}`,
-            noteWithReceiver,
-            {
-              unitCost: primary?.unitCost,
-              supplierId: primary?.supplierId ?? undefined,
-              supplierName: primary?.supplierName ?? undefined,
-              lotCode: primary?.lotCode ?? undefined,
-              totalCost: money(totalCost),
-              lotAllocations,
-              recipientName: input.receivedBy,
-            }
-          ),
-        ];
-
         await this.consumables.update(
           item.id,
           {
@@ -728,7 +657,6 @@ export class ConsumableRequestService {
               0,
               (item.reservedQty ?? 0) - line.quantityRequested
             ),
-            history,
           },
           tx
         );
@@ -791,31 +719,108 @@ export class ConsumableRequestService {
       );
       if (!up) throw new NotFoundError("Consumable request", id);
 
-      const expenseTotal = savedAllocations.reduce(
-        (sum, a) => sum + Number(a.lineTotal),
-        0
-      );
+      const lines = await this.repo.listLinesByRequestId(id, tx);
+      return toDTO(up, lines, savedAllocations);
+    });
 
-      await this.auditLogs.create(
+    return dto;
+  }
+
+  async update(
+    rawId: string,
+    rawInput: unknown,
+    actor: ActorContext
+  ): Promise<ConsumableRequestDTO> {
+    const id = consumableRequestIdSchema.parse(rawId);
+    const input = updateConsumableRequestSchema.parse(rawInput);
+    const existing = await this.repo.findById(id);
+    if (!existing) throw new NotFoundError("Consumable request", id);
+    if (existing.status !== "pending") {
+      throw new ConflictError("Only pending requests can be edited.");
+    }
+
+    let departmentName = existing.department;
+    let departmentId = existing.departmentId;
+    let projectId = existing.projectId;
+
+    if (input.departmentId !== undefined || input.projectId !== undefined) {
+      if (input.departmentId) {
+        const dest = await resolveDepartmentSnapshot({
+          actor,
+          submittedDepartmentId: input.departmentId,
+          requireDepartment: true,
+        });
+        departmentName = dest.departmentName ?? existing.department;
+        departmentId = dest.departmentId;
+        projectId = null;
+      } else if (input.projectId) {
+        departmentId = null;
+        projectId = input.projectId;
+      }
+    }
+
+    let lineRowsToInsert: Array<Omit<ConsumableRequestLineRow, "id" | "createdAt" | "updatedAt">> | null = null;
+    if (input.lines && input.lines.length > 0) {
+      const consumableIds = input.lines.map((l) => l.consumableId);
+      const uniqueIds = new Set(consumableIds);
+      if (uniqueIds.size !== consumableIds.length) {
+        throw new BadRequestError(
+          "Duplicate products in one request are not allowed. Combine quantities into a single line."
+        );
+      }
+
+      lineRowsToInsert = await Promise.all(
+        input.lines.map(async (line, index) => {
+          const item = await this.consumables.findById(line.consumableId);
+          if (!item) {
+            throw new NotFoundError("Consumable", line.consumableId);
+          }
+          return {
+            requestId: id,
+            lineNo: index + 1,
+            consumableId: item.id,
+            itemCode: item.itemCode,
+            itemName: item.name,
+            category: item.category,
+            unit: item.unit,
+            quantityRequested: line.quantity,
+            notes: line.notes ?? null,
+          };
+        })
+      );
+    }
+
+    const history = [
+      ...(Array.isArray(existing.history) ? existing.history : []),
+      historyEntry("edited", actor.displayName, input.editReason),
+    ];
+
+    const dto = await withTransaction(async (tx) => {
+      if (lineRowsToInsert) {
+        await this.repo.deleteLinesByRequestId(id, tx);
+        await this.repo.createLines(lineRowsToInsert, tx);
+      }
+
+      const up = await this.repo.update(
+        id,
         {
-          entityType: "consumable_request",
-          entityId: up.id,
-          action: "released",
-          actorName: actor.displayName,
-          actorUserId: actor.userId,
-          notes: noteWithReceiver,
-          metadata: {
-            requestCode: existing.requestCode,
-            department: existing.department,
-            totalCost: money(expenseTotal),
-            allocationCount: savedAllocations.length,
-          },
+          ...(input.requesterName !== undefined ? { requesterName: input.requesterName } : {}),
+          ...(input.requesterEmail !== undefined ? { requesterEmail: input.requesterEmail.toLowerCase() } : {}),
+          ...(input.requesterPhone !== undefined ? { requesterPhone: input.requesterPhone } : {}),
+          ...(input.requestedByName !== undefined ? { requestedByName: input.requestedByName } : {}),
+          department: departmentName,
+          departmentId,
+          projectId,
+          ...(input.purpose !== undefined ? { purpose: input.purpose } : {}),
+          ...(input.notes !== undefined ? { notes: input.notes } : {}),
+          history,
         },
         tx
       );
+      if (!up) throw new NotFoundError("Consumable request", id);
 
       const lines = await this.repo.listLinesByRequestId(id, tx);
-      return toDTO(up, lines, savedAllocations);
+      return toDTO(up, lines, []);
     });
 
     return dto;

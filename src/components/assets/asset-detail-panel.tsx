@@ -41,8 +41,10 @@ import {
   type AssetChangesMap,
 } from "@/features/assets/client";
 import { QRCodeDisplay } from "./qr-code-display";
-import { getCategoryStyle } from "@/constants/categories";
+import { useCategoryStyleMap } from "@/features/categories/client/use-categories";
 import { useBorrowRequests } from "@/features/borrow-requests/client";
+import { AuditNoteDisplay } from "@/components/audit-logs/audit-log-utils";
+import { LoadingState } from "@/components/providers/loading-context";
 
 function getTimelineIcon(status: string) {
   switch (status.toLowerCase()) {
@@ -322,9 +324,7 @@ function RequestDetailsSection({ request }: { request: BorrowRequest }) {
                     )}
                   </div>
                   {log.note && (
-                    <p className="mt-1 text-[11px] text-text bg-bg/80 border border-border/50 rounded px-2 py-1 leading-snug">
-                      {log.note}
-                    </p>
+                    <AuditNoteDisplay action={log.action} note={log.note} />
                   )}
                 </div>
               );
@@ -454,9 +454,9 @@ function LifecycleDetailsSection({ item }: { item: Extract<UnifiedTimelineItem, 
             </p>
           )}
           {event.payload.notes && (
-            <p className="text-text-secondary leading-relaxed italic">
-              &quot;{String(event.payload.notes)}&quot;
-            </p>
+            <div className="pt-1">
+              <AuditNoteDisplay action={event.eventType} note={String(event.payload.notes)} />
+            </div>
           )}
         </div>
       )}
@@ -551,9 +551,12 @@ function AssetHistoryTimeline({ asset }: { asset: Asset }) {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center p-8 rounded-xl border border-border bg-bg">
-        <Loader2 className="h-5 w-5 animate-spin text-text-secondary" />
-      </div>
+      <LoadingState
+        variant="card"
+        icon="history"
+        message="Loading asset lifecycle & history..."
+        subtitle="Retrieving custody handovers, borrow records, and audit events"
+      />
     );
   }
 
@@ -676,21 +679,7 @@ function AssetHistoryTimeline({ asset }: { asset: Asset }) {
     }
   }
 
-  // 3. Map Standalone Maintenance Logs
-  if (asset.maintenanceHistory) {
-    for (const log of asset.maintenanceHistory) {
-      timeline.push({
-        id: `maint-${log.id}`,
-        kind: "maintenance",
-        date: new Date(log.date),
-        title: `Maintenance: ${log.type}`,
-        subtitle: `By ${log.technician}`,
-        status: "maintenance",
-        iconType: "maintenance",
-        maintenance: log,
-      });
-    }
-  }
+  // 3. Standalone JSONB maintenance trail removed — lifecycle + maintenance_logs are source of truth.
 
   // Sort descending (newest first)
   timeline.sort((a, b) => b.date.getTime() - a.date.getTime());
@@ -867,9 +856,11 @@ function AssetHistoryTimeline({ asset }: { asset: Asset }) {
 export interface AssetDetailPanelProps {
   asset: Asset | null;
   isOpen: boolean;
+  isLoading?: boolean;
   onClose: () => void;
   onEdit?: (asset: Asset) => void;
   onIssue?: (asset: Asset) => void;
+  onReportMissing?: (asset: Asset) => void;
 }
 
 const STATUS_STYLES: Record<
@@ -896,16 +887,24 @@ const STATUS_STYLES: Record<
     text: "text-white font-bold",
     label: "Retired",
   },
+  missing: {
+    bg: "bg-status-outofservice-bg",
+    text: "text-white font-bold",
+    label: "Missing",
+  },
 };
 
 export function AssetDetailPanel({
   asset,
   isOpen,
+  isLoading = false,
   onClose,
   onEdit,
   onIssue,
+  onReportMissing,
 }: AssetDetailPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const { getCategoryStyle } = useCategoryStyleMap();
   // Suppliers only needed when panel is open with a linked vendor — never on list paint.
   const { data: suppliers = [] } = useSuppliersQuery({
     enabled: Boolean(isOpen && asset?.supplierId),
@@ -925,7 +924,44 @@ export function AssetDetailPanel({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen || !asset) return null;
+  if (!isOpen) return null;
+
+  if (isLoading || !asset) {
+    return (
+      <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs transition-opacity duration-200">
+        <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
+        <aside
+          role="dialog"
+          aria-modal="true"
+          aria-label="Loading asset details"
+          className={cn(
+            "relative flex flex-col w-full max-w-lg h-full bg-bg border-l border-border shadow-2xl z-10 overflow-hidden",
+            "animate-in slide-in-from-right duration-250 ease-in-out"
+          )}
+        >
+          <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-bg-subtle/50 shrink-0">
+            <div className="h-6 w-36 bg-border/60 rounded-md animate-pulse" />
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-text-secondary hover:text-text hover:bg-border transition-colors cursor-pointer shrink-0"
+              aria-label="Close"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <div className="flex-1 flex items-center justify-center p-6">
+            <LoadingState
+              variant="card"
+              icon="package"
+              message="Loading asset details..."
+              subtitle="Retrieving hardware specifications, maintenance logs, and custody status"
+            />
+          </div>
+        </aside>
+      </div>
+    );
+  }
 
   const categoryMeta = getCategoryStyle(asset.category);
   const statusMeta = STATUS_STYLES[asset.status];
@@ -964,14 +1000,14 @@ export function AssetDetailPanel({
                       ? "bg-status-active-bg/20 text-status-active-text border-status-active-bg/30"
                       : asset.status === "needs_repair"
                       ? "bg-status-repair-bg/20 text-status-repair-text border-status-repair-bg/30"
+                      : asset.status === "missing"
+                      ? "bg-status-outofservice-bg/20 text-status-outofservice-text border-status-outofservice-bg/30"
                       : "bg-status-outofservice-bg/20 text-status-outofservice-text border-status-outofservice-bg/30"
                   )}
                 >
                   {asset.currentHolder
                     ? "Borrowed / In-Use"
-                    : asset.reservedForRequestId
-                      ? "Reserved"
-                      : statusMeta.label}
+                    : statusMeta.label}
                 </span>
               )}
             </div>
@@ -981,35 +1017,42 @@ export function AssetDetailPanel({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {onIssue && !asset.currentHolder && !asset.reservedForRequestId && asset.status === "active" && (
-            <button
-              type="button"
-              onClick={() => onIssue(asset)}
-              aria-label="Issue asset to department or project"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary text-primary-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
-            >
-              Issue
-            </button>
+            {onIssue && !asset.currentHolder && asset.status === "active" && (
+              <button
+                type="button"
+                onClick={() => onIssue(asset)}
+                aria-label="Issue asset to department or project"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary text-primary-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+              >
+                <PackageMinus className="h-3.5 w-3.5" />
+                <span>Issue</span>
+              </button>
+            )}
+            {onReportMissing && asset.status !== "missing" && asset.status !== "retired" && (
+              <button
+                type="button"
+                onClick={() => onReportMissing(asset)}
+                aria-label="Report asset as missing"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-bg text-status-outofservice-text border border-status-outofservice-bg/40 hover:bg-status-outofservice-bg/10 transition-colors cursor-pointer shadow-xs"
+              >
+                <AlertCircle className="h-3.5 w-3.5" />
+                <span>Missing</span>
+              </button>
+            )}
+            {onIssue && !asset.currentHolder && asset.status === "active" && onEdit && (
+              <div className="h-4 w-px bg-border mx-0.5" aria-hidden="true" />
             )}
             {onEdit && (
-            <button
-              type="button"
-              onClick={() => onEdit(asset)}
-              aria-label="Edit asset details"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-bg text-text-secondary hover:text-text border border-border hover:border-primary transition-colors cursor-pointer shadow-xs"
-            >
-              <Edit3 className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Edit</span>
-            </button>
+              <button
+                type="button"
+                onClick={() => onEdit(asset)}
+                aria-label="Edit asset details"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-bg text-text-secondary hover:text-text border border-border hover:border-primary transition-colors cursor-pointer shadow-xs"
+              >
+                <Edit3 className="h-3.5 w-3.5" />
+                <span>Edit</span>
+              </button>
             )}
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close asset detail panel"
-              className="p-1.5 rounded-lg text-text-secondary hover:text-text hover:bg-border transition-colors cursor-pointer"
-            >
-              <X className="h-5 w-5" />
-            </button>
           </div>
         </div>
 
@@ -1039,10 +1082,6 @@ export function AssetDetailPanel({
                   {asset.currentHolder ? (
                     <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-primary text-white uppercase tracking-wider">
                       {custodyBadgeLabel(asset.currentHolder)}
-                    </span>
-                  ) : asset.reservedForRequestId ? (
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-status-repair-bg/20 text-status-repair-text uppercase tracking-wider border border-status-repair-bg/30">
-                      Reserved
                     </span>
                   ) : (
                     <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-status-active-bg text-white uppercase tracking-wider">
@@ -1107,10 +1146,6 @@ export function AssetDetailPanel({
                       >
                         {asset.currentHolder}
                       </span>
-                    ) : asset.reservedForRequestId ? (
-                      <span className="text-status-repair-text">
-                        Reserved for approved request
-                      </span>
                     ) : (
                       <span className="text-status-active-text">
                         Available In Stock
@@ -1158,9 +1193,7 @@ export function AssetDetailPanel({
                   <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-2">
                     Custody Notes / Details
                   </p>
-                  <p className="text-xs text-text leading-relaxed whitespace-pre-wrap">
-                    {asset.notes}
-                  </p>
+                  <AuditNoteDisplay note={asset.notes} className="mt-0" />
                 </div>
               )}
             </div>

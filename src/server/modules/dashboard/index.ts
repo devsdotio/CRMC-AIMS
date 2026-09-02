@@ -32,11 +32,25 @@ export class DashboardController {
       return handleError(error);
     }
   }
+
+  /** Header notification bell — overdue, pending, low stock. */
+  async notifications() {
+    try {
+      const session = await requireActor();
+      if (isAssetOperatorRole(session.role)) {
+        return ok(await this.service.getNotifications());
+      }
+      return ok(await this.service.getNotifications(session.userId));
+    } catch (error) {
+      return handleError(error);
+    }
+  }
 }
 
 export const dashboardController = new DashboardController();
 export { DashboardService } from "./dashboard.service";
 export type {
+  DashboardNotificationItem,
   DashboardSnapshotDTO,
   DashboardSummaryDTO,
 } from "./dashboard.service";

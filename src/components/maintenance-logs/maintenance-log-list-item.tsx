@@ -1,7 +1,6 @@
 "use client";
  
-import { getCategoryStyle } from "@/constants/categories";
-
+import { useCategoryStyleMap } from "@/features/categories/client/use-categories";
 import { CheckCircle2, User, Calendar, Tag, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { MaintenanceLogRecord } from "@/types/maintenance-logs";
@@ -19,6 +18,7 @@ export function MaintenanceLogListItem({
   onSelect,
   onResolve,
 }: MaintenanceLogListItemProps) {
+  const { getCategoryStyle } = useCategoryStyleMap();
   const categoryMeta = getCategoryStyle(record.category);
 
   return (

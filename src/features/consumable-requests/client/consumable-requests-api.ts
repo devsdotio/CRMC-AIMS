@@ -33,6 +33,32 @@ export type ReleaseConsumableRequestPayload = {
   }>;
 };
 
+export type UpdateConsumableRequestPayload = {
+  requesterName?: string;
+  requesterEmail?: string;
+  requesterPhone?: string;
+  departmentId?: string | null;
+  projectId?: string | null;
+  requestedByName?: string | null;
+  purpose?: string;
+  notes?: string | null;
+  lines?: Array<{
+    consumableId: string;
+    quantity: number;
+    notes?: string;
+  }>;
+  editReason: string;
+};
+
+export type ApproveConsumableRequestPayload = {
+  note?: string;
+  lines?: Array<{
+    lineId?: string;
+    consumableId: string;
+    quantity: number;
+  }>;
+};
+
 export const consumableRequestsApi = {
   async list(params?: {
     status?: ConsumableRequest["status"];
@@ -75,10 +101,26 @@ export const consumableRequestsApi = {
     return res.data;
   },
 
-  async approve(id: string, note?: string): Promise<ConsumableRequest> {
+  async update(
+    id: string,
+    payload: UpdateConsumableRequestPayload
+  ): Promise<ConsumableRequest> {
+    const res = await fetchJson<ApiResponse<ConsumableRequest>>(
+      `/api/consumable-requests/${id}`,
+      { method: "PATCH", body: JSON.stringify(payload) }
+    );
+    return res.data;
+  },
+
+  async approve(
+    id: string,
+    payload?: ApproveConsumableRequestPayload | string
+  ): Promise<ConsumableRequest> {
+    const body =
+      typeof payload === "string" ? { note: payload } : (payload ?? {});
     const res = await fetchJson<ApiResponse<ConsumableRequest>>(
       `/api/consumable-requests/${id}/approve`,
-      { method: "POST", body: JSON.stringify({ note }) }
+      { method: "POST", body: JSON.stringify(body) }
     );
     return res.data;
   },

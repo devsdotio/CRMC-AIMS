@@ -28,6 +28,7 @@ export interface ListAssetsFilters extends PaginationParams {
   modelId?: string;
   category?: string;
   search?: string;
+  assignmentType?: "borrowable" | "assignable";
   /** When true, only units with no current holder and no approved reservation. */
   availableOnly?: boolean;
 }

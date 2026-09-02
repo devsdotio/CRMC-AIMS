@@ -3,36 +3,24 @@ import { and, eq, sql } from "drizzle-orm";
 import { getDb } from "@/server/db";
 import { categories } from "@/server/db/schema";
 import { requireActor } from "@/server/shared/auth";
+import { CategoryRepository } from "@/server/modules/categories/category.repository";
 
 /**
  * Institutional category taxonomy (Settings).
- * Lists all asset + consumable categories for the org (not only creator).
+ * Lists all asset + consumable categories for the org with real item counts.
  */
 export async function GET(request: Request) {
   try {
     await requireActor();
-    const db = getDb();
     const url = new URL(request.url);
     const type = url.searchParams.get("type");
 
-    const rows =
-      type === "asset" || type === "consumable"
-        ? await db
-            .select()
-            .from(categories)
-            .where(eq(categories.type, type))
-            .orderBy(categories.name)
-        : await db.select().from(categories).orderBy(categories.name);
+    const categoryRepo = new CategoryRepository();
+    const rows = await categoryRepo.listWithCounts(
+      type === "asset" || type === "consumable" ? type : undefined
+    );
 
-    const mappedCategories = rows.map((c) => ({
-      id: c.id,
-      name: c.name,
-      type: c.type as "asset" | "consumable",
-      colorToken: c.colorToken || undefined,
-      itemCount: 0,
-    }));
-
-    return NextResponse.json({ data: mappedCategories });
+    return NextResponse.json({ data: rows });
   } catch (error) {
     console.error("GET /api/categories Error:", error);
     return NextResponse.json(

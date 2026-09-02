@@ -1,15 +1,24 @@
 "use client";
 
-import { MyRequestsTab } from "../../../../components/borrower-db/my-requests-tab";
+import { MyRequestsTab } from "@/components/borrower-db/my-requests-tab";
 
 export default function RequestsPage() {
   return (
-    <section id="tabpanel-requests" role="tabpanel" aria-labelledby="tab-requests">
-      <div className="mb-4">
-        <h1 className="text-2xl font-bold text-text">My Requests</h1>
-        <p className="text-sm text-text-secondary mt-1">Track the status of your borrow requests.</p>
+    <div className="h-full flex flex-col min-h-0 overflow-hidden bg-bg-subtle gap-3">
+      {/* Header Banner */}
+      <div className="rounded-xl border border-border bg-card px-5 py-4 shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-text">My Requests</h1>
+          <p className="text-xs text-text-secondary mt-0.5">
+            Track and monitor the status of your borrow and supply requisition requests.
+          </p>
+        </div>
       </div>
-      <MyRequestsTab />
-    </section>
+
+      {/* Main Content Area */}
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+        <MyRequestsTab />
+      </div>
+    </div>
   );
 }

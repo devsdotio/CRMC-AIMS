@@ -1,4 +1,4 @@
-import type { ConsumableRow, StockHistoryEntry } from "@/server/db/schema";
+import type { ConsumableRow } from "@/server/db/schema";
 import {
   generateOperationalCode,
   todayDateString,
@@ -20,6 +20,8 @@ import { scanReleaseLotSchema } from "@/server/modules/purchase-lots/purchase-lo
 import { CategoryRepository } from "@/server/modules/categories/category.repository";
 import { DepartmentRepository } from "@/server/modules/departments/department.repository";
 import { ProjectRepository } from "@/server/modules/projects/project.repository";
+import { ProjectExpenseRepository } from "@/server/modules/projects/project-expense.repository";
+import type { ProjectExpenseMetadata } from "@/server/db/schema";
 import {
   StockMovementService,
   allocationsToMovementLines,
@@ -51,7 +53,6 @@ function availableQty(row: { currentQty: number; reservedQty?: number | null }):
 }
 
 function toDTO(row: ConsumableRow): ConsumableDTO {
-  const history = Array.isArray(row.history) ? row.history : [];
   const reservedQty = row.reservedQty ?? 0;
   return {
     id: row.id,
@@ -71,38 +72,8 @@ function toDTO(row: ConsumableRow): ConsumableDTO {
         : String(row.lastRestocked).slice(0, 10)
       : "—",
     notes: row.notes ?? undefined,
-    history,
-  };
-}
-
-function historyEntry(
-  type: StockHistoryEntry["type"],
-  quantityChange: number,
-  actor: string,
-  reason?: string,
-  notes?: string,
-  extra?: Partial<
-    Pick<
-      StockHistoryEntry,
-      | "unitCost"
-      | "supplierId"
-      | "supplierName"
-      | "lotCode"
-      | "totalCost"
-      | "lotAllocations"
-      | "recipientName"
-    >
-  >
-): StockHistoryEntry {
-  return {
-    id: crypto.randomUUID(),
-    date: todayDateString(),
-    type,
-    quantityChange,
-    actor,
-    ...(reason ? { reason } : {}),
-    ...(notes ? { notes } : {}),
-    ...extra,
+    // Stock ledger is stock_movements (Issue History). Do not grow JSONB history.
+    history: [],
   };
 }
 
@@ -113,6 +84,7 @@ export class ConsumableService {
     private readonly taxonomy = new CategoryRepository(),
     private readonly departments = new DepartmentRepository(),
     private readonly projects = new ProjectRepository(),
+    private readonly projectExpenses = new ProjectExpenseRepository(),
     private readonly movements = new StockMovementService()
   ) {}
 
@@ -120,7 +92,14 @@ export class ConsumableService {
     departmentId: string | undefined,
     projectId: string | undefined,
     tx?: DbSession
-  ): Promise<{ departmentId: string | null; projectId: string | null }> {
+  ): Promise<{
+    departmentId: string | null;
+    projectId: string | null;
+    projectCode?: string;
+    projectName?: string;
+    departmentCode?: string;
+    departmentName?: string;
+  }> {
     if (departmentId && projectId) {
       throw new BadRequestError(
         "Specify exactly one destination: department or project."
@@ -129,12 +108,27 @@ export class ConsumableService {
     if (projectId) {
       const project = await this.projects.findById(projectId, tx);
       if (!project) throw new NotFoundError("Project", projectId);
-      return { departmentId: null, projectId };
+      if (project.status === "completed") {
+        throw new ConflictError(
+          "Completed projects are read-only. Issue materials to an active project instead."
+        );
+      }
+      return {
+        departmentId: null,
+        projectId,
+        projectCode: project.projectCode,
+        projectName: project.name,
+      };
     }
     if (departmentId) {
       const dept = await this.departments.findById(departmentId, tx);
       if (!dept) throw new NotFoundError("Department", departmentId);
-      return { departmentId, projectId: null };
+      return {
+        departmentId,
+        projectId: null,
+        departmentCode: dept.code,
+        departmentName: dept.name,
+      };
     }
     throw new BadRequestError(
       "Specify exactly one destination: department or project."
@@ -145,7 +139,7 @@ export class ConsumableService {
     const uncosted = allocations.find((a) => a.uncosted);
     if (uncosted) {
       throw new BadRequestError(
-        `Not on hand for ${itemCode}: not enough costed lot quantity (short ${uncosted.quantity}). Restock first. Purchase orders will be added later.`
+        `Not on hand for ${itemCode}: not enough costed lot quantity (short ${uncosted.quantity}). Restock or file a purchase order first.`
       );
     }
   }
@@ -243,9 +237,13 @@ export class ConsumableService {
           consumableId: row.id,
           itemCode: row.itemCode,
           itemName: row.name,
+          supplierId: input.supplierId ?? null,
           supplierName: input.supplier ?? null,
           quantity: input.currentQty,
-          unitCost: "0.00",
+          unitCost:
+            typeof input.unitCost === "number"
+              ? input.unitCost.toFixed(2)
+              : Number(input.unitCost).toFixed(2),
           purchasedOn: todayDateString(),
           reference: "Initial stock",
           notes: input.notes ?? "Opening balance on item create",
@@ -255,31 +253,16 @@ export class ConsumableService {
         tx
       );
 
-      const history: StockHistoryEntry[] = [
-        historyEntry(
-          "restock",
-          input.currentQty,
-          actor.displayName,
-          "Initial stock",
-          input.notes,
-          {
-            unitCost: lot.unitCost,
-            supplierId: lot.supplierId ?? undefined,
-            supplierName: lot.supplierName ?? undefined,
-            lotCode: lot.lotCode,
-          }
-        ),
-      ];
-
-      const updated = await this.repo.update(
-        row.id,
-        {
-          history,
-          ...(lot.supplierName ? { supplier: lot.supplierName } : {}),
-        },
-        tx
-      );
-      if (!updated) throw new NotFoundError("Consumable", row.id);
+      let updated = row;
+      if (lot.supplierName) {
+        const next = await this.repo.update(
+          row.id,
+          { supplier: lot.supplierName },
+          tx
+        );
+        if (!next) throw new NotFoundError("Consumable", row.id);
+        updated = next;
+      }
 
       await this.movements.record(
         {
@@ -362,29 +345,11 @@ export class ConsumableService {
         tx
       );
 
-      const history = [
-        ...(Array.isArray(existing.history) ? existing.history : []),
-        historyEntry(
-          "restock",
-          input.quantity,
-          actor.displayName,
-          input.reason,
-          input.notes,
-          {
-            unitCost: lot.unitCost,
-            supplierId: lot.supplierId ?? undefined,
-            supplierName: lot.supplierName ?? undefined,
-            lotCode: lot.lotCode,
-          }
-        ),
-      ];
-
       const updated = await this.repo.update(
         id,
         {
           currentQty: existing.currentQty + input.quantity,
           lastRestocked: new Date(),
-          history,
           ...(lot.supplierName ? { supplier: lot.supplierName } : {}),
         },
         tx
@@ -471,7 +436,7 @@ export class ConsumableService {
 
       if (existing.currentQty < input.quantity) {
         throw new BadRequestError(
-          `Not on hand for ${existing.itemCode}. Available: ${existing.currentQty} ${existing.unit}. Restock first. Purchase orders will be added later.`
+          `Not on hand for ${existing.itemCode}. Available: ${existing.currentQty} ${existing.unit}. Restock or file a purchase order first.`
         );
       }
       const freeQty = availableQty(existing);
@@ -493,31 +458,10 @@ export class ConsumableService {
         tx
       );
 
-      const history = [
-        ...(Array.isArray(existing.history) ? existing.history : []),
-        historyEntry(
-          "checkout",
-          -input.quantity,
-          actor.displayName,
-          input.reason,
-          input.notes,
-          {
-            unitCost: allocation.unitCost,
-            supplierId: allocation.supplierId ?? undefined,
-            supplierName: allocation.supplierName ?? undefined,
-            lotCode: allocation.lotCode ?? undefined,
-            totalCost: allocation.total,
-            lotAllocations: [allocation],
-            recipientName: input.recipientName,
-          }
-        ),
-      ];
-
       const updated = await this.repo.update(
         existing.id,
         {
           currentQty: existing.currentQty - input.quantity,
-          history,
         },
         tx
       );
@@ -637,35 +581,9 @@ export class ConsumableService {
         });
       }
 
-      const primary = lotAllocations[0];
-
-      const totalCost = lotAllocations.reduce(
-        (sum, a) => sum + Number(a.total),
-        0
-      );
-
-      const history = [
-        ...(Array.isArray(existing.history) ? existing.history : []),
-        historyEntry(
-          "adjustment",
-          input.quantityChange,
-          actor.displayName,
-          input.reason,
-          input.notes,
-          {
-            unitCost: primary?.unitCost,
-            supplierId: primary?.supplierId ?? undefined,
-            supplierName: primary?.supplierName ?? undefined,
-            lotCode: primary?.lotCode ?? undefined,
-            totalCost: totalCost.toFixed(2),
-            lotAllocations,
-          }
-        ),
-      ];
-
       const updated = await this.repo.update(
         id,
-        { currentQty: next, history },
+        { currentQty: next },
         tx
       );
       if (!updated) throw new NotFoundError("Consumable", id);
@@ -689,6 +607,8 @@ export class ConsumableService {
   /**
    * Admin walk-up issue: dest required, stock deducted immediately.
    * Same engine as checkout / lot scan — never a pending request.
+   * When destination is a project, also writes a consumable expense line
+   * so the charge appears on the project ledger.
    */
   async issue(
     rawId: string,
@@ -704,7 +624,7 @@ export class ConsumableService {
 
       if (existing.currentQty < input.quantity) {
         throw new BadRequestError(
-          `Not on hand for ${existing.itemCode}. Available: ${existing.currentQty} ${existing.unit}. Restock first. Purchase orders will be added later.`
+          `Not on hand for ${existing.itemCode}. Available: ${existing.currentQty} ${existing.unit}. Restock first.`
         );
       }
       const freeQty = availableQty(existing);
@@ -720,7 +640,6 @@ export class ConsumableService {
         tx
       );
 
-      let allocations: LotCostAllocation[] = [];
       if (!input.lotId && !input.lotCode) {
         throw new BadRequestError("Select a purchase lot to issue from.");
       }
@@ -737,43 +656,26 @@ export class ConsumableService {
             tx,
             existing.id
           );
-      allocations = [result.allocation];
+      const allocations: LotCostAllocation[] = [result.allocation];
 
       const totalCost = allocations.reduce((sum, a) => sum + Number(a.total), 0);
-      const primary = allocations[0];
       const destNote = [
         input.reason,
+        dest.projectCode
+          ? `Issued to project ${dest.projectCode}${dest.projectName ? ` (${dest.projectName})` : ""}`
+          : dest.departmentCode
+            ? `Issued to department ${dest.departmentCode}${dest.departmentName ? ` (${dest.departmentName})` : ""}`
+            : null,
         input.requestedByName ? `Requested by: ${input.requestedByName}` : null,
         input.receivedBy ? `Received by: ${input.receivedBy}` : null,
       ]
         .filter(Boolean)
         .join(". ");
 
-      const history = [
-        ...(Array.isArray(existing.history) ? existing.history : []),
-        historyEntry(
-          "checkout",
-          -input.quantity,
-          actor.displayName,
-          destNote || "Admin issue",
-          input.notes,
-          {
-            unitCost: primary?.unitCost,
-            supplierId: primary?.supplierId ?? undefined,
-            supplierName: primary?.supplierName ?? undefined,
-            lotCode: primary?.lotCode ?? undefined,
-            totalCost: totalCost.toFixed(2),
-            lotAllocations: allocations,
-            recipientName: input.receivedBy,
-          }
-        ),
-      ];
-
       const updated = await this.repo.update(
         id,
         {
           currentQty: existing.currentQty - input.quantity,
-          history,
         },
         tx
       );
@@ -792,6 +694,47 @@ export class ConsumableService {
         },
         tx
       );
+
+      // Mirror project "Use inventory material" so the charge shows on the project.
+      if (dest.projectId) {
+        const averageUnit =
+          input.quantity > 0
+            ? (totalCost / input.quantity).toFixed(2)
+            : "0.00";
+        const metadata: ProjectExpenseMetadata = {
+          lotAllocations: allocations.map((a) => ({
+            lotId: a.lotId,
+            lotCode: a.lotCode,
+            quantity: a.quantity,
+            unitCost: a.unitCost,
+            total: a.total,
+            uncosted: a.uncosted,
+          })),
+          consumableCode: existing.itemCode,
+          consumableName: existing.name,
+          consumableUnit: existing.unit,
+        };
+
+        await this.projectExpenses.create(
+          {
+            projectId: dest.projectId,
+            lineType: "consumable",
+            category: "miscellaneous",
+            description: `${existing.name} (${existing.itemCode}) × ${input.quantity} ${existing.unit}`,
+            amount: totalCost.toFixed(2),
+            quantity: String(input.quantity),
+            unitCost: averageUnit,
+            consumableId: existing.id,
+            assetId: null,
+            incurredOn: todayDateString(),
+            notes: input.notes ?? destNote ?? null,
+            metadata,
+            recordedByUserId: actor.userId,
+            recordedByName: actor.displayName,
+          },
+          tx
+        );
+      }
 
       return toDTO(updated);
     });

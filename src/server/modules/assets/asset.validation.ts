@@ -50,7 +50,14 @@ export const releaseAssetSchema = z
     projectId: z.string().uuid().optional(),
     borrowerName: z.string().trim().max(255).optional(),
     borrowerDepartment: z.string().trim().min(1).max(120).optional(),
-    borrowerEmail: z.string().trim().email().max(320).optional(),
+    borrowerEmail: z
+      .string()
+      .trim()
+      .max(320)
+      .optional()
+      .refine((v) => !v || z.string().email().safeParse(v).success, {
+        message: "Invalid email address",
+      }),
     borrowerPhone: z.string().trim().max(40).optional(),
     notes: z.string().trim().max(2000).optional(),
     expectedReturnDate: z
@@ -102,11 +109,17 @@ export const flagMaintenanceSchema = z.object({
   notes: z.string().trim().max(2000).optional(),
 });
 
+export const reportMissingSchema = z.object({
+  reason: z.enum(["lost", "stolen", "missing"]),
+  notes: z.string().trim().min(1, "notes are required.").max(2000),
+});
+
 export const listAssetsQuerySchema = z.object({
   status: assetStatusSchema.optional(),
   modelId: z.string().uuid().optional(),
   category: categoryLabelSchema.optional(),
   search: z.string().trim().max(200).optional(),
+  assignmentType: assetAssignmentTypeSchema.optional(),
   availableOnly: z
     .union([z.boolean(), z.enum(["true", "false", "1", "0"])])
     .optional()
@@ -124,4 +137,5 @@ export type UpdateAssetBody = z.infer<typeof updateAssetSchema>;
 export type ReturnAssetBody = z.infer<typeof returnAssetSchema>;
 export type ReleaseAssetBody = z.infer<typeof releaseAssetSchema>;
 export type FlagMaintenanceBody = z.infer<typeof flagMaintenanceSchema>;
+export type ReportMissingBody = z.infer<typeof reportMissingSchema>;
 export type ListAssetsQuery = z.infer<typeof listAssetsQuerySchema>;

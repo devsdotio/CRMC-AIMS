@@ -1,11 +1,13 @@
 "use client";
  
-import { getCategoryStyle } from "@/constants/categories";
-
 import { useEffect, useRef, useState } from "react";
-import { X, Check, Mail, Phone, Building2, Tag, History, FileText, User, Loader2, Send, CheckCircle, XCircle, PackageCheck, PackageMinus, RotateCcw } from "lucide-react";
+import { X, Check, Mail, Phone, Building2, Tag, History, FileText, User, Loader2, Send, CheckCircle, XCircle, PackageCheck, PackageMinus, RotateCcw, Edit3 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatItemDescription, isUuid } from "@/lib/sanitize-display";
+import { useCategoryStyleResolver } from "@/features/categories/client/use-category-style";
 import type { BorrowRequest,  RequestStatus } from "@/types/borrow-requests";
+import { ActionHistoryTimeline } from "@/components/audit-logs/audit-log-utils";
+import { LoadingState } from "@/components/providers/loading-context";
 
 /** Deterministic color from a string — same code always gets the same hue. */
 function getAssetCodeColor(code: string) {
@@ -24,12 +26,14 @@ function getAssetCodeColor(code: string) {
 export interface RequestDetailPanelProps {
   request: BorrowRequest | null;
   isOpen: boolean;
+  isLoading?: boolean;
   onClose: () => void;
   onApprove?: (request: BorrowRequest) => void;
   onReject?: (request: BorrowRequest) => void;
   onRelease?: (request: BorrowRequest) => void | Promise<void>;
   onReturn?: (request: BorrowRequest) => void | Promise<void>;
   onMarkUnreleased?: (request: BorrowRequest) => void | Promise<void>;
+  onEdit?: (request: BorrowRequest) => void;
 }
 
 const STATUS_STYLES: Record<RequestStatus, { bg: string; text: string; label: string }> = {
@@ -46,17 +50,20 @@ function getActionIcon(action: string) {
   switch (action.toLowerCase()) {
     case "pending":
     case "created":
-      return <FileText className="h-3.5 w-3.5" />;
+      return <Send className="h-3.5 w-3.5 text-accent" />;
     case "approved":
-      return <Check className="h-3.5 w-3.5" />;
-    case "rejected":
-      return <X className="h-3.5 w-3.5" />;
+      return <CheckCircle className="h-3.5 w-3.5 text-status-active-text" />;
     case "released":
-      return <Send className="h-3.5 w-3.5 ml-0.5" />;
+      return <PackageMinus className="h-3.5 w-3.5 text-status-active-text" />;
+    case "unreleased":
+      return <RotateCcw className="h-3.5 w-3.5 text-status-repair-text" />;
     case "returned":
-      return <RotateCcw className="h-3.5 w-3.5" />;
+      return <PackageCheck className="h-3.5 w-3.5 text-status-active-text" />;
+    case "rejected":
+    case "cancelled":
+      return <XCircle className="h-3.5 w-3.5 text-status-outofservice-text" />;
     default:
-      return <History className="h-3.5 w-3.5" />;
+      return <History className="h-3.5 w-3.5 text-text-secondary" />;
   }
 }
 
@@ -82,15 +89,18 @@ function getActionStyle(action: string) {
 export function RequestDetailPanel({
   request,
   isOpen,
+  isLoading = false,
   onClose,
   onApprove,
   onReject,
   onRelease,
   onReturn,
   onMarkUnreleased,
+  onEdit,
 }: RequestDetailPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [isMarkingUnreleased, setIsMarkingUnreleased] = useState(false);
+  const resolveCategoryStyle = useCategoryStyleResolver();
 
   // Keyboard Escape listener
   useEffect(() => {
@@ -113,10 +123,45 @@ export function RequestDetailPanel({
     }
   };
 
-  if (!isOpen || !request) return null;
+  if (!isOpen) return null;
 
-  const firstItem = request.items[0];
-  const categoryMeta = getCategoryStyle(firstItem?.category || "office");
+  if (isLoading || !request) {
+    return (
+      <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs transition-opacity duration-200">
+        <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
+        <aside
+          role="dialog"
+          aria-modal="true"
+          aria-label="Loading request details"
+          className={cn(
+            "relative flex flex-col w-full max-w-lg h-full bg-bg border-l border-border shadow-2xl z-10 overflow-hidden",
+            "animate-in slide-in-from-right duration-250 ease-in-out"
+          )}
+        >
+          <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-bg-subtle/50 shrink-0">
+            <div className="h-6 w-36 bg-border/60 rounded-md animate-pulse" />
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-text-secondary hover:text-text hover:bg-border transition-colors cursor-pointer shrink-0"
+              aria-label="Close"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <div className="flex-1 flex items-center justify-center p-6">
+            <LoadingState
+              variant="card"
+              icon="clipboard"
+              message="Loading borrow request..."
+              subtitle="Retrieving requested inventory items, borrower verification, and approval timeline"
+            />
+          </div>
+        </aside>
+      </div>
+    );
+  }
+
   const statusMeta = STATUS_STYLES[request.status];
   const hasReturnableAssets = request.items?.some(
     (item) => item.itemType === "asset" || Boolean(item.assetId)
@@ -162,8 +207,19 @@ export function RequestDetailPanel({
             </p>
           </div>
 
-          {request.status === "released" && onReturn && hasReturnableAssets && (
-            <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
+            {onEdit && request.status === "pending" && (
+              <button
+                type="button"
+                onClick={() => onEdit(request)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md border border-border bg-bg text-text hover:bg-accent/10 hover:text-accent hover:border-accent/30 transition-colors cursor-pointer shadow-xs"
+              >
+                <Edit3 className="h-3.5 w-3.5" />
+                Edit
+              </button>
+            )}
+
+            {request.status === "released" && onReturn && hasReturnableAssets && (
               <button
                 type="button"
                 onClick={() => onReturn(request)}
@@ -172,8 +228,8 @@ export function RequestDetailPanel({
                 <RotateCcw className="h-3.5 w-3.5" strokeWidth={2.5} />
                 Mark Returned
               </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Scrollable Panel Body */}
@@ -222,12 +278,22 @@ export function RequestDetailPanel({
             </div>
             <div className="rounded-lg border border-border bg-bg overflow-hidden divide-y divide-border">
               {request.items.map((item, idx) => {
-                const itemCategoryMeta = getCategoryStyle(item.category);
+                const itemCategoryMeta = resolveCategoryStyle(item.category);
+                const displayDesc = formatItemDescription(
+                  item.itemDescription,
+                  itemCategoryMeta.label,
+                  item.itemType
+                );
+                const shouldShowAssetCode =
+                  Boolean(item.assetCode) &&
+                  !isUuid(item.assetCode) &&
+                  !item.assetCode?.toLowerCase().startsWith("cat-");
+
                 return (
                   <div key={idx} className={cn("px-3.5 py-2.5 flex items-center gap-3", idx % 2 === 1 && "bg-bg-subtle/50")}>
                     {/* Description + tags */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-text truncate">{item.itemDescription}</p>
+                      <p className="text-xs font-semibold text-text truncate">{displayDesc}</p>
                       <div className="flex flex-wrap items-center gap-1 mt-0.5">
                         <span className={cn("rounded-full px-1.5 py-px text-[9px] font-bold uppercase", itemCategoryMeta.bg, itemCategoryMeta.text)}>
                           {itemCategoryMeta.label}
@@ -238,7 +304,7 @@ export function RequestDetailPanel({
                         )}>
                           {item.itemType === "asset" ? "Asset" : "Consumable"}
                         </span>
-                        {item.assetCode && (() => {
+                        {shouldShowAssetCode && item.assetCode && (() => {
                           const acColor = getAssetCodeColor(item.assetCode);
                           return (
                             <span
@@ -352,95 +418,44 @@ export function RequestDetailPanel({
               <History className="h-3.5 w-3.5" />
               Action History
             </h3>
-            <div className="p-4 rounded-lg border border-border bg-bg">
-              <ol className="relative border-l-2 border-border/60 ml-3 space-y-6">
-                {[...request.history].reverse().map((h, index) => {
-                  const style = getActionStyle(h.action);
-                  return (
-                    <li key={h.id} className="pl-6 relative">
-                      <span className={cn(
-                        "absolute -left-3.25 top-1.5 h-6 w-6 rounded-full border-2 flex items-center justify-center bg-bg shadow-sm z-10",
-                        style.bg,
-                        (style as Record<string, string>).iconText || style.text
-                      )}>
-                        {getActionIcon(h.action)}
-                      </span>
-                      <div className="flex flex-col gap-0.5 pt-1.5">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className={cn("font-bold capitalize", style.text)}>
-                            {h.action}
-                          </span>
-                          <time className="text-[11px] text-text-secondary font-medium">{h.timestamp}</time>
-                        </div>
-                        <p className="text-xs text-text-secondary font-medium">By {h.actor}</p>
-                      </div>
-                      
-                      {h.note && (
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {(() => {
-                            let picker = null;
-                            let restOfNote = h.note;
-                            
-                            // Extract picker from released note if present
-                            if (h.action === "released" && h.note.startsWith("Released to: ")) {
-                              const parts = h.note.split(". ");
-                              picker = parts[0].replace("Released to: ", "");
-                              restOfNote = parts.slice(1).join(". ");
-                            } else if (h.action === "returned" && h.note.startsWith("Returned by: ")) {
-                              const parts = h.note.split(". ");
-                              picker = parts[0].replace("Returned by: ", "");
-                              restOfNote = parts.slice(1).join(". ");
-                            }
-                            
-                            return (
-                              <>
-                                {picker && (
-                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-bg-subtle text-text-secondary border border-border shadow-xs">
-                                    <User className="h-3 w-3" />
-                                    {h.action === "returned" ? "Returned by: " : "Picked up by: "} {picker}
-                                  </span>
-                                )}
-                                {restOfNote && (
-                                  <span className={cn(
-                                    "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border shadow-xs max-w-full",
-                                    style.bg,
-                                    h.action === "rejected" ? "text-white" : "text-text"
-                                  )}>
-                                    <FileText className="h-3 w-3 shrink-0" />
-                                    <span className="truncate whitespace-normal leading-tight">{restOfNote}</span>
-                                  </span>
-                                )}
-                              </>
-                            );
-                          })()}
-                        </div>
-                      )}
-                    </li>
-                  );
-                })}
-              </ol>
-            </div>
+            <ActionHistoryTimeline entries={request.history} />
           </div>
         </div>
 
         {/* Action Footer (Only for pending requests with action handlers) */}
-        {request.status === "pending" && onApprove && onReject && (
-          <div className="p-4 border-t border-border bg-bg-subtle flex items-center justify-end gap-3 shrink-0">
-            <button
-              type="button"
-              onClick={() => onReject(request)}
-              className="px-4 py-2 text-xs font-semibold rounded-md border border-border bg-bg text-text-secondary hover:border-destructive hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
-            >
-              Reject Request
-            </button>
-            <button
-              type="button"
-              onClick={() => onApprove(request)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
-            >
-              <Check className="h-4 w-4" strokeWidth={2.5} />
-              Approve Request
-            </button>
+        {request.status === "pending" && (onApprove || onReject || onEdit) && (
+          <div className="p-4 border-t border-border bg-bg-subtle flex items-center justify-between gap-3 shrink-0">
+            {onReject && (
+              <button
+                type="button"
+                onClick={() => onReject(request)}
+                className="px-3.5 py-2 text-xs font-semibold rounded-md border border-border bg-bg text-text-secondary hover:border-destructive hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+              >
+                Reject Request
+              </button>
+            )}
+            <div className="flex items-center gap-2 ml-auto">
+              {onEdit && (
+                <button
+                  type="button"
+                  onClick={() => onEdit(request)}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-md border border-border bg-bg text-text hover:bg-bg-subtle hover:border-accent/40 transition-colors cursor-pointer"
+                >
+                  <Edit3 className="h-3.5 w-3.5 text-text-secondary" />
+                  Edit Request
+                </button>
+              )}
+              {onApprove && (
+                <button
+                  type="button"
+                  onClick={() => onApprove(request)}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-md bg-accent text-accent-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+                >
+                  <Check className="h-4 w-4" strokeWidth={2.5} />
+                  Approve Request
+                </button>
+              )}
+            </div>
           </div>
         )}
         

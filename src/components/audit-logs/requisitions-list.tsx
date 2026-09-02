@@ -18,6 +18,7 @@ import {
 } from "./audit-log-utils";
 import type { ConsumableRequestDTO } from "@/server/modules/consumable-requests/consumable-request.types";
 import { cn } from "@/lib/utils";
+import { formatItemDescription } from "@/lib/sanitize-display";
 import { useToast } from "@/components/providers/toast-context";
 import { LoadingState } from "@/components/providers/loading-context";
 
@@ -262,7 +263,7 @@ export function RequisitionsList() {
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border shadow-xs max-w-full bg-bg-subtle text-text border-border">
                             <FileText className="h-3 w-3 shrink-0 text-text-secondary" />
                             <span className="truncate whitespace-normal leading-tight">
-                              {req.purpose || req.lines.map((l) => `${l.quantityRequested}x ${l.itemName}`).join(", ")}
+                              {req.purpose || req.lines.map((l) => `${l.quantityRequested}x ${formatItemDescription(l.itemName, l.category, "consumable")}`).join(", ")}
                             </span>
                           </span>
                         </div>
