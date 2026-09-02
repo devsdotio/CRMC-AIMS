@@ -44,6 +44,7 @@ export default function AssetsPage() {
     categories: [],
     statuses: [],
     availability: "all",
+    assignmentType: "all",
     sortBy: "name",
     sortOrder: "asc",
   });
@@ -80,10 +81,18 @@ export default function AssetsPage() {
         return false;
       }
 
-      // 4. Availability — not borrowed, assigned, or reserved
+      // 4. Availability — not borrowed or assigned
       if (
         filters.availability === "available" &&
         !isAssetAvailableForRequest(asset)
+      ) {
+        return false;
+      }
+
+      // 5. Assignment type (borrowable vs assignable)
+      if (
+        filters.assignmentType !== "all" &&
+        asset.assignmentType !== filters.assignmentType
       ) {
         return false;
       }
@@ -116,10 +125,20 @@ export default function AssetsPage() {
       categories: [],
       statuses: [],
       availability: "all",
+      assignmentType: "all",
       sortBy: "name",
       sortOrder: "asc",
     });
   };
+
+  const assignmentTypeCounts = useMemo(
+    () => ({
+      all: assets.length,
+      borrowable: assets.filter((a) => a.assignmentType === "borrowable").length,
+      assignable: assets.filter((a) => a.assignmentType === "assignable").length,
+    }),
+    [assets]
+  );
 
   const handleSaveAsset = async (assetData: Partial<Asset>) => {
     try {
@@ -229,6 +248,7 @@ export default function AssetsPage() {
         onResetFilters={handleResetFilters}
         totalAssetsCount={assets.length}
         filteredAssetsCount={filteredAssets.length}
+        assignmentTypeCounts={assignmentTypeCounts}
       />
 
       {!canOperate && <OperatorReadOnlyBanner />}

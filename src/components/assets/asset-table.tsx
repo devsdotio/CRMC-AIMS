@@ -26,6 +26,9 @@ function SkeletonTableRow() {
         <div className="h-5 w-20 bg-border rounded-full" />
       </td>
       <td className="px-3 py-4">
+        <div className="h-5 w-20 bg-border rounded-full" />
+      </td>
+      <td className="px-3 py-4">
         <div className="h-5 w-24 bg-border rounded-full" />
       </td>
       <td className="px-3 py-4">
@@ -59,6 +62,7 @@ export function AssetTable({
               <th scope="col" className="px-5 py-3">Code</th>
               <th scope="col" className="px-3 py-3">Asset Name</th>
               <th scope="col" className="px-3 py-3">Category</th>
+              <th scope="col" className="px-3 py-3">Type</th>
               <th scope="col" className="px-3 py-3">Status</th>
               <th scope="col" className="px-3 py-3">Holder / Location</th>
               <th scope="col" className="px-3 py-3 hidden sm:table-cell">Updated</th>
@@ -99,6 +103,7 @@ export function AssetTable({
             <th scope="col" className="px-5 py-3">Code</th>
             <th scope="col" className="px-3 py-3">Asset Name</th>
             <th scope="col" className="px-3 py-3">Category</th>
+            <th scope="col" className="px-3 py-3">Type</th>
             <th scope="col" className="px-3 py-3">Status</th>
             <th scope="col" className="px-3 py-3">Holder / Location</th>
             <th scope="col" className="px-3 py-3 hidden sm:table-cell">Updated</th>

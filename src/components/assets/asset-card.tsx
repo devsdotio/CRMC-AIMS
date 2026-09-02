@@ -7,6 +7,7 @@ import {
   custodyDetailLabel,
 } from "@/lib/assets-custody";
 import type { Asset, AssetStatus } from "@/types/assets";
+import { AssignmentTypeBadge } from "./assignment-type-badge";
 
 export interface AssetCardProps {
   asset: Asset;
@@ -71,6 +72,7 @@ export function AssetCard({ asset, onSelect }: AssetCardProps) {
           {asset.assetCode}
         </span>
         <div className="flex items-center gap-2">
+          <AssignmentTypeBadge type={asset.assignmentType} compact />
           {asset.currentHolder && (
             <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-primary text-white">
               {custodyBadgeLabel(asset.currentHolder)}

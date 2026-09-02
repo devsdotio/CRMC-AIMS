@@ -7,6 +7,7 @@ import {
   custodyDetailLabel,
 } from "@/lib/assets-custody";
 import type { Asset,  AssetStatus } from "@/types/assets";
+import { AssignmentTypeBadge } from "./assignment-type-badge";
 
 export interface AssetTableRowProps {
   asset: Asset;
@@ -94,6 +95,11 @@ export function AssetTableRow({ asset, onSelect }: AssetTableRowProps) {
           <Tag className="h-2.5 w-2.5" />
           {categoryMeta.label}
         </span>
+      </td>
+
+      {/* Assignment Type */}
+      <td className="px-3 py-3.5 whitespace-nowrap">
+        <AssignmentTypeBadge type={asset.assignmentType} />
       </td>
 
       {/* Status Badge */}
