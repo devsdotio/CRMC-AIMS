@@ -150,6 +150,9 @@ export class BorrowLogService {
     const filters = listBorrowLogQuerySchema.parse(rawQuery ?? {});
     if (actor && !isAssetOperatorRole(actor.role)) {
       filters.borrowerUserId = actor.userId;
+      if (actor.email) {
+        filters.borrowerEmail = actor.email;
+      }
     }
     const rows = await this.repo.list(filters);
     return rows.map((row) => toBorrowLogDTO(row));
@@ -502,6 +505,7 @@ export class BorrowLogService {
           conditionOnReturn: input.condition,
           conditionNotes: input.conditionNotes ?? null,
           receivedByName: actor.displayName,
+          receivedByUserId: actor.userId,
         },
         tx
       );
@@ -639,10 +643,18 @@ export class BorrowLogService {
       if (existing.requestId && !options?.skipRequestClosure) {
         const req = await this.requests.findById(existing.requestId, tx);
         if (req && (req.status === "released" || req.status === "approved")) {
+          const otherActive = await this.repo.list(
+            { status: "active" },
+            tx
+          );
+          const hasRemaining = otherActive.some(
+            (o) => o.requestId === existing.requestId && o.id !== existing.id
+          );
+
           await this.requests.update(
             req.id,
             {
-              status: "returned",
+              status: hasRemaining ? "released" : "returned",
               history: [
                 ...(Array.isArray(req.history) ? req.history : []),
                 {
@@ -650,7 +662,9 @@ export class BorrowLogService {
                   action: "returned",
                   actor: actor.displayName,
                   timestamp: isoNow(),
-                  note: `Via custody log ${existing.logCode}`,
+                  note: hasRemaining
+                    ? `Item ${existing.assetCode} returned via custody log ${existing.logCode}`
+                    : `Via custody log ${existing.logCode}`,
                 },
               ],
             },

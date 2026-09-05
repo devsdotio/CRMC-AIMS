@@ -55,6 +55,8 @@ export function withAssetMeta(asset: Asset & { modelId?: string | null }): Asset
  */
 export interface IAssetRepository {
   getCategoryDistribution(): Promise<{ category: string; count: number }[]>;
+  countAssigned(): Promise<number>;
+  countByType(type: "borrowable" | "assignable"): Promise<number>;
   findMany(filters?: ListAssetsFilters): Promise<AssetRow[]>;
   findById(id: string): Promise<AssetRow | null>;
   findByAssetCode(assetCode: string): Promise<AssetRow | null>;

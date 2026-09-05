@@ -3,6 +3,7 @@ import { and, count, desc, eq, ilike, inArray, isNotNull, lt, or, sql } from "dr
 import { getDb } from "@/server/db";
 import type { DbSession } from "@/server/db/transaction";
 import {
+  assets,
   borrowTransactions,
   type BorrowTransactionRow,
   type NewBorrowTransactionRow,
@@ -115,11 +116,26 @@ export class BorrowLogRepository implements IBorrowLogRepository {
       conditions.push(lt(borrowTransactions.dueDate, today));
     }
 
+    if (filters.custodyKind && filters.custodyKind !== "all") {
+      conditions.push(eq(borrowTransactions.custodyKind, filters.custodyKind));
+    } else if (!filters.custodyKind) {
+      conditions.push(eq(borrowTransactions.custodyKind, "borrow"));
+    }
+
     if (filters.department?.trim()) {
       conditions.push(eq(borrowTransactions.department, filters.department.trim()));
     }
-    if (filters.borrowerUserId) {
+    if (filters.borrowerUserId && filters.borrowerEmail) {
+      conditions.push(
+        or(
+          eq(borrowTransactions.borrowerUserId, filters.borrowerUserId),
+          ilike(borrowTransactions.borrowerEmail, filters.borrowerEmail.trim())
+        )!
+      );
+    } else if (filters.borrowerUserId) {
       conditions.push(eq(borrowTransactions.borrowerUserId, filters.borrowerUserId));
+    } else if (filters.borrowerEmail) {
+      conditions.push(ilike(borrowTransactions.borrowerEmail, filters.borrowerEmail.trim()));
     }
     if (filters.search?.trim()) {
       const q = `%${filters.search.trim()}%`;
@@ -143,14 +159,32 @@ export class BorrowLogRepository implements IBorrowLogRepository {
     return base.where(and(...conditions));
   }
 
-  async countActive(session?: DbSession, userId?: string): Promise<number> {
+  async countActive(
+    session?: DbSession,
+    userId?: string,
+    custodyKind: "borrow" | "assignment" = "borrow"
+  ): Promise<number> {
     const db = this.db(session);
-    const conditions = [eq(borrowTransactions.status, "active")];
+    const conditions = [
+      eq(borrowTransactions.status, "active"),
+      eq(borrowTransactions.custodyKind, custodyKind),
+    ];
     if (userId) conditions.push(eq(borrowTransactions.borrowerUserId, userId));
     const [row] = await db
       .select({ value: count() })
       .from(borrowTransactions)
-      .where(and(...conditions));
+      .leftJoin(assets, eq(assets.id, borrowTransactions.assetId))
+      .where(
+        and(
+          ...conditions,
+          custodyKind === "borrow"
+            ? or(
+                eq(assets.assignmentType, "borrowable"),
+                sql`${assets.id} IS NULL`
+              )
+            : eq(assets.assignmentType, "assignable")
+        )
+      );
     return Number(row?.value ?? 0);
   }
 
@@ -159,6 +193,7 @@ export class BorrowLogRepository implements IBorrowLogRepository {
     const today = todayDateString();
     const conditions = [
       eq(borrowTransactions.status, "active"),
+      eq(borrowTransactions.custodyKind, "borrow"),
       isNotNull(borrowTransactions.dueDate),
       lt(borrowTransactions.dueDate, today),
     ];
@@ -166,7 +201,16 @@ export class BorrowLogRepository implements IBorrowLogRepository {
     const [row] = await db
       .select({ value: count() })
       .from(borrowTransactions)
-      .where(and(...conditions));
+      .leftJoin(assets, eq(assets.id, borrowTransactions.assetId))
+      .where(
+        and(
+          ...conditions,
+          or(
+            eq(assets.assignmentType, "borrowable"),
+            sql`${assets.id} IS NULL`
+          )
+        )
+      );
     return Number(row?.value ?? 0);
   }
 

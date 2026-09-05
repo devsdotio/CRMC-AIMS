@@ -75,7 +75,7 @@ export function AssetCard({ asset, onSelect }: AssetCardProps) {
           <AssignmentTypeBadge type={asset.assignmentType} compact />
           {asset.currentHolder && (
             <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-primary text-white">
-              {custodyBadgeLabel(asset.currentHolder)}
+              {custodyBadgeLabel(asset.currentHolder, asset.assignmentType)}
             </span>
           )}
           <span

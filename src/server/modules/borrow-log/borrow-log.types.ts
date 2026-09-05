@@ -36,6 +36,8 @@ export type ListBorrowLogFilters = {
   department?: string;
   search?: string;
   borrowerUserId?: string;
+  borrowerEmail?: string;
+  custodyKind?: "borrow" | "assignment" | "all";
 };
 
 export interface IBorrowLogRepository {

@@ -13,14 +13,18 @@ const returnConditionSchema = z.enum([
   "stolen",
 ]);
 
-/** DTO/query filter includes computed overdue. */
-export const logFilterStatusSchema = z.enum(["active", "overdue", "returned"]);
+/** DTO/query filter includes computed overdue and optional all. */
+export const logFilterStatusSchema = z
+  .enum(["active", "overdue", "returned", "all"])
+  .transform((v) => (v === "all" ? undefined : v));
 
 export const listBorrowLogQuerySchema = z.object({
   status: logFilterStatusSchema.optional(),
   department: z.string().trim().max(120).optional(),
   search: z.string().trim().max(200).optional(),
   borrowerUserId: z.string().uuid().optional(),
+  borrowerEmail: z.string().trim().max(320).optional(),
+  custodyKind: z.enum(["borrow", "assignment", "all"]).optional(),
 });
 
 export const releaseBorrowSchema = z
