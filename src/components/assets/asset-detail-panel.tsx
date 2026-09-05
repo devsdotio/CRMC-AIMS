@@ -986,19 +986,19 @@ export function AssetDetailPanel({
         )}
       >
         {/* Panel Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-bg-subtle/50 shrink-0">
-          <div className="min-w-0 flex-1 pr-3">
-            <div className="flex items-center gap-2.5 flex-wrap">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-border bg-bg-subtle/50 shrink-0 gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-nowrap">
               <h2
                 id="asset-detail-heading"
-                className="font-mono text-lg font-bold tracking-tight text-text"
+                className="font-mono text-base font-bold tracking-tight text-text truncate"
               >
                 {asset.assetCode}
               </h2>
               {statusMeta && (
                 <span
                   className={cn(
-                    "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold capitalize border",
+                    "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold capitalize border shrink-0",
                     asset.status === "active"
                       ? "bg-status-active-bg/20 text-status-active-text border-status-active-bg/30"
                       : asset.status === "needs_repair"
@@ -1009,25 +1009,25 @@ export function AssetDetailPanel({
                   )}
                 >
                   {asset.currentHolder
-                    ? "Borrowed / In-Use"
+                    ? (asset.assignmentType === "assignable" ? "Assigned" : "Borrowed")
                     : asset.reservedForRequestId
                       ? "Reserved"
                       : statusMeta.label}
                 </span>
               )}
             </div>
-            <p className="text-xs text-text-secondary font-medium mt-0.5 truncate">
+            <p className="text-[11px] text-text-secondary font-medium mt-0.5 truncate">
               {categoryMeta.label} • <strong className="text-text font-semibold">{asset.name}</strong>
             </p>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0">
             {onIssue && !asset.currentHolder && asset.status === "active" && (
               <button
                 type="button"
                 onClick={() => onIssue(asset)}
                 aria-label="Issue asset to department or project"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary text-primary-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-primary text-primary-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
               >
                 <PackageMinus className="h-3.5 w-3.5" />
                 <span>Issue</span>
@@ -1038,7 +1038,7 @@ export function AssetDetailPanel({
                 type="button"
                 onClick={() => onReportMissing(asset)}
                 aria-label="Report asset as missing"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-bg text-status-outofservice-text border border-status-outofservice-bg/40 hover:bg-status-outofservice-bg/10 transition-colors cursor-pointer shadow-xs"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white transition-colors cursor-pointer shadow-xs"
               >
                 <AlertCircle className="h-3.5 w-3.5" />
                 <span>Missing</span>
@@ -1052,7 +1052,7 @@ export function AssetDetailPanel({
                 type="button"
                 onClick={() => onEdit(asset)}
                 aria-label="Edit asset details"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-bg text-text-secondary hover:text-text border border-border hover:border-primary transition-colors cursor-pointer shadow-xs"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white transition-colors cursor-pointer shadow-xs"
               >
                 <Edit3 className="h-3.5 w-3.5" />
                 <span>Edit</span>
@@ -1064,7 +1064,7 @@ export function AssetDetailPanel({
                 onClick={() => onDelete(asset)}
                 title="Delete asset"
                 aria-label="Delete asset"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-bg text-status-outofservice-text hover:text-white hover:bg-status-outofservice-bg border border-status-outofservice-bg/40 transition-colors cursor-pointer shadow-xs"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-destructive text-white hover:bg-destructive/90 transition-colors cursor-pointer shadow-xs"
               >
                 <Trash2 className="h-3.5 w-3.5" />
                 <span>Delete</span>
