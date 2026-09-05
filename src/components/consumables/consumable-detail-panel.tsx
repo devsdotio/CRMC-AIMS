@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  X,
   FilePlus2,
   SlidersHorizontal,
   MapPin,
@@ -16,6 +15,7 @@ import {
   ChevronDown,
   ChevronUp,
   ExternalLink,
+  Trash2,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -40,6 +40,7 @@ export interface ConsumableDetailPanelProps {
   onAdjust?: (item: ConsumableItem) => void;
   onRelease?: (item: ConsumableItem, lot?: PurchaseLot | null) => void;
   onEdit?: (item: ConsumableItem) => void;
+  onDelete?: (item: ConsumableItem) => void;
 }
 
 function movementReasonLabel(reason: StockMovement["reason"]) {
@@ -98,6 +99,7 @@ export function ConsumableDetailPanel({
   onAdjust,
   onRelease,
   onEdit,
+  onDelete,
 }: ConsumableDetailPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const { getCategoryStyle } = useCategoryStyleMap();
@@ -202,14 +204,20 @@ export function ConsumableDetailPanel({
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close detail panel"
-            className="p-1.5 rounded-lg text-text-secondary hover:text-text hover:bg-border transition-colors cursor-pointer shrink-0"
-          >
-            <X className="h-5 w-5" />
-          </button>
+          {onDelete && (
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => onDelete(displayItem)}
+                title="Delete item"
+                aria-label="Delete item"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-destructive text-white hover:bg-destructive/90 transition-colors cursor-pointer shadow-xs"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>Delete</span>
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
@@ -254,7 +262,7 @@ export function ConsumableDetailPanel({
             <button
               type="button"
               onClick={() => onRelease(displayItem)}
-              className="inline-flex items-center justify-center gap-1.5 p-2.5 rounded-lg text-xs font-bold border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 cursor-pointer"
+              className="inline-flex items-center justify-center gap-1.5 p-2.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-xs transition-colors"
             >
               <PackageMinus className="h-4 w-4" />
               Issue
@@ -264,7 +272,7 @@ export function ConsumableDetailPanel({
             <button
               type="button"
               onClick={() => onAdjust(displayItem)}
-              className="inline-flex items-center justify-center gap-1.5 p-2.5 rounded-lg text-xs font-semibold border border-border bg-bg text-text hover:border-primary cursor-pointer"
+              className="inline-flex items-center justify-center gap-1.5 p-2.5 rounded-lg text-xs font-semibold border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400 hover:bg-amber-500 hover:text-white transition-colors cursor-pointer"
             >
               <SlidersHorizontal className="h-4 w-4" />
               Adjust
@@ -274,7 +282,7 @@ export function ConsumableDetailPanel({
               <button
                 type="button"
                 onClick={() => onEdit(displayItem)}
-                className="inline-flex items-center justify-center gap-1.5 p-2.5 rounded-lg text-xs font-semibold border border-border bg-bg text-text hover:border-primary cursor-pointer"
+                className="inline-flex items-center justify-center gap-1.5 p-2.5 rounded-lg text-xs font-semibold border border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-400 hover:bg-blue-500 hover:text-white transition-colors cursor-pointer"
               >
                 Edit details
               </button>

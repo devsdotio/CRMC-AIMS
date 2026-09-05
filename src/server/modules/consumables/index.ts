@@ -118,6 +118,16 @@ export class ConsumableController {
       return handleError(error);
     }
   }
+
+  async delete(id: string) {
+    try {
+      const session = await requireAssetOperator();
+      await this.service.delete(id, session.actor);
+      return ok({ success: true });
+    } catch (error) {
+      return handleError(error);
+    }
+  }
 }
 
 export const consumableController = new ConsumableController();

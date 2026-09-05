@@ -9,6 +9,7 @@ export interface ConsumableGridProps {
   loading?: boolean;
   onSelect: (item: ConsumableItem) => void;
   onAdjust?: (item: ConsumableItem) => void;
+  onDelete?: (item: ConsumableItem) => void;
 }
 
 // ─── Matched Skeleton Card for Consumables Grid ──────────────────────────────
@@ -42,6 +43,7 @@ export function ConsumableGrid({
   loading = false,
   onSelect,
   onAdjust,
+  onDelete,
 }: ConsumableGridProps) {
   if (loading) {
     return (
@@ -77,6 +79,7 @@ export function ConsumableGrid({
           item={item}
           onSelect={onSelect}
           onAdjust={onAdjust}
+          onDelete={onDelete}
         />
       ))}
     </div>

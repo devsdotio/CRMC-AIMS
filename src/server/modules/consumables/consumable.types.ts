@@ -42,4 +42,5 @@ export interface IConsumableRepository {
     id: string,
     data: Partial<Omit<ConsumableRow, "id" | "createdAt" | "itemCode">>
   ): Promise<ConsumableRow | null>;
+  delete(id: string, session?: import("@/server/db/transaction").DbSession): Promise<boolean>;
 }

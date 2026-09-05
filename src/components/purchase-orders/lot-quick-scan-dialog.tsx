@@ -164,7 +164,7 @@ export function LotQuickScanDialog({
                     onSelectLot(exactMatch);
                     onClose();
                   }}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-primary text-primary-foreground hover:bg-accent transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary text-primary-foreground hover:opacity-90 transition-opacity cursor-pointer"
                 >
                   <span>View Details</span>
                   <ArrowRight className="h-3.5 w-3.5" />
