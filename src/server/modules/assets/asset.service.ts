@@ -273,18 +273,6 @@ export class AssetService {
       };
     }
 
-    if (asset.reservedForRequestId) {
-      return {
-        kind: "asset",
-        code: asset.assetCode,
-        qrPayload: asset.qrPayload,
-        asset,
-        suggestedAction: "blocked",
-        reason:
-          "Asset is reserved for an approved request. Issue that request from the queue.",
-      };
-    }
-
     if (asset.assignmentType === "assignable") {
       return {
         kind: "asset",

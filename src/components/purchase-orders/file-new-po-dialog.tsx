@@ -77,15 +77,16 @@ const STEPS: Array<{ id: WizardStep; label: string; description: string; icon: R
   { id: "review", label: "Final Review", description: "Verify order specifications", icon: CheckCircle2 },
 ];
 
-let rowCounter = 0;
-function generateRowId(): string {
-  rowCounter += 1;
-  return `po-row-${rowCounter}`;
+let poLineRowIdSeq = 0;
+
+function createPoLineRowId(): string {
+  poLineRowIdSeq += 1;
+  return `row-${poLineRowIdSeq}`;
 }
 
 function generateInitialRow(poType: POType = "consumable", isNew = false): POLineItemForm {
   return {
-    id: generateRowId(),
+    id: createPoLineRowId(),
     isNew,
     name: "",
     category: "",
@@ -111,7 +112,10 @@ export function FileNewPODialog({
   const { data: suppliers = [] } = useSuppliersQuery({ activeOnly: true });
   const { data: allCategories = [] } = useCategoriesQuery();
   const { data: consumablePage } = useConsumablesQuery({ limit: 100 });
-  const consumables = useMemo(() => consumablePage?.data ?? [], [consumablePage?.data]);
+  const consumables = useMemo(
+    () => consumablePage?.data ?? [],
+    [consumablePage?.data]
+  );
   const { data: assetsList = [] } = useAssetsQuery();
 
   const createPOMutation = useCreatePurchaseOrderMutation();
@@ -245,7 +249,7 @@ export function FileNewPODialog({
       !items[0].assetId;
 
     const newRow: POLineItemForm = {
-      id: generateRowId(),
+      id: createPoLineRowId(),
       isNew: false,
       consumableId: c.id,
       name: c.name,
@@ -284,7 +288,7 @@ export function FileNewPODialog({
       !items[0].assetId;
 
     const newRow: POLineItemForm = {
-      id: generateRowId(),
+      id: createPoLineRowId(),
       isNew: false,
       assetId: a.id,
       name: a.name,

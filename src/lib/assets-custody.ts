@@ -56,11 +56,6 @@ export function custodyDetailLabel(
 export function isAssetAvailableForRequest(asset: {
   status: string;
   currentHolder?: string | null;
-  reservedForRequestId?: string | null;
 }): boolean {
-  return (
-    asset.status === "active" &&
-    !asset.currentHolder &&
-    !asset.reservedForRequestId
-  );
+  return asset.status === "active" && !asset.currentHolder;
 }

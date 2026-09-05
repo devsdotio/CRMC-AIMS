@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import type { AssetFilterState, AssetStatus } from "@/types/assets";
 import { useCategoriesQuery } from "@/features/categories/client/use-categories";
 import { getCategoryStyle } from "@/constants/categories";
+import { ASSIGNMENT_TYPE_FILTER_OPTIONS } from "@/lib/asset-assignment-type";
 
 export interface AssetFiltersProps {
   filters: AssetFilterState;
@@ -13,6 +14,7 @@ export interface AssetFiltersProps {
   onResetFilters: () => void;
   totalAssetsCount: number;
   filteredAssetsCount: number;
+  assignmentTypeCounts?: Record<AssetFilterState["assignmentType"], number>;
 }
 
 const STATUSES: { id: AssetStatus; label: string; bg: string; text: string; dotBg: string }[] = [
@@ -117,6 +119,7 @@ export function AssetFilters({
   filters,
   onFilterChange,
   onResetFilters,
+  assignmentTypeCounts,
 }: AssetFiltersProps) {
   // Only needed for labels / category multi-select — defer until first dropdown open
   // so list /api/assets is not competing with another DB round-trip on paint.
@@ -129,7 +132,8 @@ export function AssetFilters({
     (filters.searchQuery ? 1 : 0) +
     filters.categories.length +
     filters.statuses.length +
-    (filters.availability === "available" ? 1 : 0);
+    (filters.availability === "available" ? 1 : 0) +
+    (filters.assignmentType !== "all" ? 1 : 0);
 
   const toggleCategory = (catId: string) => {
     const exists = filters.categories.includes(catId);
@@ -221,6 +225,40 @@ export function AssetFilters({
               <PackageCheck className="h-3.5 w-3.5" />
               Available only
             </button>
+
+            <div className="inline-flex items-center rounded-lg border border-border bg-bg-subtle p-0.5">
+              {ASSIGNMENT_TYPE_FILTER_OPTIONS.map((opt) => {
+                const isActive = filters.assignmentType === opt.id;
+                const count = assignmentTypeCounts?.[opt.id];
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => onFilterChange({ assignmentType: opt.id })}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors",
+                      isActive
+                        ? "bg-bg text-text shadow-xs"
+                        : "text-text-secondary hover:text-text"
+                    )}
+                  >
+                    {opt.label}
+                    {count !== undefined && (
+                      <span
+                        className={cn(
+                          "tabular-nums text-[10px] font-bold px-1.5 py-0.5 rounded-full",
+                          isActive
+                            ? "bg-accent/10 text-accent"
+                            : "bg-border/60 text-text-secondary"
+                        )}
+                      >
+                        {count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div className="w-px h-6 bg-border mx-1 hidden sm:block" />

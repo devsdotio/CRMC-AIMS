@@ -7,6 +7,7 @@ import {
   custodyDetailLabel,
 } from "@/lib/assets-custody";
 import type { Asset,  AssetStatus } from "@/types/assets";
+import { AssignmentTypeBadge } from "./assignment-type-badge";
 
 export interface AssetTableRowProps {
   asset: Asset;
@@ -96,17 +97,17 @@ export function AssetTableRow({ asset, onSelect }: AssetTableRowProps) {
         </span>
       </td>
 
+      {/* Assignment Type */}
+      <td className="px-3 py-3.5 whitespace-nowrap">
+        <AssignmentTypeBadge type={asset.assignmentType} />
+      </td>
+
       {/* Status Badge */}
       <td className="px-3 py-3.5 whitespace-nowrap">
         <div className="flex items-center gap-2">
           {asset.currentHolder && (
             <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-primary text-white">
               {custodyBadgeLabel(asset.currentHolder, asset.assignmentType)}
-            </span>
-          )}
-          {!asset.currentHolder && asset.reservedForRequestId && (
-            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-status-repair-bg/20 text-status-repair-text border border-status-repair-bg/30">
-              Reserved
             </span>
           )}
           <span
@@ -130,10 +131,6 @@ export function AssetTableRow({ asset, onSelect }: AssetTableRowProps) {
           >
             {custodyDetailLabel(asset.currentHolder)}
             {asset.department ? ` (${asset.department})` : ""}
-          </span>
-        ) : asset.reservedForRequestId ? (
-          <span className="font-semibold text-status-repair-text block">
-            Reserved for approved request
           </span>
         ) : (
           <span className="font-semibold text-status-active-text block">

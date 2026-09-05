@@ -147,11 +147,8 @@ export class BorrowRequestService {
     private readonly projectAssignments = new ProjectAssetAssignmentRepository()
   ) {}
 
-  /** Shared gate: unit must be free of holder, reservation, and open project custody. */
-  private async assertAssetFreeForRequest(
-    asset: AssetRow,
-    opts?: { allowReservedForRequestId?: string }
-  ): Promise<void> {
+  /** Shared gate: unit must be free of holder and open project custody. */
+  private async assertAssetFreeForRequest(asset: AssetRow): Promise<void> {
     if (asset.status !== "active") {
       throw new ConflictError(
         `Asset ${asset.assetCode} is not available (${asset.status.replace(/_/g, " ")}).`
@@ -160,16 +157,6 @@ export class BorrowRequestService {
     if (asset.currentHolder) {
       throw new ConflictError(
         `Asset ${asset.assetCode} is currently in custody (${asset.currentHolder}).`
-      );
-    }
-    if (
-      asset.reservedForRequestId &&
-      asset.reservedForRequestId !== opts?.allowReservedForRequestId
-    ) {
-      throw new ConflictError(
-        opts?.allowReservedForRequestId
-          ? `Asset ${asset.assetCode} is reserved for another request.`
-          : `Asset ${asset.assetCode} is already reserved for an approved request.`
       );
     }
     const openProject = await this.projectAssignments.findOpenByAssetId(asset.id);
@@ -241,19 +228,7 @@ export class BorrowRequestService {
     const submitted = historyEntry("submitted", actor.displayName, "Request recorded");
 
     const requestType = input.requestType ?? "borrowable";
-
-    for (const item of input.items) {
-      if (!item.assetId) continue;
-      const asset = await this.assetRepo.findById(item.assetId);
-      if (!asset) throw new NotFoundError("Asset", item.assetId);
-      await this.assertAssetFreeForRequest(asset);
-      if (requestType === "borrowable" && asset.assignmentType !== "borrowable") {
-        throw new ConflictError(`Asset ${asset.assetCode} is not borrowable.`);
-      }
-      if (requestType === "assignable" && asset.assignmentType !== "assignable") {
-        throw new ConflictError(`Asset ${asset.assetCode} is not assignable.`);
-      }
-    }
+    const items = normalizeCategoryOnlyItems(input.items);
 
     const row = await withTransaction(async (tx) => {
       const created = await this.repo.create({
@@ -266,7 +241,7 @@ export class BorrowRequestService {
         departmentId: dest.departmentId,
         requestType,
         requestedByName: input.requestedByName ?? null,
-        items: input.items,
+        items,
         purpose: input.purpose,
         expectedReturnDate:
           requestType === "borrowable"
@@ -332,16 +307,6 @@ export class BorrowRequestService {
         tx
       );
       if (!up) throw new NotFoundError("Borrow request", id);
-
-      // Lock pre-picked units so walk-up issue cannot steal them before release.
-      for (const item of nextItems) {
-        if (!item.assetId) continue;
-        await this.assetRepo.update(
-          item.assetId,
-          { reservedForRequestId: id, lastUpdated: new Date() },
-          tx
-        );
-      }
 
       return up;
     });
@@ -438,9 +403,7 @@ export class BorrowRequestService {
 
         const asset = await this.assetRepo.findById(assetId);
         if (!asset) throw new NotFoundError("Asset", assetId);
-        await this.assertAssetFreeForRequest(asset, {
-          allowReservedForRequestId: existing.id,
-        });
+        await this.assertAssetFreeForRequest(asset);
         if (asset.assignmentType !== expectedAssignmentType) {
           throw new ConflictError(
             `Asset ${asset.assetCode} is not ${expectedAssignmentType}.`
@@ -599,16 +562,6 @@ export class BorrowRequestService {
       }, tx);
       if (!up) throw new NotFoundError("Borrow request", id);
 
-      for (const item of up.items) {
-        if (item.assetId) {
-          await this.assetRepo.update(
-            item.assetId,
-            { currentHolder: null, reservedForRequestId: null, lastUpdated: new Date() },
-            tx
-          );
-        }
-      }
-
       return up;
     });
     return toDTO(updated);
@@ -636,10 +589,17 @@ export class BorrowRequestService {
       ? `Returned by: ${input.returnedBy}. ${input.note}`
       : `Returned by: ${input.returnedBy}`;
 
-    // Close active borrow log (clears holder + lifecycle) when this request released an asset.
-    for (const item of existing.items) {
-      if (item.assetId) {
-        const open = await this.borrowLogRepo.findActiveByAssetId(item.assetId);
+    const history = [
+      ...(Array.isArray(existing.history) ? existing.history : []),
+      historyEntry("returned", actor.displayName, noteWithReturner),
+    ];
+
+    const updated = await withTransaction(async (tx) => {
+      // Close every active custody log (or legacy holder) before marking the request returned.
+      for (const item of existing.items) {
+        if (!item.assetId) continue;
+
+        const open = await this.borrowLogRepo.findActiveByAssetId(item.assetId, tx);
         if (open) {
           await this.borrowLogs.returnLog(
             open.id,
@@ -648,40 +608,44 @@ export class BorrowRequestService {
               conditionNotes: noteWithReturner,
               flagMaintenance: false,
             },
-            actor
+            actor,
+            tx,
+            { skipRequestClosure: true }
           );
         } else {
           // Legacy release without log — clear holder + any orphan project row.
-          const asset = await this.assetRepo.findById(item.assetId);
+          const asset = await this.assetRepo.findByIdForUpdate(item.assetId, tx);
           if (asset?.currentHolder) {
-            await this.assetRepo.update(item.assetId, {
-              currentHolder: null,
-              reservedForRequestId: null,
-              lastUpdated: new Date(),
-            });
+            await this.assetRepo.update(
+              item.assetId,
+              {
+                currentHolder: null,
+                reservedForRequestId: null,
+                lastUpdated: new Date(),
+              },
+              tx
+            );
           }
           const openProject = await this.projectAssignments.findOpenByAssetId(
-            item.assetId
+            item.assetId,
+            tx
           );
           if (openProject) {
-            await this.projectAssignments.update(openProject.id, {
-              status: "returned",
-              returnedAt: new Date(),
-              returnedByUserId: actor.userId,
-              returnedByName: actor.displayName,
-              returnNotes: noteWithReturner,
-            });
+            await this.projectAssignments.update(
+              openProject.id,
+              {
+                status: "returned",
+                returnedAt: new Date(),
+                returnedByUserId: actor.userId,
+                returnedByName: actor.displayName,
+                returnNotes: noteWithReturner,
+              },
+              tx
+            );
           }
         }
       }
-    }
 
-    const history = [
-      ...(Array.isArray(existing.history) ? existing.history : []),
-      historyEntry("returned", actor.displayName, noteWithReturner),
-    ];
-
-    const updated = await withTransaction(async (tx) => {
       const up = await this.repo.update(
         id,
         {
@@ -724,25 +688,9 @@ export class BorrowRequestService {
     }
 
     const nextRequestType = input.requestType ?? existing.requestType ?? "borrowable";
-    const nextItems = input.items ?? existing.items;
-
-    // Validate assets if changed or present
-    if (input.items) {
-      for (const item of nextItems) {
-        if (!item.assetId) continue;
-        const asset = await this.assetRepo.findById(item.assetId);
-        if (!asset) throw new NotFoundError("Asset", item.assetId);
-        await this.assertAssetFreeForRequest(asset, {
-          allowReservedForRequestId: existing.id,
-        });
-        if (nextRequestType === "borrowable" && asset.assignmentType !== "borrowable") {
-          throw new ConflictError(`Asset ${asset.assetCode} is not borrowable.`);
-        }
-        if (nextRequestType === "assignable" && asset.assignmentType !== "assignable") {
-          throw new ConflictError(`Asset ${asset.assetCode} is not assignable.`);
-        }
-      }
-    }
+    const nextItems = input.items
+      ? normalizeCategoryOnlyItems(input.items)
+      : existing.items;
 
     const history = [
       ...(Array.isArray(existing.history) ? existing.history : []),
