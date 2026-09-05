@@ -18,6 +18,8 @@ export class BorrowLogController {
           status: url.searchParams.get("status") as any ?? undefined,
           department: url.searchParams.get("department") ?? undefined,
           search: url.searchParams.get("search") ?? undefined,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          custodyKind: (url.searchParams.get("custodyKind") || url.searchParams.get("custody") || url.searchParams.get("type")) as any ?? undefined,
         }, session)
       );
     } catch (error) {

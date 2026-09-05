@@ -109,30 +109,40 @@ export function BorrowHistoryTab() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<HistoryStatusFilter>("all");
   const [search, setSearch] = useState("");
-  const { data: records = [], isLoading: loading } = useBorrowLogQuery();
+  const { data: rawRecords = [], isLoading: loading } = useBorrowLogQuery();
+
+  const records = useMemo(() => {
+    return rawRecords.filter((r) => r.custodyKind !== "assignment");
+  }, [rawRecords]);
 
   const toggleExpand = (id: string) => {
     setExpandedId((prev) => (prev === id ? null : id));
   };
 
+  const searchedRecords = useMemo(() => {
+    if (!search.trim()) return records;
+    const q = search.toLowerCase();
+    return records.filter((r) => {
+      const code = (r.logCode || "").toLowerCase();
+      const assetName = (r.assetName || "").toLowerCase();
+      const assetCode = (r.assetCode || "").toLowerCase();
+      return code.includes(q) || assetName.includes(q) || assetCode.includes(q);
+    });
+  }, [records, search]);
+
+  const counts = useMemo(() => {
+    return {
+      all: searchedRecords.length,
+      active: searchedRecords.filter((r) => r.status === "active").length,
+      overdue: searchedRecords.filter((r) => r.status === "overdue").length,
+      returned: searchedRecords.filter((r) => r.status === "returned").length,
+    };
+  }, [searchedRecords]);
+
   const filteredRecords = useMemo(() => {
-    return records
-      .filter((r) => {
-        if (statusFilter === "all") return true;
-        if (statusFilter === "active") return r.status === "active";
-        if (statusFilter === "overdue") return r.status === "overdue";
-        if (statusFilter === "returned") return r.status === "returned";
-        return true;
-      })
-      .filter((r) => {
-        if (!search.trim()) return true;
-        const q = search.toLowerCase();
-        const code = (r.logCode || "").toLowerCase();
-        const assetName = (r.assetName || "").toLowerCase();
-        const assetCode = (r.assetCode || "").toLowerCase();
-        return code.includes(q) || assetName.includes(q) || assetCode.includes(q);
-      });
-  }, [records, statusFilter, search]);
+    if (statusFilter === "all") return searchedRecords;
+    return searchedRecords.filter((r) => r.status === statusFilter);
+  }, [searchedRecords, statusFilter]);
 
   return (
     <div className="rounded-xl border border-border overflow-hidden bg-bg shadow-xs flex flex-col min-h-0">
@@ -145,15 +155,7 @@ export function BorrowHistoryTab() {
           </span>
           <div className="flex gap-1 rounded-xl border border-border p-1 bg-bg-subtle shrink-0 overflow-x-auto scrollbar-none relative">
             {STATUS_FILTERS.map((f) => {
-              const count =
-                f.key === "all"
-                  ? records.length
-                  : records.filter((r) => {
-                      if (f.key === "active") return r.status === "active";
-                      if (f.key === "overdue") return r.status === "overdue";
-                      if (f.key === "returned") return r.status === "returned";
-                      return true;
-                    }).length;
+              const count = counts[f.key];
 
               const isSelected = statusFilter === f.key;
 

@@ -32,7 +32,7 @@ export default function DashboardPage() {
       icon: Box,
       variant: "default",
       loading,
-      href: "/borrow-log?status=active",
+      href: "/borrow-log?filter=active",
     },
     {
       label: "Active Assignments",
@@ -59,7 +59,7 @@ export default function DashboardPage() {
       icon: AlertCircle,
       variant: "danger",
       loading,
-      href: "/borrow-log?status=overdue",
+      href: "/borrow-log?filter=overdue",
     },
     {
       label: "Low Stock Items",

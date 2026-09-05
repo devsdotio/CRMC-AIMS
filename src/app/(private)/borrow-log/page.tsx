@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import {
@@ -33,10 +33,9 @@ import {
 } from "@/features/borrow-log/client";
 
 type LogTab = "all" | "active" | "overdue" | "returned";
-type CustodyFilter = "all" | "borrowable" | "assignable";
 
 const TABS: { id: LogTab; label: string }[] = [
-  { id: "all", label: "All Custodies" },
+  { id: "all", label: "All Records" },
   { id: "active", label: "Active" },
   { id: "overdue", label: "Overdue" },
   { id: "returned", label: "Returned" },
@@ -44,7 +43,7 @@ const TABS: { id: LogTab; label: string }[] = [
 
 function BorrowLogContent() {
   const searchParams = useSearchParams();
-  const filterParam = searchParams.get("filter");
+  const filterParam = searchParams.get("filter") || searchParams.get("status");
   const initialTab: LogTab =
     filterParam === "overdue" ||
     filterParam === "active" ||
@@ -55,23 +54,36 @@ function BorrowLogContent() {
   const [tab, setTab] = useState<LogTab>(initialTab);
   const [search, setSearch] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("all");
-  const [custodyFilter, setCustodyFilter] = useState<CustodyFilter>("all");
   const [returnTarget, setReturnTarget] = useState<BorrowLogRecord | null>(null);
   const [selectedRecord, setSelectedRecord] = useState<BorrowLogRecord | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
 
+  // Sync state when URL params change from external links or navigation
+  useEffect(() => {
+    if (filterParam === "overdue" || filterParam === "active" || filterParam === "returned") {
+      setTab(filterParam);
+    } else if (filterParam === "all") {
+      setTab("all");
+    }
+  }, [filterParam]);
+
   const toast = useToast();
   const { canOperate } = useAssetOperator();
 
   const {
-    data: allRecords = [],
+    data: rawRecords = [],
     isLoading,
     isError,
     error,
     refetch,
     isRefetching,
   } = useBorrowLogQuery();
+
+  // Ensure borrow log only shows borrowable items
+  const allRecords = useMemo(() => {
+    return rawRecords.filter((r) => r.custodyKind !== "assignment");
+  }, [rawRecords]);
 
   const returnMutation = useReturnBorrowMutation();
 
@@ -82,37 +94,15 @@ function BorrowLogContent() {
     return Array.from(set).sort();
   }, [allRecords]);
 
-  // Tab counts
-  const counts = useMemo(() => {
-    return {
-      all: allRecords.length,
-      active: allRecords.filter((r) => r.status === "active").length,
-      overdue: allRecords.filter((r) => r.status === "overdue").length,
-      returned: allRecords.filter((r) => r.status === "returned").length,
-    };
-  }, [allRecords]);
-
-  // Filter pipeline
-  const filteredRecords = useMemo(() => {
+  // Base filtered records (excluding status tab) for accurate badge counts
+  const baseFilteredRecords = useMemo(() => {
     let result = allRecords;
-
-    // Status Tab filter
-    if (tab !== "all") {
-      result = result.filter((r) => r.status === tab);
-    }
 
     // Department filter
     if (departmentFilter !== "all") {
       result = result.filter(
         (r) => r.department?.toLowerCase() === departmentFilter.toLowerCase()
       );
-    }
-
-    // Custody type filter
-    if (custodyFilter === "borrowable") {
-      result = result.filter((r) => r.custodyKind !== "assignment");
-    } else if (custodyFilter === "assignable") {
-      result = result.filter((r) => r.custodyKind === "assignment");
     }
 
     // Search filter
@@ -131,7 +121,23 @@ function BorrowLogContent() {
     }
 
     return result;
-  }, [allRecords, tab, departmentFilter, custodyFilter, search]);
+  }, [allRecords, departmentFilter, search]);
+
+  // Tab counts based on active search and department filters
+  const counts = useMemo(() => {
+    return {
+      all: baseFilteredRecords.length,
+      active: baseFilteredRecords.filter((r) => r.status === "active").length,
+      overdue: baseFilteredRecords.filter((r) => r.status === "overdue").length,
+      returned: baseFilteredRecords.filter((r) => r.status === "returned").length,
+    };
+  }, [baseFilteredRecords]);
+
+  // Final filtered records for current status tab
+  const filteredRecords = useMemo(() => {
+    if (tab === "all") return baseFilteredRecords;
+    return baseFilteredRecords.filter((r) => r.status === tab);
+  }, [baseFilteredRecords, tab]);
 
   // Pagination logic
   const totalPages = Math.ceil(filteredRecords.length / pageSize) || 1;
@@ -177,7 +183,6 @@ function BorrowLogContent() {
       "Asset Code",
       "Asset Name",
       "Category",
-      "Custody Type",
       "Borrower / Holder",
       "Department",
       "Released Date",
@@ -193,7 +198,6 @@ function BorrowLogContent() {
       r.assetCode,
       `"${(r.assetName || "").replace(/"/g, '""')}"`,
       r.category || "",
-      r.custodyKind === "assignment" ? "Assignable" : "Borrowable",
       `"${(r.borrowerName || "").replace(/"/g, '""')}"`,
       `"${(r.department || "").replace(/"/g, '""')}"`,
       r.releasedAt ? new Date(r.releasedAt).toISOString() : "",
@@ -233,7 +237,7 @@ function BorrowLogContent() {
                   Borrow & Return Log
                 </h1>
                 <p className="text-xs text-text-secondary mt-0.5">
-                  Track physical asset custody, active borrows, overdue returns, and check-ins (<span className="font-mono font-bold">LOG-</span>).
+                  Track physical borrowable asset loans, active borrows, overdue returns, and check-ins (<span className="font-mono font-bold">LOG-</span>).
                 </p>
               </div>
             </div>
@@ -382,25 +386,6 @@ function BorrowLogContent() {
                 </select>
               </div>
             )}
-
-            {/* Custody Type Filter with Label */}
-            <div className="flex items-center gap-1.5 shrink-0">
-              <span className="text-xs font-semibold text-text-secondary shrink-0">
-                Type:
-              </span>
-              <select
-                value={custodyFilter}
-                onChange={(e) => {
-                  setCustodyFilter(e.target.value as CustodyFilter);
-                  setPage(1);
-                }}
-                className="h-9 px-2.5 text-xs bg-bg border border-border rounded-lg text-text font-semibold focus:outline-none focus:ring-2 focus:ring-accent shrink-0 cursor-pointer"
-              >
-                <option value="all">All Types</option>
-                <option value="borrowable">Temporary Borrow</option>
-                <option value="assignable">Fixed Assignment</option>
-              </select>
-            </div>
           </div>
         </div>
       </div>
@@ -439,17 +424,16 @@ function BorrowLogContent() {
             </span>
             <p className="text-base font-bold text-text">No Borrow Records Found</p>
             <p className="text-xs text-text-secondary mt-1 max-w-sm leading-relaxed">
-              {search || departmentFilter !== "all" || custodyFilter !== "all" || tab !== "all"
+              {search || departmentFilter !== "all" || tab !== "all"
                 ? "No custody logs match your active filter criteria. Try resetting your search or filters."
-                : "Released institutional assets will appear here until they are returned."}
+                : "Released borrowable assets on loan will appear here until they are returned."}
             </p>
-            {(search || departmentFilter !== "all" || custodyFilter !== "all" || tab !== "all") && (
+            {(search || departmentFilter !== "all" || tab !== "all") && (
               <button
                 type="button"
                 onClick={() => {
                   setSearch("");
                   setDepartmentFilter("all");
-                  setCustodyFilter("all");
                   setTab("all");
                 }}
                 className="mt-4 px-3.5 py-1.5 text-xs font-bold rounded-lg border border-border bg-bg hover:bg-bg-subtle transition-colors cursor-pointer text-text"
@@ -471,9 +455,6 @@ function BorrowLogContent() {
                   </th>
                   <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-text-secondary">
                     Borrower / Department
-                  </th>
-                  <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-text-secondary hidden lg:table-cell">
-                    Custody Type
                   </th>
                   <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-text-secondary hidden md:table-cell">
                     Due Date
@@ -514,7 +495,7 @@ function BorrowLogContent() {
                               </p>
                             ) : (
                               <p className="text-[10px] text-text-secondary mt-0.5">
-                                Direct Issue
+                                Direct Loan
                               </p>
                             )}
                           </div>
@@ -545,13 +526,6 @@ function BorrowLogContent() {
                           <Building2 className="h-3 w-3 text-text-secondary/70 shrink-0" />
                           <span className="truncate max-w-[150px]">{row.department}</span>
                         </div>
-                      </td>
-
-                      {/* Custody Type */}
-                      <td className="px-4 py-3.5 align-middle hidden lg:table-cell">
-                        <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border bg-bg-subtle text-text-secondary border-border">
-                          {row.custodyKind === "assignment" ? "Assignable" : "Borrowable"}
-                        </span>
                       </td>
 
                       {/* Due Date */}
