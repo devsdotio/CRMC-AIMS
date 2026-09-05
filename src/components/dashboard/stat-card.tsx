@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { type LucideIcon, ArrowUpRight, AlertCircle, Clock, CheckCircle2, ShieldAlert } from "lucide-react";
+import { type LucideIcon, ArrowUpRight, AlertCircle, Clock, CheckCircle2, ShieldAlert, Building2, Box } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -88,19 +88,25 @@ export function StatCard({
   const isOverdue = label.toLowerCase().includes("overdue") || variant === "danger";
   const isLowStock = label.toLowerCase().includes("low stock") || label.toLowerCase().includes("low-stock") || variant === "warning";
   const isPending = label.toLowerCase().includes("pending");
+  const isAssignable = label.toLowerCase().includes("assign");
+  const isBorrow = label.toLowerCase().includes("borrow");
 
   const cardContent = (
     <div
       className={cn(
         "group relative flex flex-col justify-between overflow-hidden rounded-lg border p-5 transition-all duration-300 select-none",
         "h-full min-h-40 bg-card text-text shadow-sm hover:shadow-md",
-        // Uniform white card background with distinct operational borders & accents
+        // Uniform card background with distinct operational borders & accents
         isOverdue
           ? "border-status-outofservice-bg/60 hover:border-status-outofservice-bg"
           : isLowStock
           ? "border-status-repair-bg/50 hover:border-status-repair-bg"
           : isPending
           ? "border-category-computing-bg/40 hover:border-category-computing-bg"
+          : isAssignable
+          ? "border-amber-500/50 hover:border-amber-500"
+          : isBorrow
+          ? "border-primary/40 hover:border-primary"
           : "border-border hover:border-text-secondary/40"
       )}
       aria-label={`${label}: ${isLoading ? "loading" : displayValue}`}
@@ -127,6 +133,10 @@ export function StatCard({
                 ? "bg-status-repair-bg/15 border-status-repair-bg/40 text-status-repair-bg"
                 : isPending
                 ? "bg-category-computing-bg/15 border-category-computing-bg/40 text-category-computing-bg"
+                : isAssignable
+                ? "bg-amber-500/15 border-amber-500/40 text-amber-600 dark:text-amber-400"
+                : isBorrow
+                ? "bg-primary/15 border-primary/40 text-primary"
                 : "bg-bg-subtle border-border text-text-secondary group-hover:text-text"
             )}
           >
@@ -136,7 +146,17 @@ export function StatCard({
           <div>
             <div className="flex items-center gap-1.5">
               <span className="font-mono text-[10px] uppercase tracking-widest text-text-secondary">
-                {isOverdue ? "CRIT // ALERT" : isLowStock ? "WARN // INVENTORY" : isPending ? "QUEUE // ACTION" : "TELEMETRY"}
+                {isOverdue
+                  ? "CRIT // ALERT"
+                  : isLowStock
+                  ? "WARN // INVENTORY"
+                  : isPending
+                  ? "QUEUE // ACTION"
+                  : isAssignable
+                  ? "CUSTODY // ASSIGNABLE"
+                  : isBorrow
+                  ? "LOAN // BORROWABLE"
+                  : "TELEMETRY"}
               </span>
             </div>
             <p className="text-xs font-bold uppercase tracking-wider text-text">
@@ -164,13 +184,27 @@ export function StatCard({
                   ? "text-status-repair-bg"
                   : isPending
                   ? "text-category-computing-bg"
+                  : isAssignable
+                  ? "text-amber-600 dark:text-amber-400"
+                  : isBorrow
+                  ? "text-primary dark:text-blue-400"
                   : "text-text"
               )}
             >
               {(displayValue as number).toLocaleString()}
             </span>
             <span className="font-mono text-xs text-text-secondary uppercase">
-              {isOverdue ? "units" : isLowStock ? "items" : isPending ? "reqs" : "active"}
+              {isOverdue
+                ? "units"
+                : isLowStock
+                ? "items"
+                : isPending
+                ? "reqs"
+                : isAssignable
+                ? "assigned"
+                : isBorrow
+                ? "borrowed"
+                : "active"}
             </span>
           </div>
         )}
@@ -179,10 +213,18 @@ export function StatCard({
         {href && !isLoading && (
           <div
             className={cn(
-              "flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-semibold transition-all duration-200",
+              "flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-bold transition-all duration-200 border shadow-2xs",
               isOverdue
-                ? "bg-status-outofservice-bg text-status-outofservice-text opacity-90 group-hover:opacity-100 group-hover:scale-105"
-                : "bg-bg-subtle text-text-secondary group-hover:text-text group-hover:bg-border"
+                ? "bg-status-outofservice-bg text-white border-status-outofservice-bg group-hover:bg-status-outofservice-bg/90 group-hover:scale-105"
+                : isLowStock
+                ? "bg-status-repair-bg/15 text-status-repair-text border-status-repair-bg/30 group-hover:bg-status-repair-bg group-hover:text-white"
+                : isPending
+                ? "bg-category-computing-bg/15 text-category-computing-bg border-category-computing-bg/30 group-hover:bg-category-computing-bg group-hover:text-white"
+                : isAssignable
+                ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30 group-hover:bg-amber-600 group-hover:text-white"
+                : isBorrow
+                ? "bg-primary/10 text-primary border-primary/25 group-hover:bg-primary group-hover:text-white"
+                : "bg-bg-subtle text-text-secondary border-border group-hover:text-text group-hover:bg-border"
             )}
           >
             <span>View</span>
@@ -204,6 +246,10 @@ export function StatCard({
                 <AlertCircle className="h-3.5 w-3.5 shrink-0 text-status-repair-bg" />
               ) : isPending ? (
                 <Clock className="h-3.5 w-3.5 shrink-0 text-category-computing-bg" />
+              ) : isAssignable ? (
+                <Building2 className="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+              ) : isBorrow ? (
+                <Box className="h-3.5 w-3.5 shrink-0 text-primary" />
               ) : (
                 <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-status-active-bg" />
               )}
@@ -253,7 +299,7 @@ export interface StatCardsGridProps {
 export function StatCardsGrid({ stats }: StatCardsGridProps) {
   return (
     <section aria-label="Key operational telemetry metrics">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {stats.map((s, i) => (
           <StatCard key={i} {...s} />
         ))}

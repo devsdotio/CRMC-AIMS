@@ -75,8 +75,8 @@ export function toAssetModelDTO(
     availableCount,
     createdByUserId: row.createdByUserId,
     createdByName: row.createdByName,
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
+    createdAt: row.createdAt ? (row.createdAt instanceof Date ? row.createdAt.toISOString() : String(row.createdAt)) : new Date().toISOString(),
+    updatedAt: row.updatedAt ? (row.updatedAt instanceof Date ? row.updatedAt.toISOString() : String(row.updatedAt)) : new Date().toISOString(),
   };
 }
 

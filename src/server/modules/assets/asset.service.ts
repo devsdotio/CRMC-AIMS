@@ -1,5 +1,7 @@
+import { eq } from "drizzle-orm";
 import type { Asset } from "@/types/assets";
-import type { AssetModelRow, AssetRow } from "@/server/db/schema";
+import { projectAssetAssignments, type AssetModelRow, type AssetRow } from "@/server/db/schema";
+import { getDb } from "@/server/db";
 import {
   BadRequestError,
   ConflictError,
@@ -62,11 +64,19 @@ function isPgUniqueViolation(error: unknown): boolean {
   );
 }
 
-function toDateString(value: Date | string): string {
+function toDateString(value: Date | string | null | undefined): string {
+  if (value === null || value === undefined) {
+    return new Date().toISOString().slice(0, 10);
+  }
   if (typeof value === "string") {
     return value.slice(0, 10);
   }
-  return value.toISOString().slice(0, 10);
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime())
+      ? new Date().toISOString().slice(0, 10)
+      : value.toISOString().slice(0, 10);
+  }
+  return String(value).slice(0, 10);
 }
 
 function parseValue(value: string | null): number | undefined {
@@ -776,14 +786,6 @@ export class AssetService {
       throw new NotFoundError("Asset", id);
     }
 
-    const open = await this.borrowLogRepo.findActiveByAssetId(id);
-    const openProject = await this.projectAssignments.findOpenByAssetId(id);
-    if (open || openProject || existing.currentHolder || existing.reservedForRequestId) {
-      throw new ConflictError(
-        "Cannot delete an asset that is currently checked out, reserved, or assigned to a project. Return or unrelease it first."
-      );
-    }
-
     // Record first — history survives FK set-null after delete.
     await this.lifecycleService.record({
       assetId: existing.id,
@@ -798,9 +800,16 @@ export class AssetService {
           category: existing.category,
           location: existing.location,
           modelId: existing.modelId,
+          assignmentType: existing.assignmentType,
+          currentHolder: existing.currentHolder,
         },
       },
     });
+
+    const db = getDb();
+    await db
+      .delete(projectAssetAssignments)
+      .where(eq(projectAssetAssignments.assetId, id));
 
     const deleted = await this.assetRepository.delete(id);
     if (!deleted) {

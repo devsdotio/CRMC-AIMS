@@ -11,10 +11,13 @@ import { toBorrowLogDTO } from "@/server/modules/borrow-log/borrow-log.service";
 
 export type DashboardSummaryDTO = {
   activeBorrows: number;
+  activeAssignments: number;
   pendingApprovals: number;
   lowStockItems: number;
   overdueAssets: number;
   totalRequests?: number;
+  totalAssignable?: number;
+  totalBorrowable?: number;
 };
 
 export type DashboardPendingRequest = {
@@ -169,40 +172,51 @@ export class DashboardService {
       ]);
       return {
         activeBorrows,
+        activeAssignments: 0,
         pendingApprovals,
         lowStockItems: 0,
         overdueAssets,
       };
     }
 
-    const [activeBorrows, pendingApprovals, lowStockItems, overdueAssets] =
-      await Promise.all([
-        this.borrowLog.countActive().catch((err) => {
-          console.error("[dashboard] failed to count active borrows:", err);
+    const [
+      activeBorrows,
+      activeAssignments,
+      pendingApprovals,
+      lowStockItems,
+      overdueAssets,
+    ] = await Promise.all([
+      this.borrowLog.countActive().catch((err) => {
+        console.error("[dashboard] failed to count active borrows:", err);
+        return 0;
+      }),
+      this.assets.countAssigned().catch((err) => {
+        console.error("[dashboard] failed to count active assignments:", err);
+        return 0;
+      }),
+      Promise.all([
+        this.requests.countPending().catch((err) => {
+          console.error("[dashboard] failed to count pending requests:", err);
           return 0;
         }),
-        Promise.all([
-          this.requests.countPending().catch((err) => {
-            console.error("[dashboard] failed to count pending requests:", err);
-            return 0;
-          }),
-          this.consumableRequests.countPending().catch((err) => {
-            console.error("[dashboard] failed to count pending supply requests:", err);
-            return 0;
-          }),
-        ]).then(([a, b]) => a + b),
-        this.consumables.countLowStock().catch((err) => {
-          console.error("[dashboard] failed to count low stock consumables:", err);
+        this.consumableRequests.countPending().catch((err) => {
+          console.error("[dashboard] failed to count pending supply requests:", err);
           return 0;
         }),
-        this.borrowLog.countOverdue().catch((err) => {
-          console.error("[dashboard] failed to count overdue assets:", err);
-          return 0;
-        }),
-      ]);
+      ]).then(([a, b]) => a + b),
+      this.consumables.countLowStock().catch((err) => {
+        console.error("[dashboard] failed to count low stock consumables:", err);
+        return 0;
+      }),
+      this.borrowLog.countOverdue().catch((err) => {
+        console.error("[dashboard] failed to count overdue assets:", err);
+        return 0;
+      }),
+    ]);
 
     return {
       activeBorrows,
+      activeAssignments,
       pendingApprovals,
       lowStockItems,
       overdueAssets,
@@ -276,6 +290,7 @@ export class DashboardService {
     return {
       summary: {
         activeBorrows,
+        activeAssignments: 0,
         pendingApprovals,
         lowStockItems: 0,
         overdueAssets,
@@ -307,9 +322,12 @@ export class DashboardService {
   async getSnapshot(limit = 5): Promise<DashboardSnapshotDTO> {
     const [
       activeBorrows,
+      activeAssignments,
       pendingApprovals,
       lowStockItems,
       overdueAssets,
+      totalAssignable,
+      totalBorrowable,
       pendingRows,
       pendingSupplyRows,
       overdueRows,
@@ -319,6 +337,10 @@ export class DashboardService {
     ] = await Promise.all([
       this.borrowLog.countActive().catch((err) => {
         console.error("[dashboard] failed to count active borrows:", err);
+        return 0;
+      }),
+      this.assets.countAssigned().catch((err) => {
+        console.error("[dashboard] failed to count active assignments:", err);
         return 0;
       }),
       Promise.all([
@@ -337,6 +359,14 @@ export class DashboardService {
       }),
       this.borrowLog.countOverdue().catch((err) => {
         console.error("[dashboard] failed to count overdue assets:", err);
+        return 0;
+      }),
+      this.assets.countByType("assignable").catch((err) => {
+        console.error("[dashboard] failed to count total assignable assets:", err);
+        return 0;
+      }),
+      this.assets.countByType("borrowable").catch((err) => {
+        console.error("[dashboard] failed to count total borrowable assets:", err);
         return 0;
       }),
       this.requests.list({ status: "pending", limit }).catch((err) => {
@@ -382,9 +412,12 @@ export class DashboardService {
     return {
       summary: {
         activeBorrows,
+        activeAssignments,
         pendingApprovals,
         lowStockItems,
         overdueAssets,
+        totalAssignable,
+        totalBorrowable,
       },
       pendingRequests: this.mergePendingRequests(
         pendingRows,

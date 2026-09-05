@@ -24,15 +24,14 @@ export function isDepartmentCustody(holder?: string | null): boolean {
 /** Short badge: Available | Reserved | On project | Assigned | Borrowed */
 export function custodyBadgeLabel(
   holder?: string | null,
-  custodyKind?: "borrow" | "assignment" | null,
+  custodyKind?: "borrow" | "assignment" | "borrowable" | "assignable" | null,
   reserved?: boolean
 ): string {
   if (holder) {
     if (isProjectCustody(holder)) return "On project";
-    if (isDepartmentCustody(holder)) {
-      return custodyKind === "assignment" ? "Assigned" : "Borrowed";
+    if (custodyKind === "assignment" || custodyKind === "assignable") {
+      return "Assigned";
     }
-    if (custodyKind === "assignment") return "Assigned";
     return "Borrowed";
   }
   if (reserved) return "Reserved";

@@ -73,7 +73,7 @@ export function AssetCard({ asset, onSelect }: AssetCardProps) {
         <div className="flex items-center gap-2">
           {asset.currentHolder && (
             <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-primary text-white">
-              {custodyBadgeLabel(asset.currentHolder)}
+              {custodyBadgeLabel(asset.currentHolder, asset.assignmentType)}
             </span>
           )}
           {!asset.currentHolder && asset.reservedForRequestId && (

@@ -28,6 +28,7 @@ import {
   AlertCircle,
   ShieldCheck,
   Sparkles,
+  Trash2,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -861,6 +862,7 @@ export interface AssetDetailPanelProps {
   onEdit?: (asset: Asset) => void;
   onIssue?: (asset: Asset) => void;
   onReportMissing?: (asset: Asset) => void;
+  onDelete?: (asset: Asset) => void;
 }
 
 const STATUS_STYLES: Record<
@@ -902,6 +904,7 @@ export function AssetDetailPanel({
   onEdit,
   onIssue,
   onReportMissing,
+  onDelete,
 }: AssetDetailPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const { getCategoryStyle } = useCategoryStyleMap();
@@ -1006,7 +1009,7 @@ export function AssetDetailPanel({
                   )}
                 >
                   {asset.currentHolder
-                    ? "Borrowed / In-Use"
+                    ? (asset.assignmentType === "assignable" ? "Assigned" : "Borrowed")
                     : asset.reservedForRequestId
                       ? "Reserved"
                       : statusMeta.label}
@@ -1055,6 +1058,18 @@ export function AssetDetailPanel({
                 <span>Edit</span>
               </button>
             )}
+            {onDelete && (
+              <button
+                type="button"
+                onClick={() => onDelete(asset)}
+                title="Delete asset"
+                aria-label="Delete asset"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-bg text-status-outofservice-text hover:text-white hover:bg-status-outofservice-bg border border-status-outofservice-bg/40 transition-colors cursor-pointer shadow-xs"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>Delete</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -1083,7 +1098,7 @@ export function AssetDetailPanel({
                 <div className="flex gap-2">
                   {asset.currentHolder ? (
                     <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-primary text-white uppercase tracking-wider">
-                      {custodyBadgeLabel(asset.currentHolder)}
+                      {custodyBadgeLabel(asset.currentHolder, asset.assignmentType)}
                     </span>
                   ) : asset.reservedForRequestId ? (
                     <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-status-repair-bg/20 text-status-repair-text uppercase tracking-wider border border-status-repair-bg/30">

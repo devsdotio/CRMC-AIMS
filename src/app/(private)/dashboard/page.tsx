@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, ClipboardList, AlertCircle } from "lucide-react";
+import { Box, ClipboardList, AlertCircle, Building2 } from "lucide-react";
 
 import { StatCardsGrid, type StatCardProps } from "@/components/dashboard/stat-card";
 import { PendingApprovalsWidget } from "@/components/dashboard/pending-approvals-widget";
@@ -28,16 +28,25 @@ export default function DashboardPage() {
     {
       label: "Active Borrows",
       value: snapshot?.summary.activeBorrows ?? null,
-      contextLine: "Currently borrowed items",
+      contextLine: "Borrowable units on loan",
       icon: Box,
       variant: "default",
       loading,
       href: "/borrow-log?status=active",
     },
     {
+      label: "Active Assignments",
+      value: snapshot?.summary.activeAssignments ?? null,
+      contextLine: "Assignable units in custody",
+      icon: Building2,
+      variant: "default",
+      loading,
+      href: "/assets",
+    },
+    {
       label: "Pending Approvals",
       value: snapshot?.summary.pendingApprovals ?? null,
-      contextLine: "Requires immediate attention",
+      contextLine: "Requires staff attention",
       icon: ClipboardList,
       variant: "default",
       loading,
@@ -46,7 +55,7 @@ export default function DashboardPage() {
     {
       label: "Overdue Returns",
       value: snapshot?.summary.overdueAssets ?? null,
-      contextLine: "Past due date",
+      contextLine: "Past due date (Borrowable)",
       icon: AlertCircle,
       variant: "danger",
       loading,
@@ -55,7 +64,7 @@ export default function DashboardPage() {
     {
       label: "Low Stock Items",
       value: snapshot?.summary.lowStockItems ?? null,
-      contextLine: "Needs reordering",
+      contextLine: "Consumables needing restock",
       icon: AlertCircle,
       variant: "warning",
       loading,

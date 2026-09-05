@@ -71,6 +71,39 @@ export class AssetRepository implements IAssetRepository {
     }));
   }
 
+  async countAssigned(session?: DbSession): Promise<number> {
+    const db = this.db(session);
+    const [row] = await db
+      .select({ val: count() })
+      .from(assets)
+      .where(
+        and(
+          eq(assets.assignmentType, "assignable"),
+          or(
+            sql`${assets.currentHolder} IS NOT NULL`,
+            sql`exists (
+              select 1 from ${projectAssetAssignments}
+              where ${projectAssetAssignments.assetId} = ${assets.id}
+                and ${projectAssetAssignments.status} = 'assigned'
+            )`
+          )
+        )
+      );
+    return Number(row?.val ?? 0);
+  }
+
+  async countByType(
+    type: "borrowable" | "assignable",
+    session?: DbSession
+  ): Promise<number> {
+    const db = this.db(session);
+    const [row] = await db
+      .select({ val: count() })
+      .from(assets)
+      .where(eq(assets.assignmentType, type));
+    return Number(row?.val ?? 0);
+  }
+
   async findMany(
     filters?: ListAssetsFilters,
     session?: DbSession

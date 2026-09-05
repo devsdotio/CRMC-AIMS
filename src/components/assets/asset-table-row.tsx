@@ -101,7 +101,7 @@ export function AssetTableRow({ asset, onSelect }: AssetTableRowProps) {
         <div className="flex items-center gap-2">
           {asset.currentHolder && (
             <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-primary text-white">
-              {custodyBadgeLabel(asset.currentHolder)}
+              {custodyBadgeLabel(asset.currentHolder, asset.assignmentType)}
             </span>
           )}
           {!asset.currentHolder && asset.reservedForRequestId && (

@@ -23,7 +23,7 @@ function toLifecycleDTO(row: AssetLifecycleEventRow): AssetLifecycleEventDTO {
     fromHolder: row.fromHolder,
     toHolder: row.toHolder,
     payload: row.payload ?? {},
-    createdAt: row.createdAt.toISOString(),
+    createdAt: row.createdAt ? (row.createdAt instanceof Date ? row.createdAt.toISOString() : String(row.createdAt)) : new Date().toISOString(),
   };
 }
 

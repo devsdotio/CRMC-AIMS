@@ -5,7 +5,8 @@ import { Plus, QrCode } from "lucide-react";
 import { 
   useAssetsQuery, 
   useCreateAssetMutation, 
-  useUpdateAssetMutation 
+  useUpdateAssetMutation,
+  useDeleteAssetMutation,
 } from "@/features/assets/client/use-assets";
 import type { Asset, ViewMode, AssetFilterState, AssetStatus } from "@/types/assets";
 import { AssetFilters } from "@/components/assets/asset-filters";
@@ -17,6 +18,7 @@ import { AddEditAssetDialog } from "@/components/assets/add-edit-asset-dialog";
 import { ScanAssetDialog } from "@/components/assets/scan-asset-dialog";
 import { IssueAssetDialog } from "@/components/assets/issue-asset-dialog";
 import { ReportMissingDialog } from "@/components/assets/report-missing-dialog";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { QueryErrorBanner } from "@/components/shared/query-error-banner";
 import { OperatorReadOnlyBanner } from "@/components/shared/operator-read-only-banner";
 import { useToast } from "@/components/providers/toast-context";
@@ -33,6 +35,7 @@ export default function AssetsPage() {
   } = useAssetsQuery();
   const createMutation = useCreateAssetMutation();
   const updateMutation = useUpdateAssetMutation();
+  const deleteMutation = useDeleteAssetMutation();
   const toast = useToast();
   const { canOperate } = useAssetOperator();
 
@@ -50,6 +53,7 @@ export default function AssetsPage() {
 
   // Modal / Drawer States
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
+  const [assetToDelete, setAssetToDelete] = useState<Asset | null>(null);
   const [addEditState, setAddEditState] = useState<{ isOpen: boolean; asset: Asset | null }>({
     isOpen: false,
     asset: null,
@@ -177,6 +181,20 @@ export default function AssetsPage() {
     }
   };
 
+  const handleConfirmDelete = async () => {
+    if (!assetToDelete) return;
+    try {
+      await deleteMutation.mutateAsync(assetToDelete.id);
+      if (selectedAsset?.id === assetToDelete.id) {
+        setSelectedAsset(null);
+      }
+      toast.success(`Asset "${assetToDelete.name}" (${assetToDelete.assetCode}) was deleted.`);
+      setAssetToDelete(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete asset.");
+    }
+  };
+
   return (
     <div className="h-full flex flex-col min-h-0 overflow-hidden bg-bg-subtle rounded-md" data-theme="light">
       {/* ── Top Header Bar ────────────────────────────────────────────── */}
@@ -286,6 +304,13 @@ export default function AssetsPage() {
               }
             : undefined
         }
+        onDelete={
+          canOperate
+            ? (asset) => {
+                setAssetToDelete(asset);
+              }
+            : undefined
+        }
       />
 
       <IssueAssetDialog
@@ -318,6 +343,21 @@ export default function AssetsPage() {
         isOpen={scanOpen}
         onClose={() => setScanOpen(false)}
         onSuccess={(message) => toast.success(message)}
+      />
+
+      <ConfirmDialog
+        isOpen={Boolean(assetToDelete)}
+        title="Delete Asset"
+        description={
+          assetToDelete
+            ? `Are you sure you want to delete asset "${assetToDelete.name}" (${assetToDelete.assetCode})? This action cannot be undone.`
+            : ""
+        }
+        confirmLabel="Delete Asset"
+        variant="destructive"
+        isLoading={deleteMutation.isPending}
+        onConfirm={handleConfirmDelete}
+        onClose={() => setAssetToDelete(null)}
       />
     </div>
   );
