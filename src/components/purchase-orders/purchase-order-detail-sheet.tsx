@@ -2,7 +2,6 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import {
-  X,
   FileText,
   ShieldCheck,
   Printer,
@@ -21,6 +20,8 @@ import {
   QrCode,
   AlertCircle,
   Loader2,
+  Trash2,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { PurchaseLot, PurchaseOrderStatus } from "@/types/purchase-lots";
@@ -37,6 +38,7 @@ interface PurchaseOrderDetailSheetProps {
   onPrintSlip: (lot: PurchaseLot) => void;
   onPrintTag?: (lot: PurchaseLot) => void;
   onReleaseStock?: (lot: PurchaseLot) => void;
+  onDelete?: (lot: PurchaseLot) => void;
   canOperate?: boolean;
 }
 
@@ -79,6 +81,7 @@ export function PurchaseOrderDetailSheet({
   onPrintSlip,
   onPrintTag,
   onReleaseStock,
+  onDelete,
   canOperate = false,
 }: PurchaseOrderDetailSheetProps) {
   const panelRef = useRef<HTMLDivElement>(null);
@@ -229,14 +232,20 @@ export function PurchaseOrderDetailSheet({
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close detail panel"
-            className="p-1.5 rounded-lg text-text-secondary hover:text-text hover:bg-border transition-colors cursor-pointer shrink-0"
-          >
-            <X className="h-5 w-5" />
-          </button>
+          {canOperate && onDelete && (
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => onDelete(lot)}
+                title="Delete Purchase Order"
+                aria-label="Delete Purchase Order"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-destructive text-white hover:bg-destructive/90 transition-colors cursor-pointer shadow-xs"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>Delete</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Tab Navigation */}
@@ -445,7 +454,7 @@ export function PurchaseOrderDetailSheet({
                   <div className="space-y-1">
                     <span className="text-[10px] uppercase font-bold text-text-secondary">Quantity Received</span>
                     <p className="font-mono font-bold text-text text-sm">
-                      {lot.quantity} {lot.itemType === "asset" ? "unit" : "units"}
+                      {lot.quantity} {lot.itemType === "asset" ? (lot.quantity === 1 ? "unit" : "units") : "pcs"}
                     </p>
                   </div>
 
@@ -526,7 +535,7 @@ export function PurchaseOrderDetailSheet({
                       <button
                         type="button"
                         onClick={() => onReleaseStock?.(lot)}
-                        className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold rounded-lg bg-accent text-accent-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+                        className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors cursor-pointer shadow-xs"
                       >
                         <Send className="h-4 w-4" />
                         <span>Issue / Release From This Lot</span>

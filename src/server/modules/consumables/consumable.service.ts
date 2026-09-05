@@ -1,4 +1,11 @@
-import type { ConsumableRow } from "@/server/db/schema";
+import {
+  type ConsumableRow,
+  auditLogs,
+  stockMovements,
+  consumableRequestLines,
+} from "@/server/db/schema";
+import { getDb } from "@/server/db";
+import { eq } from "drizzle-orm";
 import {
   generateOperationalCode,
   todayDateString,
@@ -737,6 +744,46 @@ export class ConsumableService {
       }
 
       return toDTO(updated);
+    });
+  }
+
+  async delete(rawId: string, actor: ActorContext): Promise<void> {
+    const id = consumableIdSchema.parse(rawId);
+    return withTransaction(async (session) => {
+      const db = session ?? getDb();
+      const existing = await this.repo.findByIdForUpdate(id, session);
+      if (!existing) {
+        throw new NotFoundError("Consumable", id);
+      }
+
+      await db.insert(auditLogs).values({
+        entityType: "consumable",
+        entityId: existing.itemCode,
+        action: "consumable_deleted",
+        actorName: actor.displayName,
+        actorUserId: actor.userId,
+        notes: `Deleted consumable inventory item "${existing.name}" (${existing.itemCode}).`,
+        metadata: {
+          id: existing.id,
+          itemCode: existing.itemCode,
+          name: existing.name,
+          category: existing.category,
+          currentQty: existing.currentQty,
+        },
+      });
+
+      await db
+        .delete(stockMovements)
+        .where(eq(stockMovements.consumableId, id));
+
+      await db
+        .delete(consumableRequestLines)
+        .where(eq(consumableRequestLines.consumableId, id));
+
+      const deleted = await this.repo.delete(id, session);
+      if (!deleted) {
+        throw new NotFoundError("Consumable", id);
+      }
     });
   }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { PlusCircle, SlidersHorizontal, Tag } from "lucide-react";
+import { PlusCircle, SlidersHorizontal, Tag, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ConsumableItem } from "@/types/inventory";
 import { StockLevelBar } from "./stock-level-bar";
@@ -10,12 +10,14 @@ export interface ConsumableTableRowProps {
   item: ConsumableItem;
   onSelect: (item: ConsumableItem) => void;
   onAdjust?: (item: ConsumableItem) => void;
+  onDelete?: (item: ConsumableItem) => void;
 }
 
 export function ConsumableTableRow({
   item,
   onSelect,
   onAdjust,
+  onDelete,
 }: ConsumableTableRowProps) {
   const { getCategoryStyle } = useCategoryStyleMap();
   const categoryMeta = getCategoryStyle(item.category);
@@ -82,20 +84,33 @@ export function ConsumableTableRow({
       </td>
 
       {/* Actions */}
-      {onAdjust && (
+      {(onAdjust || onDelete) && (
         <td
           className="px-5 py-3.5 text-right whitespace-nowrap"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => onAdjust(item)}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-border bg-bg text-xs font-semibold text-text-secondary hover:text-text hover:bg-bg-subtle transition-colors cursor-pointer"
-            >
-              <SlidersHorizontal className="h-3.5 w-3.5" />
-              Adjust
-            </button>
+          <div className="flex items-center justify-end gap-1.5">
+            {onAdjust && (
+              <button
+                type="button"
+                onClick={() => onAdjust(item)}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-amber-500/30 bg-amber-500/10 text-xs font-semibold text-amber-700 dark:text-amber-400 hover:bg-amber-500 hover:text-white transition-colors cursor-pointer"
+              >
+                <SlidersHorizontal className="h-3.5 w-3.5" />
+                Adjust
+              </button>
+            )}
+            {onDelete && (
+              <button
+                type="button"
+                onClick={() => onDelete(item)}
+                title="Delete supply item"
+                aria-label="Delete supply item"
+                className="inline-flex items-center p-1.5 rounded-md border border-destructive/25 bg-destructive/10 text-destructive hover:bg-destructive hover:text-white transition-colors cursor-pointer"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
         </td>
       )}

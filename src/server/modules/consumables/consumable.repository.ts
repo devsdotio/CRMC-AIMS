@@ -195,4 +195,13 @@ export class ConsumableRepository implements IConsumableRepository {
       .returning();
     return row ?? null;
   }
+
+  async delete(id: string, session?: DbSession): Promise<boolean> {
+    const db = this.db(session);
+    const deleted = await db
+      .delete(consumables)
+      .where(eq(consumables.id, id))
+      .returning({ id: consumables.id });
+    return deleted.length > 0;
+  }
 }

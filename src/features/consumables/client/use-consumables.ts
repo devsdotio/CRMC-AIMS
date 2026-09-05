@@ -375,3 +375,51 @@ export function useAdjustConsumableMutation(): UseMutationResult<
     },
   });
 }
+
+export function useDeleteConsumableMutation(): UseMutationResult<
+  { success: boolean },
+  Error,
+  string
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => consumablesApi.delete(id),
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: consumableQueryKeys.all });
+      const previousLists = qc.getQueriesData<PaginatedResponse<ConsumableItem>>({
+        queryKey: consumableQueryKeys.lists(),
+      });
+      const previousDetail = qc.getQueryData<ConsumableItem>(
+        consumableQueryKeys.detail(id)
+      );
+
+      // Optimistically remove from all cached lists
+      qc.setQueriesData<PaginatedResponse<ConsumableItem>>(
+        { queryKey: consumableQueryKeys.lists() },
+        (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            total: Math.max(0, old.total - 1),
+            data: old.data.filter((item) => item.id !== id),
+          };
+        }
+      );
+
+      return { previousLists, previousDetail };
+    },
+    onError: (_err, id, context) => {
+      if (context?.previousLists) {
+        context.previousLists.forEach(([queryKey, data]) => {
+          qc.setQueryData(queryKey, data);
+        });
+      }
+      if (context?.previousDetail) {
+        qc.setQueryData(consumableQueryKeys.detail(id), context.previousDetail);
+      }
+    },
+    onSettled: (_data, _error, id) => {
+      invalidate(qc, id);
+    },
+  });
+}

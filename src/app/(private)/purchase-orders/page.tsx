@@ -5,10 +5,15 @@ import {
   Boxes,
   FilePlus2,
 } from "lucide-react";
-import { usePurchaseLotsQuery } from "@/features/purchase-lots/client/use-purchase-lots";
+import {
+  usePurchaseLotsQuery,
+  useDeletePurchaseOrderMutation,
+} from "@/features/purchase-lots/client/use-purchase-lots";
 import { useAssetOperator } from "@/hooks/use-asset-operator";
 import { OperatorReadOnlyBanner } from "@/components/shared/operator-read-only-banner";
 import { QueryErrorBanner } from "@/components/shared/query-error-banner";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { useToast } from "@/components/providers/toast-context";
 import type { PurchaseLot } from "@/types/purchase-lots";
 
 import {
@@ -32,6 +37,8 @@ export default function PurchaseOrdersPage() {
     refetch,
   } = usePurchaseLotsQuery();
   const { canOperate } = useAssetOperator();
+  const deleteMutation = useDeletePurchaseOrderMutation();
+  const toast = useToast();
 
   const [filters, setFilters] = useState<PurchaseOrderFilterState>({
     search: "",
@@ -49,6 +56,7 @@ export default function PurchaseOrdersPage() {
   const [printSlipLot, setPrintSlipLot] = useState<PurchaseLot | null>(null);
   const [printTagLot, setPrintTagLot] = useState<PurchaseLot | null>(null);
   const [releaseLot, setReleaseLot] = useState<PurchaseLot | null>(null);
+  const [lotToDelete, setLotToDelete] = useState<PurchaseLot | null>(null);
   const [isFileNewPOOpen, setIsFileNewPOOpen] = useState(false);
 
   const uniqueLots = useMemo(() => {
@@ -180,6 +188,24 @@ export default function PurchaseOrdersPage() {
     });
   };
 
+  const handleConfirmDelete = async () => {
+    if (!lotToDelete) return;
+    try {
+      await deleteMutation.mutateAsync(lotToDelete.id);
+      toast.success(
+        `Purchase Order "${lotToDelete.poNumber || lotToDelete.lotCode}" deleted.`
+      );
+      if (selectedLot?.id === lotToDelete.id) {
+        setSelectedLot(null);
+      }
+      setLotToDelete(null);
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to delete purchase order."
+      );
+    }
+  };
+
   return (
     <div className="h-full flex flex-col min-h-0 overflow-hidden bg-bg-subtle">
       {/* Header Bar */}
@@ -243,6 +269,11 @@ export default function PurchaseOrdersPage() {
             loading={isLoading && !error}
             onSelectLot={setSelectedLot}
             onPrintSlip={setPrintSlipLot}
+            onDelete={
+              canOperate
+                ? (lot) => setLotToDelete(lot)
+                : undefined
+            }
           />
         ) : (
           <div className="p-4 md:p-6">
@@ -251,6 +282,11 @@ export default function PurchaseOrdersPage() {
               loading={isLoading && !error}
               onSelectLot={setSelectedLot}
               onPrintSlip={setPrintSlipLot}
+              onDelete={
+                canOperate
+                  ? (lot) => setLotToDelete(lot)
+                  : undefined
+              }
             />
           </div>
         )}
@@ -264,6 +300,11 @@ export default function PurchaseOrdersPage() {
         onPrintSlip={(lot) => setPrintSlipLot(lot)}
         onPrintTag={(lot) => setPrintTagLot(lot)}
         onReleaseStock={(lot) => setReleaseLot(lot)}
+        onDelete={
+          canOperate
+            ? (lot) => setLotToDelete(lot)
+            : undefined
+        }
         canOperate={canOperate}
       />
 
@@ -299,6 +340,21 @@ export default function PurchaseOrdersPage() {
             onSuccess={() => {
               void refetch();
             }}
+          />
+
+          <ConfirmDialog
+            isOpen={Boolean(lotToDelete)}
+            title="Delete Purchase Order"
+            description={
+              lotToDelete
+                ? `Are you sure you want to delete purchase order "${lotToDelete.poNumber || lotToDelete.lotCode}" (${lotToDelete.itemName})? This will cancel the order and cannot be undone.`
+                : ""
+            }
+            confirmLabel="Delete Order"
+            variant="destructive"
+            isLoading={deleteMutation.isPending}
+            onConfirm={handleConfirmDelete}
+            onClose={() => setLotToDelete(null)}
           />
         </>
       )}

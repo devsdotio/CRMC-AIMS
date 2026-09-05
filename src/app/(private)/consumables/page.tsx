@@ -8,6 +8,7 @@ import {
   useCreateConsumableMutation,
   useUpdateConsumableMutation,
   useAdjustConsumableMutation,
+  useDeleteConsumableMutation,
   type StockAdjustPayload,
 } from "@/features/consumables/client/use-consumables";
 import type { ConsumableItem, ConsumableFilterState } from "@/types/inventory";
@@ -22,6 +23,7 @@ import { AdjustStockDialog } from "@/components/consumables/adjust-stock-dialog"
 import { IssueConsumableDialog } from "@/components/consumables/issue-consumable-dialog";
 import { QueryErrorBanner } from "@/components/shared/query-error-banner";
 import { OperatorReadOnlyBanner } from "@/components/shared/operator-read-only-banner";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { useToast } from "@/components/providers/toast-context";
 import { useAssetOperator } from "@/hooks/use-asset-operator";
 
@@ -37,10 +39,12 @@ export default function ConsumablesPage() {
   const createMutation = useCreateConsumableMutation();
   const updateMutation = useUpdateConsumableMutation();
   const adjustMutation = useAdjustConsumableMutation();
+  const deleteMutation = useDeleteConsumableMutation();
   const toast = useToast();
   const { canOperate } = useAssetOperator();
 
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
+  const [itemToDelete, setItemToDelete] = useState<ConsumableItem | null>(null);
 
   const isLoading = isConsumablesLoading;
 
@@ -214,6 +218,20 @@ export default function ConsumablesPage() {
     }
   };
 
+  const handleConfirmDelete = async () => {
+    if (!itemToDelete) return;
+    try {
+      await deleteMutation.mutateAsync(itemToDelete.id);
+      toast.success(`Consumable item "${itemToDelete.name}" deleted.`);
+      if (selectedId === itemToDelete.id) {
+        setSelectedId(null);
+      }
+      setItemToDelete(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete item.");
+    }
+  };
+
   return (
     <div
       className="h-full flex flex-col min-h-0 overflow-hidden bg-bg-subtle rounded-md"
@@ -246,9 +264,9 @@ export default function ConsumablesPage() {
               setIssueItem(selectedItem);
               setIssueOpen(true);
             }}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-border bg-bg text-text hover:border-primary transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors cursor-pointer shadow-xs"
           >
-            <PackageMinus className="h-4 w-4 text-primary" />
+            <PackageMinus className="h-4 w-4" />
             <span>Issue</span>
           </button>
 
@@ -301,6 +319,11 @@ export default function ConsumablesPage() {
                 ? (item) => setAdjustState({ isOpen: true, item })
                 : undefined
             }
+            onDelete={
+              canOperate
+                ? (item) => setItemToDelete(item)
+                : undefined
+            }
           />
         ) : (
           <ConsumableTable
@@ -310,6 +333,11 @@ export default function ConsumablesPage() {
             onAdjust={
               canOperate
                 ? (item) => setAdjustState({ isOpen: true, item })
+                : undefined
+            }
+            onDelete={
+              canOperate
+                ? (item) => setItemToDelete(item)
                 : undefined
             }
           />
@@ -338,6 +366,11 @@ export default function ConsumablesPage() {
         onEdit={
           canOperate
             ? (item) => setAddEditState({ isOpen: true, item })
+            : undefined
+        }
+        onDelete={
+          canOperate
+            ? (item) => setItemToDelete(item)
             : undefined
         }
       />
@@ -369,6 +402,21 @@ export default function ConsumablesPage() {
           setIssueLotId(undefined);
         }}
         onSuccess={(message) => toast.success(message)}
+      />
+
+      <ConfirmDialog
+        isOpen={Boolean(itemToDelete)}
+        title="Delete Consumable Item"
+        description={
+          itemToDelete
+            ? `Are you sure you want to delete supply item "${itemToDelete.name}" (${itemToDelete.itemCode})? This will remove all associated stock records and cannot be undone.`
+            : ""
+        }
+        confirmLabel="Delete Item"
+        variant="destructive"
+        isLoading={deleteMutation.isPending}
+        onConfirm={handleConfirmDelete}
+        onClose={() => setItemToDelete(null)}
       />
       </>
       )}

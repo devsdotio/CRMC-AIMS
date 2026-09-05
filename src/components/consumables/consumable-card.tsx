@@ -1,6 +1,6 @@
 "use client";
 
-import { PlusCircle, SlidersHorizontal, Tag } from "lucide-react";
+import { PlusCircle, SlidersHorizontal, Tag, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ConsumableItem } from "@/types/inventory";
 import { StockLevelBar } from "./stock-level-bar";
@@ -10,12 +10,14 @@ export interface ConsumableCardProps {
   item: ConsumableItem;
   onSelect: (item: ConsumableItem) => void;
   onAdjust?: (item: ConsumableItem) => void;
+  onDelete?: (item: ConsumableItem) => void;
 }
 
 export function ConsumableCard({
   item,
   onSelect,
   onAdjust,
+  onDelete,
 }: ConsumableCardProps) {
   const { getCategoryStyle } = useCategoryStyleMap();
   const categoryMeta = getCategoryStyle(item.category);
@@ -75,19 +77,35 @@ export function ConsumableCard({
       </div>
 
       {/* Card Footer Actions */}
-      {onAdjust && (
+      {(onAdjust || onDelete) && (
         <div
           className="px-4 py-2.5 bg-bg-subtle border-t border-border flex items-center justify-between"
           onClick={(e) => e.stopPropagation()}
         >
-          <button
-            type="button"
-            onClick={() => onAdjust(item)}
-            className="inline-flex items-center gap-1 text-[11px] font-semibold text-text-secondary hover:text-text cursor-pointer"
-          >
-            <SlidersHorizontal className="h-3 w-3" />
-            Adjust
-          </button>
+          {onAdjust ? (
+            <button
+              type="button"
+              onClick={() => onAdjust(item)}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400 hover:bg-amber-500 hover:text-white transition-colors cursor-pointer text-[11px] font-semibold"
+            >
+              <SlidersHorizontal className="h-3 w-3" />
+              Adjust
+            </button>
+          ) : (
+            <span />
+          )}
+          {onDelete && (
+            <button
+              type="button"
+              onClick={() => onDelete(item)}
+              title="Delete supply item"
+              aria-label="Delete supply item"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-destructive/25 bg-destructive/10 text-destructive hover:bg-destructive hover:text-white transition-colors cursor-pointer text-[11px] font-semibold"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              <span>Delete</span>
+            </button>
+          )}
         </div>
       )}
     </div>

@@ -128,4 +128,12 @@ export const consumablesApi = {
     );
     return res.data;
   },
+
+  async delete(id: string): Promise<{ success: boolean }> {
+    const res = await fetchJson<ApiResponse<{ success: boolean }>>(
+      `/api/consumables/${id}`,
+      { method: "DELETE" }
+    );
+    return res.data;
+  },
 };

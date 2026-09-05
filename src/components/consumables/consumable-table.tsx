@@ -9,6 +9,7 @@ export interface ConsumableTableProps {
   loading?: boolean;
   onSelect: (item: ConsumableItem) => void;
   onAdjust?: (item: ConsumableItem) => void;
+  onDelete?: (item: ConsumableItem) => void;
 }
 
 // ─── Matched Skeleton Row for Consumables Table ─────────────────────────────
@@ -46,6 +47,7 @@ export function ConsumableTable({
   loading = false,
   onSelect,
   onAdjust,
+  onDelete,
 }: ConsumableTableProps) {
   if (loading) {
     return (
@@ -105,6 +107,7 @@ export function ConsumableTable({
               item={item}
               onSelect={onSelect}
               onAdjust={onAdjust}
+              onDelete={onDelete}
             />
           ))}
         </tbody>
