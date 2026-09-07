@@ -17,6 +17,9 @@ import {
   Send,
   DollarSign,
   RotateCcw,
+  FileText,
+  StickyNote,
+  PackageCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCategoryStyleResolver } from "@/features/categories/client/use-category-style";
@@ -146,20 +149,49 @@ export function SupplyRequestDetailPanel({
                   </div>
                 </div>
               </div>
-              {request.purpose && (
-                <div className="pt-2.5 border-t border-border">
-                  <span className="text-xs text-text-secondary block mb-1 font-medium">Purpose</span>
-                  <p className="text-sm text-text leading-relaxed">{request.purpose}</p>
-                </div>
-              )}
-              {request.notes && (
-                <div className="pt-2.5 border-t border-border">
-                  <span className="text-xs text-text-secondary block mb-1 font-medium">Notes</span>
-                  <p className="text-sm text-text leading-relaxed">{request.notes}</p>
-                </div>
-              )}
             </div>
           </div>
+
+          {/* Purpose & Notes */}
+          {(request.purpose || request.notes) && (
+            <div className="space-y-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
+                <FileText className="h-3.5 w-3.5 text-indigo-500" /> Purpose & Notes
+              </h3>
+              <div className="rounded-xl border border-indigo-500/25 bg-indigo-500/5 dark:bg-indigo-950/20 p-4 space-y-3 text-xs shadow-xs">
+                {request.purpose && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className="p-1 rounded-md bg-indigo-500/15 text-indigo-600 dark:text-indigo-400">
+                        <FileText className="h-3.5 w-3.5" />
+                      </span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-400">
+                        Purpose of Requisition
+                      </span>
+                    </div>
+                    <p className="text-sm font-semibold text-text leading-relaxed pl-0.5">
+                      {request.purpose}
+                    </p>
+                  </div>
+                )}
+                {request.notes && (
+                  <div className={cn(request.purpose && "pt-2.5 border-t border-indigo-500/15")}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="p-1 rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                        <StickyNote className="h-3.5 w-3.5" />
+                      </span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                        Additional Notes
+                      </span>
+                    </div>
+                    <p className="text-xs text-text-secondary font-medium leading-relaxed pl-0.5">
+                      {request.notes}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Rejection reason */}
           {request.rejectionReason && (

@@ -1,7 +1,7 @@
 "use client";
  
 import { useEffect, useRef, useState } from "react";
-import { X, Check, Mail, Phone, Building2, Tag, History, FileText, User, Loader2, Send, CheckCircle, XCircle, PackageCheck, PackageMinus, RotateCcw, Edit3 } from "lucide-react";
+import { X, Check, Mail, Phone, Building2, Tag, History, FileText, User, Loader2, Send, CheckCircle, XCircle, PackageCheck, PackageMinus, RotateCcw, Edit3, Calendar, Clock, AlertCircle, StickyNote, Briefcase, Package, Box } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatItemDescription, isUuid } from "@/lib/sanitize-display";
 import { useCategoryStyleResolver } from "@/features/categories/client/use-category-style";
@@ -87,6 +87,17 @@ function getActionStyle(action: string) {
   }
 }
 
+function formatDisplayDate(dateStr?: string | null): string {
+  if (!dateStr) return "N/A";
+  const date = dateStr.includes("T") ? new Date(dateStr) : new Date(`${dateStr}T00:00:00`);
+  if (isNaN(date.getTime())) return dateStr;
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 export function RequestDetailPanel({
   request,
   isOpen,
@@ -103,6 +114,7 @@ export function RequestDetailPanel({
   const panelRef = useRef<HTMLDivElement>(null);
   const [isMarkingUnreleased, setIsMarkingUnreleased] = useState(false);
   const [isUndoingApproval, setIsUndoingApproval] = useState(false);
+  const [isOverdue, setIsOverdue] = useState(false);
   const resolveCategoryStyle = useCategoryStyleResolver();
 
   // Keyboard Escape listener
@@ -135,6 +147,28 @@ export function RequestDetailPanel({
       setIsMarkingUnreleased(false);
     }
   };
+
+  useEffect(() => {
+    if (!isOpen || !request) {
+      setIsOverdue(false);
+      return;
+    }
+    const isAssign = request.requestType === "assignable";
+    const hasAssets =
+      !isAssign &&
+      request.items?.some(
+        (item) => item.itemType === "asset" || Boolean(item.assetId)
+      );
+    const overdue =
+      Boolean(hasAssets) &&
+      !isAssign &&
+      request.status === "released" &&
+      Boolean(
+        request.expectedReturnDate &&
+          new Date(request.expectedReturnDate).setHours(23, 59, 59, 999) < Date.now()
+      );
+    setIsOverdue(overdue);
+  }, [isOpen, request]);
 
   if (!isOpen) return null;
 
@@ -176,9 +210,14 @@ export function RequestDetailPanel({
   }
 
   const statusMeta = STATUS_STYLES[request.status];
-  const hasReturnableAssets = request.items?.some(
-    (item) => item.itemType === "asset" || Boolean(item.assetId)
-  );
+  const isAssignRequest = request.requestType === "assignable";
+  const hasReturnableAssets =
+    !isAssignRequest &&
+    request.items?.some(
+      (item) => item.itemType === "asset" || Boolean(item.assetId)
+    );
+  const totalUnits =
+    request.items?.reduce((acc, item) => acc + (item.quantity || 1), 0) ?? 0;
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs transition-opacity duration-200">
@@ -199,28 +238,34 @@ export function RequestDetailPanel({
         {/* Panel Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-bg-subtle/50 shrink-0">
           <div className="min-w-0 flex-1 pr-3">
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <h2 id="detail-panel-heading" className="font-mono text-lg font-bold tracking-tight text-text">
-                {request.requestCode}
-              </h2>
-              {statusMeta && (
-                <span
-                  className={cn(
-                    "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold capitalize border border-border/50",
-                    statusMeta.bg,
-                    statusMeta.text
-                  )}
-                >
-                  {statusMeta.label}
-                </span>
-              )}
+            <h2 id="detail-panel-heading" className="font-mono text-lg font-bold tracking-tight text-text">
+              {request.requestCode}
+            </h2>
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              <span className="text-xs text-text-secondary font-medium">
+                {isAssignRequest ? "Assignment Request" : hasReturnableAssets ? "Borrow Request" : "Supplies Requisition"}
+              </span>
+              <span className="text-text-secondary/40">•</span>
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary/10 text-primary border border-primary/20 shadow-2xs">
+                <User className="h-3 w-3 shrink-0" />
+                <span className="truncate max-w-50">{request.requesterName}</span>
+              </span>
             </div>
-            <p className="text-xs text-text-secondary font-medium mt-0.5 truncate">
-              {hasReturnableAssets ? "Borrow Request" : "Supplies Requisition"} • Requester: <strong className="text-text font-semibold">{request.requesterName}</strong>
-            </p>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center justify-center gap-2.5 shrink-0">
+            {statusMeta && (
+              <span
+                className={cn(
+                  "inline-flex items-center justify-center px-3.5 py-1 rounded-full text-xs font-bold capitalize border border-border/50 shadow-xs text-center",
+                  statusMeta.bg,
+                  statusMeta.text
+                )}
+              >
+                {statusMeta.label}
+              </span>
+            )}
+
             {onEdit && request.status === "pending" && (
               <button
                 type="button"
@@ -247,49 +292,31 @@ export function RequestDetailPanel({
 
         {/* Scrollable Panel Body */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* Status Banner */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between p-3.5 rounded-lg border border-border bg-bg-subtle">
-              <span className="text-xs font-semibold text-text-secondary">Current Status</span>
-              <div className="flex items-center gap-2">
-                {request.status === "released" && request.pickedUpBy && (
-                  <span
-                    className="inline-flex items-center gap-1.5 justify-center px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-bg text-text-secondary border border-border shadow-xs"
-                  >
-                    <User className="h-3 w-3" />
-                    <span className="font-normal opacity-80">Picker:</span> {request.pickedUpBy}
-                  </span>
-                )}
-                <span
-                  className={cn(
-                    "inline-flex items-center px-3 py-1 rounded-full text-xs font-bold",
-                    statusMeta.bg,
-                    statusMeta.text
-                  )}
-                >
-                  {statusMeta.label}
+          {/* Rejection Reason */}
+          {request.rejectionReason && (
+            <div className="p-3.5 rounded-lg border border-destructive bg-destructive/10 text-destructive text-xs">
+              <span className="font-bold block mb-1">Rejection Reason:</span>
+              {request.rejectionReason}
+            </div>
+          )}
+
+          {/* Requested Item Info */}
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
+                <Package className="h-3.5 w-3.5 text-primary" />
+                Requested Items
+              </h3>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] font-semibold text-text-secondary bg-bg-subtle px-2 py-0.5 rounded-full border border-border">
+                  {request.items.length} {request.items.length === 1 ? "item" : "items"}
+                </span>
+                <span className="text-[11px] font-bold text-text bg-bg-subtle px-2 py-0.5 rounded-full border border-border font-mono">
+                  {totalUnits} {totalUnits === 1 ? "unit" : "units"}
                 </span>
               </div>
             </div>
-            {request.rejectionReason && (
-              <div className="p-3.5 rounded-lg border border-destructive bg-destructive/10 text-destructive text-xs">
-                <span className="font-bold block mb-1">Rejection Reason:</span>
-                {request.rejectionReason}
-              </div>
-            )}
-          </div>
-
-          {/* Requested Item Info */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary">
-                Item Details
-              </h3>
-              <span className="text-[11px] font-semibold text-text-secondary bg-bg-subtle px-2 py-0.5 rounded-full border border-border">
-                {request.items.length} {request.items.length === 1 ? "item" : "items"}
-              </span>
-            </div>
-            <div className="rounded-lg border border-border bg-bg overflow-hidden divide-y divide-border">
+            <div className="rounded-xl border border-border bg-bg overflow-hidden divide-y divide-border shadow-xs">
               {request.items.map((item, idx) => {
                 const itemCategoryMeta = resolveCategoryStyle(item.category);
                 const displayDesc = formatItemDescription(
@@ -297,32 +324,70 @@ export function RequestDetailPanel({
                   itemCategoryMeta.label,
                   item.itemType
                 );
+                const isAsset =
+                  item.itemType === "asset" || Boolean(item.assetId);
                 const shouldShowAssetCode =
                   Boolean(item.assetCode) &&
                   !isUuid(item.assetCode) &&
                   !item.assetCode?.toLowerCase().startsWith("cat-");
 
                 return (
-                  <div key={idx} className={cn("px-3.5 py-2.5 flex items-center gap-3", idx % 2 === 1 && "bg-bg-subtle/50")}>
-                    {/* Description + tags */}
+                  <div
+                    key={idx}
+                    className="p-3 flex items-center gap-3 hover:bg-bg-subtle/50 transition-colors"
+                  >
+                    {/* Visual Icon Avatar */}
+                    <div
+                      className={cn(
+                        "h-9 w-9 shrink-0 rounded-lg flex items-center justify-center border",
+                        itemCategoryMeta.bg,
+                        "border-border/30"
+                      )}
+                    >
+                      {isAsset ? (
+                        <Box className={cn("h-4 w-4", itemCategoryMeta.text)} />
+                      ) : (
+                        <Package className={cn("h-4 w-4", itemCategoryMeta.text)} />
+                      )}
+                    </div>
+
+                    {/* Title + Metadata tags */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-text truncate">{displayDesc}</p>
-                      <div className="flex flex-wrap items-center gap-1 mt-0.5">
-                        <span className={cn("rounded-full px-1.5 py-px text-[9px] font-bold uppercase", itemCategoryMeta.bg, itemCategoryMeta.text)}>
+                      <p className="text-xs font-bold text-text truncate">
+                        {displayDesc}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                        <span
+                          className={cn(
+                            "rounded-md px-1.5 py-0.5 text-[10px] font-semibold",
+                            itemCategoryMeta.bg,
+                            itemCategoryMeta.text
+                          )}
+                        >
                           {itemCategoryMeta.label}
                         </span>
-                        <span className={cn(
-                          "rounded-full px-1.5 py-px text-[9px] font-semibold uppercase",
-                          item.itemType === "asset" ? "bg-primary/10 text-primary" : "bg-status-repair-bg/10 text-status-repair-text"
-                        )}>
-                          {item.itemType === "asset" ? "Asset" : "Consumable"}
+
+                        <span
+                          className={cn(
+                            "rounded-md px-1.5 py-0.5 text-[10px] font-semibold border",
+                            isAsset
+                              ? "bg-primary/10 text-primary border-primary/20"
+                              : "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20"
+                          )}
+                        >
+                          {isAsset ? "Asset" : "Consumable"}
                         </span>
+
                         {shouldShowAssetCode && item.assetCode && (() => {
                           const acColor = getAssetCodeColor(item.assetCode);
                           return (
                             <span
-                              className="rounded-full px-1.5 py-px text-[9px] font-mono font-bold"
-                              style={{ backgroundColor: acColor.bg, color: acColor.text, border: `1px solid ${acColor.border}` }}
+                              className="rounded-md px-1.5 py-0.5 text-[10px] font-mono font-bold shadow-2xs"
+                              style={{
+                                backgroundColor: acColor.bg,
+                                color: acColor.text,
+                                border: `1px solid ${acColor.border}`,
+                              }}
                             >
                               {item.assetCode}
                             </span>
@@ -330,10 +395,18 @@ export function RequestDetailPanel({
                         })()}
                       </div>
                     </div>
-                    {/* Quantity badge — right side */}
-                    <span className="flex items-center justify-center h-6 min-w-6 px-1.5 rounded-full bg-bg-subtle border border-border text-[11px] font-bold text-text shrink-0">
-                      &times;{item.quantity}
-                    </span>
+
+                    {/* Quantity Pill */}
+                    <div className="text-right shrink-0">
+                      <div className="inline-flex flex-col items-end px-2.5 py-1 rounded-md bg-bg-subtle border border-border">
+                        <span className="text-[9px] uppercase tracking-wider text-text-secondary font-bold leading-none">
+                          Qty
+                        </span>
+                        <span className="font-mono font-black text-xs text-text mt-0.5">
+                          {item.quantity} {item.unit ? item.unit : item.quantity === 1 ? "pc" : "pcs"}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 );
               })}
@@ -369,17 +442,38 @@ export function RequestDetailPanel({
 
           {/* Purpose & Notes */}
           <div className="space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
+              <FileText className="h-3.5 w-3.5 text-indigo-500" />
               Purpose & Notes
             </h3>
-            <div className="p-4 rounded-lg border border-primary/25 bg-primary/5 space-y-2 text-xs">
-              <div className="flex items-start gap-2">
-                <FileText className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                <p className="text-text font-medium leading-relaxed">{request.purpose}</p>
+            <div className="rounded-xl border border-indigo-500/25 bg-indigo-500/5 dark:bg-indigo-950/20 p-4 space-y-3 text-xs shadow-xs">
+              <div>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="p-1 rounded-md bg-indigo-500/15 text-indigo-600 dark:text-indigo-400">
+                    <FileText className="h-3.5 w-3.5" />
+                  </span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-400">
+                    Purpose of Request
+                  </span>
+                </div>
+                <p className="text-sm font-semibold text-text leading-relaxed pl-0.5">
+                  {request.purpose}
+                </p>
               </div>
+
               {request.notes && (
-                <div className="mt-2 pt-2 border-t border-primary/15 text-text-secondary">
-                  <span className="font-semibold text-text">Additional Note:</span> {request.notes}
+                <div className="pt-2.5 border-t border-indigo-500/15">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="p-1 rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                      <StickyNote className="h-3.5 w-3.5" />
+                    </span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                      Additional Notes
+                    </span>
+                  </div>
+                  <p className="text-xs text-text-secondary font-medium leading-relaxed pl-0.5">
+                    {request.notes}
+                  </p>
                 </div>
               )}
             </div>
@@ -388,38 +482,155 @@ export function RequestDetailPanel({
           {/* Fulfillment Details */}
           {request.pickedUpBy && (
             <div className="space-y-3">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
+                <PackageCheck className="h-3.5 w-3.5 text-status-active-text" />
                 Fulfillment Details
               </h3>
-              <div className="p-4 rounded-lg border border-border bg-bg space-y-2 text-xs">
-                <div className="flex items-center gap-2">
-                  <User className="h-4 w-4 text-text-secondary shrink-0" />
-                  <span className="text-text-secondary">Picked up by:</span>
-                  <span className="font-bold text-text">{request.pickedUpBy}</span>
+              <div className="p-3.5 rounded-xl border border-emerald-500/25 bg-emerald-500/5 dark:bg-emerald-950/20 shadow-xs flex items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2.5">
+                  <span className="p-1.5 rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 shrink-0">
+                    <User className="h-4 w-4" />
+                  </span>
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 block">
+                      Picked Up By
+                    </span>
+                    <span className="font-bold text-sm text-text block mt-0.5">
+                      {request.pickedUpBy}
+                    </span>
+                  </div>
                 </div>
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                  <Check className="h-3 w-3" /> Released
+                </span>
               </div>
             </div>
           )}
 
           {/* Schedule */}
           <div className="space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary">
-              {hasReturnableAssets ? "Schedule & Return Date" : "Schedule & Status"}
+            <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
+              <Calendar className="h-3.5 w-3.5 text-sky-500" />
+              {isAssignRequest ? "Schedule & Allocation" : hasReturnableAssets ? "Schedule & Return Date" : "Schedule & Status"}
             </h3>
             <div className="grid grid-cols-2 gap-3 text-xs">
-              <div className="p-3 rounded-lg border border-border bg-bg">
-                <span className="text-text-secondary block mb-1">Requested On</span>
-                <span className="font-semibold text-text">{new Date(request.requestedAt).toLocaleDateString()}</span>
-              </div>
-              {hasReturnableAssets ? (
-                <div className="p-3 rounded-lg border border-primary/25 bg-primary/5">
-                  <span className="text-text-secondary block mb-1">Expected Return</span>
-                  <span className="font-bold text-primary">{request.expectedReturnDate}</span>
+              {/* Requested On Card */}
+              <div className="p-3.5 rounded-xl border border-sky-500/25 bg-sky-500/5 dark:bg-sky-950/20 shadow-xs flex flex-col justify-between">
+                <div className="flex items-center gap-1.5 text-sky-700 dark:text-sky-400 font-semibold text-[10px] uppercase tracking-wider mb-1.5">
+                  <span className="p-1 rounded-md bg-sky-500/15 text-sky-600 dark:text-sky-400">
+                    <Calendar className="h-3 w-3" />
+                  </span>
+                  Requested On
                 </div>
+                <div>
+                  <span className="font-bold text-sm text-text block">
+                    {new Date(request.requestedAt).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </span>
+                  <span className="text-[10px] text-text-secondary font-medium">
+                    {new Date(request.requestedAt).toLocaleTimeString("en-US", {
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                </div>
+              </div>
+
+              {/* Expected Return / Custody Status Card */}
+              {isAssignRequest ? (
+                <div className="p-3.5 rounded-xl border border-indigo-500/25 bg-indigo-500/5 dark:bg-indigo-950/20 shadow-xs flex flex-col justify-between">
+                  <div className="flex items-center gap-1.5 text-indigo-700 dark:text-indigo-400 font-semibold text-[10px] uppercase tracking-wider mb-1.5">
+                    <span className="p-1 rounded-md bg-indigo-500/15 text-indigo-600 dark:text-indigo-400">
+                      <Briefcase className="h-3 w-3" />
+                    </span>
+                    Custody Allocation
+                  </div>
+                  <div>
+                    <span className="font-bold text-sm text-indigo-900 dark:text-indigo-200 block">
+                      Direct Assignment
+                    </span>
+                    <span className="text-[10px] text-indigo-700/80 dark:text-indigo-400/80 font-medium">
+                      Continuous custody • No return date
+                    </span>
+                  </div>
+                </div>
+              ) : hasReturnableAssets ? (
+                request.status === "returned" ? (
+                  <div className="p-3.5 rounded-xl border border-emerald-500/30 bg-emerald-500/8 dark:bg-emerald-950/20 shadow-xs flex flex-col justify-between">
+                    <div className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 font-semibold text-[10px] uppercase tracking-wider mb-1.5">
+                      <span className="p-1 rounded-md bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                        <CheckCircle className="h-3 w-3" />
+                      </span>
+                      Return Status
+                    </div>
+                    <div>
+                      <span className="font-bold text-sm text-emerald-700 dark:text-emerald-300 block">
+                        Returned
+                      </span>
+                      <span className="text-[10px] text-emerald-600/80 dark:text-emerald-400/80 font-medium">
+                        Expected: {formatDisplayDate(request.expectedReturnDate)}
+                      </span>
+                    </div>
+                  </div>
+                ) : isOverdue ? (
+                  <div className="p-3.5 rounded-xl border border-destructive/40 bg-destructive/10 dark:bg-destructive/15 shadow-xs flex flex-col justify-between">
+                    <div className="flex items-center justify-between gap-1 mb-1.5">
+                      <div className="flex items-center gap-1.5 text-destructive font-bold text-[10px] uppercase tracking-wider">
+                        <span className="p-1 rounded-md bg-destructive/15 text-destructive">
+                          <AlertCircle className="h-3 w-3" />
+                        </span>
+                        Expected Return
+                      </div>
+                      <span className="px-1.5 py-0.5 rounded-full text-[9px] font-extrabold bg-destructive text-white uppercase tracking-wider">
+                        Overdue
+                      </span>
+                    </div>
+                    <div>
+                      <span className="font-bold text-sm text-destructive block">
+                        {formatDisplayDate(request.expectedReturnDate)}
+                      </span>
+                      <span className="text-[10px] text-destructive/80 font-medium">
+                        Past scheduled return
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/10 dark:bg-amber-950/25 shadow-xs flex flex-col justify-between">
+                    <div className="flex items-center gap-1.5 text-amber-700 dark:text-amber-400 font-semibold text-[10px] uppercase tracking-wider mb-1.5">
+                      <span className="p-1 rounded-md bg-amber-500/20 text-amber-700 dark:text-amber-400">
+                        <Clock className="h-3 w-3" />
+                      </span>
+                      Expected Return
+                    </div>
+                    <div>
+                      <span className="font-bold text-sm text-amber-900 dark:text-amber-200 block">
+                        {formatDisplayDate(request.expectedReturnDate)}
+                      </span>
+                      <span className="text-[10px] text-amber-700/80 dark:text-amber-400/80 font-medium">
+                        Scheduled check-in
+                      </span>
+                    </div>
+                  </div>
+                )
               ) : (
-                <div className="p-3 rounded-lg border border-border bg-bg-subtle">
-                  <span className="text-text-secondary block mb-1">Return Requirement</span>
-                  <span className="font-semibold text-text-secondary">Non-returnable (Consumable)</span>
+                <div className="p-3.5 rounded-xl border border-border bg-bg-subtle/70 shadow-xs flex flex-col justify-between">
+                  <div className="flex items-center gap-1.5 text-text-secondary font-semibold text-[10px] uppercase tracking-wider mb-1.5">
+                    <span className="p-1 rounded-md bg-border text-text-secondary">
+                      <PackageCheck className="h-3 w-3" />
+                    </span>
+                    Return Requirement
+                  </div>
+                  <div>
+                    <span className="font-semibold text-xs text-text block">
+                      Non-returnable
+                    </span>
+                    <span className="text-[10px] text-text-secondary font-medium">
+                      Consumable item issued
+                    </span>
+                  </div>
                 </div>
               )}
             </div>

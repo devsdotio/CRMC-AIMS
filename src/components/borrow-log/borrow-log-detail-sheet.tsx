@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   X,
   Copy,
@@ -44,6 +44,15 @@ export function BorrowLogDetailSheet({
 }: BorrowLogDetailSheetProps) {
   const { getCategoryStyle } = useCategoryStyleMap();
   const [copied, setCopied] = useState(false);
+  const [isOverdue, setIsOverdue] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen || !record?.dueDate) {
+      setIsOverdue(false);
+      return;
+    }
+    setIsOverdue(new Date(record.dueDate).getTime() < Date.now());
+  }, [isOpen, record?.dueDate]);
 
   if (!isOpen) return null;
 
@@ -269,47 +278,167 @@ export function BorrowLogDetailSheet({
           </div>
 
           {/* Timeline & Due Dates */}
-          <div className="p-4 rounded-xl border border-border bg-bg space-y-3 text-xs">
-            <h4 className="font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
-              <Calendar className="h-3.5 w-3.5 text-accent" />
+          <div className="space-y-3">
+            <h4 className="font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1.5 text-xs">
+              <Calendar className="h-3.5 w-3.5 text-sky-500" />
               Custody Timeline
             </h4>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <span className="text-text-secondary text-[11px] block">Released At</span>
-                <span className="font-semibold text-text">{releasedDateStr}</span>
-              </div>
-              <div>
-                <span className="text-text-secondary text-[11px] block">Due Date</span>
-                <span className="font-semibold text-text">
-                  {record.dueDate
-                    ? new Date(record.dueDate).toLocaleDateString("en-PH", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })
-                    : "Open Custody"}
-                </span>
-              </div>
-              {record.returnedAt && (
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              {/* Released At */}
+              <div className="p-3.5 rounded-xl border border-sky-500/25 bg-sky-500/5 dark:bg-sky-950/20 shadow-xs flex flex-col justify-between">
+                <div className="flex items-center gap-1.5 text-sky-700 dark:text-sky-400 font-semibold text-[10px] uppercase tracking-wider mb-1.5">
+                  <span className="p-1 rounded-md bg-sky-500/15 text-sky-600 dark:text-sky-400">
+                    <Calendar className="h-3 w-3" />
+                  </span>
+                  Released At
+                </div>
                 <div>
-                  <span className="text-text-secondary text-[11px] block">Returned At</span>
-                  <span className="font-semibold text-status-active-text">
-                    {new Date(record.returnedAt).toLocaleString("en-PH", {
+                  <span className="font-bold text-sm text-text block">
+                    {new Date(record.releasedAt).toLocaleDateString("en-PH", {
                       month: "short",
                       day: "numeric",
                       year: "numeric",
+                    })}
+                  </span>
+                  <span className="text-[10px] text-text-secondary font-medium">
+                    {new Date(record.releasedAt).toLocaleTimeString("en-PH", {
                       hour: "numeric",
                       minute: "2-digit",
-                      hour12: true,
                     })}
                   </span>
                 </div>
+              </div>
+
+              {/* Due Date */}
+              {record.dueDate ? (
+                record.returnedAt ? (
+                  <div className="p-3.5 rounded-xl border border-emerald-500/30 bg-emerald-500/8 dark:bg-emerald-950/20 shadow-xs flex flex-col justify-between">
+                    <div className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 font-semibold text-[10px] uppercase tracking-wider mb-1.5">
+                      <span className="p-1 rounded-md bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                        <CheckCircle2 className="h-3 w-3" />
+                      </span>
+                      Due Date
+                    </div>
+                    <div>
+                      <span className="font-bold text-sm text-emerald-700 dark:text-emerald-300 block">
+                        {new Date(record.dueDate).toLocaleDateString("en-PH", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
+                      </span>
+                      <span className="text-[10px] text-emerald-600/80 dark:text-emerald-400/80 font-medium">
+                        Returned
+                      </span>
+                    </div>
+                  </div>
+                ) : isOverdue ? (
+                  <div className="p-3.5 rounded-xl border border-destructive/40 bg-destructive/10 dark:bg-destructive/15 shadow-xs flex flex-col justify-between">
+                    <div className="flex items-center justify-between gap-1 mb-1.5">
+                      <div className="flex items-center gap-1.5 text-destructive font-bold text-[10px] uppercase tracking-wider">
+                        <span className="p-1 rounded-md bg-destructive/15 text-destructive">
+                          <AlertCircle className="h-3 w-3" />
+                        </span>
+                        Due Date
+                      </div>
+                      <span className="px-1.5 py-0.5 rounded-full text-[9px] font-extrabold bg-destructive text-white uppercase tracking-wider">
+                        Overdue
+                      </span>
+                    </div>
+                    <div>
+                      <span className="font-bold text-sm text-destructive block">
+                        {new Date(record.dueDate).toLocaleDateString("en-PH", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
+                      </span>
+                      <span className="text-[10px] text-destructive/80 font-medium">
+                        Past due date
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/10 dark:bg-amber-950/25 shadow-xs flex flex-col justify-between">
+                    <div className="flex items-center gap-1.5 text-amber-700 dark:text-amber-400 font-semibold text-[10px] uppercase tracking-wider mb-1.5">
+                      <span className="p-1 rounded-md bg-amber-500/20 text-amber-700 dark:text-amber-400">
+                        <Clock className="h-3 w-3" />
+                      </span>
+                      Due Date
+                    </div>
+                    <div>
+                      <span className="font-bold text-sm text-amber-900 dark:text-amber-200 block">
+                        {new Date(record.dueDate).toLocaleDateString("en-PH", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
+                      </span>
+                      <span className="text-[10px] text-amber-700/80 dark:text-amber-400/80 font-medium">
+                        Expected check-in
+                      </span>
+                    </div>
+                  </div>
+                )
+              ) : (
+                <div className="p-3.5 rounded-xl border border-border bg-bg-subtle/70 shadow-xs flex flex-col justify-between">
+                  <div className="flex items-center gap-1.5 text-text-secondary font-semibold text-[10px] uppercase tracking-wider mb-1.5">
+                    <span className="p-1 rounded-md bg-border text-text-secondary">
+                      <Clock className="h-3 w-3" />
+                    </span>
+                    Due Date
+                  </div>
+                  <div>
+                    <span className="font-semibold text-xs text-text block">Open Custody</span>
+                    <span className="text-[10px] text-text-secondary font-medium">No fixed due date</span>
+                  </div>
+                </div>
               )}
+
+              {/* Returned At */}
+              {record.returnedAt && (
+                <div className="p-3.5 rounded-xl border border-emerald-500/30 bg-emerald-500/8 dark:bg-emerald-950/20 shadow-xs flex flex-col justify-between">
+                  <div className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 font-semibold text-[10px] uppercase tracking-wider mb-1.5">
+                    <span className="p-1 rounded-md bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                      <CheckCircle2 className="h-3 w-3" />
+                    </span>
+                    Returned At
+                  </div>
+                  <div>
+                    <span className="font-bold text-sm text-emerald-700 dark:text-emerald-300 block">
+                      {new Date(record.returnedAt).toLocaleDateString("en-PH", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </span>
+                    <span className="text-[10px] text-emerald-600/80 dark:text-emerald-400/80 font-medium">
+                      {new Date(record.returnedAt).toLocaleTimeString("en-PH", {
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Return Condition */}
               {record.conditionOnReturn && (
-                <div>
-                  <span className="text-text-secondary text-[11px] block">Return Condition</span>
-                  <span className="font-bold capitalize text-text">{record.conditionOnReturn}</span>
+                <div className="p-3.5 rounded-xl border border-border bg-bg-subtle/70 shadow-xs flex flex-col justify-between">
+                  <div className="flex items-center gap-1.5 text-text-secondary font-semibold text-[10px] uppercase tracking-wider mb-1.5">
+                    <span className="p-1 rounded-md bg-border text-text-secondary">
+                      <Tag className="h-3 w-3" />
+                    </span>
+                    Return Condition
+                  </div>
+                  <div>
+                    <span className="font-bold text-sm capitalize text-text block">
+                      {record.conditionOnReturn}
+                    </span>
+                    <span className="text-[10px] text-text-secondary font-medium">
+                      Inspected condition
+                    </span>
+                  </div>
                 </div>
               )}
             </div>
@@ -317,14 +446,16 @@ export function BorrowLogDetailSheet({
 
           {/* Condition Notes */}
           {record.conditionNotes && (
-            <div className="p-4 rounded-xl border border-border bg-bg space-y-2 text-xs">
-              <h4 className="font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
-                <FileText className="h-3.5 w-3.5 text-accent" />
+            <div className="space-y-2">
+              <h4 className="font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1.5 text-xs">
+                <FileText className="h-3.5 w-3.5 text-amber-500" />
                 Return Inspection Notes
               </h4>
-              <p className="text-text-secondary leading-relaxed bg-bg-subtle p-3 rounded-lg border border-border font-mono text-[11px]">
-                {record.conditionNotes}
-              </p>
+              <div className="rounded-xl border border-amber-500/25 bg-amber-500/8 dark:bg-amber-950/20 p-4 space-y-2 text-xs shadow-xs">
+                <p className="text-xs text-text font-medium leading-relaxed">
+                  {record.conditionNotes}
+                </p>
+              </div>
             </div>
           )}
         </div>

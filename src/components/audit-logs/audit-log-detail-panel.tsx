@@ -407,16 +407,23 @@ export function AuditLogDetailPanel({
 
           {/* Purpose & Notes */}
           {notes && !isRejected && (
-            <div className="space-y-3">
+            <div className="space-y-2">
               <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
-                <FileText className="h-3.5 w-3.5" />
+                <FileText className="h-3.5 w-3.5 text-indigo-500" />
                 Notes & Context
               </h3>
-              <div className="p-4 rounded-lg border border-primary/25 bg-primary/5 space-y-2 text-xs">
-                <div className="flex items-start gap-2">
-                  <FileText className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                  <p className="text-text font-medium leading-relaxed">{notes}</p>
+              <div className="rounded-xl border border-indigo-500/25 bg-indigo-500/5 dark:bg-indigo-950/20 p-4 space-y-2 text-xs shadow-xs">
+                <div className="flex items-center gap-2">
+                  <span className="p-1 rounded-md bg-indigo-500/15 text-indigo-600 dark:text-indigo-400">
+                    <FileText className="h-3.5 w-3.5" />
+                  </span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-400">
+                    Audit Note
+                  </span>
                 </div>
+                <p className="text-sm font-semibold text-text leading-relaxed pl-0.5">
+                  {notes}
+                </p>
               </div>
             </div>
           )}

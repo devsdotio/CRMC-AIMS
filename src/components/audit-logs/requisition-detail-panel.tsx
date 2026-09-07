@@ -13,6 +13,8 @@ import {
   Clock,
   PackageCheck,
   Tag,
+  StickyNote,
+  Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCategoryStyleMap } from "@/features/categories/client/use-categories";
@@ -198,17 +200,38 @@ export function RequisitionDetailPanel({
 
           {/* Purpose & Notes */}
           <div className="space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
+              <FileText className="h-3.5 w-3.5 text-indigo-500" />
               Purpose & Notes
             </h3>
-            <div className="p-4 rounded-lg border border-primary/25 bg-primary/5 space-y-2 text-xs">
-              <div className="flex items-start gap-2">
-                <FileText className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                <p className="text-text font-medium leading-relaxed">{request.purpose}</p>
+            <div className="rounded-xl border border-indigo-500/25 bg-indigo-500/5 dark:bg-indigo-950/20 p-4 space-y-3 text-xs shadow-xs">
+              <div>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="p-1 rounded-md bg-indigo-500/15 text-indigo-600 dark:text-indigo-400">
+                    <FileText className="h-3.5 w-3.5" />
+                  </span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-400">
+                    Purpose of Requisition
+                  </span>
+                </div>
+                <p className="text-sm font-semibold text-text leading-relaxed pl-0.5">
+                  {request.purpose}
+                </p>
               </div>
+
               {request.notes && (
-                <div className="mt-2 pt-2 border-t border-primary/15 text-text-secondary">
-                  <span className="font-semibold text-text">Additional Note:</span> {request.notes}
+                <div className="pt-2.5 border-t border-indigo-500/15">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="p-1 rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                      <StickyNote className="h-3.5 w-3.5" />
+                    </span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                      Additional Notes
+                    </span>
+                  </div>
+                  <p className="text-xs text-text-secondary font-medium leading-relaxed pl-0.5">
+                    {request.notes}
+                  </p>
                 </div>
               )}
             </div>
@@ -217,15 +240,27 @@ export function RequisitionDetailPanel({
           {/* Fulfillment Details */}
           {request.receivedBy && (
             <div className="space-y-3">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
+                <PackageCheck className="h-3.5 w-3.5 text-status-active-text" />
                 Fulfillment Details
               </h3>
-              <div className="p-4 rounded-lg border border-border bg-bg space-y-2 text-xs">
-                <div className="flex items-center gap-2">
-                  <User className="h-4 w-4 text-text-secondary shrink-0" />
-                  <span className="text-text-secondary">Received by:</span>
-                  <span className="font-bold text-text">{request.receivedBy}</span>
+              <div className="p-3.5 rounded-xl border border-emerald-500/25 bg-emerald-500/5 dark:bg-emerald-950/20 shadow-xs flex items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2.5">
+                  <span className="p-1.5 rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 shrink-0">
+                    <User className="h-4 w-4" />
+                  </span>
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 block">
+                      Received By
+                    </span>
+                    <span className="font-bold text-sm text-text block mt-0.5">
+                      {request.receivedBy}
+                    </span>
+                  </div>
                 </div>
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                  <Check className="h-3 w-3" /> Dispatched
+                </span>
               </div>
             </div>
           )}

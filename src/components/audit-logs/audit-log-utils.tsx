@@ -414,7 +414,7 @@ export function AuditNoteDisplay({
       {picker && (
         <span
           className={cn(
-            "inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border shadow-2xs w-fit",
+            "inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border shadow-2xs w-fit",
             isReturn
               ? "bg-teal-500/10 text-teal-700 dark:text-teal-300 border-teal-500/25"
               : "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/25"
@@ -432,7 +432,7 @@ export function AuditNoteDisplay({
       {description && (
         <span
           className={cn(
-            "inline-flex items-start gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] border shadow-2xs w-fit max-w-full",
+            "inline-flex items-start gap-1.5 px-2.5 py-1.5 rounded-lg text-xs border shadow-2xs w-fit max-w-full leading-relaxed",
             noteChipClass
           )}
         >
@@ -466,7 +466,7 @@ export function ActionHistoryTimeline({
 }) {
   if (!entries.length) {
     return (
-      <p className="text-xs text-text-secondary text-center py-4">{emptyLabel}</p>
+      <p className="text-sm text-text-secondary text-center py-4">{emptyLabel}</p>
     );
   }
 
@@ -474,7 +474,7 @@ export function ActionHistoryTimeline({
   const sorted = [...entries].reverse();
 
   return (
-    <ol className="relative border-l-2 border-border/50 ml-2.5 space-y-0">
+    <ol className="relative border-l-2 border-border/60 ml-3 space-y-0">
       {sorted.map((h, index) => {
         const style = getActionStyle(h.action);
         const icon = getActionIcon(h.action);
@@ -512,7 +512,7 @@ export function ActionHistoryTimeline({
           ? "bg-teal-500/10 text-teal-700 dark:text-teal-300 border-teal-500/25"
           : isEdit || isApprovalUndone || isUnreleased
           ? "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/25"
-          : "bg-bg-subtle text-text-secondary/80 border-border";
+          : "bg-bg-subtle text-text-secondary border-border";
 
         const hasExtras = Boolean(picker || (description && !suppressNote));
 
@@ -524,19 +524,19 @@ export function ActionHistoryTimeline({
             {/* Timeline dot */}
             <span
               className={cn(
-                "absolute -left-2.25 top-1 h-4.5 w-4.5 rounded-full border-2 flex items-center justify-center z-10 bg-bg",
+                "absolute -left-2.5 top-0.5 h-5 w-5 rounded-full border-2 flex items-center justify-center z-10 bg-bg shadow-2xs",
                 style.bg,
                 (style as Record<string, string>).iconText ?? style.text
               )}
             >
-              <span className="scale-75">{icon}</span>
+              <span className="scale-85">{icon}</span>
             </span>
 
             {/* Main row: badge + actor + timestamp */}
-            <div className={cn("flex flex-wrap items-center gap-1.5", hasExtras && "mb-1.5")}>
+            <div className={cn("flex flex-wrap items-center gap-2", hasExtras && "mb-1.5")}>
               <span
                 className={cn(
-                  "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide border",
+                  "inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold uppercase tracking-wide border",
                   style.bg,
                   style.text,
                   style.borderClass
@@ -544,16 +544,16 @@ export function ActionHistoryTimeline({
               >
                 {style.label}
               </span>
-              <span className="text-[10px] text-text-secondary">by</span>
-              <span className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-text">
-                <User className="h-3 w-3 text-text-secondary shrink-0" />
+              <span className="text-xs text-text-secondary font-medium">by</span>
+              <span className="inline-flex items-center gap-1 text-xs font-bold text-text">
+                <User className="h-3.5 w-3.5 text-text-secondary shrink-0" />
                 {h.actor}
               </span>
               <span className="flex flex-col items-end gap-0.5 ml-auto tabular-nums shrink-0">
-                <span className="text-[10px] text-text-secondary/60 leading-none">
+                <span className="text-xs text-text-secondary font-medium leading-none">
                   {formatRelativeTime(h.timestamp)}
                 </span>
-                <span className="text-[9px] text-text-secondary/35 leading-none">
+                <span className="text-[10px] text-text-secondary/50 leading-none mt-0.5">
                   {formatDateTime(h.timestamp)}
                 </span>
               </span>
@@ -561,19 +561,19 @@ export function ActionHistoryTimeline({
 
             {/* Receiver + note chips — only when present */}
             {hasExtras && (
-              <div className="flex flex-wrap gap-1.5 pl-0.5">
+              <div className="flex flex-wrap gap-1.5 pl-0.5 mt-1">
                 {picker && (
                   <span
                     className={cn(
-                      "inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold border",
+                      "inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold border",
                       isReturn
                         ? "bg-teal-500/10 text-teal-700 dark:text-teal-300 border-teal-500/25"
                         : "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/25"
                     )}
                   >
-                    <User className="h-3 w-3 shrink-0" />
+                    <User className="h-3.5 w-3.5 shrink-0" />
                     {isReturn ? "Returned by:" : "Received by:"}
-                    <strong className="font-bold ml-0.5">{picker}</strong>
+                    <strong className="font-bold ml-1">{picker}</strong>
                   </span>
                 )}
                 {description && !suppressNote && (() => {
@@ -581,14 +581,14 @@ export function ActionHistoryTimeline({
                   return (
                     <span
                       className={cn(
-                        "inline-flex items-start gap-1 px-2 py-1 rounded-md text-[10px] border max-w-full",
+                        "inline-flex items-start gap-1.5 px-2.5 py-1.5 rounded-md text-xs border max-w-full leading-relaxed",
                         noteChipClass
                       )}
                     >
-                      <FileText className="h-3 w-3 shrink-0 mt-0.5" />
+                      <FileText className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                       <span className="leading-snug wrap-break-word">
                         {noteLabel && (
-                          <span className="font-bold opacity-60 mr-1">{noteLabel}</span>
+                          <span className="font-bold opacity-75 mr-1">{noteLabel}</span>
                         )}
                         {description}
                       </span>
