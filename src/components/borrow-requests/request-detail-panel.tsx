@@ -236,28 +236,28 @@ export function RequestDetailPanel({
         )}
       >
         {/* Panel Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-bg-subtle/50 shrink-0">
+        <div className="flex items-center justify-between px-5 py-2.5 border-b border-border bg-bg-subtle/50 shrink-0">
           <div className="min-w-0 flex-1 pr-3">
-            <h2 id="detail-panel-heading" className="font-mono text-lg font-bold tracking-tight text-text">
+            <h2 id="detail-panel-heading" className="font-mono text-base font-bold tracking-tight text-text leading-tight">
               {request.requestCode}
             </h2>
-            <div className="flex items-center gap-2 mt-1 flex-wrap">
-              <span className="text-xs text-text-secondary font-medium">
-                {isAssignRequest ? "Assignment Request" : hasReturnableAssets ? "Borrow Request" : "Supplies Requisition"}
+            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+              <span className="text-[11px] text-text-secondary font-medium">
+                {isAssignRequest ? "Assignment" : hasReturnableAssets ? "Borrow" : "Supplies"}
               </span>
               <span className="text-text-secondary/40">•</span>
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary/10 text-primary border border-primary/20 shadow-2xs">
-                <User className="h-3 w-3 shrink-0" />
-                <span className="truncate max-w-50">{request.requesterName}</span>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-primary/10 text-primary border border-primary/20 shadow-2xs">
+                <User className="h-2.5 w-2.5 shrink-0" />
+                <span className="truncate max-w-45">{request.requesterName}</span>
               </span>
             </div>
           </div>
 
-          <div className="flex items-center justify-center gap-2.5 shrink-0">
+          <div className="flex items-center justify-center gap-2 shrink-0">
             {statusMeta && (
               <span
                 className={cn(
-                  "inline-flex items-center justify-center px-3.5 py-1 rounded-full text-xs font-bold capitalize border border-border/50 shadow-xs text-center",
+                  "inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-bold capitalize border border-border/50 shadow-xs text-center",
                   statusMeta.bg,
                   statusMeta.text
                 )}
@@ -270,9 +270,9 @@ export function RequestDetailPanel({
               <button
                 type="button"
                 onClick={() => onEdit(request)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md border border-border bg-bg text-text hover:bg-accent/10 hover:text-accent hover:border-accent/30 transition-colors cursor-pointer shadow-xs"
+                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-md border border-border bg-bg text-text hover:bg-accent/10 hover:text-accent hover:border-accent/30 transition-colors cursor-pointer shadow-xs"
               >
-                <Edit3 className="h-3.5 w-3.5" />
+                <Edit3 className="h-3 w-3" />
                 Edit
               </button>
             )}
@@ -281,9 +281,9 @@ export function RequestDetailPanel({
               <button
                 type="button"
                 onClick={() => onReturn(request)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
               >
-                <RotateCcw className="h-3.5 w-3.5" strokeWidth={2.5} />
+                <RotateCcw className="h-3 w-3" strokeWidth={2.5} />
                 Mark Returned
               </button>
             )}

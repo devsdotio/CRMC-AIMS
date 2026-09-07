@@ -30,9 +30,24 @@ import {
   Sparkles,
   Trash2,
   X,
+  Box,
+  QrCode,
+  Layers,
+  StickyNote,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { custodyBadgeLabel } from "@/lib/assets-custody";
+
+function formatDisplayDate(dateStr?: string | null): string {
+  if (!dateStr) return "Unrecorded";
+  const date = dateStr.includes("T") ? new Date(dateStr) : new Date(`${dateStr}T00:00:00`);
+  if (isNaN(date.getTime())) return dateStr;
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
 import type { Asset, AssetStatus, MaintenanceLogEntry } from "@/types/assets";
 import type { BorrowRequest, ActionHistoryLog } from "@/types/borrow-requests";
 import { useSuppliersQuery } from "@/features/suppliers/client";
@@ -986,50 +1001,61 @@ export function AssetDetailPanel({
         )}
       >
         {/* Panel Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-border bg-bg-subtle/50 shrink-0 gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 flex-nowrap">
-              <h2
-                id="asset-detail-heading"
-                className="font-mono text-base font-bold tracking-tight text-text truncate"
+        <div className="flex items-center justify-between px-5 py-2.5 border-b border-border bg-bg-subtle/50 shrink-0 gap-3">
+          <div className="min-w-0 flex-1 pr-3">
+            <h2
+              id="asset-detail-heading"
+              className="font-mono text-base font-bold tracking-tight text-text truncate leading-tight"
+            >
+              {asset.assetCode}
+            </h2>
+            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold shadow-2xs",
+                  categoryMeta.bg,
+                  categoryMeta.text
+                )}
               >
-                {asset.assetCode}
-              </h2>
-              {statusMeta && (
-                <span
-                  className={cn(
-                    "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold capitalize border shrink-0",
-                    asset.status === "active"
-                      ? "bg-status-active-bg/20 text-status-active-text border-status-active-bg/30"
-                      : asset.status === "needs_repair"
-                      ? "bg-status-repair-bg/20 text-status-repair-text border-status-repair-bg/30"
-                      : asset.status === "missing"
-                      ? "bg-status-outofservice-bg/20 text-status-outofservice-text border-status-outofservice-bg/30"
-                      : "bg-status-outofservice-bg/20 text-status-outofservice-text border-status-outofservice-bg/30"
-                  )}
-                >
-                  {asset.currentHolder
-                    ? (asset.assignmentType === "assignable" ? "Assigned" : "Borrowed")
-                    : asset.reservedForRequestId
-                      ? "Reserved"
-                      : statusMeta.label}
-                </span>
-              )}
+                <Tag className="h-2.5 w-2.5 shrink-0" />
+                {categoryMeta.label}
+              </span>
+              <span className="text-text-secondary/40">•</span>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-primary/10 text-primary border border-primary/20 shadow-2xs">
+                <Box className="h-2.5 w-2.5 shrink-0" />
+                <span className="truncate max-w-45">{asset.name}</span>
+              </span>
             </div>
-            <p className="text-[11px] text-text-secondary font-medium mt-0.5 truncate">
-              {categoryMeta.label} • <strong className="text-text font-semibold">{asset.name}</strong>
-            </p>
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center justify-center gap-1.5 shrink-0">
+            {statusMeta && (
+              <span
+                className={cn(
+                  "inline-flex items-center justify-center rounded-full px-2.5 py-0.5 text-xs font-bold capitalize border shadow-xs text-center shrink-0",
+                  asset.status === "active"
+                    ? "bg-status-active-bg/20 text-status-active-text border-status-active-bg/30"
+                    : asset.status === "needs_repair"
+                    ? "bg-status-repair-bg/20 text-status-repair-text border-status-repair-bg/30"
+                    : "bg-status-outofservice-bg/20 text-status-outofservice-text border-status-outofservice-bg/30"
+                )}
+              >
+                {asset.currentHolder
+                  ? (asset.assignmentType === "assignable" ? "Assigned" : "Borrowed")
+                  : asset.reservedForRequestId
+                    ? "Reserved"
+                    : statusMeta.label}
+              </span>
+            )}
+
             {onIssue && !asset.currentHolder && asset.status === "active" && (
               <button
                 type="button"
                 onClick={() => onIssue(asset)}
                 aria-label="Issue asset to department or project"
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-primary text-primary-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold bg-primary text-primary-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
               >
-                <PackageMinus className="h-3.5 w-3.5" />
+                <PackageMinus className="h-3 w-3" />
                 <span>Issue</span>
               </button>
             )}
@@ -1038,23 +1064,20 @@ export function AssetDetailPanel({
                 type="button"
                 onClick={() => onReportMissing(asset)}
                 aria-label="Report asset as missing"
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white transition-colors cursor-pointer shadow-xs"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white transition-colors cursor-pointer shadow-xs"
               >
-                <AlertCircle className="h-3.5 w-3.5" />
+                <AlertCircle className="h-3 w-3" />
                 <span>Missing</span>
               </button>
-            )}
-            {onIssue && !asset.currentHolder && asset.status === "active" && onEdit && (
-              <div className="h-4 w-px bg-border mx-0.5" aria-hidden="true" />
             )}
             {onEdit && (
               <button
                 type="button"
                 onClick={() => onEdit(asset)}
                 aria-label="Edit asset details"
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white transition-colors cursor-pointer shadow-xs"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white transition-colors cursor-pointer shadow-xs"
               >
-                <Edit3 className="h-3.5 w-3.5" />
+                <Edit3 className="h-3 w-3" />
                 <span>Edit</span>
               </button>
             )}
@@ -1064,9 +1087,9 @@ export function AssetDetailPanel({
                 onClick={() => onDelete(asset)}
                 title="Delete asset"
                 aria-label="Delete asset"
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-destructive text-white hover:bg-destructive/90 transition-colors cursor-pointer shadow-xs"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold bg-destructive text-white hover:bg-destructive/90 transition-colors cursor-pointer shadow-xs"
               >
-                <Trash2 className="h-3.5 w-3.5" />
+                <Trash2 className="h-3 w-3" />
                 <span>Delete</span>
               </button>
             )}
@@ -1077,7 +1100,8 @@ export function AssetDetailPanel({
         <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto">
           {/* QR Code Tag Card */}
           <div className="space-y-2">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
+              <QrCode className="h-3.5 w-3.5 text-primary" />
               Physical QR Tag
             </h3>
             <QRCodeDisplay assetCode={asset.assetCode} assetName={asset.name} />
@@ -1085,15 +1109,16 @@ export function AssetDetailPanel({
 
           {/* Asset Record Card */}
           <div className="space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary">
-              Asset Record
+            <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
+              <Layers className="h-3.5 w-3.5 text-indigo-500" />
+              Asset Record & Condition
             </h3>
 
-            <div className="bg-bg rounded-xl border border-border shadow-xs overflow-hidden">
+            <div className="bg-bg rounded-xl border border-indigo-500/25 shadow-xs overflow-hidden">
               {/* Status Header */}
-              <div className="p-4 border-b border-border bg-bg-subtle flex items-center justify-between">
-                <span className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">
-                  Current Condition
+              <div className="p-4 border-b border-indigo-500/15 bg-indigo-500/5 dark:bg-indigo-950/20 flex items-center justify-between">
+                <span className="text-[11px] font-bold text-indigo-700 dark:text-indigo-400 uppercase tracking-wider">
+                  Current Condition & Custody
                 </span>
                 <div className="flex gap-2">
                   {asset.currentHolder ? (
@@ -1101,7 +1126,7 @@ export function AssetDetailPanel({
                       {custodyBadgeLabel(asset.currentHolder, asset.assignmentType)}
                     </span>
                   ) : (
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-status-active-bg text-white uppercase tracking-wider">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-status-active-bg/20 text-status-active-text border border-status-active-bg/30 uppercase tracking-wider">
                       Available
                     </span>
                   )}
@@ -1118,8 +1143,8 @@ export function AssetDetailPanel({
                     className={cn(
                       "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
                       asset.assignmentType === "assignable"
-                        ? "bg-amber-600 text-white"
-                        : "bg-slate-700 text-white",
+                        ? "bg-amber-600/15 text-amber-700 dark:text-amber-400 border border-amber-500/30"
+                        : "bg-bg-subtle text-text-secondary border border-border",
                     )}
                   >
                     {asset.assignmentType === "assignable"
@@ -1130,19 +1155,19 @@ export function AssetDetailPanel({
               </div>
 
               {/* Grid Properties */}
-              <div className="p-5 grid grid-cols-2 gap-y-6 gap-x-4">
-                <div>
-                  <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1.5">
+              <div className="p-5 grid grid-cols-2 gap-4 text-xs">
+                <div className="p-2.5 rounded-lg bg-bg-subtle/50 border border-border/50">
+                  <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1">
                     Serial Number
                   </p>
-                  <p className="text-sm font-mono font-medium text-text">
+                  <p className="text-sm font-mono font-bold text-text">
                     {asset.serialNumber || "N/A"}
                   </p>
                 </div>
 
-                <div>
-                  <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                    <MapPin className="h-3 w-3" /> Location
+                <div className="p-2.5 rounded-lg bg-bg-subtle/50 border border-border/50">
+                  <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                    <MapPin className="h-3.5 w-3.5 text-indigo-500" /> Location
                   </p>
                   <p
                     className="text-sm font-medium text-text truncate"
@@ -1152,37 +1177,38 @@ export function AssetDetailPanel({
                   </p>
                 </div>
 
-                <div>
-                  <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                    <User className="h-3 w-3" /> Custody
+                <div className="p-2.5 rounded-lg bg-bg-subtle/50 border border-border/50">
+                  <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                    <User className="h-3.5 w-3.5 text-indigo-500" /> Custody
                   </p>
                   <p className="text-sm font-medium text-text truncate">
                     {asset.currentHolder ? (
                       <span
                         title={`${asset.currentHolder} ${asset.department ? `(${asset.department})` : ""}`}
+                        className="font-semibold text-text"
                       >
                         {asset.currentHolder}
                       </span>
                     ) : (
-                      <span className="text-status-active-text">
+                      <span className="text-status-active-text font-semibold">
                         Available In Stock
                       </span>
                     )}
                   </p>
                 </div>
 
-                <div>
-                  <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                    <Calendar className="h-3 w-3" /> Acquisition
+                <div className="p-2.5 rounded-lg bg-bg-subtle/50 border border-border/50">
+                  <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5 text-indigo-500" /> Acquisition
                   </p>
-                  <p className="text-sm font-medium text-text">
-                    {asset.purchaseDate || "Unrecorded"}
+                  <p className="text-sm font-semibold text-text">
+                    {formatDisplayDate(asset.purchaseDate)}
                   </p>
                 </div>
 
-                <div>
-                  <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                    <Truck className="h-3 w-3" /> Supplier
+                <div className="p-2.5 rounded-lg bg-bg-subtle/50 border border-border/50">
+                  <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                    <Truck className="h-3.5 w-3.5 text-indigo-500" /> Supplier
                   </p>
                   <p className="text-sm font-medium text-text truncate">
                     {supplierName ||
@@ -1193,11 +1219,11 @@ export function AssetDetailPanel({
                 </div>
 
                 {asset.value != null && asset.value !== undefined && (
-                  <div>
-                    <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1.5">
+                  <div className="p-2.5 rounded-lg bg-bg-subtle/50 border border-border/50">
+                    <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1">
                       Inventory Value (₱)
                     </p>
-                    <p className="text-sm font-mono font-medium text-text">
+                    <p className="text-sm font-mono font-bold text-text">
                       ₱{asset.value.toLocaleString()}
                     </p>
                   </div>
@@ -1206,10 +1232,15 @@ export function AssetDetailPanel({
 
               {/* Notes Full Width */}
               {asset.notes && (
-                <div className="p-5 border-t border-border bg-bg-subtle/30">
-                  <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-2">
-                    Custody Notes / Details
-                  </p>
+                <div className="p-4 border-t border-indigo-500/15 bg-indigo-500/5 dark:bg-indigo-950/20">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="p-1 rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                      <StickyNote className="h-3.5 w-3.5" />
+                    </span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                      Custody Notes & Details
+                    </span>
+                  </div>
                   <AuditNoteDisplay note={asset.notes} className="mt-0" />
                 </div>
               )}
