@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 
 import { requireActor, requireAssetOperator } from "@/server/shared/auth";
-import { created, handleError, ok } from "@/server/shared/http";
+import { created, handleError, ok, okWithEtag } from "@/server/shared/http";
 
 import { SupplierService } from "./supplier.service";
 
@@ -14,13 +14,14 @@ export class SupplierController {
     try {
       await requireActor();
       const url = new URL(request.url);
-      return ok(
-        await this.service.list({
-          search: url.searchParams.get("search") ?? undefined,
-          status: url.searchParams.get("status") ?? undefined,
-          activeOnly: url.searchParams.get("activeOnly") ?? undefined,
-        })
-      );
+      const data = await this.service.list({
+        search: url.searchParams.get("search") ?? undefined,
+        status: url.searchParams.get("status") ?? undefined,
+        activeOnly: url.searchParams.get("activeOnly") ?? undefined,
+      });
+      return okWithEtag(request, data, {
+        cacheControl: { maxAge: 60, staleWhileRevalidate: 300 },
+      });
     } catch (error) {
       return handleError(error);
     }

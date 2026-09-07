@@ -5,6 +5,7 @@ import {
   NotFoundError,
 } from "@/server/shared/errors";
 import { invalidateProfileCache } from "@/server/shared/auth";
+import { serverCache } from "@/server/shared/cache";
 
 import { DepartmentRepository } from "./department.repository";
 import type { DepartmentDTO, DepartmentListRow } from "./department.types";
@@ -34,16 +35,24 @@ export class DepartmentService {
 
   async list(rawQuery: unknown): Promise<DepartmentDTO[]> {
     const filters = listDepartmentsQuerySchema.parse(rawQuery ?? {});
-    const rows = await this.repo.list(filters);
-    return rows.map(toDTO);
+    const cacheKey = `departments:list:${JSON.stringify(filters)}`;
+    return serverCache.wrap(
+      cacheKey,
+      10 * 60 * 1000,
+      async () => {
+        const rows = await this.repo.list(filters);
+        return rows.map(toDTO);
+      },
+      ["departments"]
+    );
   }
 
   async getById(rawId: string): Promise<DepartmentDTO> {
     const id = departmentIdSchema.parse(rawId);
-    const rows = await this.repo.list();
+    const rows = await this.list({});
     const match = rows.find((row) => row.id === id);
     if (!match) throw new NotFoundError("Department", id);
-    return toDTO(match);
+    return match;
   }
 
   async create(rawInput: unknown): Promise<DepartmentDTO> {
@@ -68,6 +77,7 @@ export class DepartmentService {
         code: input.code,
         name: input.name,
       });
+      serverCache.invalidateTag("departments");
       return toDTO({
         ...row,
         accountUserId: null,
@@ -124,6 +134,8 @@ export class DepartmentService {
 
     if (!updated) throw new NotFoundError("Department", id);
 
+    serverCache.invalidateTag("departments");
+
     if (input.name && input.name !== existing.name) {
       await this.repo.syncLinkedProfileDepartmentName(id, updated.name);
       invalidateProfileCache();
@@ -146,6 +158,7 @@ export class DepartmentService {
 
     const deleted = await this.repo.delete(id);
     if (!deleted) throw new NotFoundError("Department", id);
+    serverCache.invalidateTag("departments");
     return { deleted: true };
   }
 }

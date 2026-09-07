@@ -43,6 +43,7 @@ import {
   listConsumableRequestsQuerySchema,
   rejectConsumableRequestSchema,
   releaseConsumableRequestSchema,
+  undoConsumableRequestApprovalSchema,
   updateConsumableRequestSchema,
 } from "./consumable-request.validation";
 
@@ -531,6 +532,70 @@ export class ConsumableRequestService {
       const up = await this.repo.update(
         id,
         { status: "cancelled", history },
+        tx
+      );
+      if (!up) throw new NotFoundError("Consumable request", id);
+
+      return up;
+    });
+
+    return this.hydrate(updated);
+  }
+
+  async undoApproval(
+    rawId: string,
+    rawInput: unknown,
+    actor: ActorContext
+  ): Promise<ConsumableRequestDTO> {
+    const id = consumableRequestIdSchema.parse(rawId);
+    const input = undoConsumableRequestApprovalSchema.parse(rawInput ?? {});
+    const existing = await this.repo.findById(id);
+    if (!existing) throw new NotFoundError("Consumable request", id);
+    if (existing.status !== "approved") {
+      throw new ConflictError("Only approved requests can have their approval undone.");
+    }
+    if (!isAssetOperatorRole(actor.role)) {
+      throw new ForbiddenError("Only an operator can undo request approval.");
+    }
+
+    const noteText = input.note?.trim()
+      ? `Approval undone: ${input.note.trim()}`
+      : "Approval undone and returned to Pending Review";
+
+    const history = [
+      ...(Array.isArray(existing.history) ? existing.history : []),
+      historyEntry("approval_undone", actor.displayName, noteText),
+    ];
+
+    const updated = await withTransaction(async (tx) => {
+      const lines = await this.repo.listLinesByRequestId(id, tx);
+      for (const line of lines) {
+        const item = await this.consumables.findByIdForUpdate(
+          line.consumableId,
+          tx
+        );
+        if (!item) continue;
+        await this.consumables.update(
+          item.id,
+          {
+            reservedQty: Math.max(
+              0,
+              (item.reservedQty ?? 0) - line.quantityRequested
+            ),
+          },
+          tx
+        );
+      }
+
+      const up = await this.repo.update(
+        id,
+        {
+          status: "pending",
+          approvedAt: null,
+          approvedByUserId: null,
+          approvedByName: null,
+          history,
+        },
         tx
       );
       if (!up) throw new NotFoundError("Consumable request", id);

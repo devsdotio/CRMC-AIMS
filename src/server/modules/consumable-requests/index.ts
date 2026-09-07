@@ -71,6 +71,21 @@ export class ConsumableRequestController {
     }
   }
 
+  async undoApproval(request: NextRequest | Request, id: string) {
+    try {
+      const session = await requireAssetOperator();
+      let body: unknown = {};
+      try {
+        body = await request.json();
+      } catch {
+        body = {};
+      }
+      return ok(await this.service.undoApproval(id, body, session.actor));
+    } catch (error) {
+      return handleError(error);
+    }
+  }
+
   async reject(request: NextRequest | Request, id: string) {
     try {
       const session = await requireAssetOperator();

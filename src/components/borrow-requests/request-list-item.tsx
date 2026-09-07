@@ -1,10 +1,13 @@
 "use client";
  
 import { useEffect, useRef, useState } from "react";
-import { Check, X, Calendar, User, Building2, Tag, Loader2 } from "lucide-react";
+import { Check, X, Calendar, User, Building2, Tag, Loader2, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatItemDescription } from "@/lib/sanitize-display";
 import { useCategoryStyleResolver } from "@/features/categories/client/use-category-style";
+import { useQueryClient } from "@tanstack/react-query";
+import { borrowRequestQueryKeys } from "@/features/borrow-requests/client/query-keys";
+import { borrowRequestsApi } from "@/features/borrow-requests/client/borrow-requests-api";
 import type { BorrowRequest,  RequestStatus } from "@/types/borrow-requests";
 
 export interface RequestListItemProps {
@@ -14,6 +17,7 @@ export interface RequestListItemProps {
   onApprove?: (request: BorrowRequest) => void;
   onReject?: (request: BorrowRequest) => void;
   onEdit?: (request: BorrowRequest) => void;
+  onUndoApproval?: (request: BorrowRequest) => void | Promise<void>;
   onRelease?: (request: BorrowRequest) => void | Promise<void>;
   onReturn?: (request: BorrowRequest) => void | Promise<void>;
   onMarkUnreleased?: (request: BorrowRequest) => void | Promise<void>;
@@ -36,6 +40,7 @@ export function RequestListItem({
   onApprove,
   onReject,
   onEdit,
+  onUndoApproval,
   onRelease,
   onReturn,
   onMarkUnreleased,
@@ -67,10 +72,20 @@ export function RequestListItem({
     }
   };
 
+  const qc = useQueryClient();
+  const handleMouseEnter = () => {
+    void qc.prefetchQuery({
+      queryKey: borrowRequestQueryKeys.detail(request.id),
+      queryFn: () => borrowRequestsApi.getById(request.id),
+      staleTime: 45_000,
+    });
+  };
+
   return (
     <div
       ref={rowRef}
       onClick={() => onSelect(request)}
+      onMouseEnter={handleMouseEnter}
       tabIndex={0}
       role="button"
       onKeyDown={(e) => {
@@ -196,24 +211,41 @@ export function RequestListItem({
         )}
 
         {/* Inline Actions (only for Approved requests) */}
-        {request.status === "approved" && onRelease && (
+        {request.status === "approved" && (onRelease || onUndoApproval) && (
           <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (onRelease) onRelease(request);
-              }}
-              aria-label={`Mark request ${request.requestCode} as released`}
-              className={cn(
-                "inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-semibold",
-                "shadow-xs transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1",
-                "bg-accent text-accent-foreground hover:opacity-90 focus-visible:ring-accent"
-              )}
-            >
-              <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
-              Release
-            </button>
+            {onUndoApproval && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onUndoApproval(request);
+                }}
+                aria-label={`Undo approval for request ${request.requestCode}`}
+                title="Undo approval and return to Pending Review"
+                className="inline-flex items-center gap-1 rounded-md border border-border bg-bg px-2.5 py-1.5 text-xs font-semibold text-text-secondary hover:border-accent/40 hover:text-text hover:bg-bg-subtle transition-colors cursor-pointer"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                Undo
+              </button>
+            )}
+            {onRelease && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onRelease) onRelease(request);
+                }}
+                aria-label={`Mark request ${request.requestCode} as released`}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-semibold",
+                  "shadow-xs transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1",
+                  "bg-accent text-accent-foreground hover:opacity-90 focus-visible:ring-accent"
+                )}
+              >
+                <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
+                Release
+              </button>
+            )}
           </div>
         )}
 

@@ -21,10 +21,10 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const scope = url.searchParams.get("scope");
   if (scope === "sidebar") {
-    return dashboardController.sidebarSummary();
+    return dashboardController.sidebarSummary(request);
   }
   if (scope === "notifications") {
-    return dashboardController.notifications();
+    return dashboardController.notifications(request);
   }
-  return dashboardController.snapshot();
+  return dashboardController.snapshot(request);
 }

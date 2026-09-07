@@ -14,5 +14,6 @@ export {
   useUpdateConsumableRequestMutation,
   useRejectConsumableRequestMutation,
   useReleaseConsumableRequestMutation,
+  useUndoConsumableRequestApprovalMutation,
 } from "./use-consumable-requests";
 

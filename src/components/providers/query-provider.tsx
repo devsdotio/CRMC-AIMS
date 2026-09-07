@@ -14,7 +14,8 @@ function createQueryClient() {
   return new QueryClient({
     defaultOptions: {
       queries: {
-        staleTime: 30_000,
+        staleTime: 45_000,
+        gcTime: 10 * 60 * 1000,
         retry: 1,
         retryDelay: 800,
         // Custodians and borrowers act on the same records from different tabs,

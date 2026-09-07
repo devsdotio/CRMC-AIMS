@@ -280,6 +280,45 @@ export function useCancelBorrowRequestMutation(): UseMutationResult<
   });
 }
 
+export function useUndoBorrowRequestApprovalMutation(): UseMutationResult<
+  BorrowRequest,
+  Error,
+  { id: string; note?: string }
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, note }) => borrowRequestsApi.undoApproval(id, note),
+    onSuccess: (updatedRequest) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      qc.setQueriesData<any>({ queryKey: dashboardQueryKeys.snapshot() }, (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          summary: {
+            ...old.summary,
+            pendingApprovals: (old.summary?.pendingApprovals || 0) + 1,
+          },
+          pendingRequests: [
+            {
+              id: updatedRequest.id,
+              requesterName: updatedRequest.requesterName,
+              department: updatedRequest.department,
+              items: updatedRequest.items,
+              requestedAt: updatedRequest.requestedAt,
+              relativeTime: updatedRequest.relativeTime,
+            },
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            ...(old.pendingRequests || []).filter((r: any) => r.id !== updatedRequest.id),
+          ],
+        };
+      });
+    },
+    onSettled: () => {
+      void invalidateDomains(qc, REQUEST_QUEUE_DOMAINS);
+    },
+  });
+}
+
 export function useReleaseBorrowRequestMutation(): UseMutationResult<
   BorrowRequest,
   Error,

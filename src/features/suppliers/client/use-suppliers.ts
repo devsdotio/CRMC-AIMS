@@ -30,7 +30,9 @@ export function useSuppliersQuery(options?: {
         activeOnly: options?.activeOnly,
       }),
     enabled: options?.enabled ?? true,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 }
 

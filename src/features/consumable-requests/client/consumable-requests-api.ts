@@ -133,6 +133,14 @@ export const consumableRequestsApi = {
     return res.data;
   },
 
+  async undoApproval(id: string, note?: string): Promise<ConsumableRequest> {
+    const res = await fetchJson<ApiResponse<ConsumableRequest>>(
+      `/api/consumable-requests/${id}/undo-approval`,
+      { method: "POST", body: JSON.stringify(note ? { note } : {}) }
+    );
+    return res.data;
+  },
+
   async cancel(id: string, note?: string): Promise<ConsumableRequest> {
     const res = await fetchJson<ApiResponse<ConsumableRequest>>(
       `/api/consumable-requests/${id}/cancel`,

@@ -56,6 +56,9 @@ export function getActionIcon(rawAction: string): React.ReactNode {
     case "check_in":
     case "checked_in":
       return <RotateCcw className="h-3.5 w-3.5" />;
+    case "approval_undone":
+    case "unapproved":
+      return <RotateCcw className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />;
     case "purchased":
     case "purchase_lot_created":
       return <ShoppingCart className="h-3.5 w-3.5" />;
@@ -131,6 +134,16 @@ export function getActionStyle(rawAction: string): { bg: string; text: string; i
         label: "Unreleased",
         bg: "bg-amber-500/10 border-amber-400/25",
         text: "text-amber-700 dark:text-amber-300",
+        borderClass: "border-amber-400/30",
+      };
+    // Approval Undone — amber
+    case "approval_undone":
+    case "unapproved":
+      return {
+        label: "Approval Undone",
+        bg: "bg-amber-500/10 border-amber-400/25",
+        text: "text-amber-700 dark:text-amber-300",
+        iconText: "text-amber-600 dark:text-amber-400",
         borderClass: "border-amber-400/30",
       };
     // Returned — teal (distinct from emerald approval)
@@ -224,6 +237,27 @@ export function getActionMeta(rawAction: string): AuditActionMeta {
     badgeClass: `${style.bg} ${style.text} border`,
     icon,
   };
+}
+
+/**
+ * Maps an action key to a human-readable note label prefix shown inside the
+ * note chip. Return `null` to suppress the note entirely (e.g. boilerplate).
+ */
+function getNoteLabel(rawAction: string): string | null {
+  switch (rawAction.toLowerCase().trim()) {
+    case "rejected":        return "Rejection reason:";
+    case "cancelled":       return "Cancellation reason:";
+    case "approval_undone": return "Reason:";
+    case "unapproved":      return "Reason:";
+    case "edited":          return "Edit reason:";
+    case "modified":        return "Edit reason:";
+    case "approved":        return "Approval note:";
+    case "unreleased":      return "Reason:";
+    case "submitted":
+    case "pending":
+    case "created":         return null; // suppress boilerplate notes
+    default:                return "Note:";
+  }
 }
 
 export function formatDateTime(isoString?: string | null): string {
@@ -452,6 +486,18 @@ export function ActionHistoryTimeline({
         const isRelease = actionType === "released";
         const isEdit =
           h.action.toLowerCase() === "edited" || h.action.toLowerCase() === "modified";
+        const isApprovalUndone =
+          h.action.toLowerCase() === "approval_undone" ||
+          h.action.toLowerCase() === "unapproved";
+        const isUnreleased = h.action.toLowerCase() === "unreleased";
+
+        // Suppress boilerplate submission notes that add no information
+        const BOILERPLATE_NOTES = ["request recorded", "consumable request recorded"];
+        const suppressNote =
+          (h.action.toLowerCase() === "submitted" ||
+            h.action.toLowerCase() === "pending" ||
+            h.action.toLowerCase() === "created") &&
+          BOILERPLATE_NOTES.includes((h.note ?? "").toLowerCase().trim());
 
         // Note chip color inherits the action's hue family
         const noteChipClass = isRejection
@@ -464,11 +510,11 @@ export function ActionHistoryTimeline({
           ? "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/25"
           : isReturn
           ? "bg-teal-500/10 text-teal-700 dark:text-teal-300 border-teal-500/25"
-          : isEdit
+          : isEdit || isApprovalUndone || isUnreleased
           ? "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/25"
-          : "bg-bg-subtle text-text-secondary border-border";
+          : "bg-bg-subtle text-text-secondary/80 border-border";
 
-        const hasExtras = Boolean(picker || description);
+        const hasExtras = Boolean(picker || (description && !suppressNote));
 
         return (
           <li
@@ -503,8 +549,13 @@ export function ActionHistoryTimeline({
                 <User className="h-3 w-3 text-text-secondary shrink-0" />
                 {h.actor}
               </span>
-              <span className="text-[10px] text-text-secondary/60 ml-auto tabular-nums">
-                {formatRelativeTime(h.timestamp)}
+              <span className="flex flex-col items-end gap-0.5 ml-auto tabular-nums shrink-0">
+                <span className="text-[10px] text-text-secondary/60 leading-none">
+                  {formatRelativeTime(h.timestamp)}
+                </span>
+                <span className="text-[9px] text-text-secondary/35 leading-none">
+                  {formatDateTime(h.timestamp)}
+                </span>
               </span>
             </div>
 
@@ -525,17 +576,25 @@ export function ActionHistoryTimeline({
                     <strong className="font-bold ml-0.5">{picker}</strong>
                   </span>
                 )}
-                {description && (
-                  <span
-                    className={cn(
-                      "inline-flex items-start gap-1 px-2 py-0.5 rounded-md text-[10px] border max-w-full",
-                      noteChipClass
-                    )}
-                  >
-                    <FileText className="h-3 w-3 shrink-0 mt-0.5" />
-                    <span className="leading-snug wrap-break-word">{description}</span>
-                  </span>
-                )}
+                {description && !suppressNote && (() => {
+                  const noteLabel = getNoteLabel(h.action);
+                  return (
+                    <span
+                      className={cn(
+                        "inline-flex items-start gap-1 px-2 py-1 rounded-md text-[10px] border max-w-full",
+                        noteChipClass
+                      )}
+                    >
+                      <FileText className="h-3 w-3 shrink-0 mt-0.5" />
+                      <span className="leading-snug wrap-break-word">
+                        {noteLabel && (
+                          <span className="font-bold opacity-60 mr-1">{noteLabel}</span>
+                        )}
+                        {description}
+                      </span>
+                    </span>
+                  );
+                })()}
               </div>
             )}
           </li>

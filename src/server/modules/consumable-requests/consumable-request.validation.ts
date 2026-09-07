@@ -76,6 +76,10 @@ export const cancelConsumableRequestSchema = z.object({
   note: z.string().trim().max(1000).optional(),
 });
 
+export const undoConsumableRequestApprovalSchema = z.object({
+  note: z.string().trim().max(1000).optional(),
+});
+
 const lotAllocationSchema = z
   .object({
     lotId: z.string().uuid().optional(),
@@ -149,6 +153,9 @@ export type RejectConsumableRequestBody = z.infer<
 >;
 export type CancelConsumableRequestBody = z.infer<
   typeof cancelConsumableRequestSchema
+>;
+export type UndoConsumableRequestApprovalBody = z.infer<
+  typeof undoConsumableRequestApprovalSchema
 >;
 export type ReleaseConsumableRequestBody = z.infer<
   typeof releaseConsumableRequestSchema

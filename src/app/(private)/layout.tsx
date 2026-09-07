@@ -3,18 +3,17 @@ import { redirect } from "next/navigation";
 
 import DashboardLayout from "@/components/dashboard-layout";
 import { createClient } from "@/lib/supabase/server";
-import { getDb } from "@/server/db";
-import { profiles } from "@/server/db/schema";
+import { type ProfileRow } from "@/server/db/schema";
+import { getCachedProfile } from "@/server/shared/auth";
 import { UserService } from "@/server/modules/users/user.service";
 import { isStaffShellRole, type AppRole } from "@/server/shared/roles";
-import { eq } from "drizzle-orm";
 
 /**
  * Authenticated app shell gate.
  *
  * Auth verification uses `getClaims()` (local JWT verify when possible) —
  * not `getUser()` which always round-trips the Auth server (~1s+ on remote
- * Supabase). Profile gate remains a single local Postgres query.
+ * Supabase). Profile gate uses in-memory cached profile to avoid redundant DB queries.
  *
  * Do not call supabase.auth.signOut() here and then redirect.
  * Cookie clears from Server Components often never land on the redirect
@@ -39,15 +38,9 @@ export default async function PrivateLayout({
     redirect("/sign-in");
   }
 
-  let profile: typeof profiles.$inferSelect | undefined;
+  let profile: ProfileRow | null | undefined;
   try {
-    const db = getDb();
-    const rows = await db
-      .select()
-      .from(profiles)
-      .where(eq(profiles.userId, userId))
-      .limit(1);
-    profile = rows[0];
+    profile = await getCachedProfile(userId);
   } catch (error) {
     console.error("[private-layout] profile lookup failed:", error);
     redirect("/sign-in?error=no_profile");

@@ -4,6 +4,8 @@ import { getDb } from "@/server/db";
 import { categories } from "@/server/db/schema";
 import { requireActor } from "@/server/shared/auth";
 import { CategoryRepository } from "@/server/modules/categories/category.repository";
+import { okWithEtag } from "@/server/shared/http";
+import { serverCache } from "@/server/shared/cache";
 
 /**
  * Institutional category taxonomy (Settings).
@@ -16,11 +18,19 @@ export async function GET(request: Request) {
     const type = url.searchParams.get("type");
 
     const categoryRepo = new CategoryRepository();
-    const rows = await categoryRepo.listWithCounts(
-      type === "asset" || type === "consumable" ? type : undefined
+    const rows = await serverCache.wrap(
+      `categories:type:${type ?? "all"}`,
+      10 * 60 * 1000,
+      () =>
+        categoryRepo.listWithCounts(
+          type === "asset" || type === "consumable" ? type : undefined
+        ),
+      ["categories"]
     );
 
-    return NextResponse.json({ data: rows });
+    return okWithEtag(request, rows, {
+      cacheControl: { maxAge: 60, staleWhileRevalidate: 300 },
+    });
   } catch (error) {
     console.error("GET /api/categories Error:", error);
     return NextResponse.json(
@@ -80,6 +90,8 @@ export async function POST(request: Request) {
         createdByUserId: actor.userId,
       })
       .returning();
+
+    serverCache.invalidateTag("categories");
 
     return NextResponse.json(
       {

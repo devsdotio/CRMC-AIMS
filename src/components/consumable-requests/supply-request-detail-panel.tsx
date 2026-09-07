@@ -16,6 +16,7 @@ import {
   CheckCircle,
   Send,
   DollarSign,
+  RotateCcw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCategoryStyleResolver } from "@/features/categories/client/use-category-style";
@@ -36,6 +37,7 @@ export interface SupplyRequestDetailPanelProps {
   onClose: () => void;
   onApprove?: (request: ConsumableRequest) => void;
   onReject?: (request: ConsumableRequest) => void;
+  onUndoApproval?: (request: ConsumableRequest) => void;
   onRelease?: (request: ConsumableRequest) => void;
 }
 
@@ -45,6 +47,7 @@ export function SupplyRequestDetailPanel({
   onClose,
   onApprove,
   onReject,
+  onUndoApproval,
   onRelease,
 }: SupplyRequestDetailPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
@@ -287,16 +290,28 @@ export function SupplyRequestDetailPanel({
         )}
 
         {/* Footer — approved */}
-        {request.status === "approved" && onRelease && (
-          <div className="p-4 border-t border-border bg-bg-subtle flex items-center justify-end gap-3 shrink-0">
-            <button
-              type="button"
-              onClick={() => onRelease(request)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
-            >
-              <Send className="h-4 w-4" />
-              Issue Supplies
-            </button>
+        {request.status === "approved" && (onRelease || onUndoApproval) && (
+          <div className="p-4 border-t border-border bg-bg-subtle flex items-center justify-between gap-3 shrink-0">
+            {onUndoApproval && (
+              <button
+                type="button"
+                onClick={() => onUndoApproval(request)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg border border-border bg-bg text-text-secondary hover:border-accent/40 hover:text-text hover:bg-bg-subtle transition-colors cursor-pointer"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                Undo Approval
+              </button>
+            )}
+            {onRelease && (
+              <button
+                type="button"
+                onClick={() => onRelease(request)}
+                className="ml-auto inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+              >
+                <Send className="h-4 w-4" />
+                Issue Supplies
+              </button>
+            )}
           </div>
         )}
       </aside>

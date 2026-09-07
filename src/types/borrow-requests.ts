@@ -18,6 +18,7 @@ export interface ActionHistoryLog {
     | "unreleased"
     | "returned"
     | "cancelled"
+    | "approval_undone"
     | "edited";
   actor: string;
   timestamp: string;

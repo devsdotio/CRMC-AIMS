@@ -1,7 +1,14 @@
+import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { ZodError, type ZodIssue } from "zod";
 
 import { isAppError } from "./errors";
+
+export interface CacheControlOptions {
+  maxAge?: number;
+  staleWhileRevalidate?: number;
+  private?: boolean;
+}
 
 /**
  * Success envelope used by the frontend assets client:
@@ -10,8 +17,55 @@ import { isAppError } from "./errors";
  * Keep this shape stable so hooks integrate without client changes.
  * Structured `success`/`code` can be layered on later without dropping `data`.
  */
-export function ok<T>(data: T, status = 200) {
-  return NextResponse.json({ data }, { status });
+export function ok<T>(data: T, status = 200, headers?: HeadersInit) {
+  return NextResponse.json({ data }, { status, headers });
+}
+
+/**
+ * Conditional response with ETag and Cache-Control.
+ * If the client provides a matching `If-None-Match`, returns 304 Not Modified
+ * with zero payload transfer across the wire.
+ */
+export function okWithEtag<T>(
+  request: Request,
+  data: T,
+  options?: {
+    status?: number;
+    cacheControl?: CacheControlOptions;
+  }
+) {
+  const bodyString = JSON.stringify({ data });
+  const hash = createHash("sha1").update(bodyString).digest("hex");
+  const etag = `W/"${hash}"`;
+
+  const ifNoneMatch = request.headers.get("if-none-match");
+  const cacheControlDirectives = [
+    options?.cacheControl?.private !== false ? "private" : "public",
+    options?.cacheControl?.maxAge !== undefined
+      ? `max-age=${options.cacheControl.maxAge}`
+      : "no-cache",
+    options?.cacheControl?.staleWhileRevalidate !== undefined
+      ? `stale-while-revalidate=${options.cacheControl.staleWhileRevalidate}`
+      : "stale-while-revalidate=60",
+  ].join(", ");
+
+  const headers = new Headers({
+    "Content-Type": "application/json",
+    ETag: etag,
+    "Cache-Control": cacheControlDirectives,
+  });
+
+  if (
+    ifNoneMatch &&
+    (ifNoneMatch === etag || ifNoneMatch === "*" || ifNoneMatch.includes(hash))
+  ) {
+    return new NextResponse(null, { status: 304, headers });
+  }
+
+  return new NextResponse(bodyString, {
+    status: options?.status ?? 200,
+    headers,
+  });
 }
 
 export function created<T>(data: T) {

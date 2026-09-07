@@ -39,6 +39,7 @@ import {
   releaseBorrowRequestSchema,
   markUnreleasedBorrowRequestSchema,
   returnBorrowRequestSchema,
+  undoBorrowRequestApprovalSchema,
   updateBorrowRequestSchema,
 } from "./borrow-request.validation";
 
@@ -534,6 +535,44 @@ export class BorrowRequestService {
       return up;
     });
 
+    return toDTO(updated);
+  }
+
+  async undoApproval(
+    rawId: string,
+    rawInput: unknown,
+    actor: ActorContext
+  ): Promise<BorrowRequestDTO> {
+    const id = borrowRequestIdSchema.parse(rawId);
+    const input = undoBorrowRequestApprovalSchema.parse(rawInput ?? {});
+    const existing = await this.repo.findById(id);
+    if (!existing) throw new NotFoundError("Borrow request", id);
+    if (existing.status !== "approved") {
+      throw new ConflictError("Only approved requests can have their approval undone.");
+    }
+
+    const noteText = input.note?.trim()
+      ? `Approval undone: ${input.note.trim()}`
+      : "Approval undone and returned to Pending Review";
+
+    const history = [
+      ...(Array.isArray(existing.history) ? existing.history : []),
+      historyEntry("approval_undone", actor.displayName, noteText),
+    ];
+
+    const updated = await withTransaction(async (tx) => {
+      const up = await this.repo.update(
+        id,
+        {
+          status: "pending",
+          history,
+        },
+        tx
+      );
+      if (!up) throw new NotFoundError("Borrow request", id);
+
+      return up;
+    });
     return toDTO(updated);
   }
 

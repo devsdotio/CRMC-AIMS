@@ -30,6 +30,7 @@ export interface RequestDetailPanelProps {
   onClose: () => void;
   onApprove?: (request: BorrowRequest) => void;
   onReject?: (request: BorrowRequest) => void;
+  onUndoApproval?: (request: BorrowRequest) => void | Promise<void>;
   onRelease?: (request: BorrowRequest) => void | Promise<void>;
   onReturn?: (request: BorrowRequest) => void | Promise<void>;
   onMarkUnreleased?: (request: BorrowRequest) => void | Promise<void>;
@@ -93,6 +94,7 @@ export function RequestDetailPanel({
   onClose,
   onApprove,
   onReject,
+  onUndoApproval,
   onRelease,
   onReturn,
   onMarkUnreleased,
@@ -100,18 +102,29 @@ export function RequestDetailPanel({
 }: RequestDetailPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [isMarkingUnreleased, setIsMarkingUnreleased] = useState(false);
+  const [isUndoingApproval, setIsUndoingApproval] = useState(false);
   const resolveCategoryStyle = useCategoryStyleResolver();
 
   // Keyboard Escape listener
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && isOpen && !isMarkingUnreleased) {
+      if (e.key === "Escape" && isOpen && !isMarkingUnreleased && !isUndoingApproval) {
         onClose();
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose, isMarkingUnreleased]);
+  }, [isOpen, onClose, isMarkingUnreleased, isUndoingApproval]);
+
+  const handleUndoApproval = async () => {
+    if (!onUndoApproval || !request) return;
+    setIsUndoingApproval(true);
+    try {
+      await onUndoApproval(request);
+    } finally {
+      setIsUndoingApproval(false);
+    }
+  };
 
   const handleMarkUnreleased = async () => {
     if (!onMarkUnreleased || !request) return;
@@ -461,16 +474,33 @@ export function RequestDetailPanel({
         
         
         {/* Action Footer (Only for approved requests) */}
-        {request.status === "approved" && onRelease && (
-          <div className="p-4 border-t border-border bg-bg-subtle flex items-center justify-end gap-3 shrink-0">
-            <button
-              type="button"
-              onClick={() => onRelease && request && onRelease(request)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
-            >
-              <Check className="h-4 w-4" strokeWidth={2.5} />
-              Release Request
-            </button>
+        {request.status === "approved" && (onRelease || onUndoApproval) && (
+          <div className="p-4 border-t border-border bg-bg-subtle flex items-center justify-between gap-3 shrink-0">
+            {onUndoApproval && (
+              <button
+                type="button"
+                onClick={handleUndoApproval}
+                disabled={isUndoingApproval}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-md border border-border bg-bg text-text-secondary hover:border-accent/40 hover:text-text hover:bg-bg-subtle transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {isUndoingApproval ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <RotateCcw className="h-3.5 w-3.5" />
+                )}
+                <span>Undo Approval</span>
+              </button>
+            )}
+            {onRelease && (
+              <button
+                type="button"
+                onClick={() => onRelease && request && onRelease(request)}
+                className="ml-auto inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+              >
+                <Check className="h-4 w-4" strokeWidth={2.5} />
+                Release Request
+              </button>
+            )}
           </div>
         )}
       </aside>

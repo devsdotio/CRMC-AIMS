@@ -8,6 +8,7 @@ import { getDb } from "@/server/db";
 import { assetLifecycleEvents } from "@/server/db/schema";
 import { desc } from "drizzle-orm";
 import { toBorrowLogDTO } from "@/server/modules/borrow-log/borrow-log.service";
+import { serverCache } from "@/server/shared/cache";
 
 export type DashboardSummaryDTO = {
   activeBorrows: number;
@@ -149,78 +150,86 @@ export class DashboardService {
    * Layout used to call getSnapshot() on every private page and exhaust the DB pool.
    */
   async getSidebarSummary(userId?: string): Promise<DashboardSummaryDTO> {
-    if (userId) {
-      const [activeBorrows, pendingApprovals, overdueAssets] = await Promise.all([
-        this.borrowLog.countActive(undefined, userId).catch((err) => {
-          console.error("[dashboard] failed to count active borrows for borrower:", err);
-          return 0;
-        }),
-        Promise.all([
-          this.requests.countPending(undefined, userId).catch((err) => {
-            console.error("[dashboard] failed to count pending requests for borrower:", err);
+    const cacheKey = userId ? `dashboard:sidebar:${userId}` : "dashboard:sidebar:all";
+    return serverCache.wrap(
+      cacheKey,
+      30_000,
+      async () => {
+        if (userId) {
+          const [activeBorrows, pendingApprovals, overdueAssets] = await Promise.all([
+            this.borrowLog.countActive(undefined, userId).catch((err) => {
+              console.error("[dashboard] failed to count active borrows for borrower:", err);
+              return 0;
+            }),
+            Promise.all([
+              this.requests.countPending(undefined, userId).catch((err) => {
+                console.error("[dashboard] failed to count pending requests for borrower:", err);
+                return 0;
+              }),
+              this.consumableRequests.countPending(undefined, userId).catch((err) => {
+                console.error("[dashboard] failed to count pending supply requests for borrower:", err);
+                return 0;
+              }),
+            ]).then(([a, b]) => a + b),
+            this.borrowLog.countOverdue(undefined, userId).catch((err) => {
+              console.error("[dashboard] failed to count overdue assets for borrower:", err);
+              return 0;
+            }),
+          ]);
+          return {
+            activeBorrows,
+            activeAssignments: 0,
+            pendingApprovals,
+            lowStockItems: 0,
+            overdueAssets,
+          };
+        }
+
+        const [
+          activeBorrows,
+          activeAssignments,
+          pendingApprovals,
+          lowStockItems,
+          overdueAssets,
+        ] = await Promise.all([
+          this.borrowLog.countActive().catch((err) => {
+            console.error("[dashboard] failed to count active borrows:", err);
             return 0;
           }),
-          this.consumableRequests.countPending(undefined, userId).catch((err) => {
-            console.error("[dashboard] failed to count pending supply requests for borrower:", err);
+          this.assets.countAssigned().catch((err) => {
+            console.error("[dashboard] failed to count active assignments:", err);
             return 0;
           }),
-        ]).then(([a, b]) => a + b),
-        this.borrowLog.countOverdue(undefined, userId).catch((err) => {
-          console.error("[dashboard] failed to count overdue assets for borrower:", err);
-          return 0;
-        }),
-      ]);
-      return {
-        activeBorrows,
-        activeAssignments: 0,
-        pendingApprovals,
-        lowStockItems: 0,
-        overdueAssets,
-      };
-    }
+          Promise.all([
+            this.requests.countPending().catch((err) => {
+              console.error("[dashboard] failed to count pending requests:", err);
+              return 0;
+            }),
+            this.consumableRequests.countPending().catch((err) => {
+              console.error("[dashboard] failed to count pending supply requests:", err);
+              return 0;
+            }),
+          ]).then(([a, b]) => a + b),
+          this.consumables.countLowStock().catch((err) => {
+            console.error("[dashboard] failed to count low stock consumables:", err);
+            return 0;
+          }),
+          this.borrowLog.countOverdue().catch((err) => {
+            console.error("[dashboard] failed to count overdue assets:", err);
+            return 0;
+          }),
+        ]);
 
-    const [
-      activeBorrows,
-      activeAssignments,
-      pendingApprovals,
-      lowStockItems,
-      overdueAssets,
-    ] = await Promise.all([
-      this.borrowLog.countActive().catch((err) => {
-        console.error("[dashboard] failed to count active borrows:", err);
-        return 0;
-      }),
-      this.assets.countAssigned().catch((err) => {
-        console.error("[dashboard] failed to count active assignments:", err);
-        return 0;
-      }),
-      Promise.all([
-        this.requests.countPending().catch((err) => {
-          console.error("[dashboard] failed to count pending requests:", err);
-          return 0;
-        }),
-        this.consumableRequests.countPending().catch((err) => {
-          console.error("[dashboard] failed to count pending supply requests:", err);
-          return 0;
-        }),
-      ]).then(([a, b]) => a + b),
-      this.consumables.countLowStock().catch((err) => {
-        console.error("[dashboard] failed to count low stock consumables:", err);
-        return 0;
-      }),
-      this.borrowLog.countOverdue().catch((err) => {
-        console.error("[dashboard] failed to count overdue assets:", err);
-        return 0;
-      }),
-    ]);
-
-    return {
-      activeBorrows,
-      activeAssignments,
-      pendingApprovals,
-      lowStockItems,
-      overdueAssets,
-    };
+        return {
+          activeBorrows,
+          activeAssignments,
+          pendingApprovals,
+          lowStockItems,
+          overdueAssets,
+        };
+      },
+      ["dashboard:sidebar"]
+    );
   }
 
   async getBorrowerSnapshot(userId: string, limit = 5): Promise<DashboardSnapshotDTO> {

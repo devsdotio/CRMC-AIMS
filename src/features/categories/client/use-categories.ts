@@ -68,7 +68,9 @@ export function useCategoriesQuery(options?: {
   return useQuery({
     queryKey: categoryQueryKeys.list(),
     queryFn: fetchCategories,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
     enabled: options?.enabled ?? true,
   });
 }

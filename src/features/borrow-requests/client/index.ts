@@ -18,4 +18,5 @@ export {
   useRejectBorrowRequestMutation,
   useReleaseBorrowRequestMutation,
   useMarkUnreleasedBorrowRequestMutation,
+  useUndoBorrowRequestApprovalMutation,
 } from "./use-borrow-requests";

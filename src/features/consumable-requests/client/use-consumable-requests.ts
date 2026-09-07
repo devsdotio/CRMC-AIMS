@@ -114,6 +114,18 @@ export function useCancelConsumableRequestMutation(): UseMutationResult<
   });
 }
 
+export function useUndoConsumableRequestApprovalMutation(): UseMutationResult<
+  ConsumableRequest,
+  Error,
+  { id: string; note?: string }
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, note }) => consumableRequestsApi.undoApproval(id, note),
+    onSettled: () => invalidate(qc),
+  });
+}
+
 export function useReleaseConsumableRequestMutation(): UseMutationResult<
   ConsumableRequest,
   Error,

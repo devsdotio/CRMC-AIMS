@@ -43,6 +43,7 @@ export type BorrowRequestHistoryEntry = {
     | "unreleased"
     | "returned"
     | "cancelled"
+    | "approval_undone"
     | "edited";
   actor: string;
   timestamp: string;
