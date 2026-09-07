@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect } from "react";
-import { AlertTriangle, Trash2, X, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface ConfirmDialogProps {
   isOpen: boolean;
   title: string;
-  description: string;
+  description: React.ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
   variant?: "destructive" | "warning";
@@ -43,7 +43,7 @@ export function ConfirmDialog({
   const isDestructive = variant === "destructive";
 
   return (
-    <div className="fixed inset-0 z-70 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs transition-opacity">
+    <div className="fixed inset-0 z-70 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs transition-opacity animate-in fade-in duration-150">
       <div
         className="absolute inset-0"
         onClick={isLoading ? undefined : onClose}
@@ -54,54 +54,26 @@ export function ConfirmDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
-        className="relative w-full max-w-md rounded-xl border border-border bg-bg p-6 shadow-2xl z-10 animate-in fade-in zoom-in-95 duration-150 overflow-hidden"
+        className="relative w-full max-w-sm rounded-xl border border-border bg-bg p-4 shadow-xl z-10 animate-in fade-in zoom-in-95 duration-150 overflow-hidden"
       >
-        <div className="flex items-start justify-between gap-3 mb-4">
-          <div className="flex items-center gap-3">
-            <div
-              className={cn(
-                "flex h-10 w-10 items-center justify-center rounded-xl shrink-0",
-                isDestructive
-                  ? "bg-status-outofservice-bg/15 text-status-outofservice-text"
-                  : "bg-status-repair-bg/15 text-status-repair-text"
-              )}
-            >
-              {isDestructive ? (
-                <Trash2 className="h-5 w-5" />
-              ) : (
-                <AlertTriangle className="h-5 w-5" />
-              )}
-            </div>
-            <div>
-              <h3
-                id="confirm-dialog-title"
-                className="text-base font-bold text-text leading-tight"
-              >
-                {title}
-              </h3>
-              <p className="text-xs text-text-secondary mt-0.5 leading-relaxed">
-                {description}
-              </p>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isLoading}
-            aria-label="Close dialog"
-            className="p-1.5 rounded-lg text-text-secondary hover:text-text hover:bg-bg-subtle transition-colors cursor-pointer disabled:opacity-50"
+        <div className="px-1">
+          <h3
+            id="confirm-dialog-title"
+            className="text-base font-bold text-text text-center leading-snug"
           >
-            <X className="h-4 w-4" />
-          </button>
+            {title}
+          </h3>
+          <p className="text-xs text-text-secondary text-justify mt-1.5 leading-relaxed">
+            {description}
+          </p>
         </div>
 
-        <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-border mt-5">
+        <div className="flex items-center justify-end gap-2 pt-2.5 border-t border-border/70 mt-2.5">
           <button
             type="button"
             onClick={onClose}
             disabled={isLoading}
-            className="h-9 px-4 text-xs font-bold text-text rounded-lg border border-border bg-bg hover:bg-bg-subtle transition-colors cursor-pointer disabled:opacity-50"
+            className="h-8 px-3.5 text-xs font-semibold text-text-secondary hover:text-text rounded-lg border border-border bg-bg hover:bg-bg-subtle transition-colors cursor-pointer disabled:opacity-50 shadow-2xs"
           >
             {cancelLabel}
           </button>
@@ -110,13 +82,13 @@ export function ConfirmDialog({
             onClick={() => void onConfirm()}
             disabled={isLoading}
             className={cn(
-              "inline-flex items-center gap-1.5 h-9 px-4 text-xs font-bold rounded-lg transition-opacity cursor-pointer disabled:opacity-50 shadow-xs",
+              "inline-flex items-center justify-center gap-1.5 h-8 px-3.5 text-xs font-bold rounded-lg transition-all cursor-pointer disabled:opacity-50 shadow-xs active:scale-[0.98]",
               isDestructive
-                ? "bg-status-outofservice-bg text-white hover:opacity-90"
+                ? "bg-destructive text-white hover:bg-destructive/90"
                 : "bg-accent text-accent-foreground hover:opacity-90"
             )}
           >
-            {isLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {isLoading && <Loader2 className="h-3 w-3 animate-spin" />}
             {confirmLabel}
           </button>
         </div>

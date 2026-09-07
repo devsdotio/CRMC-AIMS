@@ -1028,35 +1028,21 @@ export function AssetDetailPanel({
             </div>
           </div>
 
-          <div className="flex items-center justify-center gap-1.5 shrink-0">
-            {statusMeta && (
-              <span
-                className={cn(
-                  "inline-flex items-center justify-center rounded-full px-2.5 py-0.5 text-xs font-bold capitalize border shadow-xs text-center shrink-0",
-                  asset.status === "active"
-                    ? "bg-status-active-bg/20 text-status-active-text border-status-active-bg/30"
-                    : asset.status === "needs_repair"
-                    ? "bg-status-repair-bg/20 text-status-repair-text border-status-repair-bg/30"
-                    : "bg-status-outofservice-bg/20 text-status-outofservice-text border-status-outofservice-bg/30"
-                )}
-              >
-                {asset.currentHolder
-                  ? (asset.assignmentType === "assignable" ? "Assigned" : "Borrowed")
-                  : asset.reservedForRequestId
-                    ? "Reserved"
-                    : statusMeta.label}
-              </span>
-            )}
-
+          <div className="flex items-center justify-end gap-2.5 shrink-0">
             {onIssue && !asset.currentHolder && asset.status === "active" && (
               <button
                 type="button"
                 onClick={() => onIssue(asset)}
                 aria-label="Issue asset to department or project"
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold bg-primary text-primary-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+                className="relative group inline-flex items-center justify-center p-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white transition-colors cursor-pointer shadow-xs shrink-0"
               >
-                <PackageMinus className="h-3 w-3" />
-                <span>Issue</span>
+                <PackageMinus className="h-4 w-4" />
+                <span
+                  role="tooltip"
+                  className="pointer-events-none absolute top-full mt-1.5 left-1/2 -translate-x-1/2 z-50 whitespace-nowrap rounded-md bg-neutral-900/95 dark:bg-neutral-800/95 backdrop-blur-xs text-white px-2 py-0.5 text-[10px] font-semibold tracking-wide shadow-md border border-white/10 opacity-0 group-hover:opacity-100 translate-y-0.5 group-hover:translate-y-0 scale-95 group-hover:scale-100 transition-all duration-150"
+                >
+                  Issue Asset
+                </span>
               </button>
             )}
             {onReportMissing && asset.status !== "missing" && asset.status !== "retired" && (
@@ -1064,10 +1050,15 @@ export function AssetDetailPanel({
                 type="button"
                 onClick={() => onReportMissing(asset)}
                 aria-label="Report asset as missing"
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white transition-colors cursor-pointer shadow-xs"
+                className="relative group inline-flex items-center justify-center p-1.5 rounded-md bg-amber-500 hover:bg-amber-600 text-white transition-colors cursor-pointer shadow-xs shrink-0"
               >
-                <AlertCircle className="h-3 w-3" />
-                <span>Missing</span>
+                <AlertCircle className="h-4 w-4" />
+                <span
+                  role="tooltip"
+                  className="pointer-events-none absolute top-full mt-1.5 left-1/2 -translate-x-1/2 z-50 whitespace-nowrap rounded-md bg-neutral-900/95 dark:bg-neutral-800/95 backdrop-blur-xs text-white px-2 py-0.5 text-[10px] font-semibold tracking-wide shadow-md border border-white/10 opacity-0 group-hover:opacity-100 translate-y-0.5 group-hover:translate-y-0 scale-95 group-hover:scale-100 transition-all duration-150"
+                >
+                  Report Missing
+                </span>
               </button>
             )}
             {onEdit && (
@@ -1075,22 +1066,31 @@ export function AssetDetailPanel({
                 type="button"
                 onClick={() => onEdit(asset)}
                 aria-label="Edit asset details"
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white transition-colors cursor-pointer shadow-xs"
+                className="relative group inline-flex items-center justify-center p-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white transition-colors cursor-pointer shadow-xs shrink-0"
               >
-                <Edit3 className="h-3 w-3" />
-                <span>Edit</span>
+                <Edit3 className="h-4 w-4" />
+                <span
+                  role="tooltip"
+                  className="pointer-events-none absolute top-full mt-1.5 left-1/2 -translate-x-1/2 z-50 whitespace-nowrap rounded-md bg-neutral-900/95 dark:bg-neutral-800/95 backdrop-blur-xs text-white px-2 py-0.5 text-[10px] font-semibold tracking-wide shadow-md border border-white/10 opacity-0 group-hover:opacity-100 translate-y-0.5 group-hover:translate-y-0 scale-95 group-hover:scale-100 transition-all duration-150"
+                >
+                  Edit Details
+                </span>
               </button>
             )}
             {onDelete && (
               <button
                 type="button"
                 onClick={() => onDelete(asset)}
-                title="Delete asset"
                 aria-label="Delete asset"
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold bg-destructive text-white hover:bg-destructive/90 transition-colors cursor-pointer shadow-xs"
+                className="relative group inline-flex items-center justify-center p-1.5 rounded-md bg-destructive text-white hover:bg-destructive/90 transition-colors cursor-pointer shadow-xs shrink-0"
               >
-                <Trash2 className="h-3 w-3" />
-                <span>Delete</span>
+                <Trash2 className="h-4 w-4" />
+                <span
+                  role="tooltip"
+                  className="pointer-events-none absolute top-full mt-1.5 right-0 z-50 whitespace-nowrap rounded-md bg-neutral-900/95 dark:bg-neutral-800/95 backdrop-blur-xs text-white px-2 py-0.5 text-[10px] font-semibold tracking-wide shadow-md border border-white/10 opacity-0 group-hover:opacity-100 translate-y-0.5 group-hover:translate-y-0 scale-95 group-hover:scale-100 transition-all duration-150 origin-top-right"
+                >
+                  Delete Asset
+                </span>
               </button>
             )}
           </div>

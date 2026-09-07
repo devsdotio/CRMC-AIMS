@@ -208,11 +208,16 @@ export function ConsumableDetailPanel({
             <button
               type="button"
               onClick={() => onDelete(displayItem)}
-              title="Delete item"
               aria-label="Delete item"
-              className="inline-flex items-center justify-center p-1.5 rounded-md bg-destructive text-white hover:bg-destructive/90 transition-colors cursor-pointer shadow-xs shrink-0"
+              className="relative group inline-flex items-center justify-center p-1.5 rounded-md bg-destructive text-white hover:bg-destructive/90 transition-colors cursor-pointer shadow-xs shrink-0"
             >
               <Trash2 className="h-5 w-5" />
+              <span
+                role="tooltip"
+                className="pointer-events-none absolute top-full mt-1.5 right-0 z-50 whitespace-nowrap rounded-md bg-neutral-900/95 dark:bg-neutral-800/95 backdrop-blur-xs text-white px-2 py-0.5 text-[10px] font-semibold tracking-wide shadow-md border border-white/10 opacity-0 group-hover:opacity-100 translate-y-0.5 group-hover:translate-y-0 scale-95 group-hover:scale-100 transition-all duration-150 origin-top-right"
+              >
+                Delete Item
+              </span>
             </button>
           )}
         </div>

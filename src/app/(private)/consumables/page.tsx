@@ -406,11 +406,17 @@ export default function ConsumablesPage() {
 
       <ConfirmDialog
         isOpen={Boolean(itemToDelete)}
-        title="Delete Consumable Item"
+        title="Delete Consumable Item?"
         description={
-          itemToDelete
-            ? `Are you sure you want to delete supply item "${itemToDelete.name}" (${itemToDelete.itemCode})? This will remove all associated stock records and cannot be undone.`
-            : ""
+          itemToDelete ? (
+            <>
+              Are you sure you want to delete supply item{" "}
+              <strong className="font-bold text-text">
+                &ldquo;{itemToDelete.name}&rdquo; ({itemToDelete.itemCode})
+              </strong>
+              ? This will remove all associated stock records and cannot be undone.
+            </>
+          ) : ""
         }
         confirmLabel="Delete Item"
         variant="destructive"
