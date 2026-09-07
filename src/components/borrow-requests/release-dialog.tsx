@@ -38,6 +38,30 @@ export interface ReleaseDialogProps {
   ) => Promise<void>;
 }
 
+function normalizeSearchToken(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function assetMatchesSearch(asset: Asset, query: string): boolean {
+  const q = query.toLowerCase().trim();
+  if (!q) return true;
+
+  const compactQ = normalizeSearchToken(q);
+  const fields = [
+    asset.name,
+    asset.assetCode,
+    asset.location ?? "",
+    asset.serialNumber ?? "",
+  ];
+
+  return fields.some((field) => {
+    const lower = field.toLowerCase();
+    if (lower.includes(q)) return true;
+    // Code match without dashes/spaces (e.g. "ast001" → "AST-001")
+    return compactQ.length > 0 && normalizeSearchToken(field).includes(compactQ);
+  });
+}
+
 function ReleaseLineAssetPicker({
   lineIndex,
   item,
@@ -82,7 +106,7 @@ function ReleaseLineAssetPicker({
   const remaining = item.quantity - selectedAssetIds.length;
   const isComplete = remaining === 0;
 
-  // Filter available assets that are valid for this line or already selected in this line
+  // Full eligible set for auto-select / allocation — never narrowed by search.
   const eligibleAssets = useMemo(() => {
     return assets.filter(
       (asset: Asset) =>
@@ -90,21 +114,24 @@ function ReleaseLineAssetPicker({
     );
   }, [assets, selectedAssetIds, disabledAssetIds]);
 
+  // Display-only filter. Selected units stay visible so search cannot hide allocations.
   const filteredAssets = useMemo(() => {
     if (!searchQuery.trim()) return assets;
-    const q = searchQuery.toLowerCase().trim();
     return assets.filter(
       (asset: Asset) =>
-        asset.name.toLowerCase().includes(q) ||
-        asset.assetCode.toLowerCase().includes(q) ||
-        (asset.location && asset.location.toLowerCase().includes(q)) ||
-        (asset.serialNumber && asset.serialNumber.toLowerCase().includes(q))
+        selectedAssetIds.includes(asset.id) ||
+        assetMatchesSearch(asset, searchQuery)
     );
-  }, [assets, searchQuery]);
+  }, [assets, searchQuery, selectedAssetIds]);
 
   const handleAutoSelect = () => {
     const availableIds = eligibleAssets.map((a: Asset) => a.id);
     onAutoSelect(lineIndex, availableIds, item.quantity);
+  };
+
+  const handleClearLine = () => {
+    setSearchQuery("");
+    onClearLine(lineIndex);
   };
 
   return (
@@ -140,7 +167,7 @@ function ReleaseLineAssetPicker({
           {selectedAssetIds.length > 0 && (
             <button
               type="button"
-              onClick={() => onClearLine(lineIndex)}
+              onClick={handleClearLine}
               className="inline-flex items-center gap-1 text-[11px] font-medium text-text-secondary hover:text-text cursor-pointer transition-colors px-1.5 py-0.5 rounded hover:bg-bg-subtle"
               title="Clear selection for this item"
             >
@@ -200,96 +227,108 @@ function ReleaseLineAssetPicker({
           </div>
         ) : (
           <div className="space-y-2">
-            {/* Search Filter when more than 3 units */}
-            {assets.length > 3 && (
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-secondary/60 pointer-events-none" />
-                <input
-                  type="text"
-                  placeholder="Filter available units by code, name, location..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-8 pr-7 py-1.5 bg-bg border border-border rounded-lg text-xs text-text placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent"
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery("")}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-text-secondary hover:text-text rounded cursor-pointer"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                )}
-              </div>
-            )}
-
-            {/* Asset Cards Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-1">
-              {filteredAssets.map((asset: Asset) => {
-                const isSelected = selectedAssetIds.includes(asset.id);
-                const isUsedInOtherLine =
-                  !isSelected && disabledAssetIds.has(asset.id);
-                const isLineFull =
-                  !isSelected && selectedAssetIds.length >= item.quantity;
-                const isDisabled = isUsedInOtherLine || isLineFull;
-                const code = formatAssetCodeDisplay(asset.assetCode);
-
-                return (
-                  <button
-                    key={asset.id}
-                    type="button"
-                    disabled={isDisabled}
-                    onClick={() => onToggle(lineIndex, asset.id)}
-                    className={cn(
-                      "flex items-start gap-2.5 p-2.5 rounded-lg border text-left text-xs transition-all cursor-pointer select-none",
-                      isSelected
-                        ? "border-accent bg-accent/10 text-text ring-1 ring-accent/30 shadow-2xs font-medium"
-                        : "border-border bg-bg hover:bg-bg-subtle hover:border-border/80 text-text",
-                      isDisabled && "opacity-45 cursor-not-allowed bg-bg-subtle/50 hover:bg-bg-subtle/50"
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "flex h-4 w-4 shrink-0 items-center justify-center rounded-md border mt-0.5 transition-colors",
-                        isSelected
-                          ? "border-accent bg-accent text-accent-foreground shadow-2xs"
-                          : "border-border bg-card"
-                      )}
-                    >
-                      {isSelected && <Check className="h-3 w-3" strokeWidth={2.5} />}
-                    </span>
-
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 justify-between">
-                        <span className="font-mono font-bold text-[11px] text-text shrink-0">
-                          {code}
-                        </span>
-                        {asset.location && (
-                          <span className="inline-flex items-center gap-0.5 text-[10px] text-text-secondary truncate shrink-0 max-w-28">
-                            <MapPin className="h-2.5 w-2.5 shrink-0 opacity-70" />
-                            {asset.location}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-text truncate mt-0.5">
-                        {asset.name}
-                      </p>
-                      {isUsedInOtherLine && (
-                        <p className="text-[10px] text-amber-700 dark:text-amber-300 font-semibold mt-0.5">
-                          Allocated to another item
-                        </p>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-secondary/60 pointer-events-none" />
+              <input
+                type="search"
+                placeholder="Search by asset code, name, serial, or location…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-8 pr-7 py-2 bg-bg border border-border rounded-lg text-xs text-text placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent"
+                aria-label={`Search available ${catStyle.label} units`}
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-text-secondary hover:text-text rounded cursor-pointer"
+                  aria-label="Clear search"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
             </div>
 
-            {filteredAssets.length === 0 && searchQuery && (
-              <p className="text-xs text-text-secondary py-2 text-center">
-                No units match &quot;{searchQuery}&quot;.
+            {searchQuery.trim() && (
+              <p className="text-[11px] text-text-secondary px-0.5">
+                Showing {filteredAssets.length} of {assets.length} available unit
+                {assets.length === 1 ? "" : "s"}
+                {selectedAssetIds.length > 0
+                  ? " · selected units stay visible"
+                  : ""}
               </p>
             )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-56 overflow-y-auto pr-1">
+              {filteredAssets.length === 0 ? (
+                <div className="col-span-full rounded-lg border border-border bg-bg-subtle p-3 text-xs text-text-secondary">
+                  No units match &quot;{searchQuery.trim()}&quot;. Try the full asset
+                  code or clear the search.
+                </div>
+              ) : (
+                filteredAssets.map((asset: Asset) => {
+                  const isSelected = selectedAssetIds.includes(asset.id);
+                  const isUsedInOtherLine =
+                    !isSelected && disabledAssetIds.has(asset.id);
+                  const isLineFull =
+                    !isSelected && selectedAssetIds.length >= item.quantity;
+                  const isDisabled = isUsedInOtherLine || isLineFull;
+                  const code = formatAssetCodeDisplay(asset.assetCode);
+
+                  return (
+                    <button
+                      key={asset.id}
+                      type="button"
+                      disabled={isDisabled}
+                      onClick={() => onToggle(lineIndex, asset.id)}
+                      className={cn(
+                        "flex items-start gap-2.5 p-2.5 rounded-lg border text-left text-xs transition-all cursor-pointer select-none",
+                        isSelected
+                          ? "border-accent bg-accent/10 text-text ring-1 ring-accent/30 shadow-2xs font-medium"
+                          : "border-border bg-bg hover:bg-bg-subtle hover:border-border/80 text-text",
+                        isDisabled &&
+                          "opacity-45 cursor-not-allowed bg-bg-subtle/50 hover:bg-bg-subtle/50"
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "flex h-4 w-4 shrink-0 items-center justify-center rounded-md border mt-0.5 transition-colors",
+                          isSelected
+                            ? "border-accent bg-accent text-accent-foreground shadow-2xs"
+                            : "border-border bg-card"
+                        )}
+                      >
+                        {isSelected && (
+                          <Check className="h-3 w-3" strokeWidth={2.5} />
+                        )}
+                      </span>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 justify-between">
+                          <span className="font-mono font-bold text-[11px] text-text shrink-0">
+                            {code}
+                          </span>
+                          {asset.location && (
+                            <span className="inline-flex items-center gap-0.5 text-[10px] text-text-secondary truncate shrink-0 max-w-28">
+                              <MapPin className="h-2.5 w-2.5 shrink-0 opacity-70" />
+                              {asset.location}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-text truncate mt-0.5">
+                          {asset.name}
+                        </p>
+                        {isUsedInOtherLine && (
+                          <p className="text-[10px] text-amber-700 dark:text-amber-300 font-semibold mt-0.5">
+                            Allocated to another item
+                          </p>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
           </div>
         )}
       </div>
