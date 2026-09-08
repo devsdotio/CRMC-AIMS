@@ -48,7 +48,14 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
           return;
         }
         lastError = { message: friendly, timestamp: now };
-        toast.error(friendly);
+        toast.error(friendly, {
+          action: {
+            label: "Retry Connection",
+            onClick: () => {
+              void queryClient.refetchQueries({ type: "active" });
+            },
+          },
+        });
       }
     });
 
@@ -64,7 +71,14 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
           return;
         }
         lastError = { message: friendly, timestamp: now };
-        toast.error(friendly);
+        toast.error(friendly, {
+          action: {
+            label: "Retry Connection",
+            onClick: () => {
+              void queryClient.refetchQueries({ type: "active" });
+            },
+          },
+        });
       }
     });
 
@@ -78,7 +92,15 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     function handleOffline() {
       toast.error(
-        "You are currently offline. Actions will be unavailable until connection is restored."
+        "You are currently offline. Actions will be unavailable until connection is restored.",
+        {
+          action: {
+            label: "Retry Connection",
+            onClick: () => {
+              void queryClient.refetchQueries({ type: "active" });
+            },
+          },
+        }
       );
     }
     function handleOnline() {

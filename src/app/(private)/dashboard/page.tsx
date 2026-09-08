@@ -8,7 +8,6 @@ import { OverdueAssetsWidget } from "@/components/dashboard/overdue-assets-widge
 import { LowStockWidget } from "@/components/dashboard/low-stock-widget";
 import { AssetsByCategoryChart } from "@/components/dashboard/assets-by-category-chart";
 import { RecentActivityFeed } from "@/components/dashboard/recent-activity-feed";
-import { QueryErrorBanner } from "@/components/shared/query-error-banner";
 
 import { useDashboardSnapshotQuery } from "@/features/dashboard/client/use-dashboard";
 
@@ -77,19 +76,10 @@ export default function DashboardPage() {
       className="flex flex-col gap-4 bg-bg-subtle max-w-full overflow-x-hidden"
       data-theme="light"
     >
-      {isError && (
-        <QueryErrorBanner
-          message={
-            error?.message ||
-            "Failed to load dashboard. The database may be slow or unreachable."
-          }
-          onRetry={() => void refetch()}
-        />
-      )}
 
       <StatCardsGrid stats={stats} />
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_360px]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <PendingApprovalsWidget
           requests={snapshot?.pendingRequests || []}
           loading={loading}
@@ -100,7 +90,7 @@ export default function DashboardPage() {
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_360px]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <OverdueAssetsWidget
           assets={snapshot?.overdueAssets || []}
           loading={loading}
