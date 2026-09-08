@@ -29,6 +29,7 @@ import { useAssetOperator } from "@/hooks/use-asset-operator";
 import {
   useBorrowLogQuery,
   useReturnBorrowMutation,
+  useVoidBorrowMutation,
   type BorrowLogRecord,
 } from "@/features/borrow-log/client";
 
@@ -86,6 +87,7 @@ function BorrowLogContent() {
   }, [rawRecords]);
 
   const returnMutation = useReturnBorrowMutation();
+  const voidMutation = useVoidBorrowMutation();
 
   // Extract unique departments for dropdown
   const departments = useMemo(() => {
@@ -129,13 +131,20 @@ function BorrowLogContent() {
       all: baseFilteredRecords.length,
       active: baseFilteredRecords.filter((r) => r.status === "active").length,
       overdue: baseFilteredRecords.filter((r) => r.status === "overdue").length,
-      returned: baseFilteredRecords.filter((r) => r.status === "returned").length,
+      returned: baseFilteredRecords.filter(
+        (r) => r.status === "returned" || r.status === "voided"
+      ).length,
     };
   }, [baseFilteredRecords]);
 
   // Final filtered records for current status tab
   const filteredRecords = useMemo(() => {
     if (tab === "all") return baseFilteredRecords;
+    if (tab === "returned") {
+      return baseFilteredRecords.filter(
+        (r) => r.status === "returned" || r.status === "voided"
+      );
+    }
     return baseFilteredRecords.filter((r) => r.status === tab);
   }, [baseFilteredRecords, tab]);
 
@@ -163,6 +172,20 @@ function BorrowLogContent() {
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to record return.");
+      throw err;
+    }
+  };
+
+  const handleVoidIssue = async (record: BorrowLogRecord, reason: string) => {
+    try {
+      await voidMutation.mutateAsync({
+        id: record.id,
+        payload: { reason: reason || undefined },
+      });
+      toast.success(`${record.assetCode} issue voided — asset restored to stock.`);
+      setSelectedRecord(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to void issue.");
       throw err;
     }
   };
@@ -472,6 +495,8 @@ function BorrowLogContent() {
                   const category = getCategoryStyle(row.category || "office");
                   const isOverdue = row.status === "overdue";
                   const isReturned = row.status === "returned";
+                  const isVoided = row.status === "voided";
+                  const canReturn = canOperate && !isReturned && !isVoided;
 
                   return (
                     <tr
@@ -495,9 +520,18 @@ function BorrowLogContent() {
                               </p>
                             ) : (
                               <p className="text-[10px] text-text-secondary mt-0.5">
-                                Direct Loan
+                                {row.source === "admin_manual"
+                                  ? "Manual Issue"
+                                  : row.source === "project_legacy"
+                                    ? "Project Issue"
+                                    : "Direct Loan"}
                               </p>
                             )}
+                            {row.source === "admin_manual" && row.requestCode ? (
+                              <p className="text-[10px] text-amber-700 dark:text-amber-300 mt-0.5">
+                                Manual Issue
+                              </p>
+                            ) : null}
                           </div>
                         </div>
                       </td>
@@ -550,6 +584,10 @@ function BorrowLogContent() {
                       <td className="px-4 py-3.5 align-middle">
                         {isOverdue ? (
                           <OverdueBadge daysOverdue={row.daysOverdue ?? 1} />
+                        ) : isVoided ? (
+                          <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border bg-status-repair-bg/15 text-status-repair-text border-status-repair-bg/30">
+                            Voided
+                          </span>
                         ) : isReturned ? (
                           <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border bg-bg-subtle text-text-secondary border-border">
                             Returned
@@ -564,7 +602,7 @@ function BorrowLogContent() {
                       {/* Actions */}
                       <td className="px-4 py-3.5 align-middle text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          {canOperate && !isReturned && (
+                          {canReturn && (
                             <button
                               type="button"
                               onClick={(e) => {
@@ -670,6 +708,7 @@ function BorrowLogContent() {
         isOpen={Boolean(selectedRecord)}
         onClose={() => setSelectedRecord(null)}
         onRecordReturn={(r) => setReturnTarget(r)}
+        onVoidIssue={canOperate ? handleVoidIssue : undefined}
         canOperate={canOperate}
       />
     </div>

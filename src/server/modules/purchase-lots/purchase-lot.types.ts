@@ -18,6 +18,10 @@ export type PurchaseLotDTO = {
   supplierName: string | null;
   quantity: number;
   quantityRemaining: number;
+  /** Original ordered qty when receive differs (from notes metadata). */
+  orderedQuantity?: number;
+  /** Qty actually stocked on deliver (from notes metadata). */
+  receivedQuantity?: number | null;
   unitCost: string;
   totalCost: string;
   purchasedOn: string;
@@ -108,6 +112,7 @@ export type UpdatePurchaseOrderStatusInput = {
   status: PurchaseOrderStatus;
   notes?: string;
   approvedBy?: string;
+  receivedQuantity?: number;
 };
 
 export interface IPurchaseLotRepository {

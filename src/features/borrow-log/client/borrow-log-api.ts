@@ -22,6 +22,10 @@ export type ReturnBorrowPayload = {
   flagMaintenance?: boolean;
 };
 
+export type VoidBorrowPayload = {
+  reason?: string;
+};
+
 export const borrowLogApi = {
   async list(params?: {
     status?: BorrowLogRecord["status"];
@@ -60,6 +64,17 @@ export const borrowLogApi = {
   ): Promise<BorrowLogRecord> {
     const res = await fetchJson<ApiResponse<BorrowLogRecord>>(
       `/api/borrow-log/${id}/return`,
+      { method: "POST", body: JSON.stringify(payload) }
+    );
+    return res.data;
+  },
+
+  async voidLog(
+    id: string,
+    payload: VoidBorrowPayload = {}
+  ): Promise<BorrowLogRecord> {
+    const res = await fetchJson<ApiResponse<BorrowLogRecord>>(
+      `/api/borrow-log/${id}/void`,
       { method: "POST", body: JSON.stringify(payload) }
     );
     return res.data;

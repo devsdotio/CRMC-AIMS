@@ -57,6 +57,8 @@ export const updatePurchaseOrderStatusSchema = z.object({
   status: purchaseOrderStatusSchema,
   notes: z.string().trim().max(2000).optional(),
   approvedBy: z.string().trim().max(255).optional(),
+  /** Actual qty received on deliver (consumables). Defaults to ordered qty when omitted. */
+  receivedQuantity: z.number().int().positive().optional(),
 });
 
 export const updatePurchaseOrderSchema = z.object({

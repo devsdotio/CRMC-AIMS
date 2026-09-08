@@ -89,6 +89,7 @@ export function PurchaseOrderDetailSheet({
   const [activeTab, setActiveTab] = useState<"specs" | "workflow" | "qr">("specs");
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [statusNote, setStatusNote] = useState("");
+  const [receivedQuantity, setReceivedQuantity] = useState("");
   const [showStatusModal, setShowStatusModal] = useState<PurchaseOrderStatus | null>(null);
 
   const updateStatusMutation = useUpdatePOStatusMutation();
@@ -133,18 +134,37 @@ export function PurchaseOrderDetailSheet({
   const handleTransitionStatus = async (nextStatus: PurchaseOrderStatus) => {
     setIsUpdatingStatus(true);
     try {
+      const parsedReceived =
+        nextStatus === "delivered" && lot.itemType === "consumable"
+          ? Number.parseInt(receivedQuantity || String(lot.quantity), 10)
+          : undefined;
+
+      if (
+        nextStatus === "delivered" &&
+        lot.itemType === "consumable" &&
+        (!Number.isFinite(parsedReceived) || (parsedReceived ?? 0) < 1)
+      ) {
+        toast.error("Enter a valid received quantity (at least 1).");
+        setIsUpdatingStatus(false);
+        return;
+      }
+
       await updateStatusMutation.mutateAsync({
         id: lot.id,
         payload: {
           status: nextStatus,
           notes: statusNote.trim() || undefined,
+          receivedQuantity: parsedReceived,
         },
       });
       toast.success(
-        `PO ${lot.poNumber || lot.lotCode} updated to ${nextStatus.replace("_", " ")}.`
+        nextStatus === "delivered" && parsedReceived != null
+          ? `PO ${lot.poNumber || lot.lotCode} delivered ù ${parsedReceived} unit(s) added to inventory.`
+          : `PO ${lot.poNumber || lot.lotCode} updated to ${nextStatus.replace("_", " ")}.`
       );
       setShowStatusModal(null);
       setStatusNote("");
+      setReceivedQuantity("");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to update status.");
     } finally {
@@ -225,9 +245,9 @@ export function PurchaseOrderDetailSheet({
             </div>
             <p className="text-xs text-text-secondary font-medium mt-0.5 space-x-1.5 truncate">
               <span>CRMC Purchase Order</span>
-              <span>‚Ä¢</span>
+              <span>ù</span>
               <span className="font-mono">Lot: <strong className="text-text font-medium">{lot.lotCode}</strong></span>
-              <span>‚Ä¢</span>
+              <span>ù</span>
               <span>Date: <strong className="text-text font-semibold">{poDate}</strong></span>
             </p>
           </div>
@@ -452,15 +472,29 @@ export function PurchaseOrderDetailSheet({
                   </div>
 
                   <div className="space-y-1">
-                    <span className="text-[10px] uppercase font-bold text-text-secondary">Quantity Received</span>
+                    <span className="text-[10px] uppercase font-bold text-text-secondary">
+                      {lot.status === "delivered" ? "Quantity in Stock" : "Quantity Ordered"}
+                    </span>
                     <p className="font-mono font-bold text-text text-sm">
-                      {lot.quantity} {lot.itemType === "asset" ? (lot.quantity === 1 ? "unit" : "units") : "pcs"}
+                      {lot.quantity}{" "}
+                      {lot.itemType === "asset"
+                        ? lot.quantity === 1
+                          ? "unit"
+                          : "units"
+                        : "pcs"}
                     </p>
+                    {lot.status === "delivered" &&
+                      lot.orderedQuantity != null &&
+                      lot.orderedQuantity !== lot.quantity && (
+                        <p className="text-[10px] text-text-secondary">
+                          Ordered {lot.orderedQuantity} ù received {lot.receivedQuantity ?? lot.quantity}
+                        </p>
+                      )}
                   </div>
 
                   <div className="space-y-1">
                     <span className="text-[10px] uppercase font-bold text-text-secondary">Unit Acquisition Cost</span>
-                    <p className="font-mono font-bold text-text">‚Ç±{unitCostNum.toFixed(2)}</p>
+                    <p className="font-mono font-bold text-text">?{unitCostNum.toFixed(2)}</p>
                   </div>
 
                   <div className="space-y-1">
@@ -618,7 +652,12 @@ export function PurchaseOrderDetailSheet({
                           <time className="text-[10px] text-text-secondary font-mono">{formatDateTime(lot.deliveredAt)}</time>
                         </div>
                         <p className="text-text-secondary text-[11px]">
-                          Received {lot.quantity} units into active inventory.
+                          Received {lot.receivedQuantity ?? lot.quantity} units into active inventory
+                          {lot.orderedQuantity != null &&
+                          lot.orderedQuantity !== (lot.receivedQuantity ?? lot.quantity)
+                            ? ` (ordered ${lot.orderedQuantity})`
+                            : ""}
+                          .
                         </p>
                       </div>
                     </li>
@@ -685,11 +724,44 @@ export function PurchaseOrderDetailSheet({
 
               <p className="text-xs text-text-secondary">
                 {showStatusModal === "delivered"
-                  ? "Marking this PO as delivered will immediately conduct inventory stock intake, adding the item units to current inventory."
+                  ? lot.itemType === "consumable"
+                    ? "Confirm the actual quantity received. That amount will be added to inventory (it can differ from the ordered quantity)."
+                    : "Marking this PO as delivered will activate the asset in inventory."
                   : showStatusModal === "approved"
                   ? "Approve this purchase order to authorize supplier issuance and procurement."
                   : `Are you sure you want to transition this purchase order to ${showStatusModal.replace("_", " ")}?`}
               </p>
+
+              {showStatusModal === "delivered" && lot.itemType === "consumable" && (
+                <div className="space-y-1">
+                  <label
+                    htmlFor="po-received-qty"
+                    className="text-[11px] font-semibold text-text"
+                  >
+                    Actual Quantity Received <span className="text-accent">*</span>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      id="po-received-qty"
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={receivedQuantity || String(lot.quantity)}
+                      onChange={(e) => setReceivedQuantity(e.target.value)}
+                      className="w-full p-2 text-xs rounded-lg border border-border bg-bg text-text font-mono focus:ring-1 focus:ring-accent focus:outline-hidden"
+                    />
+                    <span className="text-[11px] text-text-secondary shrink-0">
+                      of {lot.quantity} ordered
+                    </span>
+                  </div>
+                  {Number.parseInt(receivedQuantity || String(lot.quantity), 10) !==
+                    lot.quantity && (
+                    <p className="text-[10px] text-amber-700 dark:text-amber-300">
+                      Inventory will be adjusted to the received quantity, not the ordered amount.
+                    </p>
+                  )}
+                </div>
+              )}
 
               <div className="space-y-1">
                 <label className="text-[11px] font-semibold text-text">Optional Audit Notes</label>
@@ -705,7 +777,11 @@ export function PurchaseOrderDetailSheet({
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
                 <button
                   type="button"
-                  onClick={() => setShowStatusModal(null)}
+                  onClick={() => {
+                    setShowStatusModal(null);
+                    setStatusNote("");
+                    setReceivedQuantity("");
+                  }}
                   className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-border hover:bg-bg-subtle text-text cursor-pointer"
                 >
                   Cancel
@@ -722,7 +798,11 @@ export function PurchaseOrderDetailSheet({
                       <span>Updating...</span>
                     </>
                   ) : (
-                    <span>Confirm</span>
+                    <span>
+                      {showStatusModal === "delivered"
+                        ? "Confirm Receive & Stock"
+                        : "Confirm"}
+                    </span>
                   )}
                 </button>
               </div>

@@ -7,6 +7,7 @@ export type {
   BorrowLogRecord,
   ReleaseBorrowPayload,
   ReturnBorrowPayload,
+  VoidBorrowPayload,
 } from "./borrow-log-api";
 export { borrowLogQueryKeys } from "./query-keys";
 export {
@@ -14,4 +15,5 @@ export {
   useBorrowLogRecordQuery,
   useReleaseBorrowMutation,
   useReturnBorrowMutation,
+  useVoidBorrowMutation,
 } from "./use-borrow-log";

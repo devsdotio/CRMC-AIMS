@@ -38,6 +38,7 @@ import {
   listBorrowLogQuerySchema,
   releaseBorrowSchema,
   returnBorrowSchema,
+  voidBorrowSchema,
 } from "./borrow-log.validation";
 
 function daysBetween(from: string, to: string): number {
@@ -67,21 +68,23 @@ function custodyHistoryFromRow(row: BorrowTransactionRow): AuditLogRow[] {
     notes: null,
     metadata: null,
   };
-  if (!row.returnedAt) return [released];
+  if (!row.returnedAt && row.status !== "voided") return [released];
 
+  const isVoided = row.status === "voided";
   const flagged =
-    row.conditionOnReturn === "needs_repair" ||
-    row.conditionOnReturn === "damaged";
+    !isVoided &&
+    (row.conditionOnReturn === "needs_repair" ||
+      row.conditionOnReturn === "damaged");
   return [
     released,
     {
-      id: `${row.id}-returned`,
+      id: `${row.id}-${isVoided ? "voided" : "returned"}`,
       entityType: "borrow_transaction",
       entityId: row.id,
-      action: flagged ? "flagged_repair" : "returned",
+      action: isVoided ? "voided" : flagged ? "flagged_repair" : "returned",
       actorName: row.receivedByName ?? row.releasedByName,
       actorUserId: row.receivedByUserId,
-      timestamp: asDate(row.returnedAt),
+      timestamp: asDate(row.returnedAt ?? row.updatedAt),
       notes: row.conditionNotes,
       metadata: null,
     },
@@ -93,7 +96,9 @@ export function toBorrowLogDTO(row: BorrowTransactionRow): BorrowLogDTO {
   let status: BorrowLogDTO["status"] = "active";
   let daysOverdue: number | undefined;
 
-  if (row.status === "returned") {
+  if (row.status === "voided") {
+    status = "voided";
+  } else if (row.status === "returned") {
     status = "returned";
   } else if (row.dueDate && row.dueDate < today) {
     status = "overdue";
@@ -568,7 +573,12 @@ export class BorrowLogService {
                 logCode: existing.logCode,
                 logId: existing.id,
                 condition: input.condition,
+                // Persist under both keys so asset detail + older readers show notes.
                 conditionNotes: input.conditionNotes ?? null,
+                notes: input.conditionNotes ?? null,
+                source: existing.source ?? "portal",
+                requestCode: existing.requestCode ?? null,
+                requestId: existing.requestId ?? null,
               },
             },
             tx
@@ -674,6 +684,106 @@ export class BorrowLogService {
       }
 
       return toBorrowLogDTO(updated);
+  }
+
+  /**
+   * Soft-void an active custody issue (undo mistaken manual release).
+   * Restores the asset to stock and keeps the log row for audit.
+   * Portal/request releases are blocked — use the normal return path instead.
+   */
+  async voidLog(
+    rawId: string,
+    rawInput: unknown,
+    actor: ActorContext
+  ): Promise<BorrowLogDTO> {
+    const id = borrowLogIdSchema.parse(rawId);
+    const input = voidBorrowSchema.parse(rawInput ?? {});
+
+    return withTransaction(async (tx) => {
+      const existing = await this.repo.findByIdForUpdate(id, tx);
+      if (!existing) throw new NotFoundError("Borrow log", id);
+      if (existing.status !== "active") {
+        throw new ConflictError("Only active custody issues can be voided.");
+      }
+      if (existing.source !== "admin_manual") {
+        throw new BadRequestError(
+          "Only manual issues can be voided. Request-based releases must be returned through the normal return flow."
+        );
+      }
+
+      const reason = input.reason;
+      const now = new Date();
+
+      const updated = await this.repo.update(
+        id,
+        {
+          status: "voided",
+          returnedAt: now,
+          conditionOnReturn: "good",
+          conditionNotes: `[VOIDED] ${reason}`,
+          receivedByName: actor.displayName,
+          receivedByUserId: actor.userId,
+        },
+        tx
+      );
+      if (!updated) throw new NotFoundError("Borrow log", id);
+
+      if (existing.assetId) {
+        const asset = await this.assets.findByIdForUpdate(existing.assetId, tx);
+        if (asset) {
+          const openProject = await this.projectAssignments.findOpenByAssetId(
+            asset.id,
+            tx
+          );
+          if (openProject) {
+            await this.projectAssignments.update(
+              openProject.id,
+              {
+                status: "returned",
+                returnedAt: now,
+                returnedByUserId: actor.userId,
+                returnedByName: actor.displayName,
+                returnNotes: `Voided mistaken issue ${existing.logCode}: ${reason}`,
+              },
+              tx
+            );
+          }
+
+          await this.assets.update(
+            asset.id,
+            {
+              currentHolder: null,
+              lastUpdated: now,
+            },
+            tx
+          );
+
+          await this.lifecycle.record(
+            {
+              assetId: asset.id,
+              assetCode: asset.assetCode,
+              eventType: "returned",
+              actor,
+              fromStatus: asset.status,
+              toStatus: asset.status,
+              fromHolder: existing.borrowerName,
+              toHolder: null,
+              payload: {
+                voided: true,
+                logCode: existing.logCode,
+                logId: existing.id,
+                notes: reason,
+                conditionNotes: `[VOIDED] ${reason}`,
+                source: existing.source,
+              },
+            },
+            tx
+          );
+        }
+      }
+
+      return toBorrowLogDTO(updated);
+    });
   }
 
   /** Helper for AssetService.releaseAsset → single custody path. */

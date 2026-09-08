@@ -60,11 +60,13 @@ function assetToDetailRecord(row: BorrowLogRecord): IssueDetailRecord {
     when: row.releasedAt,
     actor: row.releasedBy,
     source:
-      row.source === "admin_manual"
-        ? "Manual Issue"
-        : row.source === "project_legacy"
-          ? "Project Issue"
-          : "Portal Requisition",
+      row.status === "voided"
+        ? "Voided Manual Issue"
+        : row.source === "admin_manual"
+          ? "Manual Issue"
+          : row.source === "project_legacy"
+            ? "Project Issue"
+            : "Portal Requisition",
     extra: row.requestCode || undefined,
     department: row.department,
     borrowerName: row.borrowerName,
@@ -76,6 +78,7 @@ function assetToDetailRecord(row: BorrowLogRecord): IssueDetailRecord {
     returnedAt: row.returnedAt,
     requestCode: row.requestCode,
     custodyKind: row.custodyKind,
+    notes: row.conditionNotes,
   };
 }
 

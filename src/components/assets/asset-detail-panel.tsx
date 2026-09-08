@@ -105,6 +105,13 @@ function getTimelineStyle(status: string) {
         badge: "bg-category-computing-bg text-white border-transparent",
         iconText: "text-white",
       };
+    case "voided":
+      return {
+        bg: "bg-status-repair-bg text-white border-status-repair-bg",
+        text: "text-status-repair-text",
+        badge: "bg-status-repair-bg text-white border-transparent",
+        iconText: "text-white",
+      };
     case "maintenance":
     case "needs_repair":
     case "flagged_maintenance":
@@ -426,12 +433,31 @@ function LifecycleDetailsSection({ item }: { item: Extract<UnifiedTimelineItem, 
       {/* Event Notes or Conditions */}
       {(Boolean(
         event.payload.notes ||
+          event.payload.conditionNotes ||
+          event.payload.returnNotes ||
           event.payload.condition ||
           event.payload.description ||
           event.payload.logCode ||
-          event.payload.requestCode
+          event.payload.requestCode ||
+          event.payload.source ||
+          event.payload.voided
       )) && (
         <div className="rounded bg-bg/80 p-2 border border-border/50 space-y-1">
+          {event.payload.voided ? (
+            <p className="text-[11px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">
+              Issue voided (undo)
+            </p>
+          ) : null}
+          {event.payload.source != null && (
+            <p className="text-text leading-relaxed text-[11px]">
+              <strong className="text-text-secondary font-sans">Source:</strong>{" "}
+              {String(event.payload.source) === "admin_manual"
+                ? "Manual Issue"
+                : String(event.payload.source) === "project_legacy"
+                  ? "Project Issue"
+                  : "Portal Request"}
+            </p>
+          )}
           {event.payload.logCode != null && (
             <p className="text-text leading-relaxed font-mono text-[11px]">
               <strong className="text-text-secondary font-sans">Custody code:</strong>{" "}
@@ -454,9 +480,20 @@ function LifecycleDetailsSection({ item }: { item: Extract<UnifiedTimelineItem, 
               <strong className="text-text-secondary">Condition:</strong> {String(event.payload.condition)}
             </p>
           )}
-          {event.payload.notes && (
+          {Boolean(
+            event.payload.notes ||
+              event.payload.conditionNotes ||
+              event.payload.returnNotes
+          ) && (
             <div className="pt-1">
-              <AuditNoteDisplay action={event.eventType} note={String(event.payload.notes)} />
+              <AuditNoteDisplay
+                action={event.payload.voided ? "voided" : event.eventType}
+                note={String(
+                  event.payload.notes ||
+                    event.payload.conditionNotes ||
+                    event.payload.returnNotes
+                )}
+              />
             </div>
           )}
         </div>
@@ -600,11 +637,34 @@ function AssetHistoryTimeline({ asset }: { asset: Asset }) {
         title = `Status Changed: ${ev.fromStatus || "—"} → ${ev.toStatus || "—"}`;
         statusLabel = ev.toStatus || "status_changed";
       } else if (ev.eventType === "released") {
-        title = `Released${ev.toHolder ? ` to ${ev.toHolder}` : ""}`;
+        const releaseSource = ev.payload?.source;
+        const sourceTag =
+          releaseSource === "admin_manual"
+            ? " · Manual"
+            : releaseSource === "project_legacy"
+              ? " · Project"
+              : ev.payload?.requestCode
+                ? " · Request"
+                : "";
+        title = `Released${ev.toHolder ? ` to ${ev.toHolder}` : ""}${sourceTag}`;
         statusLabel = "released";
       } else if (ev.eventType === "returned") {
-        title = `Returned${ev.fromHolder ? ` from ${ev.fromHolder}` : ""}`;
-        statusLabel = "returned";
+        if (ev.payload?.voided) {
+          title = "Issue Voided (Undo)";
+          statusLabel = "voided";
+        } else {
+          const returnSource = ev.payload?.source;
+          const sourceTag =
+            returnSource === "admin_manual"
+              ? " · Manual"
+              : returnSource === "project_legacy"
+                ? " · Project"
+                : ev.payload?.requestCode || returnSource === "portal"
+                  ? " · Request"
+                  : "";
+          title = `Returned${ev.fromHolder ? ` from ${ev.fromHolder}` : ""}${sourceTag}`;
+          statusLabel = "returned";
+        }
       } else if (ev.eventType === "flagged_maintenance") {
         title = "Flagged for Maintenance";
         statusLabel = "needs_repair";
@@ -712,10 +772,14 @@ function AssetHistoryTimeline({ asset }: { asset: Asset }) {
                   Boolean(item.event.fromHolder || item.event.toHolder) ||
                   Boolean(
                     item.event.payload.notes ||
+                      item.event.payload.conditionNotes ||
+                      item.event.payload.returnNotes ||
                       item.event.payload.description ||
                       item.event.payload.condition ||
                       item.event.payload.logCode ||
-                      item.event.payload.requestCode
+                      item.event.payload.requestCode ||
+                      item.event.payload.source ||
+                      item.event.payload.voided
                   ))) ||
               item.kind === "maintenance";
 
