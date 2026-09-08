@@ -16,6 +16,12 @@ import {
   StockMovementService,
   allocationsToMovementLines,
 } from "@/server/modules/stock-movements/stock-movement.service";
+import {
+  StockMovementRepository,
+  isVoidedNotes,
+  reversesMarker,
+  voidedMarker,
+} from "@/server/modules/stock-movements/stock-movement.repository";
 
 import { ProjectRepository } from "./project.repository";
 import { ProjectExpenseRepository } from "./project-expense.repository";
@@ -87,7 +93,8 @@ export class ProjectExpenseService {
     private readonly projects = new ProjectRepository(),
     private readonly consumables = new ConsumableRepository(),
     private readonly lots = new PurchaseLotRepository(),
-    private readonly movements = new StockMovementService()
+    private readonly movements = new StockMovementService(),
+    private readonly movementRepo = new StockMovementRepository()
   ) {}
 
   private async requireMutableProject(projectId: string) {
@@ -261,13 +268,6 @@ export class ProjectExpenseService {
           : "0.00";
       const amount = totalCost.toFixed(2);
 
-      const metadata: ProjectExpenseMetadata = {
-        lotAllocations,
-        consumableCode: item.itemCode,
-        consumableName: item.name,
-        consumableUnit: item.unit,
-      };
-
       const description =
         input.description?.trim() ||
         `${item.name} (${item.itemCode}) × ${input.quantity} ${item.unit}`;
@@ -280,7 +280,7 @@ export class ProjectExpenseService {
         tx
       );
 
-      await this.movements.record(
+      const movementRows = await this.movements.record(
         {
           consumableId: item.id,
           direction: "out",
@@ -297,6 +297,16 @@ export class ProjectExpenseService {
         },
         tx
       );
+
+      const movementIds = movementRows.map((r) => r.id);
+      const metadata: ProjectExpenseMetadata = {
+        lotAllocations,
+        consumableCode: item.itemCode,
+        consumableName: item.name,
+        consumableUnit: item.unit,
+        stockMovementId: movementIds[0],
+        stockMovementIds: movementIds,
+      };
 
       const row = await this.expenses.create(
         {
@@ -443,6 +453,28 @@ export class ProjectExpenseService {
       }
 
       const metadata = (existing.metadata ?? {}) as ProjectExpenseMetadata;
+      const linkedIds =
+        metadata.stockMovementIds ??
+        (metadata.stockMovementId ? [metadata.stockMovementId] : []);
+
+      // Issue History undo already restocked — drop the charge without double-restock.
+      let alreadyUndone = false;
+      for (const movementId of linkedIds) {
+        const mov = await this.movementRepo.findById(movementId, tx);
+        if (!mov) continue;
+        if (
+          isVoidedNotes(mov.notes) ||
+          (await this.movementRepo.findReversalOf(movementId, tx))
+        ) {
+          alreadyUndone = true;
+          break;
+        }
+      }
+      if (alreadyUndone) {
+        await this.expenses.delete(existing.id, tx);
+        return;
+      }
+
       const allocations = metadata.lotAllocations ?? [];
 
       for (const alloc of allocations) {
@@ -456,7 +488,13 @@ export class ProjectExpenseService {
         );
       }
 
-      const returnNote = `Project material line removed — stock returned to inventory`;
+      const reverseMarkers = linkedIds.map((id) => reversesMarker(id)).join(" ");
+      const returnNote = [
+        reverseMarkers || null,
+        "Project material line removed — stock returned to inventory",
+      ]
+        .filter(Boolean)
+        .join(" ");
 
       await this.consumables.update(
         item.id,
@@ -482,6 +520,18 @@ export class ProjectExpenseService {
         },
         tx
       );
+
+      for (const movementId of linkedIds) {
+        const mov = await this.movementRepo.findById(movementId, tx);
+        if (!mov || isVoidedNotes(mov.notes)) continue;
+        const nextNotes = [
+          mov.notes?.trim(),
+          `${voidedMarker()} Project material line removed`,
+        ]
+          .filter(Boolean)
+          .join(" · ");
+        await this.movementRepo.updateNotes(movementId, nextNotes, tx);
+      }
 
       await this.expenses.delete(existing.id, tx);
     });

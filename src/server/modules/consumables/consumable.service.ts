@@ -688,7 +688,7 @@ export class ConsumableService {
       );
       if (!updated) throw new NotFoundError("Consumable", id);
 
-      await this.movements.record(
+      const movementRows = await this.movements.record(
         {
           consumableId: existing.id,
           direction: "out",
@@ -708,6 +708,7 @@ export class ConsumableService {
           input.quantity > 0
             ? (totalCost / input.quantity).toFixed(2)
             : "0.00";
+        const movementIds = movementRows.map((r) => r.id);
         const metadata: ProjectExpenseMetadata = {
           lotAllocations: allocations.map((a) => ({
             lotId: a.lotId,
@@ -720,6 +721,8 @@ export class ConsumableService {
           consumableCode: existing.itemCode,
           consumableName: existing.name,
           consumableUnit: existing.unit,
+          stockMovementId: movementIds[0],
+          stockMovementIds: movementIds,
         };
 
         await this.projectExpenses.create(

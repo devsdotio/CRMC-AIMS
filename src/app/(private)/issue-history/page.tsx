@@ -2,28 +2,23 @@
 
 import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { motion } from "framer-motion";
 import {
   History,
   Search,
-  Box,
   Package,
   Download,
   RefreshCw,
   X,
   Building2,
-  Calendar,
   User,
   ArrowUpRight,
-  TrendingUp,
-  SlidersHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { QueryErrorBanner } from "@/components/shared/query-error-banner";
 import { formatPhp } from "@/components/projects/format-money";
-import { useBorrowLogQuery, type BorrowLogRecord } from "@/features/borrow-log/client";
 import {
   useStockMovementsQuery,
+  useVoidStockMovementMutation,
   type StockMovement,
 } from "@/features/stock-movements/client";
 import {
@@ -31,15 +26,9 @@ import {
   type IssueDetailRecord,
 } from "@/components/issue-history/issue-detail-sheet";
 import { useToast } from "@/components/providers/toast-context";
+import { useAssetOperator } from "@/hooks/use-asset-operator";
 
-type KindTab = "all" | "asset" | "supply";
 type DateFilter = "all" | "today" | "7days" | "30days";
-
-const TABS: { id: KindTab; label: string; icon: typeof Box }[] = [
-  { id: "all", label: "All Transactions", icon: History },
-  { id: "asset", label: "Asset Releases", icon: Box },
-  { id: "supply", label: "Supply Movements", icon: Package },
-];
 
 const DATE_FILTERS: { id: DateFilter; label: string }[] = [
   { id: "all", label: "All Time" },
@@ -48,44 +37,11 @@ const DATE_FILTERS: { id: DateFilter; label: string }[] = [
   { id: "30days", label: "This Month" },
 ];
 
-function assetToDetailRecord(row: BorrowLogRecord): IssueDetailRecord {
-  return {
-    id: `asset-${row.id}`,
-    code: row.logCode,
-    kind: "asset",
-    itemLabel: row.assetName,
-    itemCode: row.assetCode,
-    destination: row.department,
-    qtyLabel: row.custodyKind === "assignment" ? "Assigned (1 unit)" : "Borrowed (1 unit)",
-    when: row.releasedAt,
-    actor: row.releasedBy,
-    source:
-      row.status === "voided"
-        ? "Voided Manual Issue"
-        : row.source === "admin_manual"
-          ? "Manual Issue"
-          : row.source === "project_legacy"
-            ? "Project Issue"
-            : "Portal Requisition",
-    extra: row.requestCode || undefined,
-    department: row.department,
-    borrowerName: row.borrowerName,
-    borrowerEmail: row.borrowerEmail,
-    borrowerPhone: row.borrowerPhone,
-    category: row.category,
-    status: row.status,
-    dueDate: row.dueDate,
-    returnedAt: row.returnedAt,
-    requestCode: row.requestCode,
-    custodyKind: row.custodyKind,
-    notes: row.conditionNotes,
-  };
-}
-
 function supplyToDetailRecord(row: StockMovement): IssueDetailRecord {
   const signed = row.direction === "out" ? `−${row.qty}` : `+${row.qty}`;
   return {
     id: `mov-${row.id}`,
+    movementId: row.id,
     code: row.movementCode,
     kind: "supply",
     itemLabel: row.itemName ?? "Consumable",
@@ -94,8 +50,9 @@ function supplyToDetailRecord(row: StockMovement): IssueDetailRecord {
     qtyLabel: `${signed}${row.unit ? ` ${row.unit}` : ""}`,
     when: row.createdAt,
     actor: row.actorName || "Custodian",
-    source:
-      row.reason === "issue"
+    source: row.voided
+      ? "Voided Issue"
+      : row.reason === "issue"
         ? "Issued Consumable"
         : row.reason === "restock"
           ? row.notes?.toLowerCase().includes("project material line removed")
@@ -116,17 +73,15 @@ function supplyToDetailRecord(row: StockMovement): IssueDetailRecord {
     unit: row.unit,
     notes: row.notes,
     requestCode: row.requestId,
+    voided: row.voided,
+    reversalMovementCode: row.reversalMovementCode,
   };
 }
 
 function IssueHistoryContent() {
   const searchParams = useSearchParams();
-  const kindParam = searchParams.get("kind");
   const itemParam = searchParams.get("item") ?? "";
-  const initialKind: KindTab =
-    kindParam === "asset" || kindParam === "supply" ? kindParam : "all";
 
-  const [tab, setTab] = useState<KindTab>(initialKind);
   const [search, setSearch] = useState(itemParam);
   const [departmentFilter, setDepartmentFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState<DateFilter>("all");
@@ -134,55 +89,35 @@ function IssueHistoryContent() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const toast = useToast();
-
-  const {
-    data: assetLogs = [],
-    isLoading: loadingAssets,
-    isError: assetError,
-    error: assetErr,
-    refetch: refetchAssets,
-    isRefetching: refetchingAssets,
-  } = useBorrowLogQuery({ custodyKind: "all" });
+  const { canOperate } = useAssetOperator();
+  const voidMutation = useVoidStockMovementMutation();
 
   const {
     data: movements = [],
-    isLoading: loadingMoves,
+    isLoading: loading,
     isError: moveError,
     error: moveErr,
     refetch: refetchMoves,
-    isRefetching: refetchingMoves,
-  } = useStockMovementsQuery({ reason: "issue", limit: 300 });
+    isRefetching: isRefreshing,
+  } = useStockMovementsQuery({ reason: "issue", limit: 500 });
 
-  const isRefreshing = refetchingAssets || refetchingMoves;
-  const loading = loadingAssets || loadingMoves;
-
-  // Extract all unique departments for the filter dropdown
   const departments = useMemo(() => {
     const set = new Set<string>();
-    assetLogs.forEach((l) => l.department && set.add(l.department));
     movements.forEach((m) => m.destinationLabel && set.add(m.destinationLabel));
     return Array.from(set).sort();
-  }, [assetLogs, movements]);
+  }, [movements]);
 
-  // Transform raw items to uniform records
-  const allRecords = useMemo(() => {
-    const assets = assetLogs.map(assetToDetailRecord);
-    const supplies = movements.map(supplyToDetailRecord);
-    return [...assets, ...supplies].sort((a, b) => b.when.localeCompare(a.when));
-  }, [assetLogs, movements]);
+  const allRecords = useMemo(
+    () =>
+      movements
+        .map(supplyToDetailRecord)
+        .sort((a, b) => b.when.localeCompare(a.when)),
+    [movements]
+  );
 
-  // Filter pipeline
   const filteredRecords = useMemo(() => {
     let result = allRecords;
 
-    // Tab filter
-    if (tab === "asset") {
-      result = result.filter((r) => r.kind === "asset");
-    } else if (tab === "supply") {
-      result = result.filter((r) => r.kind === "supply");
-    }
-
-    // Department filter
     if (departmentFilter !== "all") {
       result = result.filter(
         (r) =>
@@ -191,7 +126,6 @@ function IssueHistoryContent() {
       );
     }
 
-    // Date range filter
     if (dateFilter !== "all") {
       const now = new Date();
       const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -207,7 +141,6 @@ function IssueHistoryContent() {
       }
     }
 
-    // Search query
     const q = search.trim().toLowerCase();
     if (q) {
       result = result.filter(
@@ -217,46 +150,20 @@ function IssueHistoryContent() {
           r.itemCode.toLowerCase().includes(q) ||
           r.destination.toLowerCase().includes(q) ||
           (r.actor ?? "").toLowerCase().includes(q) ||
-          (r.borrowerName ?? "").toLowerCase().includes(q) ||
           (r.extra ?? "").toLowerCase().includes(q) ||
           (r.lotCode ?? "").toLowerCase().includes(q)
       );
     }
 
     return result;
-  }, [allRecords, tab, departmentFilter, dateFilter, search]);
+  }, [allRecords, departmentFilter, dateFilter, search]);
 
-  // Summary Metrics calculations
-  const metrics = useMemo(() => {
-    const totalCount = allRecords.length;
-    const assetCount = allRecords.filter((r) => r.kind === "asset").length;
-    const supplyCount = allRecords.filter((r) => r.kind === "supply").length;
-    const totalValuation = allRecords.reduce((acc, r) => {
-      const val = Number(r.lineTotal) || 0;
-      return acc + val;
-    }, 0);
-
-    return { totalCount, assetCount, supplyCount, totalValuation };
-  }, [allRecords]);
-
-  // Tab counts
-  const assetCount = useMemo(
-    () => allRecords.filter((r) => r.kind === "asset").length,
-    [allRecords]
-  );
-  const supplyCount = useMemo(
-    () => allRecords.filter((r) => r.kind === "supply").length,
-    [allRecords]
-  );
-
-  // Pagination logic
   const totalPages = Math.ceil(filteredRecords.length / pageSize) || 1;
   const paginatedRecords = useMemo(() => {
     const start = (page - 1) * pageSize;
     return filteredRecords.slice(start, start + pageSize);
   }, [filteredRecords, page, pageSize]);
 
-  // CSV Export Handler
   const handleExportCSV = () => {
     if (filteredRecords.length === 0) {
       toast.info("No records available to export.");
@@ -264,13 +171,11 @@ function IssueHistoryContent() {
     }
 
     const headers = [
-      "Transaction Code",
-      "Type",
+      "Movement Code",
       "Item Code",
       "Item Description",
-      "Quantity / Custody",
-      "Destination / Department",
-      "Recipient / Borrower",
+      "Quantity",
+      "Destination",
       "Issued By",
       "Date Issued",
       "Lot Code",
@@ -279,12 +184,10 @@ function IssueHistoryContent() {
 
     const rowsData = filteredRecords.map((r) => [
       r.code,
-      r.kind === "asset" ? "Asset" : "Supply",
       r.itemCode,
       `"${(r.itemLabel || "").replace(/"/g, '""')}"`,
       r.qtyLabel,
       `"${(r.destination || "").replace(/"/g, '""')}"`,
-      `"${(r.borrowerName || "").replace(/"/g, '""')}"`,
       `"${(r.actor || "").replace(/"/g, '""')}"`,
       new Date(r.when).toISOString(),
       r.lotCode || "",
@@ -298,34 +201,55 @@ function IssueHistoryContent() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `issue-history-${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute(
+      "download",
+      `consumable-issue-history-${new Date().toISOString().slice(0, 10)}.csv`
+    );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    toast.success(`Exported ${filteredRecords.length} records to CSV.`);
+    toast.success(`Exported ${filteredRecords.length} supply issues to CSV.`);
   };
 
   const handleRefresh = async () => {
-    await Promise.all([refetchAssets(), refetchMoves()]);
-    toast.success("Issue history updated.");
+    await refetchMoves();
+    toast.success("Consumable issue history updated.");
+  };
+
+  const handleVoidIssue = async (record: IssueDetailRecord, reason: string) => {
+    if (!record.movementId) return;
+    try {
+      await voidMutation.mutateAsync({
+        id: record.movementId,
+        payload: { reason: reason || undefined },
+      });
+      toast.success(
+        `${record.code} undone — ${record.qtyLabel.replace(/^−/, "")} restocked to inventory.`
+      );
+      setSelectedRecord(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to undo supply issue.");
+      throw err;
+    }
   };
 
   return (
     <div className="h-full flex flex-col min-h-0 overflow-hidden bg-bg-subtle rounded-md">
-      {/* Top Banner Header */}
       <div className="px-4 md:px-6 pt-5 pb-4 bg-bg shrink-0 border-b border-border space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <div className="flex items-center gap-2.5">
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent/10 text-accent shrink-0">
-                <History className="h-5 w-5" />
+                <Package className="h-5 w-5" />
               </div>
               <div>
                 <h1 className="text-xl font-bold tracking-tight text-text leading-tight">
                   Issue History
                 </h1>
                 <p className="text-xs text-text-secondary mt-0.5">
-                  Unified audit log of released asset custody handovers (<span className="font-mono font-bold">LOG-</span>) and supply dispatches (<span className="font-mono font-bold">MOV-</span>).
+                  Consumable supply issues and dispatches (
+                  <span className="font-mono font-bold">MOV-</span>
+                  ). Asset custody lives in the Custody Log.
                 </p>
               </div>
             </div>
@@ -337,7 +261,7 @@ function IssueHistoryContent() {
               onClick={handleRefresh}
               disabled={isRefreshing || loading}
               className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-border bg-bg text-text hover:bg-bg-subtle transition-colors cursor-pointer disabled:opacity-50"
-              title="Refresh transaction records"
+              title="Refresh supply issue records"
             >
               <RefreshCw className={cn("h-3.5 w-3.5", isRefreshing && "animate-spin")} />
               <span>Refresh</span>
@@ -355,65 +279,20 @@ function IssueHistoryContent() {
           </div>
         </div>
 
-        {/* Filter Controls Row */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-          {/* Segmented Kind Tabs with Label */}
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="text-xs font-bold text-text-secondary uppercase tracking-wider shrink-0">
-              Type:
+          <div className="flex items-center gap-2 text-xs text-text-secondary">
+            <History className="h-3.5 w-3.5 shrink-0" />
+            <span>
+              <span className="font-bold text-text tabular-nums">{filteredRecords.length}</span>
+              {" "}
+              supply issue{filteredRecords.length === 1 ? "" : "s"}
+              {filteredRecords.length !== allRecords.length
+                ? ` (of ${allRecords.length})`
+                : ""}
             </span>
-            <div className="flex gap-1 rounded-xl border border-border p-1 bg-bg-subtle shrink-0 relative">
-              {TABS.map((item) => {
-                const isSelected = tab === item.id;
-                const Icon = item.icon;
-                const count =
-                  item.id === "all"
-                    ? allRecords.length
-                    : item.id === "asset"
-                      ? assetCount
-                      : supplyCount;
-
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => {
-                      setTab(item.id);
-                      setPage(1);
-                    }}
-                    className={cn(
-                      "relative inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors duration-150 cursor-pointer select-none",
-                      isSelected
-                        ? "text-text"
-                        : "text-text-secondary hover:text-text"
-                    )}
-                  >
-                    {isSelected && (
-                      <motion.span
-                        layoutId="issue-history-active-tab"
-                        className="absolute inset-0 rounded-lg bg-bg shadow-xs border border-border/80"
-                        transition={{ type: "spring", stiffness: 500, damping: 38 }}
-                      />
-                    )}
-                    <Icon className="h-3.5 w-3.5 shrink-0 relative z-10" />
-                    <span className="relative z-10">{item.label}</span>
-                    <span
-                      className={cn(
-                        "relative z-10 px-1.5 py-0.2 rounded-full text-[10px] font-mono font-semibold transition-colors duration-150",
-                        isSelected ? "bg-accent/15 text-accent font-bold" : "bg-bg-subtle text-text-secondary"
-                      )}
-                    >
-                      {count}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
           </div>
 
-          {/* Search and Dropdowns */}
           <div className="flex items-center gap-2 flex-1 min-w-72 justify-end">
-            {/* Search Input */}
             <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-secondary pointer-events-none" />
               <input
@@ -422,7 +301,7 @@ function IssueHistoryContent() {
                   setSearch(e.target.value);
                   setPage(1);
                 }}
-                placeholder="Search code, item, destination, or recipient…"
+                placeholder="Search code, item, destination, or issuer…"
                 className="w-full h-9 pl-8.5 pr-8 text-xs bg-bg border border-border rounded-lg text-text placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent"
               />
               {search && (
@@ -436,7 +315,6 @@ function IssueHistoryContent() {
               )}
             </div>
 
-            {/* Department Filter with Label */}
             {departments.length > 0 && (
               <div className="flex items-center gap-1.5 shrink-0">
                 <span className="text-xs font-semibold text-text-secondary shrink-0">
@@ -450,7 +328,7 @@ function IssueHistoryContent() {
                   }}
                   className="h-9 px-2.5 text-xs bg-bg border border-border rounded-lg text-text font-semibold focus:outline-none focus:ring-2 focus:ring-accent shrink-0 cursor-pointer"
                 >
-                  <option value="all">All Departments</option>
+                  <option value="all">All Destinations</option>
                   {departments.map((d) => (
                     <option key={d} value={d}>
                       {d}
@@ -460,7 +338,6 @@ function IssueHistoryContent() {
               </div>
             )}
 
-            {/* Date Filter with Label */}
             <div className="flex items-center gap-1.5 shrink-0">
               <span className="text-xs font-semibold text-text-secondary shrink-0">
                 Date:
@@ -484,22 +361,18 @@ function IssueHistoryContent() {
         </div>
       </div>
 
-      {/* Error State Banner */}
-      {(assetError || moveError) && (
+      {moveError && (
         <QueryErrorBanner
           message={
-            assetErr?.message ||
             moveErr?.message ||
-            "Unable to load transaction records. Please check your network."
+            "Unable to load consumable issue records. Please check your network."
           }
           onRetry={() => {
-            void refetchAssets();
             void refetchMoves();
           }}
         />
       )}
 
-      {/* Main Table Content */}
       <main className="flex-1 overflow-y-auto min-h-0 bg-bg flex flex-col">
         {loading ? (
           <div className="p-5 space-y-2.5">
@@ -518,14 +391,14 @@ function IssueHistoryContent() {
           </div>
         ) : filteredRecords.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center px-4">
-            <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-category-av-bg/10 border border-category-av-bg/25 text-category-av-bg shadow-xs mb-3">
-              <History className="h-7 w-7" strokeWidth={1.8} />
+            <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-status-active-bg/10 border border-status-active-bg/25 text-status-active-text shadow-xs mb-3">
+              <Package className="h-7 w-7" strokeWidth={1.8} />
             </span>
-            <p className="text-base font-bold text-text">No Issue Records Found</p>
+            <p className="text-base font-bold text-text">No Supply Issues Found</p>
             <p className="text-xs text-text-secondary mt-1 max-w-sm leading-relaxed">
               {search || departmentFilter !== "all" || dateFilter !== "all"
-                ? "No transactions match your search query or active filter criteria. Try resetting filters."
-                : "No asset releases or supply disbursements have been recorded yet."}
+                ? "No consumable issues match your filters. Try resetting search or date range."
+                : "Consumable dispatches will appear here when supplies are issued from inventory."}
             </p>
             {(search || departmentFilter !== "all" || dateFilter !== "all") && (
               <button
@@ -534,7 +407,6 @@ function IssueHistoryContent() {
                   setSearch("");
                   setDepartmentFilter("all");
                   setDateFilter("all");
-                  setTab("all");
                 }}
                 className="mt-4 px-3.5 py-1.5 text-xs font-bold rounded-lg border border-border bg-bg hover:bg-bg-subtle transition-colors cursor-pointer text-text"
               >
@@ -548,13 +420,13 @@ function IssueHistoryContent() {
               <thead className="sticky top-0 bg-bg-subtle/95 backdrop-blur-xs border-b border-border z-10 select-none">
                 <tr>
                   <th className="px-5 py-3 text-[10px] font-bold uppercase tracking-wider text-text-secondary">
-                    Transaction Code
+                    Movement Code
                   </th>
                   <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-text-secondary">
                     Item Description
                   </th>
                   <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-text-secondary">
-                    Destination & Recipient
+                    Destination
                   </th>
                   <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-text-secondary hidden sm:table-cell">
                     Quantity / Valuation
@@ -569,7 +441,6 @@ function IssueHistoryContent() {
               </thead>
               <tbody className="divide-y divide-border">
                 {paginatedRecords.map((row) => {
-                  const isAsset = row.kind === "asset";
                   const dateStr = new Date(row.when).toLocaleDateString("en-PH", {
                     month: "short",
                     day: "numeric",
@@ -587,38 +458,34 @@ function IssueHistoryContent() {
                       onClick={() => setSelectedRecord(row)}
                       className="hover:bg-bg-subtle/70 transition-colors cursor-pointer group"
                     >
-                      {/* Code & Kind Badge */}
                       <td className="px-5 py-3.5 align-middle">
                         <div className="flex items-center gap-2">
-                          <span
-                            className={cn(
-                              "p-1.5 rounded-lg shrink-0",
-                              isAsset
-                                ? "bg-blue-500/15 text-blue-600 dark:text-blue-400"
-                                : "bg-status-active-bg/20 text-status-active-text"
-                            )}
-                          >
-                            {isAsset ? (
-                              <Box className="h-3.5 w-3.5" />
-                            ) : (
-                              <Package className="h-3.5 w-3.5" />
-                            )}
+                          <span className="p-1.5 rounded-lg shrink-0 bg-status-active-bg/20 text-status-active-text">
+                            <Package className="h-3.5 w-3.5" />
                           </span>
                           <div>
-                            <span className="font-mono font-bold text-xs text-text group-hover:text-accent transition-colors">
-                              {row.code}
-                            </span>
-                            <div className="flex items-center gap-1.5 text-[10px] text-text-secondary mt-0.5">
-                              <span>{isAsset ? "Asset" : "Supply"}</span>
-                              {row.source && <span>· {row.source}</span>}
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-mono font-bold text-xs text-text group-hover:text-accent transition-colors">
+                                {row.code}
+                              </span>
+                              {row.voided && (
+                                <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border bg-status-repair-bg/15 text-status-repair-text border-status-repair-bg/30">
+                                  Voided
+                                </span>
+                              )}
                             </div>
+                            {row.source && (
+                              <div className="text-[10px] text-text-secondary mt-0.5">
+                                {row.source}
+                                {row.voided ? " · restocked" : ""}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </td>
 
-                      {/* Item Details */}
                       <td className="px-4 py-3.5 align-middle">
-                        <p className="font-bold text-text truncate max-w-[220px]">
+                        <p className="font-bold text-text truncate max-w-55">
                           {row.itemLabel}
                         </p>
                         <div className="flex items-center gap-1.5 text-[11px] font-mono text-text-secondary mt-0.5">
@@ -631,21 +498,17 @@ function IssueHistoryContent() {
                         </div>
                       </td>
 
-                      {/* Destination & Recipient */}
                       <td className="px-4 py-3.5 align-middle">
                         <div className="flex items-center gap-1.5 font-semibold text-text">
                           <Building2 className="h-3 w-3 text-text-secondary shrink-0" />
-                          <span className="truncate max-w-[180px]">{row.destination}</span>
+                          <span className="truncate max-w-45">{row.destination}</span>
                         </div>
                         <div className="flex items-center gap-1 text-[11px] text-text-secondary mt-0.5">
                           <User className="h-3 w-3 text-text-secondary/70 shrink-0" />
-                          <span className="truncate max-w-[150px]">
-                            {row.borrowerName || row.actor}
-                          </span>
+                          <span className="truncate max-w-37.5">{row.actor}</span>
                         </div>
                       </td>
 
-                      {/* Quantity & Valuation */}
                       <td className="px-4 py-3.5 align-middle hidden sm:table-cell">
                         <span className="font-mono font-bold text-text">{row.qtyLabel}</span>
                         {row.lineTotal && (
@@ -655,13 +518,11 @@ function IssueHistoryContent() {
                         )}
                       </td>
 
-                      {/* When Issued */}
                       <td className="px-4 py-3.5 align-middle hidden md:table-cell">
                         <p className="font-medium text-text">{dateStr}</p>
                         <p className="text-[11px] text-text-secondary">{timeStr}</p>
                       </td>
 
-                      {/* Action */}
                       <td className="px-4 py-3.5 align-middle text-right">
                         <button
                           type="button"
@@ -681,7 +542,6 @@ function IssueHistoryContent() {
               </tbody>
             </table>
 
-            {/* Pagination Controls */}
             {filteredRecords.length > 0 && (
               <div className="flex items-center justify-between px-6 py-3.5 border-t border-border bg-bg shrink-0 mt-auto">
                 <div className="flex items-center gap-3">
@@ -694,7 +554,8 @@ function IssueHistoryContent() {
                     <span className="font-bold text-text">
                       {Math.min(page * pageSize, filteredRecords.length)}
                     </span>{" "}
-                    of <span className="font-bold text-text">{filteredRecords.length}</span> results
+                    of <span className="font-bold text-text">{filteredRecords.length}</span>{" "}
+                    results
                   </span>
 
                   <select
@@ -738,11 +599,12 @@ function IssueHistoryContent() {
         )}
       </main>
 
-      {/* Transaction Inspection Slide-over Sheet */}
       <IssueDetailSheet
         record={selectedRecord}
         isOpen={Boolean(selectedRecord)}
         onClose={() => setSelectedRecord(null)}
+        canOperate={canOperate}
+        onVoidIssue={canOperate ? handleVoidIssue : undefined}
       />
     </div>
   );
@@ -753,7 +615,7 @@ export default function IssueHistoryPage() {
     <Suspense
       fallback={
         <div className="h-full flex items-center justify-center text-xs text-text-secondary bg-bg-subtle">
-          Loading issue history…
+          Loading consumable issue history…
         </div>
       }
     >

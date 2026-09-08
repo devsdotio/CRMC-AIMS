@@ -54,6 +54,10 @@ export type ProjectExpenseMetadata = {
   consumableCode?: string;
   consumableName?: string;
   consumableUnit?: string;
+  /** Links a project charge to the originating stock issue movement. */
+  stockMovementId?: string;
+  /** All MOV ids when an issue splits across lots (FIFO). */
+  stockMovementIds?: string[];
   /** Phase 5 write-off linkage */
   assignmentId?: string;
   assetCode?: string;

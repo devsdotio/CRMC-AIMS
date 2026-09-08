@@ -159,7 +159,7 @@ export function PurchaseOrderDetailSheet({
       });
       toast.success(
         nextStatus === "delivered" && parsedReceived != null
-          ? `PO ${lot.poNumber || lot.lotCode} delivered ù ${parsedReceived} unit(s) added to inventory.`
+          ? `PO ${lot.poNumber || lot.lotCode} delivered ¬∑ ${parsedReceived} unit(s) added to inventory.`
           : `PO ${lot.poNumber || lot.lotCode} updated to ${nextStatus.replace("_", " ")}.`
       );
       setShowStatusModal(null);
@@ -245,9 +245,9 @@ export function PurchaseOrderDetailSheet({
             </div>
             <p className="text-xs text-text-secondary font-medium mt-0.5 space-x-1.5 truncate">
               <span>CRMC Purchase Order</span>
-              <span>ù</span>
+              <span>¬∑</span>
               <span className="font-mono">Lot: <strong className="text-text font-medium">{lot.lotCode}</strong></span>
-              <span>ù</span>
+              <span>¬∑</span>
               <span>Date: <strong className="text-text font-semibold">{poDate}</strong></span>
             </p>
           </div>
@@ -487,14 +487,14 @@ export function PurchaseOrderDetailSheet({
                       lot.orderedQuantity != null &&
                       lot.orderedQuantity !== lot.quantity && (
                         <p className="text-[10px] text-text-secondary">
-                          Ordered {lot.orderedQuantity} ù received {lot.receivedQuantity ?? lot.quantity}
+                          Ordered {lot.orderedQuantity} ¬∑ received {lot.receivedQuantity ?? lot.quantity}
                         </p>
                       )}
                   </div>
 
                   <div className="space-y-1">
                     <span className="text-[10px] uppercase font-bold text-text-secondary">Unit Acquisition Cost</span>
-                    <p className="font-mono font-bold text-text">?{unitCostNum.toFixed(2)}</p>
+                    <p className="font-mono font-bold text-text">{formatPhp(unitCostNum)}</p>
                   </div>
 
                   <div className="space-y-1">

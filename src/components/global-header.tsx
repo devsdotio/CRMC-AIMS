@@ -33,8 +33,8 @@ const ROUTE_MAP: Record<string, RouteMeta> = {
     category: "Logs & History",
   },
   "/issue-history": {
-    title: "Issue history",
-    subtitle: "Asset LOG and supply MOV transaction codes",
+    title: "Issue History",
+    subtitle: "Consumable supply issues and MOV transaction codes",
     category: "Logs & History",
   },
   "/consumable-requests": {
