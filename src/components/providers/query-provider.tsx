@@ -48,7 +48,7 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
           return;
         }
         lastError = { message: friendly, timestamp: now };
-        toast.error(friendly, {
+        toast.warning(friendly, {
           action: {
             label: "Retry Connection",
             onClick: () => {
@@ -71,7 +71,7 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
           return;
         }
         lastError = { message: friendly, timestamp: now };
-        toast.error(friendly, {
+        toast.warning(friendly, {
           action: {
             label: "Retry Connection",
             onClick: () => {

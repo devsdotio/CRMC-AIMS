@@ -39,10 +39,10 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  --color-bg: var(--color-bg);
-  --color-bg-subtle: var(--color-bg-subtle);
-  --color-text: var(--color-text);
-  --color-text-secondary: var(--color-text-secondary);
+  --color-bg: #FFFFFF;
+  --color-bg-subtle: #F2F3F7;
+  --color-text: #1B2140;
+  --color-text-secondary: #5A5F73;
 
   /* Status Colors */
   --color-status-active: var(--status-active-bg);
