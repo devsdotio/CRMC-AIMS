@@ -300,6 +300,14 @@ export function RequestDetailPanel({
             </div>
           )}
 
+          {/* Cancellation Reason */}
+          {request.cancellationReason && (
+            <div className="p-3.5 rounded-lg border border-orange-400/30 bg-orange-500/10 text-orange-700 dark:text-orange-300 text-xs">
+              <span className="font-bold block mb-1">Cancellation Reason:</span>
+              {request.cancellationReason}
+            </div>
+          )}
+
           {/* Requested Item Info */}
           <div className="space-y-2.5">
             <div className="flex items-center justify-between">

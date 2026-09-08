@@ -57,6 +57,13 @@ const STATUS_FILTERS: {
     badge: "bg-destructive/10 text-destructive border border-destructive/20",
     activeBadge: "bg-destructive/20 text-destructive font-bold border border-destructive/30",
   },
+  {
+    key: "cancelled",
+    label: "Cancelled",
+    dot: "bg-orange-500",
+    badge: "bg-orange-500/10 text-orange-700 dark:text-orange-400 border border-orange-500/20",
+    activeBadge: "bg-orange-500/20 text-orange-800 dark:text-orange-300 font-bold border border-orange-500/30",
+  },
 ];
 
 const REQUESTS_PAGE_SIZE = 10;
@@ -89,6 +96,7 @@ export function MyRequestsTab() {
   const requests = useMemo<PortalBorrowRequest[]>(() => {
     const mappedAssets: PortalBorrowRequest[] = assetRequests.map((row) => ({
       ...row,
+      cancellationReason: row.cancellationReason,
       requestedDateFrom: row.requestedAt.slice(0, 10),
       requestedDateTo: (row.expectedReturnDate ?? row.requestedAt).slice(0, 10),
     }));
@@ -117,6 +125,7 @@ export function MyRequestsTab() {
             : row.status,
       notes: row.notes,
       rejectionReason: row.rejectionReason,
+      cancellationReason: row.cancellationReason,
       history: row.history.map((h) => ({
         id: h.id,
         action: h.action as PortalBorrowRequest["history"][number]["action"],
@@ -132,18 +141,18 @@ export function MyRequestsTab() {
     );
   }, [assetRequests, supplyRequests]);
 
-  const handleCancelConfirmed = async (requestId: string) => {
+  const handleCancelConfirmed = async (requestId: string, reason: string) => {
     const target = requests.find((r) => r.id === requestId);
     const isSupply = Boolean(
       target?.items.every((i) => i.itemType === "consumable")
     );
     try {
       if (isSupply) {
-        await cancelSupply({ id: requestId, note: "Cancelled by department" });
+        await cancelSupply({ id: requestId, reason, note: reason });
       } else {
-        await cancelRequest({ id: requestId, note: "Cancelled by requester" });
+        await cancelRequest({ id: requestId, reason, note: reason });
       }
-      toast.success("Request cancelled.");
+      toast.success("Request cancelled successfully.");
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Failed to cancel request."
@@ -267,7 +276,9 @@ export function MyRequestsTab() {
                   ? "bg-status-active-bg/15 border-status-active-bg/30 text-status-active-text"
                   : statusFilter === "approved"
                     ? "bg-blue-500/10 border-blue-500/25 text-blue-600 dark:text-blue-400"
-                    : "bg-bg-subtle border-border text-text-secondary"
+                    : statusFilter === "cancelled"
+                      ? "bg-orange-500/10 border-orange-500/25 text-orange-600 dark:text-orange-400"
+                      : "bg-bg-subtle border-border text-text-secondary"
               )}
             >
               {statusFilter === "pending" ? (
@@ -344,8 +355,8 @@ export function MyRequestsTab() {
           onOpenChange={(open) => {
             if (!open) setCancelTarget(null);
           }}
-          onConfirm={async () => {
-            await handleCancelConfirmed(cancelTarget.id);
+          onConfirm={async (reason: string) => {
+            await handleCancelConfirmed(cancelTarget.id, reason);
             setCancelTarget(null);
           }}
         />

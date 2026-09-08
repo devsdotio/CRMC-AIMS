@@ -24,6 +24,7 @@ import {
   type UpdateConsumableRequestPayload,
 } from "./consumable-requests-api";
 import { consumableRequestQueryKeys } from "./query-keys";
+import { dashboardQueryKeys } from "@/features/dashboard/client/query-keys";
 
 /**
  * Every requisition decision either reserves, frees or issues stock, so the
@@ -55,6 +56,46 @@ export function useCreateConsumableRequestMutation(): UseMutationResult<
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (payload) => consumableRequestsApi.create(payload),
+    onSuccess: (newRequest) => {
+      const firstLine = newRequest.lines?.[0];
+      const itemDesc = firstLine
+        ? `${firstLine.itemName}${newRequest.lines.length > 1 ? ` (+${newRequest.lines.length - 1} more)` : ""}`
+        : "Supply Requisition";
+
+      // Optimistically update dashboard snapshot
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      qc.setQueriesData<any>(
+        { queryKey: dashboardQueryKeys.snapshot() },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (old: any) => {
+          if (!old) return old;
+          return {
+            ...old,
+            summary: {
+              ...old.summary,
+              pendingApprovals: (old.summary?.pendingApprovals || 0) + 1,
+              totalRequests: (old.summary?.totalRequests || 0) + 1,
+            },
+            pendingRequests: [
+              {
+                id: newRequest.id,
+                itemDescription: itemDesc,
+                requesterName: newRequest.requesterName,
+                department: newRequest.department,
+                items: newRequest.lines.map((l) => ({
+                  itemDescription: l.itemName,
+                  quantity: l.quantityRequested,
+                  itemType: "consumable",
+                })),
+                requestedAt: newRequest.requestedAt,
+                relativeTime: newRequest.relativeTime || "Just now",
+              },
+              ...(old.pendingRequests || []),
+            ],
+          };
+        }
+      );
+    },
     onSettled: () => invalidate(qc),
   });
 }
@@ -105,11 +146,27 @@ export function useRejectConsumableRequestMutation(): UseMutationResult<
 export function useCancelConsumableRequestMutation(): UseMutationResult<
   ConsumableRequest,
   Error,
-  { id: string; note?: string }
+  { id: string; reason?: string; note?: string }
 > {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, note }) => consumableRequestsApi.cancel(id, note),
+    mutationFn: ({ id, reason, note }) =>
+      consumableRequestsApi.cancel(id, { reason, note }),
+    onSuccess: (_, { id }) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      qc.setQueriesData<any>({ queryKey: dashboardQueryKeys.snapshot() }, (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          summary: {
+            ...old.summary,
+            pendingApprovals: Math.max(0, (old.summary?.pendingApprovals || 1) - 1),
+          },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          pendingRequests: (old.pendingRequests || []).filter((r: any) => r.id !== id),
+        };
+      });
+    },
     onSettled: () => invalidate(qc),
   });
 }

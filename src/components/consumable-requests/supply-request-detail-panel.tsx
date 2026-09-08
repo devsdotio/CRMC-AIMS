@@ -204,6 +204,17 @@ export function SupplyRequestDetailPanel({
             </div>
           )}
 
+          {/* Cancellation reason */}
+          {request.cancellationReason && (
+            <div className="p-3 rounded-xl border border-orange-500/25 bg-orange-500/8 flex gap-2.5">
+              <XCircle className="h-4 w-4 text-orange-600 dark:text-orange-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-semibold text-orange-700 dark:text-orange-300 mb-0.5">Cancellation Reason</p>
+                <p className="text-xs text-orange-700 dark:text-orange-300 leading-relaxed">{request.cancellationReason}</p>
+              </div>
+            </div>
+          )}
+
           {/* Line Items */}
           <div className="space-y-2">
             <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">

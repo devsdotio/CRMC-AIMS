@@ -1,9 +1,13 @@
 "use client";
 
 import { createContext, useContext, useState, ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { BrowseItem } from "./types";
 import { NewBorrowRequestWizard } from "./new-borrow-request-wizard";
 import { useToast } from "@/components/providers/toast-context";
+import { dashboardQueryKeys } from "@/features/dashboard/client/query-keys";
+import { borrowRequestQueryKeys } from "@/features/borrow-requests/client/query-keys";
+import { consumableRequestQueryKeys } from "@/features/consumable-requests/client/query-keys";
 
 interface BorrowerPortalContextValue {
   cart: BrowseItem[];
@@ -52,6 +56,8 @@ export function BorrowerPortalProvider({ children }: { children: ReactNode }) {
     }, 200); // clear after animation
   };
 
+  const qc = useQueryClient();
+
   return (
     <BorrowerPortalContext.Provider value={{ cart, toggleCartItem, clearCart, openWizard, closeWizard }}>
       {children}
@@ -62,6 +68,9 @@ export function BorrowerPortalProvider({ children }: { children: ReactNode }) {
         initialType={wizardType}
         onSuccess={(req) => {
           clearCart();
+          void qc.invalidateQueries({ queryKey: dashboardQueryKeys.all });
+          void qc.invalidateQueries({ queryKey: borrowRequestQueryKeys.all });
+          void qc.invalidateQueries({ queryKey: consumableRequestQueryKeys.all });
           toast.success(`${req.requestCode} submitted.`);
         }}
       />

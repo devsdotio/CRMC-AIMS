@@ -61,6 +61,10 @@ const EMPTY_MESSAGES: Record<TabFilter, { title: string; subtitle: string }> = {
     title: "No rejected requests",
     subtitle: "No requests have been rejected under this view.",
   },
+  cancelled: {
+    title: "No cancelled requests",
+    subtitle: "There are currently no cancelled requests matching your filters.",
+  },
   released: {
     title: "No released requests",
     subtitle: "There are currently no released requests matching your filters.",

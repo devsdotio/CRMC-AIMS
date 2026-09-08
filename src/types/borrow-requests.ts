@@ -6,7 +6,7 @@ import type { BaseFilterState, DateRangeFilter } from "./filters";
 
 export type RequestStatus = "pending" | "approved" | "rejected" | "released" | "unreleased" | "returned" | "cancelled";
 
-export type TabFilter = "pending" | "approved" | "rejected" | "released" | "returned" | "all";
+export type TabFilter = "pending" | "approved" | "rejected" | "released" | "returned" | "cancelled" | "all";
 
 export interface ActionHistoryLog {
   id: string;
@@ -52,6 +52,7 @@ export interface BorrowRequest {
   status: RequestStatus;
   notes?: string;
   rejectionReason?: string;
+  cancellationReason?: string;
   pickedUpBy?: string;
   history: ActionHistoryLog[];
 }

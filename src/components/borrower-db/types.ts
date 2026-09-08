@@ -74,7 +74,7 @@ export interface WizardFormValues {
 
 export type ActiveTab = "browse" | "my-requests" | "history";
 
-export type RequestStatusFilter = "all" | "pending" | "approved" | "rejected" | "returned";
+export type RequestStatusFilter = "all" | "pending" | "approved" | "rejected" | "returned" | "cancelled";
 
 // ─── Summary stats ────────────────────────────────────────────────────────────
 

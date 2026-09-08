@@ -29,6 +29,7 @@ export type BorrowRequestDTO = {
   status: "pending" | "approved" | "rejected" | "released" | "unreleased" | "returned" | "cancelled";
   notes?: string;
   rejectionReason?: string;
+  cancellationReason?: string;
   pickedUpBy?: string;
   history: BorrowRequestHistoryEntry[];
 };

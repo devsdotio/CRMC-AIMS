@@ -146,10 +146,19 @@ export const borrowRequestsApi = {
     return res.data;
   },
 
-  async cancel(id: string, note?: string): Promise<BorrowRequest> {
+  async cancel(
+    id: string,
+    payload?: string | { reason?: string; note?: string }
+  ): Promise<BorrowRequest> {
+    const body =
+      typeof payload === "string"
+        ? { note: payload }
+        : payload
+        ? payload
+        : {};
     const res = await fetchJson<ApiResponse<BorrowRequest>>(
       `/api/requests/${id}/cancel`,
-      { method: "POST", body: JSON.stringify(note ? { note } : {}) }
+      { method: "POST", body: JSON.stringify(body) }
     );
     return res.data;
   },

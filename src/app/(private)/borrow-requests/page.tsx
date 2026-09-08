@@ -202,11 +202,11 @@ function BorrowRequestsContent() {
     }
     if (
       statusParam &&
-      ["pending", "approved", "rejected", "released", "returned", "all"].includes(
+      ["pending", "approved", "rejected", "cancelled", "released", "returned", "all"].includes(
         statusParam
       )
     ) {
-      setActiveTab(statusParam);
+      setActiveTab(statusParam as TabFilter);
     }
   }, [requestIdParam, statusParam]);
 
@@ -229,6 +229,7 @@ function BorrowRequestsContent() {
   const pendingCount = meta?.counts?.pending || 0;
   const approvedCount = meta?.counts?.approved || 0;
   const rejectedCount = meta?.counts?.rejected || 0;
+  const cancelledCount = meta?.counts?.cancelled || 0;
   const releasedCount = meta?.counts?.released || 0;
   const returnedCount = meta?.counts?.returned || 0;
   const totalCount = meta?.counts
@@ -490,6 +491,7 @@ function BorrowRequestsContent() {
             pendingCount={pendingCount}
             approvedCount={approvedCount}
             rejectedCount={rejectedCount}
+            cancelledCount={cancelledCount}
             releasedCount={releasedCount}
             returnedCount={returnedCount}
             totalCount={totalCount}

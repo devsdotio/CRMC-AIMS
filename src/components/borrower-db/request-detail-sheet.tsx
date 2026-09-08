@@ -195,6 +195,19 @@ export function RequestDetailSheet({
                 },
               ]
             : []),
+          ...(request.status === "cancelled"
+            ? [
+                {
+                  id: "can-1",
+                  action: "cancelled" as const,
+                  actor: request.requesterName || "Requester",
+                  timestamp: request.requestedAt,
+                  note: request.cancellationReason
+                    ? `Reason: ${request.cancellationReason}`
+                    : "Request was cancelled",
+                },
+              ]
+            : []),
           ...(request.status === "released" || request.status === "returned"
             ? [
                 {
@@ -335,6 +348,21 @@ export function RequestDetailSheet({
                 <p className="text-xs text-text leading-relaxed">
                   <span className="font-semibold">Reason: </span>
                   {request.rejectionReason || "No specific reason provided."}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {request.status === "cancelled" && (
+            <div className="rounded-xl border border-orange-400/30 bg-orange-500/10 p-3.5 flex items-start gap-3">
+              <XCircle className="h-5 w-5 text-orange-600 dark:text-orange-400 shrink-0 mt-0.5" />
+              <div className="space-y-0.5">
+                <p className="text-xs font-bold text-orange-700 dark:text-orange-300">
+                  Request Cancelled
+                </p>
+                <p className="text-xs text-text leading-relaxed">
+                  <span className="font-semibold">Reason: </span>
+                  {request.cancellationReason || "No cancellation reason provided."}
                 </p>
               </div>
             </div>
@@ -642,16 +670,18 @@ export function RequestDetailSheet({
           </section>
         </div>
 
-        {/* Footer Actions (Only for pending cancellation) */}
-        {request.status === "pending" && onCancel && (
+        {/* Footer Actions (Cancel allowed for pending and approved requests before release) */}
+        {(request.status === "pending" || request.status === "approved") && onCancel && (
           <div className="p-4 border-t border-border bg-card shrink-0 flex items-center justify-between gap-3">
             <p className="text-xs text-text-secondary">
-              Need to withdraw this pending request?
+              {request.status === "approved"
+                ? "Need to cancel this approved request before release?"
+                : "Need to withdraw this pending request?"}
             </p>
             <button
               type="button"
               onClick={() => onCancel(request)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border border-destructive/30 text-destructive hover:bg-destructive/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border border-destructive/30 text-destructive hover:bg-destructive/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive cursor-pointer"
             >
               <X className="h-3.5 w-3.5" />
               Cancel Request

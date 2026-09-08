@@ -106,6 +106,7 @@ export const returnBorrowRequestSchema = z.object({
 
 export const cancelBorrowRequestSchema = z.object({
   note: z.string().trim().max(1000).optional(),
+  reason: z.string().trim().max(1000).optional(),
 });
 
 export const undoBorrowRequestApprovalSchema = z.object({

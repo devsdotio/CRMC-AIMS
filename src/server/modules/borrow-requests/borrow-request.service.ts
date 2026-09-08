@@ -66,6 +66,7 @@ function toDTO(row: BorrowRequestRow): BorrowRequestDTO {
     status: row.status,
     notes: row.notes ?? undefined,
     rejectionReason: row.rejectionReason ?? undefined,
+    cancellationReason: row.cancellationReason ?? undefined,
     pickedUpBy: row.pickedUpBy ?? undefined,
     history,
   };
@@ -508,8 +509,8 @@ export class BorrowRequestService {
     const input = cancelBorrowRequestSchema.parse(rawInput ?? {});
     const existing = await this.repo.findById(id);
     if (!existing) throw new NotFoundError("Borrow request", id);
-    if (existing.status !== "pending") {
-      throw new ConflictError("Only pending requests can be cancelled.");
+    if (existing.status !== "pending" && existing.status !== "approved") {
+      throw new ConflictError("Only pending or approved requests can be cancelled.");
     }
 
     if (
@@ -519,15 +520,22 @@ export class BorrowRequestService {
       throw new ForbiddenError("You can only cancel your own requests.");
     }
 
+    const reason = (input.reason ?? input.note ?? "").trim();
+    const historyNote = reason ? `Reason: ${reason}` : "Cancelled by requester";
+
     const history = [
       ...(Array.isArray(existing.history) ? existing.history : []),
-      historyEntry("cancelled", actor.displayName, input.note),
+      historyEntry("cancelled", actor.displayName, historyNote),
     ];
 
     const updated = await withTransaction(async (tx) => {
       const up = await this.repo.update(
         id,
-        { status: "cancelled", history },
+        {
+          status: "cancelled",
+          cancellationReason: reason || null,
+          history,
+        },
         tx
       );
       if (!up) throw new NotFoundError("Borrow request", id);
