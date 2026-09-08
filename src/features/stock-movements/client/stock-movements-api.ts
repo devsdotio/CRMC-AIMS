@@ -3,6 +3,10 @@ import { fetchJson, type ApiResponse } from "@/features/shared/fetch-json";
 
 export type StockMovement = StockMovementDTO;
 
+export type VoidStockMovementPayload = {
+  reason?: string;
+};
+
 export const stockMovementsApi = {
   async list(params?: {
     reason?: StockMovement["reason"];
@@ -21,6 +25,17 @@ export const stockMovementsApi = {
   async listByConsumable(id: string): Promise<StockMovement[]> {
     const res = await fetchJson<ApiResponse<StockMovement[]>>(
       `/api/consumables/${id}/movements`
+    );
+    return res.data;
+  },
+
+  async voidIssue(
+    id: string,
+    payload: VoidStockMovementPayload = {}
+  ): Promise<StockMovement> {
+    const res = await fetchJson<ApiResponse<StockMovement>>(
+      `/api/stock-movements/${id}/void`,
+      { method: "POST", body: JSON.stringify(payload) }
     );
     return res.data;
   },

@@ -162,6 +162,13 @@
       "when": 1786358000000,
       "tag": "0022_cancellation_reason",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1786359000000,
+      "tag": "0023_borrow_voided_status",
+      "breakpoints": true
     }
   ]
 }

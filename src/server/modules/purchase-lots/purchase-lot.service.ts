@@ -75,6 +75,8 @@ export function parseNotesMetadata(rawNotes?: string | null): {
   approvedAt: string | null;
   orderedAt: string | null;
   deliveredAt: string | null;
+  orderedQuantity: number | null;
+  receivedQuantity: number | null;
 } {
   let status: PurchaseOrderStatus = "delivered";
   let purpose: string | null = null;
@@ -82,6 +84,8 @@ export function parseNotesMetadata(rawNotes?: string | null): {
   let approvedAt: string | null = null;
   let orderedAt: string | null = null;
   let deliveredAt: string | null = null;
+  let orderedQuantity: number | null = null;
+  let receivedQuantity: number | null = null;
   let cleanNotes = rawNotes ?? null;
 
   if (rawNotes) {
@@ -94,6 +98,12 @@ export function parseNotesMetadata(rawNotes?: string | null): {
         if (meta.approvedAt) approvedAt = meta.approvedAt;
         if (meta.orderedAt) orderedAt = meta.orderedAt;
         if (meta.deliveredAt) deliveredAt = meta.deliveredAt;
+        if (typeof meta.orderedQuantity === "number") {
+          orderedQuantity = meta.orderedQuantity;
+        }
+        if (typeof meta.receivedQuantity === "number") {
+          receivedQuantity = meta.receivedQuantity;
+        }
         cleanNotes = meta.notes ?? null;
       } catch {
         // use raw
@@ -127,6 +137,8 @@ export function parseNotesMetadata(rawNotes?: string | null): {
     approvedAt,
     orderedAt,
     deliveredAt,
+    orderedQuantity,
+    receivedQuantity,
   };
 }
 
@@ -138,6 +150,8 @@ export function serializeNotesMetadata(data: {
   approvedAt?: string | null;
   orderedAt?: string | null;
   deliveredAt?: string | null;
+  orderedQuantity?: number | null;
+  receivedQuantity?: number | null;
 }): string {
   return JSON.stringify({
     notes: data.notes || "",
@@ -147,6 +161,10 @@ export function serializeNotesMetadata(data: {
     approvedAt: data.approvedAt || null,
     orderedAt: data.orderedAt || null,
     deliveredAt: data.deliveredAt || null,
+    orderedQuantity:
+      typeof data.orderedQuantity === "number" ? data.orderedQuantity : null,
+    receivedQuantity:
+      typeof data.receivedQuantity === "number" ? data.receivedQuantity : null,
   });
 }
 
@@ -169,6 +187,8 @@ export function toPurchaseLotDTO(row: PurchaseLotRow): PurchaseLotDTO {
     supplierName: row.supplierName ?? null,
     quantity: row.quantity,
     quantityRemaining: row.quantityRemaining,
+    orderedQuantity: meta.orderedQuantity ?? row.quantity,
+    receivedQuantity: meta.receivedQuantity ?? null,
     unitCost: formatMoney(row.unitCost),
     totalCost: formatMoney(row.totalCost),
     purchasedOn: row.purchasedOn,
@@ -485,8 +505,26 @@ export class PurchaseLotService {
 
       // Handle Delivery Stock Intake if transitioning to delivered for the first time
       let nextRemaining = lot.quantityRemaining;
+      let nextQuantity = lot.quantity;
+      let receivedQtyForMeta: number | null = currentMeta.receivedQuantity;
+      let orderedQtyForMeta: number | null = currentMeta.orderedQuantity;
+
       if (nextStatus === "delivered" && currentMeta.status !== "delivered") {
-        nextRemaining = lot.quantity;
+        const orderedQty = lot.quantity;
+        const receivedQty =
+          typeof body.receivedQuantity === "number"
+            ? body.receivedQuantity
+            : orderedQty;
+
+        if (receivedQty < 1) {
+          throw new BadRequestError("Received quantity must be at least 1.");
+        }
+
+        // Stocked qty becomes the lot quantity so remaining/issue math stays coherent.
+        nextQuantity = receivedQty;
+        nextRemaining = receivedQty;
+        orderedQtyForMeta = orderedQty;
+        receivedQtyForMeta = receivedQty;
 
         if (lot.itemType === "consumable" && lot.consumableId) {
           const [consumable] = await db
@@ -496,27 +534,33 @@ export class PurchaseLotService {
             .limit(1);
 
           if (consumable) {
+            const unit = Number(lot.unitCost) || 0;
+            const lineTotal = formatMoney(unit * receivedQty);
+
             await db
               .update(consumables)
               .set({
-                currentQty: consumable.currentQty + lot.quantity,
+                currentQty: consumable.currentQty + receivedQty,
                 lastRestocked: new Date(),
                 updatedAt: new Date(),
               })
               .where(eq(consumables.id, lot.consumableId));
 
-            // Record stock movement
+            // Record stock movement for actual received qty
             await db.insert(stockMovements).values({
               movementCode: generateOperationalCode("MOV"),
               consumableId: lot.consumableId,
               purchaseLotId: lot.id,
               lotCode: lot.lotCode,
-              qty: lot.quantity,
+              qty: receivedQty,
               direction: "in",
               reason: "restock",
               unitCost: lot.unitCost,
-              lineTotal: lot.totalCost,
-              notes: `Delivered via PO ${lot.reference || lot.lotCode}`,
+              lineTotal,
+              notes:
+                receivedQty === orderedQty
+                  ? `Delivered via PO ${lot.reference || lot.lotCode}`
+                  : `Delivered via PO ${lot.reference || lot.lotCode} — received ${receivedQty} of ${orderedQty} ordered`,
               actorUserId: actor.userId,
               actorName: actor.displayName,
             });
@@ -542,13 +586,25 @@ export class PurchaseLotService {
         approvedAt,
         orderedAt,
         deliveredAt,
+        orderedQuantity: orderedQtyForMeta,
+        receivedQuantity: receivedQtyForMeta,
       });
 
       const updated = await this.repo.update(
         lot.id,
         {
           notes: nextNotes,
+          quantity: nextQuantity,
           quantityRemaining: nextRemaining,
+          ...(nextStatus === "delivered" &&
+          currentMeta.status !== "delivered" &&
+          nextQuantity !== lot.quantity
+            ? {
+                totalCost: formatMoney(
+                  (Number(lot.unitCost) || 0) * nextQuantity
+                ),
+              }
+            : {}),
         },
         session
       );
@@ -575,6 +631,15 @@ export class PurchaseLotService {
         actorUserId: actor.userId,
         notes: `PO ${poCode} status transitioned from ${currentMeta.status} to ${nextStatus}.${
           body.notes ? ` Notes: ${body.notes}` : ""
+        }${
+          nextStatus === "delivered" && receivedQtyForMeta != null
+            ? ` Received qty: ${receivedQtyForMeta}${
+                orderedQtyForMeta != null &&
+                orderedQtyForMeta !== receivedQtyForMeta
+                  ? ` (ordered ${orderedQtyForMeta})`
+                  : ""
+              }.`
+            : ""
         }`,
         metadata: {
           poNumber: poCode,
@@ -582,6 +647,8 @@ export class PurchaseLotService {
           previousStatus: currentMeta.status,
           newStatus: nextStatus,
           approvedByName,
+          orderedQuantity: orderedQtyForMeta,
+          receivedQuantity: receivedQtyForMeta,
         },
       });
 
@@ -629,6 +696,8 @@ export class PurchaseLotService {
         approvedAt: currentMeta.approvedAt,
         orderedAt: currentMeta.orderedAt,
         deliveredAt: currentMeta.deliveredAt,
+        orderedQuantity: currentMeta.orderedQuantity,
+        receivedQuantity: currentMeta.receivedQuantity,
       });
 
       const updated = await this.repo.update(

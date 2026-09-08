@@ -18,12 +18,15 @@ import {
   AlertCircle,
   Phone,
   Mail,
+  Undo2,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BorrowLogRecord } from "@/features/borrow-log/client";
 import { useCategoryStyleMap } from "@/features/categories/client/use-categories";
 import { OverdueBadge } from "@/components/ui/overdue-badge";
 import { LoadingState } from "@/components/providers/loading-context";
+import { custodySourceLabel } from "@/lib/custody-source";
 
 interface BorrowLogDetailSheetProps {
   record: BorrowLogRecord | null;
@@ -31,6 +34,7 @@ interface BorrowLogDetailSheetProps {
   isLoading?: boolean;
   onClose: () => void;
   onRecordReturn?: (record: BorrowLogRecord) => void;
+  onVoidIssue?: (record: BorrowLogRecord, reason: string) => Promise<void>;
   canOperate?: boolean;
 }
 
@@ -40,11 +44,15 @@ export function BorrowLogDetailSheet({
   isLoading = false,
   onClose,
   onRecordReturn,
+  onVoidIssue,
   canOperate,
 }: BorrowLogDetailSheetProps) {
   const { getCategoryStyle } = useCategoryStyleMap();
   const [copied, setCopied] = useState(false);
   const [isOverdue, setIsOverdue] = useState(false);
+  const [showVoidForm, setShowVoidForm] = useState(false);
+  const [voidReason, setVoidReason] = useState("");
+  const [isVoiding, setIsVoiding] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !record?.dueDate) {
@@ -53,6 +61,14 @@ export function BorrowLogDetailSheet({
     }
     setIsOverdue(new Date(record.dueDate).getTime() < Date.now());
   }, [isOpen, record?.dueDate]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setShowVoidForm(false);
+      setVoidReason("");
+      setIsVoiding(false);
+    }
+  }, [isOpen, record?.id]);
 
   if (!isOpen) return null;
 
@@ -135,16 +151,23 @@ export function BorrowLogDetailSheet({
                     ? "bg-status-outofservice-bg/15 text-status-outofservice-text border-status-outofservice-bg/30"
                     : record.status === "active"
                       ? "bg-status-active-bg/15 text-status-active-text border-status-active-bg/30"
-                      : "bg-bg-subtle text-text-secondary border-border"
+                      : record.status === "voided"
+                        ? "bg-status-repair-bg/15 text-status-repair-text border-status-repair-bg/30"
+                        : "bg-bg-subtle text-text-secondary border-border"
                 )}
               >
                 {record.status === "overdue" ? (
                   <OverdueBadge daysOverdue={record.daysOverdue ?? 1} />
                 ) : record.status === "returned" ? (
                   "Returned"
+                ) : record.status === "voided" ? (
+                  "Voided"
                 ) : (
                   "Active Custody"
                 )}
+              </span>
+              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full border bg-bg-subtle text-text-secondary border-border">
+                {custodySourceLabel(record.source)}
               </span>
             </div>
 
@@ -449,7 +472,9 @@ export function BorrowLogDetailSheet({
             <div className="space-y-2">
               <h4 className="font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1.5 text-xs">
                 <FileText className="h-3.5 w-3.5 text-amber-500" />
-                Return Inspection Notes
+                {record.status === "voided"
+                  ? "Void Reason"
+                  : "Return Inspection Notes"}
               </h4>
               <div className="rounded-xl border border-amber-500/25 bg-amber-500/8 dark:bg-amber-950/20 p-4 space-y-2 text-xs shadow-xs">
                 <p className="text-xs text-text font-medium leading-relaxed">
@@ -458,25 +483,115 @@ export function BorrowLogDetailSheet({
               </div>
             </div>
           )}
+
+          {showVoidForm && (
+            <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/5 space-y-3 text-xs">
+              <h4 className="font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                <Undo2 className="h-3.5 w-3.5" />
+                Undo Manual Issue
+              </h4>
+              <p className="text-text-secondary leading-relaxed">
+                This restores the asset to stock and marks the custody log as
+                voided. Use for mistaken manual or project issues. The history
+                entry is kept for audit — it is not hard-deleted.
+              </p>
+              <div className="space-y-1">
+                <label htmlFor="void-reason" className="text-[11px] font-semibold text-text">
+                  Reason (optional)
+                </label>
+                <textarea
+                  id="void-reason"
+                  value={voidReason}
+                  onChange={(e) => setVoidReason(e.target.value)}
+                  rows={2}
+                  placeholder="e.g. Issued to wrong department"
+                  className="w-full p-2 text-xs rounded-lg border border-border bg-bg text-text focus:ring-1 focus:ring-accent focus:outline-hidden resize-none"
+                />
+              </div>
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  disabled={isVoiding}
+                  onClick={() => {
+                    setShowVoidForm(false);
+                    setVoidReason("");
+                  }}
+                  className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-border hover:bg-bg-subtle text-text cursor-pointer disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isVoiding || !onVoidIssue}
+                  onClick={async () => {
+                    if (!onVoidIssue || !record) return;
+                    setIsVoiding(true);
+                    try {
+                      await onVoidIssue(record, voidReason.trim());
+                      setShowVoidForm(false);
+                      setVoidReason("");
+                      onClose();
+                    } finally {
+                      setIsVoiding(false);
+                    }
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-status-repair-bg text-white hover:opacity-90 cursor-pointer disabled:opacity-50"
+                >
+                  {isVoiding ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Voiding…
+                    </>
+                  ) : (
+                    <>
+                      <Undo2 className="h-3.5 w-3.5" />
+                      Confirm Undo
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer with Action */}
         <div className="p-4 border-t border-border bg-bg-subtle shrink-0 flex items-center justify-between gap-3">
-          {canOperate && record.status !== "returned" && onRecordReturn ? (
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                onRecordReturn(record);
-              }}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg bg-accent text-accent-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              <span>Record Return</span>
-            </button>
-          ) : (
-            <div />
-          )}
+          <div className="flex items-center gap-2">
+            {canOperate &&
+            record.status !== "returned" &&
+            record.status !== "voided" &&
+            onRecordReturn ? (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onRecordReturn(record);
+                }}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg bg-accent text-accent-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                <span>
+                  Record Return
+                </span>
+              </button>
+            ) : null}
+
+            {canOperate &&
+            record.status !== "returned" &&
+            record.status !== "voided" &&
+            record.source !== "portal" &&
+            onVoidIssue &&
+            !showVoidForm ? (
+              <button
+                type="button"
+                onClick={() => setShowVoidForm(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg border border-amber-500/40 text-amber-800 dark:text-amber-300 hover:bg-amber-500/10 transition-colors cursor-pointer"
+              >
+                <Undo2 className="h-3.5 w-3.5" />
+                <span>Undo Issue</span>
+              </button>
+            ) : null}
+          </div>
 
           <button
             type="button"

@@ -1,12 +1,23 @@
 "use client";
 
-import { useQuery, type UseQueryResult } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseMutationResult,
+  type UseQueryResult,
+} from "@tanstack/react-query";
 
 import {
   stockMovementsApi,
   type StockMovement,
+  type VoidStockMovementPayload,
 } from "./stock-movements-api";
 import { stockMovementQueryKeys } from "./query-keys";
+import {
+  STOCK_DOMAINS,
+  invalidateDomains,
+} from "@/features/shared/cache-invalidation";
 
 export function useStockMovementsQuery(filters?: {
   reason?: StockMovement["reason"];
@@ -29,5 +40,20 @@ export function useConsumableMovementsQuery(
     queryKey: stockMovementQueryKeys.byConsumable(consumableId),
     queryFn: () => stockMovementsApi.listByConsumable(consumableId),
     enabled: Boolean(consumableId) && (options?.enabled ?? true),
+  });
+}
+
+export function useVoidStockMovementMutation(): UseMutationResult<
+  StockMovement,
+  Error,
+  { id: string; payload?: VoidStockMovementPayload }
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }) =>
+      stockMovementsApi.voidIssue(id, payload ?? {}),
+    onSettled: () => {
+      void invalidateDomains(qc, [...STOCK_DOMAINS, "projects"]);
+    },
   });
 }

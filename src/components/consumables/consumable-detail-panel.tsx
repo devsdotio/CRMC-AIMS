@@ -478,7 +478,7 @@ export function ConsumableDetailPanel({
                 Stock ledger
               </h3>
               <Link
-                href={`/issue-history?kind=supply&item=${encodeURIComponent(displayItem.itemCode)}`}
+                href={`/issue-history?item=${encodeURIComponent(displayItem.itemCode)}`}
                 title="View issue history"
                 className="p-1 rounded-md text-text-secondary hover:text-primary hover:bg-bg-subtle transition-colors cursor-pointer"
                 aria-label="View issue history"

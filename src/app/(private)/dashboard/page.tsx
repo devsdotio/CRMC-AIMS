@@ -32,7 +32,7 @@ export default function DashboardPage() {
       icon: Box,
       variant: "default",
       loading,
-      href: "/borrow-log?filter=active",
+      href: "/borrow-log?custody=borrow&filter=active",
     },
     {
       label: "Active Assignments",
@@ -41,7 +41,7 @@ export default function DashboardPage() {
       icon: Building2,
       variant: "default",
       loading,
-      href: "/assets",
+      href: "/borrow-log?custody=assignment&filter=active",
     },
     {
       label: "Pending Approvals",

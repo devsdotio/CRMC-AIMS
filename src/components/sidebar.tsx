@@ -146,7 +146,7 @@ export default function Sidebar({
     {
       label: "Logs & History",
       items: [
-        { name: "Borrow Log", href: "/borrow-log", icon: Repeat, badge: overdueCount, badgeTone: "warning", roles: ["superadmin", "admin", "staff"] },
+        { name: "Custody Log", href: "/borrow-log", icon: Repeat, badge: overdueCount, badgeTone: "warning", roles: ["superadmin", "admin", "staff"] },
         { name: "Issue History", href: "/issue-history", icon: History, roles: ["superadmin", "admin", "staff"] },
         { name: "Borrow History", href: "/borrower-db/history", icon: History, roles: ["borrower"] },
       ],

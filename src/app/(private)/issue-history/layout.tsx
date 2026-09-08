@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 export const metadata = {
   title: "Issue history | AIMS",
-  description: "Asset custody and consumable issue transaction codes.",
+  description: "Consumable supply issue and dispatch transaction codes.",
 };
 
 export default function IssueHistoryLayout({

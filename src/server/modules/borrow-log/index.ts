@@ -55,6 +55,16 @@ export class BorrowLogController {
       return handleError(error);
     }
   }
+
+  async voidLog(request: NextRequest | Request, id: string) {
+    try {
+      const session = await requireAssetOperator();
+      const body = await request.json().catch(() => ({}));
+      return ok(await this.service.voidLog(id, body, session.actor));
+    } catch (error) {
+      return handleError(error);
+    }
+  }
 }
 
 export const borrowLogController = new BorrowLogController();

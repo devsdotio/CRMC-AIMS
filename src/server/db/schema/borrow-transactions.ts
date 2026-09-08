@@ -30,6 +30,7 @@ export const custodySourceEnum = pgEnum("custody_source", [
 export const borrowTransactionStatusEnum = pgEnum("borrow_transaction_status", [
   "active",
   "returned",
+  "voided",
 ]);
 
 export const returnConditionEnum = pgEnum("return_condition", [

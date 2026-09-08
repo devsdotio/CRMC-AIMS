@@ -35,6 +35,8 @@ export interface PurchaseLot {
   supplierName: string | null;
   quantity: number;
   quantityRemaining: number;
+  orderedQuantity?: number;
+  receivedQuantity?: number | null;
   unitCost: string;
   totalCost: string;
   purchasedOn: string;

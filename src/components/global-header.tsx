@@ -28,13 +28,13 @@ const ROUTE_MAP: Record<string, RouteMeta> = {
     category: "Operations",
   },
   "/borrow-log": {
-    title: "Borrow & Return Log",
-    subtitle: "Asset custody with LOG codes — borrowable and assignable",
+    title: "Custody Log",
+    subtitle: "Borrowed and assigned asset custody — return or undo",
     category: "Logs & History",
   },
   "/issue-history": {
-    title: "Issue history",
-    subtitle: "Asset LOG and supply MOV transaction codes",
+    title: "Issue History",
+    subtitle: "Consumable supply issues and MOV transaction codes",
     category: "Logs & History",
   },
   "/consumable-requests": {

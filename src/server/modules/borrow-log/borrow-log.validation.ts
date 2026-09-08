@@ -15,7 +15,7 @@ const returnConditionSchema = z.enum([
 
 /** DTO/query filter includes computed overdue and optional all. */
 export const logFilterStatusSchema = z
-  .enum(["active", "overdue", "returned", "all"])
+  .enum(["active", "overdue", "returned", "voided", "all"])
   .transform((v) => (v === "all" ? undefined : v));
 
 export const listBorrowLogQuerySchema = z.object({
@@ -94,9 +94,20 @@ export const returnBorrowSchema = z.object({
   flagMaintenance: z.boolean().optional().default(false),
 });
 
+/** Undo a mistaken active issue (primarily admin_manual). Soft-void — no hard delete. */
+export const voidBorrowSchema = z.object({
+  reason: z
+    .string()
+    .trim()
+    .max(2000)
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : "Mistaken or incorrect issue")),
+});
+
 export const borrowLogIdSchema = z.string().uuid("Invalid log id.");
 export const assetCategorySchemaExport = assetCategorySchema;
 
 export type ReleaseBorrowBody = z.infer<typeof releaseBorrowSchema>;
 export type ReturnBorrowBody = z.infer<typeof returnBorrowSchema>;
+export type VoidBorrowBody = z.infer<typeof voidBorrowSchema>;
 export type ListBorrowLogQuery = z.infer<typeof listBorrowLogQuerySchema>;

@@ -23,7 +23,7 @@ export type BorrowLogDTO = {
   dueDate?: string | null;
   returnedAt?: string;
   daysOverdue?: number;
-  status: "active" | "overdue" | "returned";
+  status: "active" | "overdue" | "returned" | "voided";
   conditionOnReturn?: "good" | "damaged" | "needs_repair" | "lost" | "stolen";
   conditionNotes?: string;
   releasedBy: string;
@@ -32,7 +32,7 @@ export type BorrowLogDTO = {
 };
 
 export type ListBorrowLogFilters = {
-  status?: "active" | "overdue" | "returned";
+  status?: "active" | "overdue" | "returned" | "voided";
   department?: string;
   search?: string;
   borrowerUserId?: string;
