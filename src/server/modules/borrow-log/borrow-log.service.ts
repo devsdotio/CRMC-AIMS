@@ -705,9 +705,9 @@ export class BorrowLogService {
       if (existing.status !== "active") {
         throw new ConflictError("Only active custody issues can be voided.");
       }
-      if (existing.source !== "admin_manual") {
+      if (existing.source === "portal") {
         throw new BadRequestError(
-          "Only manual issues can be voided. Request-based releases must be returned through the normal return flow."
+          "Only manual or project issues can be voided. Request-based releases must be returned through the normal return flow."
         );
       }
 

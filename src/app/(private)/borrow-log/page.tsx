@@ -15,7 +15,6 @@ import {
   RefreshCw,
   X,
   ArrowUpRight,
-  Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getCategoryStyle } from "@/constants/categories";
@@ -34,31 +33,47 @@ import {
 } from "@/features/borrow-log/client";
 
 type LogTab = "all" | "active" | "overdue" | "returned";
+type CustodyMode = "borrow" | "assignment";
 
-const TABS: { id: LogTab; label: string }[] = [
+const BORROW_TABS: { id: LogTab; label: string }[] = [
   { id: "all", label: "All Records" },
   { id: "active", label: "Active" },
   { id: "overdue", label: "Overdue" },
   { id: "returned", label: "Returned" },
 ];
 
+const ASSIGNMENT_TABS: { id: LogTab; label: string }[] = [
+  { id: "all", label: "All Records" },
+  { id: "active", label: "Active" },
+  { id: "returned", label: "Returned / Voided" },
+];
+
 function BorrowLogContent() {
   const searchParams = useSearchParams();
   const filterParam = searchParams.get("filter") || searchParams.get("status");
+  const custodyParam = searchParams.get("custody") || searchParams.get("custodyKind");
   const initialTab: LogTab =
     filterParam === "overdue" ||
     filterParam === "active" ||
     filterParam === "returned"
       ? filterParam
       : "all";
+  const initialCustody: CustodyMode =
+    custodyParam === "assignment" || custodyParam === "assignable"
+      ? "assignment"
+      : "borrow";
 
   const [tab, setTab] = useState<LogTab>(initialTab);
+  const [custodyMode, setCustodyMode] = useState<CustodyMode>(initialCustody);
   const [search, setSearch] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("all");
   const [returnTarget, setReturnTarget] = useState<BorrowLogRecord | null>(null);
   const [selectedRecord, setSelectedRecord] = useState<BorrowLogRecord | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
+
+  const statusTabs = custodyMode === "assignment" ? ASSIGNMENT_TABS : BORROW_TABS;
+  const isAssignmentMode = custodyMode === "assignment";
 
   // Sync state when URL params change from external links or navigation
   useEffect(() => {
@@ -69,22 +84,34 @@ function BorrowLogContent() {
     }
   }, [filterParam]);
 
+  useEffect(() => {
+    if (custodyParam === "assignment" || custodyParam === "assignable") {
+      setCustodyMode("assignment");
+    } else if (custodyParam === "borrow" || custodyParam === "borrowable") {
+      setCustodyMode("borrow");
+    }
+  }, [custodyParam]);
+
+  // Assignments have no due dates — drop overdue tab if we landed on it.
+  useEffect(() => {
+    if (isAssignmentMode && tab === "overdue") {
+      setTab("active");
+    }
+  }, [isAssignmentMode, tab]);
+
   const toast = useToast();
   const { canOperate } = useAssetOperator();
 
   const {
-    data: rawRecords = [],
+    data: allRecords = [],
     isLoading,
     isError,
     error,
     refetch,
     isRefetching,
-  } = useBorrowLogQuery();
-
-  // Ensure borrow log only shows borrowable items
-  const allRecords = useMemo(() => {
-    return rawRecords.filter((r) => r.custodyKind !== "assignment");
-  }, [rawRecords]);
+  } = useBorrowLogQuery({
+    custodyKind: isAssignmentMode ? "assignment" : "borrow",
+  });
 
   const returnMutation = useReturnBorrowMutation();
   const voidMutation = useVoidBorrowMutation();
@@ -192,7 +219,7 @@ function BorrowLogContent() {
 
   const handleRefresh = async () => {
     await refetch();
-    toast.success("Borrow log updated.");
+    toast.success("Custody log updated.");
   };
 
   const handleExportCSV = () => {
@@ -242,7 +269,9 @@ function BorrowLogContent() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    toast.success(`Exported ${filteredRecords.length} borrow records to CSV.`);
+    toast.success(
+      `Exported ${filteredRecords.length} ${isAssignmentMode ? "assignment" : "borrow"} records to CSV.`
+    );
   };
 
   return (
@@ -257,10 +286,13 @@ function BorrowLogContent() {
               </div>
               <div>
                 <h1 className="text-xl font-bold tracking-tight text-text leading-tight">
-                  Borrow & Return Log
+                  Custody Log
                 </h1>
                 <p className="text-xs text-text-secondary mt-0.5">
-                  Track physical borrowable asset loans, active borrows, overdue returns, and check-ins (<span className="font-mono font-bold">LOG-</span>).
+                  {isAssignmentMode
+                    ? "Track assignable assets issued to departments or projects — pull back, return, or undo mistaken issues."
+                    : "Track borrowable asset loans, overdue returns, and check-ins."}{" "}
+                  (<span className="font-mono font-bold">LOG-</span>)
                 </p>
               </div>
             </div>
@@ -290,74 +322,122 @@ function BorrowLogContent() {
           </div>
         </div>
 
-        {/* Filter Controls Row */}
+        {/* Custody kind + status filters */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-          {/* Segmented Status Tabs with Label */}
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="text-xs font-bold text-text-secondary uppercase tracking-wider shrink-0">
-              Status:
-            </span>
-            <div className="flex gap-1 rounded-xl border border-border p-1 bg-bg-subtle shrink-0 relative">
-              {TABS.map((item) => {
-                const isSelected = tab === item.id;
-                const count = counts[item.id];
-
-                const dotColor =
-                  item.id === "active"
-                    ? "bg-blue-500"
-                    : item.id === "overdue"
-                      ? "bg-destructive"
-                      : item.id === "returned"
-                        ? "bg-emerald-500"
-                        : "bg-text-secondary/70";
-
-                const badgeColor =
-                  item.id === "active"
-                    ? isSelected ? "bg-blue-500/20 text-blue-700 dark:text-blue-300 font-bold border border-blue-500/30" : "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
-                    : item.id === "overdue"
-                      ? isSelected ? "bg-destructive/20 text-destructive font-bold border border-destructive/30" : "bg-destructive/10 text-destructive border border-destructive/20"
-                      : item.id === "returned"
-                        ? isSelected ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-500/30" : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-                        : isSelected ? "bg-bg-subtle text-text font-bold border border-border/80" : "bg-bg-subtle text-text-secondary border border-border";
-
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => {
-                      setTab(item.id);
-                      setPage(1);
-                    }}
-                    className={cn(
-                      "relative inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors duration-150 cursor-pointer select-none",
-                      isSelected
-                        ? "text-text"
-                        : "text-text-secondary hover:text-text"
-                    )}
-                  >
-                    {isSelected && (
-                      <motion.span
-                        layoutId="borrow-log-active-tab"
-                        className="absolute inset-0 rounded-lg bg-bg shadow-xs border border-border/80"
-                        transition={{ type: "spring", stiffness: 500, damping: 38 }}
-                      />
-                    )}
-                    <span
-                      className={cn("h-1.5 w-1.5 rounded-full relative z-10 shrink-0", dotColor)}
-                      aria-hidden="true"
-                    />
-                    <span className="relative z-10">{item.label}</span>
-                    <span
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-xs font-bold text-text-secondary uppercase tracking-wider shrink-0">
+                Custody:
+              </span>
+              <div className="flex gap-1 rounded-xl border border-border p-1 bg-bg-subtle shrink-0">
+                {(
+                  [
+                    { id: "borrow" as const, label: "Borrowed" },
+                    { id: "assignment" as const, label: "Assigned" },
+                  ] as const
+                ).map((item) => {
+                  const isSelected = custodyMode === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => {
+                        setCustodyMode(item.id);
+                        setTab("all");
+                        setPage(1);
+                        setSelectedRecord(null);
+                      }}
                       className={cn(
-                        "relative z-10 px-1.5 py-0.2 rounded-full text-[10px] font-mono font-semibold transition-colors duration-150",
-                        badgeColor
+                        "inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer select-none",
+                        isSelected
+                          ? "bg-bg text-text shadow-xs border border-border"
+                          : "text-text-secondary hover:text-text"
                       )}
                     >
-                      {count}
-                    </span>
-                  </button>
-                );
-              })}
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-xs font-bold text-text-secondary uppercase tracking-wider shrink-0">
+                Status:
+              </span>
+              <div className="flex gap-1 rounded-xl border border-border p-1 bg-bg-subtle shrink-0 relative">
+                {statusTabs.map((item) => {
+                  const isSelected = tab === item.id;
+                  const count = counts[item.id];
+
+                  const dotColor =
+                    item.id === "active"
+                      ? "bg-blue-500"
+                      : item.id === "overdue"
+                        ? "bg-destructive"
+                        : item.id === "returned"
+                          ? "bg-emerald-500"
+                          : "bg-text-secondary/70";
+
+                  const badgeColor =
+                    item.id === "active"
+                      ? isSelected
+                        ? "bg-blue-500/20 text-blue-700 dark:text-blue-300 font-bold border border-blue-500/30"
+                        : "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
+                      : item.id === "overdue"
+                        ? isSelected
+                          ? "bg-destructive/20 text-destructive font-bold border border-destructive/30"
+                          : "bg-destructive/10 text-destructive border border-destructive/20"
+                        : item.id === "returned"
+                          ? isSelected
+                            ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-500/30"
+                            : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                          : isSelected
+                            ? "bg-bg-subtle text-text font-bold border border-border/80"
+                            : "bg-bg-subtle text-text-secondary border border-border";
+
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => {
+                        setTab(item.id);
+                        setPage(1);
+                      }}
+                      className={cn(
+                        "relative inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors duration-150 cursor-pointer select-none",
+                        isSelected
+                          ? "text-text"
+                          : "text-text-secondary hover:text-text"
+                      )}
+                    >
+                      {isSelected && (
+                        <motion.span
+                          layoutId="borrow-log-active-tab"
+                          className="absolute inset-0 rounded-lg bg-bg shadow-xs border border-border/80"
+                          transition={{ type: "spring", stiffness: 500, damping: 38 }}
+                        />
+                      )}
+                      <span
+                        className={cn(
+                          "h-1.5 w-1.5 rounded-full relative z-10 shrink-0",
+                          dotColor
+                        )}
+                        aria-hidden="true"
+                      />
+                      <span className="relative z-10">{item.label}</span>
+                      <span
+                        className={cn(
+                          "relative z-10 px-1.5 py-0.2 rounded-full text-[10px] font-mono font-semibold transition-colors duration-150",
+                          badgeColor
+                        )}
+                      >
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
@@ -372,7 +452,11 @@ function BorrowLogContent() {
                   setSearch(e.target.value);
                   setPage(1);
                 }}
-                placeholder="Search asset, borrower, code, or department…"
+                placeholder={
+                  isAssignmentMode
+                    ? "Search asset, holder, code, or department…"
+                    : "Search asset, borrower, code, or department…"
+                }
                 className="w-full h-9 pl-8.5 pr-8 text-xs bg-bg border border-border rounded-lg text-text placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent"
               />
               {search && (
@@ -418,7 +502,7 @@ function BorrowLogContent() {
       {/* Error State Banner */}
       {isError && (
         <QueryErrorBanner
-          message={error?.message || "Failed to load borrow logs. Please check your network."}
+          message={error?.message || "Failed to load custody logs. Please check your network."}
           onRetry={() => void refetch()}
         />
       )}
@@ -445,11 +529,15 @@ function BorrowLogContent() {
             <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-500/10 border border-blue-500/25 text-blue-600 dark:text-blue-400 shadow-xs mb-3">
               <Repeat className="h-7 w-7" strokeWidth={1.8} />
             </span>
-            <p className="text-base font-bold text-text">No Borrow Records Found</p>
+            <p className="text-base font-bold text-text">
+              {isAssignmentMode ? "No Assignment Records Found" : "No Borrow Records Found"}
+            </p>
             <p className="text-xs text-text-secondary mt-1 max-w-sm leading-relaxed">
               {search || departmentFilter !== "all" || tab !== "all"
                 ? "No custody logs match your active filter criteria. Try resetting your search or filters."
-                : "Released borrowable assets on loan will appear here until they are returned."}
+                : isAssignmentMode
+                  ? "Assignable assets issued to departments or projects will appear here until they are returned or voided."
+                  : "Released borrowable assets on loan will appear here until they are returned."}
             </p>
             {(search || departmentFilter !== "all" || tab !== "all") && (
               <button
@@ -477,10 +565,10 @@ function BorrowLogContent() {
                     Asset Details
                   </th>
                   <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-text-secondary">
-                    Borrower / Department
+                    {isAssignmentMode ? "Holder / Department" : "Borrower / Department"}
                   </th>
                   <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-text-secondary hidden md:table-cell">
-                    Due Date
+                    {isAssignmentMode ? "Custody" : "Due Date"}
                   </th>
                   <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-text-secondary">
                     Status
@@ -562,7 +650,7 @@ function BorrowLogContent() {
                         </div>
                       </td>
 
-                      {/* Due Date */}
+                      {/* Due Date / Open custody */}
                       <td className="px-4 py-3.5 align-middle hidden md:table-cell">
                         {row.dueDate ? (
                           <div className="flex items-center gap-1 text-text">
@@ -576,7 +664,9 @@ function BorrowLogContent() {
                             </span>
                           </div>
                         ) : (
-                          <span className="text-text-secondary">—</span>
+                          <span className="text-text-secondary">
+                            {isAssignmentMode ? "Open assignment" : "—"}
+                          </span>
                         )}
                       </td>
 
@@ -612,7 +702,7 @@ function BorrowLogContent() {
                               className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg border border-border bg-bg hover:border-primary hover:text-text text-text-secondary transition-colors cursor-pointer"
                             >
                               <RotateCcw className="h-3 w-3" />
-                              <span>Return</span>
+                              <span>{isAssignmentMode ? "Pull Back" : "Return"}</span>
                             </button>
                           )}
 
@@ -720,7 +810,7 @@ export default function BorrowLogPage() {
     <Suspense
       fallback={
         <div className="h-full flex items-center justify-center text-xs text-text-secondary bg-bg-subtle">
-          Loading borrow log…
+          Loading custody log…
         </div>
       }
     >

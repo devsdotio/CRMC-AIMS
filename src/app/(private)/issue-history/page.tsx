@@ -142,7 +142,7 @@ function IssueHistoryContent() {
     error: assetErr,
     refetch: refetchAssets,
     isRefetching: refetchingAssets,
-  } = useBorrowLogQuery();
+  } = useBorrowLogQuery({ custodyKind: "all" });
 
   const {
     data: movements = [],

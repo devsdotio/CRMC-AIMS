@@ -361,7 +361,8 @@ export function BorrowLogDetailSheet({
               </h4>
               <p className="text-text-secondary leading-relaxed">
                 This restores the asset to stock and marks the custody log as
-                voided. The history entry is kept for audit — it is not hard-deleted.
+                voided. Use for mistaken manual or project issues. The history
+                entry is kept for audit — it is not hard-deleted.
               </p>
               <div className="space-y-1">
                 <label htmlFor="void-reason" className="text-[11px] font-semibold text-text">
@@ -438,14 +439,18 @@ export function BorrowLogDetailSheet({
                 className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg bg-accent text-accent-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
               >
                 <RotateCcw className="h-3.5 w-3.5" />
-                <span>Record Return</span>
+                <span>
+                  {record.custodyKind === "assignment"
+                    ? "Pull Back"
+                    : "Record Return"}
+                </span>
               </button>
             ) : null}
 
             {canOperate &&
             record.status !== "returned" &&
             record.status !== "voided" &&
-            record.source === "admin_manual" &&
+            record.source !== "portal" &&
             onVoidIssue &&
             !showVoidForm ? (
               <button

@@ -30,6 +30,7 @@ export function useBorrowLogQuery(filters?: {
   status?: BorrowLogRecord["status"];
   department?: string;
   search?: string;
+  custodyKind?: "borrow" | "assignment" | "all";
 }): UseQueryResult<BorrowLogRecord[], Error> {
   return useQuery({
     queryKey: borrowLogQueryKeys.list(filters),

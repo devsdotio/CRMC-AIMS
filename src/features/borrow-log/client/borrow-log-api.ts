@@ -31,11 +31,13 @@ export const borrowLogApi = {
     status?: BorrowLogRecord["status"];
     department?: string;
     search?: string;
+    custodyKind?: "borrow" | "assignment" | "all";
   }): Promise<BorrowLogRecord[]> {
     const sp = new URLSearchParams();
     if (params?.status) sp.set("status", params.status);
     if (params?.department) sp.set("department", params.department);
     if (params?.search) sp.set("search", params.search);
+    if (params?.custodyKind) sp.set("custodyKind", params.custodyKind);
     const qs = sp.toString();
     const res = await fetchJson<ApiResponse<BorrowLogRecord[]>>(
       qs ? `/api/borrow-log?${qs}` : "/api/borrow-log"
