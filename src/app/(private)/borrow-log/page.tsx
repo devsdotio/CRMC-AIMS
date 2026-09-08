@@ -290,7 +290,7 @@ function BorrowLogContent() {
                 </h1>
                 <p className="text-xs text-text-secondary mt-0.5">
                   {isAssignmentMode
-                    ? "Track assignable assets issued to departments or projects — pull back, return, or undo mistaken issues."
+                    ? "Track assignable assets issued to departments or projects — return, or undo mistaken issues."
                     : "Track borrowable asset loans, overdue returns, and check-ins."}{" "}
                   (<span className="font-mono font-bold">LOG-</span>)
                 </p>
@@ -702,7 +702,7 @@ function BorrowLogContent() {
                               className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg border border-border bg-bg hover:border-primary hover:text-text text-text-secondary transition-colors cursor-pointer"
                             >
                               <RotateCcw className="h-3 w-3" />
-                              <span>{isAssignmentMode ? "Pull Back" : "Return"}</span>
+                              <span>Return</span>
                             </button>
                           )}
 

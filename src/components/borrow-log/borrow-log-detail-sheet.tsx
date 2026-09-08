@@ -440,9 +440,7 @@ export function BorrowLogDetailSheet({
               >
                 <RotateCcw className="h-3.5 w-3.5" />
                 <span>
-                  {record.custodyKind === "assignment"
-                    ? "Pull Back"
-                    : "Record Return"}
+                  Record Return
                 </span>
               </button>
             ) : null}

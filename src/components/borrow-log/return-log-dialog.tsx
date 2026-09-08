@@ -68,9 +68,7 @@ export function ReturnLogDialog({
       >
         <div className="px-5 py-4 border-b border-border">
           <h2 className="text-sm font-bold text-text">
-            {record.custodyKind === "assignment"
-              ? "Pull back assignment"
-              : "Record return"}
+            Record Return
           </h2>
           <p className="text-xs text-text-secondary mt-0.5">
             {record.assetName} · {record.assetCode}

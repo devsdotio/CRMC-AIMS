@@ -29,7 +29,7 @@ const ROUTE_MAP: Record<string, RouteMeta> = {
   },
   "/borrow-log": {
     title: "Custody Log",
-    subtitle: "Borrowed and assigned asset custody — return, pull back, or undo",
+    subtitle: "Borrowed and assigned asset custody — return or undo",
     category: "Logs & History",
   },
   "/issue-history": {
