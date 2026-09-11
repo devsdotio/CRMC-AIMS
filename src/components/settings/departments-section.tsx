@@ -1,9 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Building2, Check, Edit3, Plus, Trash2, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Building2,
+  Check,
+  Edit3,
+  Mail,
+  Plus,
+  Search,
+  ShieldCheck,
+  Trash2,
+  UserCheck,
+  UserX,
+  X,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { DepartmentDTO } from "@/features/departments/client";
+import { StatMetricCard } from "@/components/ui/stat-metric-card";
 
 export interface DepartmentsSectionProps {
   departments: DepartmentDTO[];
@@ -15,6 +28,8 @@ export interface DepartmentsSectionProps {
   onDelete: (department: DepartmentDTO) => Promise<void>;
 }
 
+type AccountFilter = "all" | "has_account" | "no_account";
+
 export function DepartmentsSection({
   departments,
   onSave,
@@ -22,71 +37,243 @@ export function DepartmentsSection({
 }: DepartmentsSectionProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<DepartmentDTO | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [accountFilter, setAccountFilter] = useState<AccountFilter>("all");
+
+  // Metric summaries
+  const totalCount = departments.length;
+  const withAccountCount = useMemo(
+    () => departments.filter((d) => Boolean(d.accountUserId)).length,
+    [departments],
+  );
+  const noAccountCount = totalCount - withAccountCount;
+  const activeAccountCount = useMemo(
+    () =>
+      departments.filter(
+        (d) => Boolean(d.accountUserId) && d.accountStatus === "active",
+      ).length,
+    [departments],
+  );
+
+  // Filtered List
+  const filteredDepartments = useMemo(() => {
+    return departments.filter((dept) => {
+      const hasAccount = Boolean(dept.accountUserId);
+      if (accountFilter === "has_account" && !hasAccount) return false;
+      if (accountFilter === "no_account" && hasAccount) return false;
+
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchName = dept.name.toLowerCase().includes(q);
+        const matchCode = dept.code.toLowerCase().includes(q);
+        const matchEmail = dept.accountEmail?.toLowerCase().includes(q);
+        if (!matchName && !matchCode && !matchEmail) return false;
+      }
+
+      return true;
+    });
+  }, [departments, accountFilter, searchQuery]);
 
   return (
     <div className="w-full space-y-6">
-      <div className="p-6 rounded-2xl border border-border bg-bg space-y-4">
-        <div className="flex items-center justify-between border-b border-border pb-4 gap-3">
-          <div>
-            <h3 className="text-base font-bold text-text">Departments</h3>
-            <p className="text-xs text-text-secondary mt-0.5">
-              Master list used for department logins and later issue destinations
-            </p>
+      {/* ── KPI Metric Cards ────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <StatMetricCard
+          title="Total Departments"
+          value={totalCount}
+          subtitle="registered offices"
+          description="All academic departments and campus offices."
+          icon={Building2}
+          tone="blue"
+        />
+
+        <StatMetricCard
+          title="Linked Accounts"
+          value={withAccountCount}
+          subtitle="with login access"
+          description="Offices that have their own login account."
+          icon={UserCheck}
+          tone="emerald"
+        />
+
+        <StatMetricCard
+          title="No Login Assigned"
+          value={noAccountCount}
+          subtitle="awaiting account"
+          description="Offices that still need a login account."
+          icon={UserX}
+          tone="amber"
+        />
+
+        <StatMetricCard
+          title="Active In Circulation"
+          value={activeAccountCount}
+          subtitle="can borrow now"
+          description="Offices allowed to borrow items right now."
+          icon={ShieldCheck}
+          tone="purple"
+        />
+      </div>
+
+      {/* ── Control Bar (Search, Filter Tabs, Add Button) ─────────── */}
+      <div className="p-4 rounded-2xl border border-border bg-bg shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
+        {/* Search Input */}
+        <div className="relative w-full md:w-80">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by name, code, or email..."
+            className="w-full pl-9 pr-8 py-2 text-xs rounded-xl border border-border bg-bg text-text placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-bg-subtle text-text-secondary cursor-pointer"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+
+        {/* Tab Filter & Add Action */}
+        <div className="flex items-center gap-2.5 w-full md:w-auto justify-between md:justify-end shrink-0">
+          <div className="flex items-center p-1 rounded-xl bg-bg-subtle border border-border text-xs font-medium">
+            <button
+              type="button"
+              onClick={() => setAccountFilter("all")}
+              className={cn(
+                "px-3 py-1.5 rounded-lg transition-colors duration-150 cursor-pointer text-xs font-semibold whitespace-nowrap",
+                accountFilter === "all"
+                  ? "bg-bg text-text shadow-2xs"
+                  : "text-text-secondary hover:text-text",
+              )}
+            >
+              All ({totalCount})
+            </button>
+            <button
+              type="button"
+              onClick={() => setAccountFilter("has_account")}
+              className={cn(
+                "px-3 py-1.5 rounded-lg transition-colors duration-150 cursor-pointer text-xs font-semibold whitespace-nowrap",
+                accountFilter === "has_account"
+                  ? "bg-bg text-text shadow-2xs"
+                  : "text-text-secondary hover:text-text",
+              )}
+            >
+              With Login ({withAccountCount})
+            </button>
+            <button
+              type="button"
+              onClick={() => setAccountFilter("no_account")}
+              className={cn(
+                "px-3 py-1.5 rounded-lg transition-colors duration-150 cursor-pointer text-xs font-semibold whitespace-nowrap",
+                accountFilter === "no_account"
+                  ? "bg-bg text-text shadow-2xs"
+                  : "text-text-secondary hover:text-text",
+              )}
+            >
+              No Login ({noAccountCount})
+            </button>
           </div>
+
           <button
             type="button"
             onClick={() => {
               setEditTarget(null);
               setDialogOpen(true);
             }}
-            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-lg bg-accent text-accent-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl bg-primary text-primary-foreground hover:opacity-90 active:scale-95 transition-opacity cursor-pointer shadow-xs shrink-0 whitespace-nowrap"
           >
-            <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
-            Add Department
+            <Plus className="h-4 w-4" strokeWidth={2.5} />
+            <span>Add Department</span>
           </button>
         </div>
+      </div>
 
-        {departments.length === 0 ? (
-          <div className="py-8 text-center bg-bg-subtle/50 rounded-xl border border-dashed border-border">
-            <p className="text-xs font-medium text-text-secondary">
-              No departments yet.
-            </p>
-            <p className="text-[11px] text-text-secondary/70 mt-1">
-              Add a department before creating a department login.
-            </p>
+      {/* ── Departments Cards Grid ────────────────────────────────── */}
+      {filteredDepartments.length === 0 ? (
+        <div className="p-12 text-center bg-bg rounded-2xl border border-dashed border-border flex flex-col items-center justify-center">
+          <div className="h-12 w-12 rounded-2xl bg-bg-subtle flex items-center justify-center text-text-secondary mb-3">
+            <Building2 className="h-6 w-6" />
           </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {departments.map((dept) => {
-              const hasAccount = Boolean(dept.accountUserId);
-              return (
-                <div
-                  key={dept.id}
-                  className="flex items-center justify-between gap-3 p-3.5 bg-bg rounded-xl border border-border"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-bg-subtle text-text-secondary shrink-0">
-                      <Building2 className="h-4 w-4" />
+          <p className="text-sm font-bold text-text">No departments found</p>
+          <p className="text-xs text-text-secondary mt-1 max-w-sm">
+            {searchQuery
+              ? `No departments match "${searchQuery}". Try a different keyword.`
+              : "No departments registered yet."}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setEditTarget(null);
+              setDialogOpen(true);
+            }}
+            className="mt-4 inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity cursor-pointer"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Create Department
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
+          {filteredDepartments.map((dept) => {
+            const hasAccount = Boolean(dept.accountUserId);
+            const isDeactivated = dept.accountStatus === "deactivated";
+
+            return (
+              <div
+                key={dept.id}
+                className="group relative flex flex-col justify-between gap-3 p-4 bg-bg rounded-xl border border-border transition-colors hover:border-primary/40 hover:shadow-xs"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3 min-w-0">
+                    <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary/5 text-primary shrink-0 transition-transform duration-150 group-hover:scale-105">
+                      <Building2 className="h-5 w-5" />
                     </span>
+
                     <div className="min-w-0">
-                      <span className="text-xs font-bold text-text block leading-tight truncate">
-                        {dept.name}
-                      </span>
-                      <span className="text-[11px] text-text-secondary font-mono">
-                        {dept.code}
-                      </span>
-                      <span className="text-[11px] text-text-secondary block mt-0.5 truncate">
-                        {hasAccount
-                          ? `Login: ${dept.accountEmail}${
-                              dept.accountStatus === "deactivated"
-                                ? " (deactivated)"
-                                : ""
-                            }`
-                          : "No department account yet"}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-text truncate">
+                          {dept.name}
+                        </span>
+                        <span className="font-mono text-[11px] font-bold px-2 py-0.5 rounded-md bg-bg-subtle text-text-secondary border border-border shrink-0">
+                          {dept.code}
+                        </span>
+                      </div>
+
+                      {/* Login Status */}
+                      <div className="mt-1.5 flex items-center gap-1.5">
+                        {hasAccount ? (
+                          <span
+                            className={cn(
+                              "inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md truncate",
+                              isDeactivated
+                                ? "bg-red-50 text-red-700 border border-red-200"
+                                : "bg-emerald-50 text-emerald-700 border border-emerald-200",
+                            )}
+                          >
+                            <Mail className="h-3 w-3 shrink-0" />
+                            <span className="truncate">{dept.accountEmail}</span>
+                            {isDeactivated && (
+                              <span className="text-[10px] text-red-500 font-bold ml-0.5">
+                                (deactivated)
+                              </span>
+                            )}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center text-[11px] font-medium text-text-secondary/70 bg-bg-subtle px-2 py-0.5 rounded-md">
+                            No department login linked
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-1.5 shrink-0 opacity-80 group-hover:opacity-100 transition-opacity">
                     <button
                       type="button"
                       onClick={() => {
@@ -94,10 +281,12 @@ export function DepartmentsSection({
                         setDialogOpen(true);
                       }}
                       aria-label={`Edit ${dept.name}`}
-                      className="p-1.5 rounded-md border border-border bg-bg text-text-secondary hover:text-text hover:border-primary transition-colors cursor-pointer"
+                      title="Edit department"
+                      className="p-2 rounded-lg border border-border bg-bg text-text-secondary hover:text-text hover:border-primary/50 hover:bg-bg-subtle transition-all cursor-pointer shadow-2xs"
                     >
                       <Edit3 className="h-3.5 w-3.5" />
                     </button>
+
                     <button
                       type="button"
                       onClick={() => void onDelete(dept)}
@@ -108,18 +297,54 @@ export function DepartmentsSection({
                           : `Delete ${dept.name}`
                       }
                       aria-label={`Delete ${dept.name}`}
-                      className="p-1.5 rounded-md border border-border bg-bg text-text-secondary hover:border-status-retired-bg hover:text-status-retired-text transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="p-2 rounded-lg border border-border bg-bg text-text-secondary hover:border-status-retired-bg hover:text-status-retired-text hover:bg-red-50/50 transition-all cursor-pointer shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
 
+                {/* Footer status line */}
+                <div className="flex items-center justify-between pt-2 border-t border-border/60 text-xs">
+                  <span className="text-text-secondary text-[11px] font-medium">
+                    Account Status
+                  </span>
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1 font-semibold text-xs",
+                      hasAccount
+                        ? isDeactivated
+                          ? "text-red-600"
+                          : "text-emerald-600"
+                        : "text-amber-600",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "h-1.5 w-1.5 rounded-full",
+                        hasAccount
+                          ? isDeactivated
+                            ? "bg-red-500"
+                            : "bg-emerald-500"
+                          : "bg-amber-500",
+                      )}
+                    />
+                    <span>
+                      {hasAccount
+                        ? isDeactivated
+                          ? "Deactivated"
+                          : "Active Custodian"
+                        : "Pending Account"}
+                    </span>
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ── Add / Edit Modal Dialog ───────────────────────────────── */}
       <DepartmentDialog
         isOpen={dialogOpen}
         department={editTarget}
@@ -183,93 +408,127 @@ function DepartmentDialog({
     try {
       await onSave({
         id: department?.id,
-        code: code.trim(),
+        code: code.trim().toUpperCase(),
         name: name.trim(),
       });
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save department.");
+      setError(
+        err instanceof Error ? err.message : "Failed to save department.",
+      );
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-      <div className="absolute inset-0" onClick={isSubmitting ? undefined : onClose} />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+      <div
+        className="absolute inset-0"
+        onClick={isSubmitting ? undefined : onClose}
+      />
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="department-dialog-title"
-        className="relative w-full max-w-md rounded-2xl border border-border bg-bg p-6 shadow-2xl z-10 space-y-4"
+        className="relative w-full max-w-md rounded-2xl border border-border bg-bg p-6 shadow-2xl z-10 space-y-5"
       >
         <div className="flex items-start justify-between gap-3 border-b border-border pb-4">
-          <div>
-            <h3 id="department-dialog-title" className="text-base font-bold text-text">
-              {isEditing ? "Edit Department" : "Add Department"}
-            </h3>
-            <p className="text-xs text-text-secondary mt-0.5">
-              Code is a short unique label (e.g. REG, IT, FIN).
-            </p>
+          <div className="flex items-center gap-3">
+            <span className="p-2.5 rounded-xl bg-primary/5 text-primary">
+              <Building2 className="h-5 w-5" />
+            </span>
+            <div>
+              <h3
+                id="department-dialog-title"
+                className="text-base font-bold text-text"
+              >
+                {isEditing ? "Edit Department" : "Add Department"}
+              </h3>
+              <p className="text-xs text-text-secondary mt-0.5">
+                Define the office name and short unique code
+              </p>
+            </div>
           </div>
           <button
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
             aria-label="Close"
-            className="p-1 rounded-md text-text-secondary hover:text-text hover:bg-bg-subtle cursor-pointer disabled:opacity-50"
+            className="p-1.5 rounded-lg text-text-secondary hover:text-text hover:bg-bg-subtle cursor-pointer disabled:opacity-50 transition-colors"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <div className="space-y-1">
-            <label htmlFor="dept-name" className="block text-xs font-semibold text-text">
-              Name <span className="text-accent">*</span>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <label
+              htmlFor="dept-name"
+              className="block text-xs font-semibold text-text"
+            >
+              Department Name <span className="text-primary font-bold">*</span>
             </label>
             <input
               id="dept-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Registrar"
-              className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent"
+              placeholder="e.g. Information Technology Services"
+              className="w-full h-10 px-3.5 text-xs bg-bg border border-border rounded-xl text-text placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
             />
           </div>
-          <div className="space-y-1">
-            <label htmlFor="dept-code" className="block text-xs font-semibold text-text">
-              Code <span className="text-accent">*</span>
-            </label>
+
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label
+                htmlFor="dept-code"
+                className="block text-xs font-semibold text-text"
+              >
+                Department Code{" "}
+                <span className="text-primary font-bold">*</span>
+              </label>
+              {code && (
+                <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-bg-subtle text-text border border-border">
+                  Preview: {code.toUpperCase()}
+                </span>
+              )}
+            </div>
             <input
               id="dept-code"
               value={code}
               onChange={(e) => setCode(e.target.value.toUpperCase())}
-              placeholder="e.g. REG"
-              className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text font-mono focus:outline-none focus:ring-2 focus:ring-accent"
+              placeholder="e.g. ITS"
+              maxLength={12}
+              className="w-full h-10 px-3.5 text-xs bg-bg border border-border rounded-xl text-text font-mono font-semibold tracking-wider placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
             />
+            <p className="text-[11px] text-text-secondary">
+              Short abbreviation used in requisition numbers and asset logs.
+            </p>
           </div>
 
           {error && (
-            <p className="text-xs font-bold text-status-outofservice-text">{error}</p>
+            <p className="text-xs font-bold text-red-600 bg-red-50 p-2.5 rounded-lg border border-red-200">
+              {error}
+            </p>
           )}
 
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex justify-end gap-2.5 pt-2 border-t border-border">
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="px-4 py-2 text-xs font-semibold text-text-secondary border border-border rounded-md cursor-pointer disabled:opacity-50"
+              className="px-4 py-2 text-xs font-semibold text-text-secondary hover:text-text border border-border hover:bg-bg-subtle rounded-xl cursor-pointer disabled:opacity-50 transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className={cn(
-                "inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-md bg-accent text-accent-foreground cursor-pointer disabled:opacity-50"
-              )}
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl bg-primary text-primary-foreground hover:opacity-90 active:scale-95 cursor-pointer disabled:opacity-50 transition-all shadow-xs"
             >
               <Check className="h-3.5 w-3.5" />
-              {isSubmitting ? "Saving…" : isEditing ? "Save" : "Create"}
+              <span>
+                {isSubmitting ? "Saving…" : isEditing ? "Save Changes" : "Create Department"}
+              </span>
             </button>
           </div>
         </form>

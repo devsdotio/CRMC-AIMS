@@ -57,12 +57,13 @@ export default async function PrivateLayout({
   const role = profile.role as AppRole;
   const headerList = await headers();
   const pathname = headerList.get("x-pathname") ?? "";
+  const isProfileRoute = pathname === "/profile";
   const onBorrowerPortal =
     pathname === "/borrower-db" || pathname.startsWith("/borrower-db/");
 
   if (role === "borrower") {
-    // Keep borrowers inside the borrower portal; redirect if accessing staff routes
-    if (pathname && !onBorrowerPortal) {
+    // Keep borrowers inside borrower portal or profile; redirect if accessing staff routes
+    if (pathname && !onBorrowerPortal && !isProfileRoute) {
       redirect("/borrower-db/dashboard");
     }
   } else if (isStaffShellRole(role)) {
