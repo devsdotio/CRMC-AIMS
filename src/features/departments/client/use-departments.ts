@@ -48,7 +48,9 @@ export function useDepartmentsQuery(options?: {
   return useQuery({
     queryKey: departmentQueryKeys.list(),
     queryFn: fetchDepartments,
-    staleTime: 60 * 1000,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
     enabled: options?.enabled ?? true,
   });
 }

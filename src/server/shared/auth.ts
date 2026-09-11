@@ -17,13 +17,27 @@ import {
   isStaffShellRole,
   isUserManagerRole,
 } from "@/server/shared/roles";
+import { serverCache } from "@/server/shared/cache";
 
 /** Short-lived cache — parallel APIs hit requireActor(); avoid N× slow profile selects. */
-const PROFILE_CACHE_TTL_MS = 30_000;
-const profileCache = new Map<
-  string,
-  { row: ProfileRow; expires: number }
->();
+const PROFILE_CACHE_TTL_MS = 60_000;
+
+export async function getCachedProfile(userId: string): Promise<ProfileRow | null> {
+  return serverCache.wrap(
+    `profile:${userId}`,
+    PROFILE_CACHE_TTL_MS,
+    async () => {
+      const db = getDb();
+      const [row] = await db
+        .select()
+        .from(profiles)
+        .where(eq(profiles.userId, userId))
+        .limit(1);
+      return row ?? null;
+    },
+    [`profile:${userId}`, "profiles"]
+  );
+}
 
 /** Extracts raw JWT from `Authorization: Bearer <token>` when present. */
 async function getBearerToken(): Promise<string | null> {
@@ -90,12 +104,20 @@ export async function resolveDepartmentSnapshot(opts: {
     return { departmentId: null, departmentName: null };
   }
 
-  const db = getDb();
-  const [row] = await db
-    .select({ id: departments.id, name: departments.name })
-    .from(departments)
-    .where(eq(departments.id, departmentId))
-    .limit(1);
+  const row = await serverCache.wrap(
+    `department:${departmentId}`,
+    10 * 60 * 1000,
+    async () => {
+      const db = getDb();
+      const [dept] = await db
+        .select({ id: departments.id, name: departments.name })
+        .from(departments)
+        .where(eq(departments.id, departmentId))
+        .limit(1);
+      return dept ?? null;
+    },
+    ["departments", `department:${departmentId}`]
+  );
   if (!row) {
     throw new BadRequestError("Unknown department.");
   }
@@ -103,32 +125,13 @@ export async function resolveDepartmentSnapshot(opts: {
 }
 
 async function loadProfile(userId: string): Promise<ProfileRow | null> {
-  const now = Date.now();
-  const hit = profileCache.get(userId);
-  if (hit && hit.expires > now) {
-    return hit.row;
-  }
-
-  const db = getDb();
-  const [row] = await db
-    .select()
-    .from(profiles)
-    .where(eq(profiles.userId, userId))
-    .limit(1);
-
-  if (row) {
-    profileCache.set(userId, { row, expires: now + PROFILE_CACHE_TTL_MS });
-  } else {
-    profileCache.delete(userId);
-  }
-
-  return row ?? null;
+  return getCachedProfile(userId);
 }
 
 /** Drop cached profile after mutations that change role/status (user admin). */
 export function invalidateProfileCache(userId?: string) {
-  if (userId) profileCache.delete(userId);
-  else profileCache.clear();
+  if (userId) serverCache.invalidateTag(`profile:${userId}`);
+  else serverCache.invalidateTag("profiles");
 }
 
 /**

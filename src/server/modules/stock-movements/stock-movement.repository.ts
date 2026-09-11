@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, ilike, or } from "drizzle-orm";
 
 import { getDb } from "@/server/db";
 import type { DbSession } from "@/server/db/transaction";
@@ -14,6 +14,25 @@ export type StockMovementListRow = StockMovementRow & {
   itemName: string;
   unit: string;
 };
+
+/** Notes marker linking a compensating restock back to the original issue. */
+export function reversesMarker(movementId: string): string {
+  return `[REVERSES:${movementId}]`;
+}
+
+export function voidedMarker(): string {
+  return "[VOIDED]";
+}
+
+export function isVoidedNotes(notes?: string | null): boolean {
+  return Boolean(notes?.includes("[VOIDED]"));
+}
+
+export function extractReversedId(notes?: string | null): string | null {
+  if (!notes) return null;
+  const match = notes.match(/\[REVERSES:([0-9a-f-]{36})\]/i);
+  return match?.[1] ?? null;
+}
 
 export class StockMovementRepository {
   private db(session?: DbSession) {
@@ -37,6 +56,88 @@ export class StockMovementRepository {
     if (rows.length === 0) return [];
     const db = this.db(session);
     return db.insert(stockMovements).values(rows).returning();
+  }
+
+  async findById(
+    id: string,
+    session?: DbSession
+  ): Promise<StockMovementRow | null> {
+    const db = this.db(session);
+    const [row] = await db
+      .select()
+      .from(stockMovements)
+      .where(eq(stockMovements.id, id))
+      .limit(1);
+    return row ?? null;
+  }
+
+  async findByIdForUpdate(
+    id: string,
+    session: DbSession
+  ): Promise<StockMovementRow | null> {
+    const [row] = await session
+      .select()
+      .from(stockMovements)
+      .where(eq(stockMovements.id, id))
+      .for("update")
+      .limit(1);
+    return row ?? null;
+  }
+
+  /** Compensating restock that undoes a given issue movement, if any. */
+  async findReversalOf(
+    movementId: string,
+    session?: DbSession
+  ): Promise<StockMovementRow | null> {
+    const db = this.db(session);
+    const marker = reversesMarker(movementId);
+    const [row] = await db
+      .select()
+      .from(stockMovements)
+      .where(ilike(stockMovements.notes, `%${marker}%`))
+      .orderBy(desc(stockMovements.createdAt))
+      .limit(1);
+    return row ?? null;
+  }
+
+  async findReversalsForIds(
+    movementIds: string[],
+    session?: DbSession
+  ): Promise<Map<string, StockMovementRow>> {
+    const out = new Map<string, StockMovementRow>();
+    if (movementIds.length === 0) return out;
+
+    const db = this.db(session);
+    const conditions = movementIds.map((id) =>
+      ilike(stockMovements.notes, `%${reversesMarker(id)}%`)
+    );
+    const rows = await db
+      .select()
+      .from(stockMovements)
+      .where(or(...conditions)!)
+      .orderBy(desc(stockMovements.createdAt));
+
+    for (const row of rows) {
+      const originalId = extractReversedId(row.notes);
+      if (originalId && !out.has(originalId)) {
+        out.set(originalId, row);
+      }
+    }
+    return out;
+  }
+
+  async updateNotes(
+    id: string,
+    notes: string | null,
+    session?: DbSession
+  ): Promise<StockMovementRow | null> {
+    const db = this.db(session);
+    const [row] = await db
+      .update(stockMovements)
+      .set({ notes })
+      .where(eq(stockMovements.id, id))
+      .returning();
+    return row ?? null;
   }
 
   async listByConsumableId(

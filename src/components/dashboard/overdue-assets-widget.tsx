@@ -52,11 +52,11 @@ export function OverdueAssetsWidget({
 
   return (
     <section
-      className="flex flex-col rounded-lg border border-border bg-card overflow-hidden shadow-xs"
+      className="flex flex-col h-[400px] rounded-lg border border-border bg-card overflow-hidden shadow-xs"
       aria-labelledby="overdue-assets-heading"
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-card">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-card shrink-0">
         <div className="flex items-center gap-2.5">
           <div className="h-7 w-7 rounded-lg bg-status-outofservice-bg/15 border border-status-outofservice-bg/30 flex items-center justify-center text-status-outofservice-bg shrink-0">
             <AlertCircle className="h-4 w-4" aria-hidden="true" />
@@ -113,7 +113,7 @@ export function OverdueAssetsWidget({
           </div>
         </div>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="flex-1 min-h-0 overflow-auto">
           <table className="w-full text-sm" aria-label="Overdue assets">
             <thead>
               <tr className="border-b border-border">

@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 
 import { requireUserManager } from "@/server/shared/auth";
-import { created, handleError, ok } from "@/server/shared/http";
+import { created, handleError, ok, okWithEtag } from "@/server/shared/http";
 
 import { DepartmentService } from "./department.service";
 
@@ -14,11 +14,12 @@ export class DepartmentController {
     try {
       await requireUserManager();
       const url = new URL(request.url);
-      return ok(
-        await this.service.list({
-          search: url.searchParams.get("search") ?? undefined,
-        })
-      );
+      const data = await this.service.list({
+        search: url.searchParams.get("search") ?? undefined,
+      });
+      return okWithEtag(request, data, {
+        cacheControl: { maxAge: 60, staleWhileRevalidate: 300 },
+      });
     } catch (error) {
       return handleError(error);
     }

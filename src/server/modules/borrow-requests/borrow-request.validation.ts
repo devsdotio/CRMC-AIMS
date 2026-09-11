@@ -106,6 +106,11 @@ export const returnBorrowRequestSchema = z.object({
 
 export const cancelBorrowRequestSchema = z.object({
   note: z.string().trim().max(1000).optional(),
+  reason: z.string().trim().max(1000).optional(),
+});
+
+export const undoBorrowRequestApprovalSchema = z.object({
+  note: z.string().trim().max(1000).optional(),
 });
 
 export const updateBorrowRequestSchema = z.object({
@@ -152,5 +157,6 @@ export type ReleaseBorrowRequestBody = z.infer<typeof releaseBorrowRequestSchema
 export type MarkUnreleasedBorrowRequestBody = z.infer<typeof markUnreleasedBorrowRequestSchema>;
 export type ReturnBorrowRequestBody = z.infer<typeof returnBorrowRequestSchema>;
 export type CancelBorrowRequestBody = z.infer<typeof cancelBorrowRequestSchema>;
+export type UndoBorrowRequestApprovalBody = z.infer<typeof undoBorrowRequestApprovalSchema>;
 export type ListBorrowRequestsQuery = z.infer<typeof listBorrowRequestsQuerySchema>;
 

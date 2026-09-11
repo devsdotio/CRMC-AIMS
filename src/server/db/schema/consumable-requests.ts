@@ -41,6 +41,7 @@ export type ConsumableRequestHistoryEntry = {
     | "rejected"
     | "released"
     | "cancelled"
+    | "approval_undone"
     | "edited";
   actor: string;
   timestamp: string;
@@ -73,6 +74,7 @@ export const consumableRequests = pgTable(
 
     notes: text("notes"),
     rejectionReason: text("rejection_reason"),
+    cancellationReason: text("cancellation_reason"),
     /** Person who physically received the issued supplies. */
     receivedBy: text("received_by"),
 

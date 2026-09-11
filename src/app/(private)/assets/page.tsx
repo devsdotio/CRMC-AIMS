@@ -367,11 +367,17 @@ export default function AssetsPage() {
 
       <ConfirmDialog
         isOpen={Boolean(assetToDelete)}
-        title="Delete Asset"
+        title="Delete Asset?"
         description={
-          assetToDelete
-            ? `Are you sure you want to delete asset "${assetToDelete.name}" (${assetToDelete.assetCode})? This action cannot be undone.`
-            : ""
+          assetToDelete ? (
+            <>
+              Are you sure you want to delete asset{" "}
+              <strong className="font-bold text-text">
+                &ldquo;{assetToDelete.name}&rdquo; ({assetToDelete.assetCode})
+              </strong>
+              ? This action cannot be undone.
+            </>
+          ) : ""
         }
         confirmLabel="Delete Asset"
         variant="destructive"

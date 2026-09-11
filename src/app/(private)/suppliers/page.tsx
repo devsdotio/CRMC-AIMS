@@ -202,7 +202,7 @@ export default function SuppliersPage() {
 
       <ConfirmDialog
         isOpen={Boolean(deactivateTarget)}
-        title="Deactivate Supplier"
+        title="Deactivate Supplier?"
         description={
           deactivateTarget
             ? `Are you sure you want to deactivate "${deactivateTarget.name}" (${deactivateTarget.supplierCode})? Purchase lot and restock history will remain intact.`

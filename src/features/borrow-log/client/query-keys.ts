@@ -7,6 +7,7 @@ export const borrowLogQueryKeys = {
     status?: BorrowLogRecord["status"];
     department?: string;
     search?: string;
+    custodyKind?: "borrow" | "assignment" | "all";
   }) => [...borrowLogQueryKeys.lists(), filters ?? {}] as const,
   detail: (id: string) => [...borrowLogQueryKeys.all, "detail", id] as const,
 };

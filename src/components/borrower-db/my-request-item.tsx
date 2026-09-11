@@ -6,6 +6,7 @@ import {
   Tag,
   FileText,
   Package,
+  X,
 } from "lucide-react";
 import { useCategoryStyleMap } from "@/features/categories/client/use-categories";
 import { cn } from "@/lib/utils";
@@ -85,7 +86,7 @@ export function MyRequestItemSkeleton() {
   );
 }
 
-export function MyRequestItem({ request, onViewDetails, onEdit }: MyRequestItemProps) {
+export function MyRequestItem({ request, onCancel, onViewDetails, onEdit }: MyRequestItemProps) {
   const { getCategoryStyle } = useCategoryStyleMap();
   const statusStyle =
     WORKFLOW_STATUS_STYLES[request.status] ?? WORKFLOW_STATUS_STYLES.pending;
@@ -181,8 +182,22 @@ export function MyRequestItem({ request, onViewDetails, onEdit }: MyRequestItemP
         </div>
       </div>
 
-      {/* Right Column: Status Badge & Chevron */}
+      {/* Right Column: Cancel Action, Status Badge & Chevron */}
       <div className="flex items-center gap-2.5 shrink-0 self-end md:self-center">
+        {onCancel && (request.status === "pending" || request.status === "approved") && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onCancel(request);
+            }}
+            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg border border-destructive/30 text-destructive hover:bg-destructive/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive cursor-pointer"
+            title="Cancel this request"
+          >
+            <X className="h-3 w-3" />
+            <span>Cancel</span>
+          </button>
+        )}
         <span
           className={cn(
             "inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-semibold tabular-nums whitespace-nowrap",

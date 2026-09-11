@@ -2,6 +2,7 @@ import type { SupplierRow } from "@/server/db/schema";
 import type { ActorContext } from "@/server/shared/auth";
 import { generateOperationalCode } from "@/server/shared/codes";
 import { NotFoundError } from "@/server/shared/errors";
+import { serverCache } from "@/server/shared/cache";
 
 import { SupplierRepository } from "./supplier.repository";
 import type { SupplierDTO } from "./supplier.types";
@@ -40,8 +41,16 @@ export class SupplierService {
 
   async list(rawQuery: unknown): Promise<SupplierDTO[]> {
     const filters = listSuppliersQuerySchema.parse(rawQuery ?? {});
-    const rows = await this.repo.list(filters);
-    return rows.map(toDTO);
+    const cacheKey = `suppliers:list:${JSON.stringify(filters)}`;
+    return serverCache.wrap(
+      cacheKey,
+      10 * 60 * 1000,
+      async () => {
+        const rows = await this.repo.list(filters);
+        return rows.map(toDTO);
+      },
+      ["suppliers"]
+    );
   }
 
   async getById(rawId: string): Promise<SupplierDTO> {
@@ -65,6 +74,7 @@ export class SupplierService {
       createdByUserId: actor.userId,
       createdByName: actor.displayName,
     });
+    serverCache.invalidateTag("suppliers");
     return toDTO(row);
   }
 
@@ -94,6 +104,7 @@ export class SupplierService {
     });
 
     if (!updated) throw new NotFoundError("Supplier", id);
+    serverCache.invalidateTag("suppliers");
     return toDTO(updated);
   }
 

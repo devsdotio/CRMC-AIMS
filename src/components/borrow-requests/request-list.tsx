@@ -15,6 +15,7 @@ export interface RequestListProps {
   onApprove?: (request: BorrowRequest) => void;
   onReject?: (request: BorrowRequest) => void;
   onEdit?: (request: BorrowRequest) => void;
+  onUndoApproval?: (request: BorrowRequest) => void | Promise<void>;
   onRelease?: (request: BorrowRequest) => void;
   onReturn?: (request: BorrowRequest) => void;
   onMarkUnreleased?: (request: BorrowRequest) => void;
@@ -60,6 +61,10 @@ const EMPTY_MESSAGES: Record<TabFilter, { title: string; subtitle: string }> = {
     title: "No rejected requests",
     subtitle: "No requests have been rejected under this view.",
   },
+  cancelled: {
+    title: "No cancelled requests",
+    subtitle: "There are currently no cancelled requests matching your filters.",
+  },
   released: {
     title: "No released requests",
     subtitle: "There are currently no released requests matching your filters.",
@@ -84,6 +89,7 @@ export function RequestList({
   onApprove,
   onReject,
   onEdit,
+  onUndoApproval,
   onRelease,
   onReturn,
   onMarkUnreleased,
@@ -142,6 +148,7 @@ export function RequestList({
           onApprove={onApprove}
           onReject={onReject}
           onEdit={onEdit}
+          onUndoApproval={onUndoApproval}
           onRelease={onRelease}
           onReturn={onReturn}
           onMarkUnreleased={onMarkUnreleased}

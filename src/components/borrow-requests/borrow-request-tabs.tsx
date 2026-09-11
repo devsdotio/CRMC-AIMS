@@ -11,6 +11,7 @@ export interface BorrowRequestTabsProps {
   pendingCount: number;
   approvedCount: number;
   rejectedCount: number;
+  cancelledCount?: number;
   releasedCount: number;
   returnedCount: number;
   totalCount: number;
@@ -42,6 +43,11 @@ const STATUS_THEMES: Record<
     badge: "bg-destructive/10 text-destructive border border-destructive/20",
     activeBadge: "bg-destructive/20 text-destructive font-bold border border-destructive/30",
   },
+  cancelled: {
+    dot: "bg-orange-500",
+    badge: "bg-orange-500/10 text-orange-700 dark:text-orange-400 border border-orange-500/20",
+    activeBadge: "bg-orange-500/20 text-orange-800 dark:text-orange-300 font-bold border border-orange-500/30",
+  },
   released: {
     dot: "bg-emerald-500",
     badge: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20",
@@ -65,6 +71,7 @@ export function BorrowRequestTabs({
   pendingCount,
   approvedCount,
   rejectedCount,
+  cancelledCount = 0,
   releasedCount,
   returnedCount,
   totalCount,
@@ -73,6 +80,7 @@ export function BorrowRequestTabs({
     pending: null,
     approved: null,
     rejected: null,
+    cancelled: null,
     released: null,
     returned: null,
     all: null,
@@ -82,13 +90,22 @@ export function BorrowRequestTabs({
     { id: "pending", label: "Pending", count: pendingCount, showBadge: true },
     { id: "approved", label: "Approved", count: approvedCount },
     { id: "rejected", label: "Rejected", count: rejectedCount },
+    { id: "cancelled", label: "Cancelled", count: cancelledCount },
     { id: "released", label: "Released", count: releasedCount },
     { id: "returned", label: "Returned", count: returnedCount },
     { id: "all", label: "All Requests", count: totalCount },
   ];
 
   const handleKeyDown = (e: KeyboardEvent<HTMLButtonElement>, currentId: TabFilter) => {
-    const tabOrder: TabFilter[] = ["pending", "approved", "rejected", "released", "returned", "all"];
+    const tabOrder: TabFilter[] = [
+      "pending",
+      "approved",
+      "rejected",
+      "cancelled",
+      "released",
+      "returned",
+      "all",
+    ];
     const currentIndex = tabOrder.indexOf(currentId);
     let nextIndex = -1;
 

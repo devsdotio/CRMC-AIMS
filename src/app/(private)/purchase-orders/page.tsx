@@ -344,7 +344,7 @@ export default function PurchaseOrdersPage() {
 
           <ConfirmDialog
             isOpen={Boolean(lotToDelete)}
-            title="Delete Purchase Order"
+            title="Delete Purchase Order?"
             description={
               lotToDelete
                 ? `Are you sure you want to delete purchase order "${lotToDelete.poNumber || lotToDelete.lotCode}" (${lotToDelete.itemName})? This will cancel the order and cannot be undone.`

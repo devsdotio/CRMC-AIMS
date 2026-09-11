@@ -67,9 +67,14 @@ export function ReturnLogDialog({
         className="relative z-10 w-full max-w-md rounded-xl bg-bg border border-border shadow-xl overflow-hidden"
       >
         <div className="px-5 py-4 border-b border-border">
-          <h2 className="text-sm font-bold text-text">Record return</h2>
+          <h2 className="text-sm font-bold text-text">
+            Record Return
+          </h2>
           <p className="text-xs text-text-secondary mt-0.5">
             {record.assetName} · {record.assetCode}
+            {record.custodyKind === "assignment"
+              ? " · restores asset to stock"
+              : ""}
           </p>
         </div>
         <div className="p-5 space-y-3">

@@ -10,6 +10,7 @@ import {
   useReleaseBorrowRequestMutation,
   useMarkUnreleasedBorrowRequestMutation,
   useMarkReturnedBorrowRequestMutation,
+  useUndoBorrowRequestApprovalMutation,
 } from "@/features/borrow-requests/client/use-borrow-requests";
 import type {
   BorrowRequest,
@@ -44,6 +45,7 @@ import {
   type ConsumableRequest,
 } from "@/features/consumable-requests/client";
 import { cn } from "@/lib/utils";
+import { RotateCcw, X, Loader2 } from "lucide-react";
 
 type RequestKind = "borrow" | "assign" | "supply";
 
@@ -80,11 +82,16 @@ function BorrowRequestsContent() {
 
   const approveMutation = useApproveBorrowRequestMutation();
   const rejectMutation = useRejectBorrowRequestMutation();
+  const undoApprovalMutation = useUndoBorrowRequestApprovalMutation();
   const releaseMutation = useReleaseBorrowRequestMutation();
   const markUnreleasedMutation = useMarkUnreleasedBorrowRequestMutation();
   const returnMutation = useMarkReturnedBorrowRequestMutation();
   const toast = useToast();
   const { canOperate } = useAssetOperator();
+
+  const [undoApprovalTarget, setUndoApprovalTarget] = useState<BorrowRequest | null>(null);
+  const [undoApprovalNote, setUndoApprovalNote] = useState("");
+  const [isUndoingApproval, setIsUndoingApproval] = useState(false);
 
   const [activeTab, setActiveTab] = useState<TabFilter>(
     statusParam &&
@@ -195,11 +202,11 @@ function BorrowRequestsContent() {
     }
     if (
       statusParam &&
-      ["pending", "approved", "rejected", "released", "returned", "all"].includes(
+      ["pending", "approved", "rejected", "cancelled", "released", "returned", "all"].includes(
         statusParam
       )
     ) {
-      setActiveTab(statusParam);
+      setActiveTab(statusParam as TabFilter);
     }
   }, [requestIdParam, statusParam]);
 
@@ -222,6 +229,7 @@ function BorrowRequestsContent() {
   const pendingCount = meta?.counts?.pending || 0;
   const approvedCount = meta?.counts?.approved || 0;
   const rejectedCount = meta?.counts?.rejected || 0;
+  const cancelledCount = meta?.counts?.cancelled || 0;
   const releasedCount = meta?.counts?.released || 0;
   const returnedCount = meta?.counts?.returned || 0;
   const totalCount = meta?.counts
@@ -305,6 +313,37 @@ function BorrowRequestsContent() {
     // Keep drawer in sync if open
     if (selectedRequest && selectedRequest.id === req.id) {
       setSelectedRequest(null);
+    }
+  };
+
+  const handleOpenUndoApprovalModal = (req: BorrowRequest) => {
+    setUndoApprovalTarget(req);
+    setUndoApprovalNote("");
+  };
+
+  const handleConfirmUndoApproval = async () => {
+    if (!undoApprovalTarget) return;
+    setIsUndoingApproval(true);
+    try {
+      await undoApprovalMutation.mutateAsync({
+        id: undoApprovalTarget.id,
+        note: undoApprovalNote.trim() || undefined,
+      });
+      toast.success(
+        `Approval undone for ${undoApprovalTarget.requestCode}. Returned to Pending Review.`
+      );
+      if (selectedRequest && selectedRequest.id === undoApprovalTarget.id) {
+        setSelectedRequest(null);
+      }
+      setUndoApprovalTarget(null);
+      setUndoApprovalNote("");
+      refetch();
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to undo approval."
+      );
+    } finally {
+      setIsUndoingApproval(false);
     }
   };
 
@@ -452,6 +491,7 @@ function BorrowRequestsContent() {
             pendingCount={pendingCount}
             approvedCount={approvedCount}
             rejectedCount={rejectedCount}
+            cancelledCount={cancelledCount}
             releasedCount={releasedCount}
             returnedCount={returnedCount}
             totalCount={totalCount}
@@ -494,6 +534,7 @@ function BorrowRequestsContent() {
           onApprove={canOperate ? handleOpenApproveModal : undefined}
           onReject={canOperate ? handleOpenRejectModal : undefined}
           onEdit={canOperate ? (req) => setEditTarget(req) : undefined}
+          onUndoApproval={canOperate ? handleOpenUndoApprovalModal : undefined}
           onRelease={canOperate ? handleOpenReleaseModal : undefined}
           onReturn={canOperate ? handleOpenReturnModal : undefined}
           onMarkUnreleased={canOperate ? handleMarkUnreleased : undefined}
@@ -564,6 +605,7 @@ function BorrowRequestsContent() {
         }}
         onApprove={canOperate ? handleOpenApproveModal : undefined}
         onReject={canOperate ? handleOpenRejectModal : undefined}
+        onUndoApproval={canOperate ? handleOpenUndoApprovalModal : undefined}
         onRelease={canOperate ? handleOpenReleaseModal : undefined}
         onReturn={canOperate ? handleOpenReturnModal : undefined}
         onMarkUnreleased={canOperate ? handleMarkUnreleased : undefined}
@@ -624,6 +666,90 @@ function BorrowRequestsContent() {
         }
         onConfirm={handleReturnConfirm}
       />
+
+      {/* ── Undo Approval Confirmation Modal ───────────────────────────── */}
+      {undoApprovalTarget && (
+        <div className="fixed inset-0 z-70 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs transition-opacity">
+          <div
+            className="absolute inset-0"
+            onClick={() => !isUndoingApproval && setUndoApprovalTarget(null)}
+            aria-hidden="true"
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="undo-approval-title"
+            className="relative w-full max-w-md rounded-xl border border-border bg-bg p-6 shadow-2xl z-10 animate-in fade-in zoom-in-95 duration-150 overflow-hidden"
+          >
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl shrink-0 bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                  <RotateCcw className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3
+                    id="undo-approval-title"
+                    className="text-base font-bold text-text leading-tight"
+                  >
+                    Undo Request Approval
+                  </h3>
+                  <p className="text-xs text-text-secondary mt-0.5 leading-relaxed font-mono">
+                    {undoApprovalTarget.requestCode}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setUndoApprovalTarget(null)}
+                disabled={isUndoingApproval}
+                aria-label="Close dialog"
+                className="p-1.5 rounded-lg text-text-secondary hover:text-text hover:bg-bg-subtle transition-colors cursor-pointer disabled:opacity-50"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-text leading-relaxed">
+              Are you sure you want to revert this request back to <strong className="font-semibold text-text">Pending Review</strong>? The request will re-enter the review queue and can be re-evaluated, edited, approved, or rejected.
+            </p>
+
+            <div className="mt-4 space-y-1.5">
+              <label htmlFor="undo-note" className="block text-xs font-semibold text-text">
+                Reason / Note <span className="text-text-secondary font-normal">(Optional)</span>
+              </label>
+              <textarea
+                id="undo-note"
+                rows={3}
+                value={undoApprovalNote}
+                onChange={(e) => setUndoApprovalNote(e.target.value)}
+                placeholder="e.g., Approved by mistake, requester asked to adjust quantities..."
+                className="w-full text-xs rounded-lg border border-border bg-bg p-2.5 text-text placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent resize-none"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-border mt-5">
+              <button
+                type="button"
+                onClick={() => setUndoApprovalTarget(null)}
+                disabled={isUndoingApproval}
+                className="h-9 px-4 text-xs font-bold text-text rounded-lg border border-border bg-bg hover:bg-bg-subtle transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmUndoApproval}
+                disabled={isUndoingApproval}
+                className="inline-flex items-center gap-1.5 h-9 px-4 text-xs font-bold rounded-lg bg-amber-600 hover:bg-amber-700 text-white transition-opacity cursor-pointer disabled:opacity-50 shadow-xs"
+              >
+                {isUndoingApproval && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                Undo Approval
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       </>
       )}
         </>

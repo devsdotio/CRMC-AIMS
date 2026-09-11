@@ -58,6 +58,14 @@ export async function fetchJson<T>(
       return undefined as T;
     }
 
+    if (response.status === 304) {
+      try {
+        return (await response.json()) as T;
+      } catch {
+        return undefined as T;
+      }
+    }
+
     return (await response.json()) as T;
   } catch (err) {
     if (err instanceof Error && err.name === "AbortError") {

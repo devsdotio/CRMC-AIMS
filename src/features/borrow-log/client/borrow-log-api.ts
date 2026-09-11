@@ -22,16 +22,22 @@ export type ReturnBorrowPayload = {
   flagMaintenance?: boolean;
 };
 
+export type VoidBorrowPayload = {
+  reason?: string;
+};
+
 export const borrowLogApi = {
   async list(params?: {
     status?: BorrowLogRecord["status"];
     department?: string;
     search?: string;
+    custodyKind?: "borrow" | "assignment" | "all";
   }): Promise<BorrowLogRecord[]> {
     const sp = new URLSearchParams();
     if (params?.status) sp.set("status", params.status);
     if (params?.department) sp.set("department", params.department);
     if (params?.search) sp.set("search", params.search);
+    if (params?.custodyKind) sp.set("custodyKind", params.custodyKind);
     const qs = sp.toString();
     const res = await fetchJson<ApiResponse<BorrowLogRecord[]>>(
       qs ? `/api/borrow-log?${qs}` : "/api/borrow-log"
@@ -60,6 +66,17 @@ export const borrowLogApi = {
   ): Promise<BorrowLogRecord> {
     const res = await fetchJson<ApiResponse<BorrowLogRecord>>(
       `/api/borrow-log/${id}/return`,
+      { method: "POST", body: JSON.stringify(payload) }
+    );
+    return res.data;
+  },
+
+  async voidLog(
+    id: string,
+    payload: VoidBorrowPayload = {}
+  ): Promise<BorrowLogRecord> {
+    const res = await fetchJson<ApiResponse<BorrowLogRecord>>(
+      `/api/borrow-log/${id}/void`,
       { method: "POST", body: JSON.stringify(payload) }
     );
     return res.data;

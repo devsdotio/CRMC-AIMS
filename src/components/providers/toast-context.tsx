@@ -9,22 +9,36 @@ import {
   useRef,
   type ReactNode,
 } from "react";
-import { CheckCircle, XCircle, Info, X } from "lucide-react";
+import { CheckCircle, XCircle, AlertTriangle, Info, X, RefreshCw } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type ToastVariant = "success" | "error" | "info";
+type ToastVariant = "success" | "error" | "warning" | "info";
+
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
+export interface ToastOptions {
+  duration?: number;
+  action?: ToastAction;
+}
 
 interface Toast {
   id: string;
   variant: ToastVariant;
   message: string;
+  action?: ToastAction;
+  duration?: number;
 }
 
-interface ToastContextValue {
-  success: (message: string) => void;
-  error: (message: string) => void;
-  info: (message: string) => void;
+export interface ToastContextValue {
+  success: (message: string, options?: ToastOptions) => void;
+  error: (message: string, options?: ToastOptions) => void;
+  warning: (message: string, options?: ToastOptions) => void;
+  info: (message: string, options?: ToastOptions) => void;
 }
 
 // ─── Context ──────────────────────────────────────────────────────────────────
@@ -39,25 +53,40 @@ export function useToast(): ToastContextValue {
 
 // ─── Single Toast Item ────────────────────────────────────────────────────────
 
-const DURATION = 4_000;
+const DEFAULT_DURATION = 4_000;
+const ACTION_DURATION = 8_000;
 
 const variantStyles: Record<
   ToastVariant,
-  { wrapper: string; icon: string; IconComponent: typeof CheckCircle }
+  {
+    wrapper: string;
+    icon: string;
+    textColor: string;
+    IconComponent: typeof CheckCircle;
+  }
 > = {
   success: {
-    wrapper: "bg-[#2ECC71] border border-[#27ae60] shadow-lg",
+    wrapper: "bg-[#2ECC71] border border-[#27ae60] shadow-xl",
     icon: "text-white",
+    textColor: "text-white",
     IconComponent: CheckCircle,
   },
+  warning: {
+    wrapper: "bg-red-600 border border-red-500 shadow-xl",
+    icon: "text-white",
+    textColor: "text-white",
+    IconComponent: AlertTriangle,
+  },
   error: {
-    wrapper: "bg-white border border-red-200 shadow-lg",
-    icon: "text-red-500",
+    wrapper: "bg-red-600 border border-red-500 shadow-xl",
+    icon: "text-white",
+    textColor: "text-white",
     IconComponent: XCircle,
   },
   info: {
-    wrapper: "bg-white border border-blue-200 shadow-lg",
-    icon: "text-blue-500",
+    wrapper: "bg-white border border-blue-300 shadow-xl",
+    icon: "text-blue-600",
+    textColor: "text-zinc-900",
     IconComponent: Info,
   },
 };
@@ -78,21 +107,24 @@ function ToastItem({
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  // Auto-dismiss
-  useEffect(() => {
-    timerRef.current = setTimeout(() => dismiss(), DURATION);
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   function dismiss() {
     setVisible(false);
     setTimeout(() => onRemove(toast.id), 300);
   }
 
-  const { wrapper, icon, IconComponent } = variantStyles[toast.variant];
+  // Auto-dismiss: give users longer if there is an actionable button
+  useEffect(() => {
+    const timeoutMs =
+      toast.duration ?? (toast.action ? ACTION_DURATION : DEFAULT_DURATION);
+    timerRef.current = setTimeout(() => dismiss(), timeoutMs);
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [toast.duration, toast.action]);
+
+  const { wrapper, icon, textColor, IconComponent } =
+    variantStyles[toast.variant];
 
   return (
     <div
@@ -103,19 +135,48 @@ function ToastItem({
         opacity: visible ? 1 : 0,
         transform: visible ? "translateX(0)" : "translateX(1rem)",
       }}
-      className={`flex items-start gap-3 w-80 rounded-xl px-4 py-3.5 ${wrapper}`}
+      className={`flex items-start gap-3 w-84 sm:w-96 rounded-xl px-4 py-3.5 ${wrapper}`}
     >
       <IconComponent className={`h-4 w-4 mt-0.5 shrink-0 ${icon}`} />
-      <p className={`flex-1 text-sm font-medium leading-snug ${toast.variant === "success" ? "text-white" : "text-text"}`}>
-        {toast.message}
-      </p>
+      <div className="min-w-0 flex-1 space-y-1">
+        <p className={`text-sm font-semibold leading-snug ${textColor}`}>
+          {toast.message}
+        </p>
+        {toast.action && (
+          <div className="pt-1">
+            <button
+              type="button"
+              onClick={() => {
+                toast.action?.onClick();
+                dismiss();
+              }}
+              className={cn(
+                "inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-md transition-colors cursor-pointer shadow-xs",
+                toast.variant === "info"
+                  ? "bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800"
+                  : toast.variant === "success"
+                    ? "bg-white/25 text-white hover:bg-white/35"
+                    : "bg-white text-red-600 hover:bg-white/90 active:bg-white/80 font-bold"
+              )}
+            >
+              <RefreshCw className="h-3 w-3" />
+              {toast.action.label}
+            </button>
+          </div>
+        )}
+      </div>
       <button
         type="button"
         onClick={dismiss}
-        className={`shrink-0 transition-colors cursor-pointer ${toast.variant === "success" ? "text-white/70 hover:text-white" : "text-text-secondary hover:text-text"}`}
+        className={cn(
+          "shrink-0 transition-colors cursor-pointer p-0.5 rounded-md",
+          toast.variant === "info"
+            ? "text-zinc-400 hover:text-zinc-800 hover:bg-zinc-100"
+            : "text-white/80 hover:text-white hover:bg-white/15"
+        )}
         aria-label="Dismiss notification"
       >
-        <X className="h-3.5 w-3.5" />
+        <X className="h-4 w-4" />
       </button>
     </div>
   );
@@ -126,19 +187,32 @@ function ToastItem({
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const add = useCallback((variant: ToastVariant, message: string) => {
-    const id = crypto.randomUUID();
-    setToasts((prev) => [...prev, { id, variant, message }]);
-  }, []);
+  const add = useCallback(
+    (variant: ToastVariant, message: string, options?: ToastOptions) => {
+      const id = crypto.randomUUID();
+      setToasts((prev) => [
+        ...prev,
+        {
+          id,
+          variant,
+          message,
+          action: options?.action,
+          duration: options?.duration,
+        },
+      ]);
+    },
+    []
+  );
 
   const remove = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
   const value: ToastContextValue = {
-    success: (msg) => add("success", msg),
-    error: (msg) => add("error", msg),
-    info: (msg) => add("info", msg),
+    success: (msg, opts) => add("success", msg, opts),
+    error: (msg, opts) => add("error", msg, opts),
+    warning: (msg, opts) => add("warning", msg, opts),
+    info: (msg, opts) => add("info", msg, opts),
   };
 
   return (
@@ -148,6 +222,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {/* Portal — fixed bottom-right, above all modals */}
       <div
         aria-label="Notifications"
+        data-theme="light"
         className="fixed bottom-4 right-4 z-9999 flex flex-col gap-2 pointer-events-none"
       >
         {toasts.map((t) => (

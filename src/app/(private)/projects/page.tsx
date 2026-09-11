@@ -223,7 +223,7 @@ export default function ProjectsPage() {
 
       <ConfirmDialog
         isOpen={Boolean(deleteTarget)}
-        title="Delete Project"
+        title="Delete Project?"
         description={
           deleteTarget
             ? `Are you sure you want to delete project "${deleteTarget.name}" (${deleteTarget.projectCode})? This action cannot be undone.`

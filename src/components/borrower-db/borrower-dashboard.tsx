@@ -26,6 +26,7 @@ import {
 } from "./types";
 import { useDashboardSnapshotQuery } from "@/features/dashboard/client/use-dashboard";
 import { useMeQuery } from "@/features/users/client";
+import { useBorrowerRealtimeSync } from "@/hooks/use-borrower-realtime-sync";
 import type { DashboardPendingRequest } from "@/server/modules/dashboard/dashboard.service";
 import { calendarDaysUntil } from "@/lib/format-relative-time";
 
@@ -212,6 +213,12 @@ function PendingRequestCard({ request }: { request: DashboardPendingRequest }) {
 
   const statusBadge = { label: "Pending", className: "bg-status-repair-bg/15 text-status-repair-text border-status-repair-bg/30" };
 
+  const itemTitle =
+    request.itemDescription ||
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (request as any).items?.[0]?.itemDescription ||
+    "Pending Request";
+
   return (
     <div className={cn(
       "flex items-center gap-3 px-4 py-3 border-b border-border last:border-b-0 hover:bg-bg-subtle/50 transition-colors duration-150 border-l-4",
@@ -222,7 +229,7 @@ function PendingRequestCard({ request }: { request: DashboardPendingRequest }) {
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-text truncate">
-          {request.itemDescription}
+          {itemTitle}
         </p>
         <div className="flex items-center gap-1.5 mt-0.5">
           <p className="text-xs text-text-secondary font-mono">{request.id.substring(0, 8).toUpperCase()}</p>
@@ -308,8 +315,11 @@ function QuickActionBtn({
 
 export function BorrowerDashboard() {
   const { openWizard } = useBorrowerPortal();
-  const { data: snapshot, isLoading, isError, refetch } = useDashboardSnapshotQuery();
   const { data: me } = useMeQuery();
+  useBorrowerRealtimeSync({ enabled: Boolean(me?.id) });
+  const { data: snapshot, isLoading, isError, refetch } = useDashboardSnapshotQuery({
+    refetchInterval: 30_000,
+  });
   const loading = isLoading && !snapshot;
 
   const defaultSummary = {

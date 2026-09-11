@@ -14,7 +14,8 @@ function createQueryClient() {
   return new QueryClient({
     defaultOptions: {
       queries: {
-        staleTime: 30_000,
+        staleTime: 45_000,
+        gcTime: 10 * 60 * 1000,
         retry: 1,
         retryDelay: 800,
         // Custodians and borrowers act on the same records from different tabs,
@@ -47,7 +48,14 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
           return;
         }
         lastError = { message: friendly, timestamp: now };
-        toast.error(friendly);
+        toast.warning(friendly, {
+          action: {
+            label: "Retry Connection",
+            onClick: () => {
+              void queryClient.refetchQueries({ type: "active" });
+            },
+          },
+        });
       }
     });
 
@@ -63,7 +71,14 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
           return;
         }
         lastError = { message: friendly, timestamp: now };
-        toast.error(friendly);
+        toast.warning(friendly, {
+          action: {
+            label: "Retry Connection",
+            onClick: () => {
+              void queryClient.refetchQueries({ type: "active" });
+            },
+          },
+        });
       }
     });
 
@@ -77,7 +92,15 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     function handleOffline() {
       toast.error(
-        "You are currently offline. Actions will be unavailable until connection is restored."
+        "You are currently offline. Actions will be unavailable until connection is restored.",
+        {
+          action: {
+            label: "Retry Connection",
+            onClick: () => {
+              void queryClient.refetchQueries({ type: "active" });
+            },
+          },
+        }
       );
     }
     function handleOnline() {

@@ -52,6 +52,7 @@ export type ConsumableRequestDTO = {
   status: ConsumableRequestRow["status"];
   notes?: string;
   rejectionReason?: string;
+  cancellationReason?: string;
   receivedBy?: string;
   history: ConsumableRequestHistoryEntry[];
   lines: ConsumableRequestLineDTO[];

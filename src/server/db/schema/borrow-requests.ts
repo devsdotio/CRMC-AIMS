@@ -43,6 +43,7 @@ export type BorrowRequestHistoryEntry = {
     | "unreleased"
     | "returned"
     | "cancelled"
+    | "approval_undone"
     | "edited";
   actor: string;
   timestamp: string;
@@ -91,6 +92,7 @@ export const borrowRequests = pgTable(
 
     notes: text("notes"),
     rejectionReason: text("rejection_reason"),
+    cancellationReason: text("cancellation_reason"),
     pickedUpBy: text("picked_up_by"),
 
     history: jsonb("history")

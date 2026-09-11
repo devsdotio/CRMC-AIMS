@@ -17,6 +17,7 @@ import {
   Tag,
   Package,
   Loader2,
+  RotateCcw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatItemDescription } from "@/lib/sanitize-display";
@@ -33,6 +34,7 @@ import {
   useConsumableRequests,
   useRejectConsumableRequestMutation,
   useReleaseConsumableRequestMutation,
+  useUndoConsumableRequestApprovalMutation,
   type ConsumableRequest,
 } from "@/features/consumable-requests/client";
 import type {
@@ -211,6 +213,40 @@ export function SupplyRequestsQueue({
   const reject = useRejectConsumableRequestMutation();
   const cancel = useCancelConsumableRequestMutation();
   const release = useReleaseConsumableRequestMutation();
+  const undoApproval = useUndoConsumableRequestApprovalMutation();
+
+  const [undoApprovalTarget, setUndoApprovalTarget] = useState<ConsumableRequest | null>(null);
+  const [undoApprovalNote, setUndoApprovalNote] = useState("");
+  const [isUndoingApproval, setIsUndoingApproval] = useState(false);
+
+  const handleOpenUndoApproval = (row: ConsumableRequest) => {
+    setUndoApprovalTarget(row);
+    setUndoApprovalNote("");
+  };
+
+  const handleConfirmUndoApproval = async () => {
+    if (!undoApprovalTarget) return;
+    setIsUndoingApproval(true);
+    try {
+      await undoApproval.mutateAsync({
+        id: undoApprovalTarget.id,
+        note: undoApprovalNote.trim() || undefined,
+      });
+      toast.success(
+        `Approval undone for ${undoApprovalTarget.requestCode}. Returned to Pending Review.`
+      );
+      if (detailTarget?.id === undoApprovalTarget.id) {
+        setDetailTarget(null);
+      }
+      setUndoApprovalTarget(null);
+      setUndoApprovalNote("");
+      refetch();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to undo approval.");
+    } finally {
+      setIsUndoingApproval(false);
+    }
+  };
 
   const handleOpenApproveModal = (row: ConsumableRequest) => {
     setDialogState({
@@ -485,6 +521,17 @@ export function SupplyRequestsQueue({
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
+                          onClick={(e) => { e.stopPropagation(); handleOpenUndoApproval(row); }}
+                          disabled={cancel.isPending || isUndoingApproval}
+                          aria-label={`Undo approval for request ${row.requestCode}`}
+                          title="Undo approval and return to Pending Review"
+                          className="inline-flex items-center gap-1 rounded-md border border-border bg-bg px-2.5 py-1.5 text-xs font-semibold text-text-secondary hover:border-accent/40 hover:text-text hover:bg-bg-subtle transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" />
+                          Undo
+                        </button>
+                        <button
+                          type="button"
                           onClick={(e) => { e.stopPropagation(); setReleaseTarget(row); }}
                           disabled={cancel.isPending}
                           aria-label={`Issue supplies for request ${row.requestCode}`}
@@ -550,8 +597,93 @@ export function SupplyRequestsQueue({
         onClose={() => setDetailTarget(null)}
         onApprove={canOperate ? (req) => { setDetailTarget(null); handleOpenApproveModal(req); } : undefined}
         onReject={canOperate ? (req) => { setDetailTarget(null); handleOpenRejectModal(req); } : undefined}
+        onUndoApproval={canOperate ? (req) => { handleOpenUndoApproval(req); } : undefined}
         onRelease={canOperate ? (req) => { setDetailTarget(null); setReleaseTarget(req); } : undefined}
       />
+
+      {/* ── Undo Approval Confirmation Modal ───────────────────────────── */}
+      {undoApprovalTarget && (
+        <div className="fixed inset-0 z-70 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs transition-opacity">
+          <div
+            className="absolute inset-0"
+            onClick={() => !isUndoingApproval && setUndoApprovalTarget(null)}
+            aria-hidden="true"
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="undo-supply-approval-title"
+            className="relative w-full max-w-md rounded-xl border border-border bg-bg p-6 shadow-2xl z-10 animate-in fade-in zoom-in-95 duration-150 overflow-hidden"
+          >
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl shrink-0 bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                  <RotateCcw className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3
+                    id="undo-supply-approval-title"
+                    className="text-base font-bold text-text leading-tight"
+                  >
+                    Undo Request Approval
+                  </h3>
+                  <p className="text-xs text-text-secondary mt-0.5 leading-relaxed font-mono">
+                    {undoApprovalTarget.requestCode}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setUndoApprovalTarget(null)}
+                disabled={isUndoingApproval}
+                aria-label="Close dialog"
+                className="p-1.5 rounded-lg text-text-secondary hover:text-text hover:bg-bg-subtle transition-colors cursor-pointer disabled:opacity-50"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-text leading-relaxed">
+              Are you sure you want to revert this request back to <strong className="font-semibold text-text">Pending Review</strong>? Reserved supplies will be released back into available inventory.
+            </p>
+
+            <div className="mt-4 space-y-1.5">
+              <label htmlFor="undo-supply-note" className="block text-xs font-semibold text-text">
+                Reason / Note <span className="text-text-secondary font-normal">(Optional)</span>
+              </label>
+              <textarea
+                id="undo-supply-note"
+                rows={3}
+                value={undoApprovalNote}
+                onChange={(e) => setUndoApprovalNote(e.target.value)}
+                placeholder="e.g., Approved by mistake, requester asked to adjust quantities..."
+                className="w-full text-xs rounded-lg border border-border bg-bg p-2.5 text-text placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent resize-none"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-border mt-5">
+              <button
+                type="button"
+                onClick={() => setUndoApprovalTarget(null)}
+                disabled={isUndoingApproval}
+                className="h-9 px-4 text-xs font-bold text-text rounded-lg border border-border bg-bg hover:bg-bg-subtle transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmUndoApproval}
+                disabled={isUndoingApproval}
+                className="inline-flex items-center gap-1.5 h-9 px-4 text-xs font-bold rounded-lg bg-amber-600 hover:bg-amber-700 text-white transition-opacity cursor-pointer disabled:opacity-50 shadow-xs"
+              >
+                {isUndoingApproval && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                Undo Approval
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

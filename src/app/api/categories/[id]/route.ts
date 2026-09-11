@@ -4,6 +4,7 @@ import { getDb } from "@/server/db";
 import { categories } from "@/server/db/schema";
 import { requireActor } from "@/server/shared/auth";
 import { CategoryRepository, type CategoryType } from "@/server/modules/categories/category.repository";
+import { serverCache } from "@/server/shared/cache";
 
 export async function PUT(
   request: Request,
@@ -64,6 +65,8 @@ export async function PUT(
       return NextResponse.json({ error: "Category not found" }, { status: 404 });
     }
 
+    serverCache.invalidateTag("categories");
+
     return NextResponse.json({ data: updated });
   } catch (error) {
     console.error("PUT /api/categories/[id] Error:", error);
@@ -115,6 +118,8 @@ export async function DELETE(
 
     const db = getDb();
     await db.delete(categories).where(eq(categories.id, id));
+
+    serverCache.invalidateTag("categories");
 
     return NextResponse.json({ data: { success: true } });
   } catch (error) {

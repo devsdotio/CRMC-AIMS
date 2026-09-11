@@ -11,7 +11,7 @@ export { allocationsToMovementLines } from "./stock-movement.service";
 
 import type { NextRequest } from "next/server";
 
-import { requireActor } from "@/server/shared/auth";
+import { requireActor, requireAssetOperator } from "@/server/shared/auth";
 import { handleError, ok } from "@/server/shared/http";
 
 import { StockMovementService } from "./stock-movement.service";
@@ -40,6 +40,16 @@ export class StockMovementController {
     try {
       await requireActor();
       return ok(await this.service.listByConsumable(id));
+    } catch (error) {
+      return handleError(error);
+    }
+  }
+
+  async voidIssue(request: NextRequest | Request, id: string) {
+    try {
+      const session = await requireAssetOperator();
+      const body = await request.json().catch(() => ({}));
+      return ok(await this.service.voidIssue(id, body, session.actor));
     } catch (error) {
       return handleError(error);
     }

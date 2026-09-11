@@ -17,12 +17,16 @@ import { dashboardQueryKeys } from "./query-keys";
 /** Full dashboard widgets — only enable on the dashboard page. */
 export function useDashboardSnapshotQuery(options?: {
   enabled?: boolean;
+  refetchInterval?: number | false;
 }): UseQueryResult<DashboardSnapshot, Error> {
   return useQuery({
     queryKey: dashboardQueryKeys.snapshot(),
     queryFn: () => dashboardApi.getSnapshot(),
     enabled: options?.enabled ?? true,
-    staleTime: 60_000,
+    staleTime: 10_000,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    refetchInterval: options?.refetchInterval,
   });
 }
 

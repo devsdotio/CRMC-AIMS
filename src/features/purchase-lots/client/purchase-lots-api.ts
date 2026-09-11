@@ -59,6 +59,7 @@ export type UpdatePOStatusPayload = {
   status: PurchaseOrderStatus;
   notes?: string;
   approvedBy?: string;
+  receivedQuantity?: number;
 };
 
 export const purchaseLotsApi = {

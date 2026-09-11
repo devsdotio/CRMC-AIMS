@@ -1,5 +1,8 @@
 "use client";
 import { useCategoryStyleMap } from "@/features/categories/client/use-categories";
+import { useQueryClient } from "@tanstack/react-query";
+import { assetQueryKeys } from "@/features/assets/client/query-keys";
+import { assetsApi } from "@/features/assets/client/assets-api";
 import { Tag, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -50,9 +53,19 @@ export function AssetTableRow({ asset, onSelect }: AssetTableRowProps) {
   const categoryMeta = getCategoryStyle(asset.category);
   const statusMeta = STATUS_STYLES[asset.status];
 
+  const qc = useQueryClient();
+  const handleMouseEnter = () => {
+    void qc.prefetchQuery({
+      queryKey: assetQueryKeys.lifecycle(asset.id),
+      queryFn: () => assetsApi.listLifecycle(asset.id),
+      staleTime: 5 * 60 * 1000,
+    });
+  };
+
   return (
     <tr
       onClick={() => onSelect(asset)}
+      onMouseEnter={handleMouseEnter}
       tabIndex={0}
       role="row"
       onKeyDown={(e) => {

@@ -102,6 +102,8 @@ export class BorrowLogRepository implements IBorrowLogRepository {
 
     if (filters.status === "returned") {
       conditions.push(eq(borrowTransactions.status, "returned"));
+    } else if (filters.status === "voided") {
+      conditions.push(eq(borrowTransactions.status, "voided"));
     } else if (filters.status === "active") {
       conditions.push(eq(borrowTransactions.status, "active"));
       conditions.push(
