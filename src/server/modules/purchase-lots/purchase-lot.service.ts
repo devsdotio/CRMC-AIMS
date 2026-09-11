@@ -53,7 +53,7 @@ export type LotCostAllocation = {
 };
 
 export function derivePONumber(lotCode: string, reference?: string | null): string {
-  if (reference && reference.trim().toUpperCase().startsWith("PO-")) {
+  if (reference && reference.trim()) {
     return reference.trim();
   }
   return lotCode.startsWith("LOT-")
@@ -249,7 +249,7 @@ export class PurchaseLotService {
     actor: ActorContext
   ): Promise<PurchaseLotDTO[]> {
     const body: CreatePurchaseOrderInput = createPurchaseOrderSchema.parse(rawBody);
-    const poNumber = generateOperationalCode("PO");
+    const poNumber = body.poNumber?.trim() || generateOperationalCode("PO");
 
     return withTransaction(async (session) => {
       const results: PurchaseLotDTO[] = [];
@@ -700,20 +700,26 @@ export class PurchaseLotService {
         receivedQuantity: currentMeta.receivedQuantity,
       });
 
+      const resolvedReference =
+        body.poNumber !== undefined
+          ? body.poNumber
+          : body.reference !== undefined
+          ? body.reference
+          : lot.reference;
+
       const updated = await this.repo.update(
         lot.id,
         {
           supplierId,
           supplierName,
-          reference:
-            body.reference !== undefined ? body.reference : lot.reference,
+          reference: resolvedReference,
           purchasedOn: body.purchasedOn || lot.purchasedOn,
           notes: updatedNotes,
         },
         session
       );
 
-      const poCode = lot.reference || lot.lotCode;
+      const poCode = resolvedReference || lot.reference || lot.lotCode;
       await db.insert(auditLogs).values({
         entityType: "purchase_order",
         entityId: poCode,

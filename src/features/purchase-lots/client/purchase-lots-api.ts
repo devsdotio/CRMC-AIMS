@@ -36,6 +36,7 @@ export type CreatePurchaseOrderItemPayload = {
 };
 
 export type CreatePurchaseOrderPayload = {
+  poNumber?: string;
   poDate: string;
   requestedBy: string;
   supplierId?: string;
@@ -47,6 +48,7 @@ export type CreatePurchaseOrderPayload = {
 };
 
 export type UpdatePurchaseOrderPayload = {
+  poNumber?: string | null;
   supplierId?: string | null;
   supplierName?: string | null;
   reference?: string | null;

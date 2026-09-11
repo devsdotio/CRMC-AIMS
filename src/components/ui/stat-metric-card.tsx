@@ -137,11 +137,11 @@ export function StatMetricCard({
           role="tooltip"
           className={cn(
             "absolute top-[calc(100%+8px)] left-0 right-0 z-50",
-            "px-3.5 py-2.5 rounded-xl bg-[#1B2140] text-white text-xs border border-white/15 shadow-md",
+            "px-3.5 py-2.5 rounded-xl bg-text text-white text-xs border border-white/15 shadow-md",
             "animate-in fade-in zoom-in-95 duration-100 pointer-events-none",
           )}
         >
-          <div className="absolute -top-1 left-6 w-2 h-2 rotate-45 bg-[#1B2140] border-l border-t border-white/15" />
+          <div className="absolute -top-1 left-6 w-2 h-2 rotate-45 bg-text border-l border-t border-white/15" />
           <p className="leading-snug text-white/95 font-normal">
             {description}
           </p>

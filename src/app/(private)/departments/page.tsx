@@ -79,7 +79,7 @@ export default function DepartmentsPage() {
       </div>
 
       {/* Main Scoped Scroll Area */}
-      <main className="flex-1 overflow-y-auto [scrollbar-gutter:stable] p-4 md:p-6 min-h-0">
+      <main className="flex-1 overflow-y-auto scrollbar-gutter-stable p-4 md:p-6 min-h-0">
         <div className="w-full space-y-6">
           {departmentsError ? (
             <QueryErrorBanner

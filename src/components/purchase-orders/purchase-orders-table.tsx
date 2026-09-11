@@ -119,33 +119,33 @@ function StatusBadge({ status }: { status: PurchaseOrderStatus }) {
 function SkeletonTableRow() {
   return (
     <tr className="border-b border-border bg-bg animate-pulse">
-      <td className="px-4 py-3">
-        <div className="h-4 w-28 bg-border rounded mb-1.5" />
-        <div className="h-3 w-20 bg-border/60 rounded" />
+      <td className="px-3 sm:px-4 py-3.5">
+        <div className="h-4 w-24 sm:w-28 bg-border rounded mb-1.5" />
+        <div className="h-3 w-16 sm:w-20 bg-border/60 rounded" />
       </td>
-      <td className="px-4 py-3">
-        <div className="h-5 w-20 bg-border rounded-full" />
+      <td className="px-3 sm:px-4 py-3.5">
+        <div className="h-5 w-18 sm:w-20 bg-border rounded-full" />
       </td>
-      <td className="px-4 py-3">
-        <div className="h-4 w-40 bg-border rounded mb-1.5" />
+      <td className="px-3 sm:px-4 py-3.5">
+        <div className="h-4 w-32 sm:w-40 bg-border rounded mb-1.5" />
         <div className="flex items-center gap-2">
           <div className="h-3 w-16 bg-border/60 rounded" />
           <div className="h-3.5 w-16 bg-border/60 rounded-full" />
         </div>
       </td>
-      <td className="px-4 py-3">
+      <td className="px-3 sm:px-4 py-3.5 hidden sm:table-cell">
         <div className="h-4 w-12 bg-border rounded" />
       </td>
-      <td className="px-4 py-3">
+      <td className="px-3 sm:px-4 py-3.5 hidden lg:table-cell">
         <div className="h-4 w-28 bg-border rounded mb-1" />
       </td>
-      <td className="px-4 py-3">
+      <td className="px-3 sm:px-4 py-3.5 hidden md:table-cell">
         <div className="h-4 w-20 bg-border rounded mb-1" />
         <div className="h-3 w-14 bg-border/60 rounded" />
       </td>
-      <td className="px-4 py-3 text-right">
+      <td className="px-3 sm:px-4 py-3.5 text-right">
         <div className="flex justify-end">
-          <div className="h-7 w-20 bg-border rounded-lg" />
+          <div className="h-7 w-16 sm:w-20 bg-border rounded-lg" />
         </div>
       </td>
     </tr>
@@ -199,17 +199,17 @@ export function PurchaseOrdersTable({
 
   if (loading) {
     return (
-      <div className="overflow-x-auto">
-        <table className="w-full text-xs text-left">
+      <div className="w-full overflow-x-auto min-w-full">
+        <table className="w-full text-xs text-left min-w-[520px] sm:min-w-full">
           <thead className="sticky top-0 z-10 bg-bg-subtle text-text-secondary border-b border-border font-semibold uppercase tracking-wider text-[11px] shadow-2xs">
             <tr>
-              <th className="px-4 py-3.5">PO Number & Date</th>
-              <th className="px-4 py-3.5">Status</th>
-              <th className="px-4 py-3.5">Description</th>
-              <th className="px-4 py-3.5">Qty</th>
-              <th className="px-4 py-3.5">Dealer / Supplier</th>
-              <th className="px-4 py-3.5">Cost (₱)</th>
-              <th className="px-4 py-3.5 text-right">Actions</th>
+              <th className="px-3 sm:px-4 py-3.5 whitespace-nowrap">PO Number & Date</th>
+              <th className="px-3 sm:px-4 py-3.5 whitespace-nowrap">Status</th>
+              <th className="px-3 sm:px-4 py-3.5">Description</th>
+              <th className="px-3 sm:px-4 py-3.5 hidden sm:table-cell whitespace-nowrap">Qty</th>
+              <th className="px-3 sm:px-4 py-3.5 hidden lg:table-cell whitespace-nowrap">Dealer / Supplier</th>
+              <th className="px-3 sm:px-4 py-3.5 hidden md:table-cell whitespace-nowrap">Cost (₱)</th>
+              <th className="px-3 sm:px-4 py-3.5 text-right whitespace-nowrap">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -240,266 +240,286 @@ export function PurchaseOrdersTable({
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-xs text-left" aria-label="Purchase orders table">
+    <div className="w-full overflow-x-auto min-w-full">
+      <table className="w-full text-xs text-left min-w-[520px] sm:min-w-full" aria-label="Purchase orders table">
         <thead className="sticky top-0 z-10 bg-bg-subtle text-text-secondary border-b border-border font-semibold uppercase tracking-wider text-[11px] select-none shadow-2xs">
           <tr>
             <th
               onClick={() => handleSort("createdAt")}
-              className="px-4 py-3.5 cursor-pointer hover:text-text transition-colors"
+              className="px-3 sm:px-4 py-3.5 cursor-pointer hover:text-text transition-colors whitespace-nowrap"
             >
-                <div className="flex items-center gap-1.5">
-                  <span>PO Number & Date</span>
-                  {sortField === "createdAt" ? (
-                    sortOrder === "asc" ? (
-                      <ArrowUp className="h-3 w-3" />
-                    ) : (
-                      <ArrowDown className="h-3 w-3" />
-                    )
+              <div className="flex items-center gap-1.5">
+                <span>PO Number & Date</span>
+                {sortField === "createdAt" ? (
+                  sortOrder === "asc" ? (
+                    <ArrowUp className="h-3 w-3" />
                   ) : (
-                    <ArrowUpDown className="h-3 w-3 opacity-40" />
-                  )}
-                </div>
-              </th>
+                    <ArrowDown className="h-3 w-3" />
+                  )
+                ) : (
+                  <ArrowUpDown className="h-3 w-3 opacity-40" />
+                )}
+              </div>
+            </th>
 
-              <th
-                onClick={() => handleSort("status")}
-                className="px-4 py-3.5 cursor-pointer hover:text-text transition-colors"
+            <th
+              onClick={() => handleSort("status")}
+              className="px-3 sm:px-4 py-3.5 cursor-pointer hover:text-text transition-colors whitespace-nowrap"
+            >
+              <div className="flex items-center gap-1.5">
+                <span>Status</span>
+                {sortField === "status" ? (
+                  sortOrder === "asc" ? (
+                    <ArrowUp className="h-3 w-3" />
+                  ) : (
+                    <ArrowDown className="h-3 w-3" />
+                  )
+                ) : (
+                  <ArrowUpDown className="h-3 w-3 opacity-40" />
+                )}
+              </div>
+            </th>
+
+            <th
+              onClick={() => handleSort("itemName")}
+              className="px-3 sm:px-4 py-3.5 cursor-pointer hover:text-text transition-colors"
+            >
+              <div className="flex items-center gap-1.5">
+                <span>Item Description</span>
+                {sortField === "itemName" ? (
+                  sortOrder === "asc" ? (
+                    <ArrowUp className="h-3 w-3" />
+                  ) : (
+                    <ArrowDown className="h-3 w-3" />
+                  )
+                ) : (
+                  <ArrowUpDown className="h-3 w-3 opacity-40" />
+                )}
+              </div>
+            </th>
+
+            <th
+              onClick={() => handleSort("quantity")}
+              className="px-3 sm:px-4 py-3.5 cursor-pointer hover:text-text transition-colors whitespace-nowrap hidden sm:table-cell"
+            >
+              <div className="flex items-center gap-1.5">
+                <span>Qty</span>
+                {sortField === "quantity" ? (
+                  sortOrder === "asc" ? (
+                    <ArrowUp className="h-3 w-3" />
+                  ) : (
+                    <ArrowDown className="h-3 w-3" />
+                  )
+                ) : (
+                  <ArrowUpDown className="h-3 w-3 opacity-40" />
+                )}
+              </div>
+            </th>
+
+            <th className="px-3 sm:px-4 py-3.5 whitespace-nowrap hidden lg:table-cell">Dealer / Supplier</th>
+
+            <th
+              onClick={() => handleSort("totalCost")}
+              className="px-3 sm:px-4 py-3.5 cursor-pointer hover:text-text transition-colors whitespace-nowrap hidden md:table-cell"
+            >
+              <div className="flex items-center gap-1.5">
+                <span>Total Value (₱)</span>
+                {sortField === "totalCost" ? (
+                  sortOrder === "asc" ? (
+                    <ArrowUp className="h-3 w-3" />
+                  ) : (
+                    <ArrowDown className="h-3 w-3" />
+                  )
+                ) : (
+                  <ArrowUpDown className="h-3 w-3 opacity-40" />
+                )}
+              </div>
+            </th>
+
+            <th className="px-3 sm:px-4 py-3.5 text-right whitespace-nowrap">Actions</th>
+          </tr>
+        </thead>
+
+        <tbody className="divide-y divide-border">
+          {sortedLots.map((lot) => {
+            const displayPO = lot.poNumber || lot.lotCode;
+            const poDate = lot.purchasedOn || lot.createdAt.split("T")[0];
+            const remainingRatio =
+              lot.quantity > 0 ? lot.quantityRemaining / lot.quantity : 0;
+            const isDepleted =
+              lot.status === "delivered" && lot.quantityRemaining === 0;
+            const isLowStock =
+              lot.status === "delivered" && !isDepleted && remainingRatio <= 0.2;
+
+            return (
+              <tr
+                key={lot.id}
+                onClick={() => onSelectLot(lot)}
+                className={cn(
+                  "transition-all duration-150 cursor-pointer group bg-bg",
+                  getStatusRowClasses(lot.status)
+                )}
               >
-                <div className="flex items-center gap-1.5">
-                  <span>Status</span>
-                  {sortField === "status" ? (
-                    sortOrder === "asc" ? (
-                      <ArrowUp className="h-3 w-3" />
-                    ) : (
-                      <ArrowDown className="h-3 w-3" />
-                    )
-                  ) : (
-                    <ArrowUpDown className="h-3 w-3 opacity-40" />
-                  )}
-                </div>
-              </th>
-
-              <th
-                onClick={() => handleSort("itemName")}
-                className="px-4 py-3.5 cursor-pointer hover:text-text transition-colors"
-              >
-                <div className="flex items-center gap-1.5">
-                  <span>Item Description</span>
-                  {sortField === "itemName" ? (
-                    sortOrder === "asc" ? (
-                      <ArrowUp className="h-3 w-3" />
-                    ) : (
-                      <ArrowDown className="h-3 w-3" />
-                    )
-                  ) : (
-                    <ArrowUpDown className="h-3 w-3 opacity-40" />
-                  )}
-                </div>
-              </th>
-
-              <th
-                onClick={() => handleSort("quantity")}
-                className="px-4 py-3.5 cursor-pointer hover:text-text transition-colors"
-              >
-                <div className="flex items-center gap-1.5">
-                  <span>Qty</span>
-                  {sortField === "quantity" ? (
-                    sortOrder === "asc" ? (
-                      <ArrowUp className="h-3 w-3" />
-                    ) : (
-                      <ArrowDown className="h-3 w-3" />
-                    )
-                  ) : (
-                    <ArrowUpDown className="h-3 w-3 opacity-40" />
-                  )}
-                </div>
-              </th>
-
-              <th className="px-4 py-3.5">Dealer / Supplier</th>
-
-              <th
-                onClick={() => handleSort("totalCost")}
-                className="px-4 py-3.5 cursor-pointer hover:text-text transition-colors"
-              >
-                <div className="flex items-center gap-1.5">
-                  <span>Total Value (₱)</span>
-                  {sortField === "totalCost" ? (
-                    sortOrder === "asc" ? (
-                      <ArrowUp className="h-3 w-3" />
-                    ) : (
-                      <ArrowDown className="h-3 w-3" />
-                    )
-                  ) : (
-                    <ArrowUpDown className="h-3 w-3 opacity-40" />
-                  )}
-                </div>
-              </th>
-
-              <th className="px-4 py-3.5 text-right">Actions</th>
-            </tr>
-          </thead>
-
-          <tbody className="divide-y divide-border">
-            {sortedLots.map((lot) => {
-              const displayPO = lot.poNumber || lot.lotCode;
-              const poDate = lot.purchasedOn || lot.createdAt.split("T")[0];
-              const remainingRatio =
-                lot.quantity > 0 ? lot.quantityRemaining / lot.quantity : 0;
-              const isDepleted =
-                lot.status === "delivered" && lot.quantityRemaining === 0;
-              const isLowStock =
-                lot.status === "delivered" && !isDepleted && remainingRatio <= 0.2;
-
-              return (
-                <tr
-                  key={lot.id}
-                  onClick={() => onSelectLot(lot)}
-                  className={cn(
-                    "transition-all duration-150 cursor-pointer group bg-bg",
-                    getStatusRowClasses(lot.status)
-                  )}
-                >
-                  {/* PO Number & Date */}
-                  <td className="px-4 py-3.5 whitespace-nowrap">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-mono text-xs font-bold text-text bg-bg-subtle/80 px-2 py-0.5 rounded-md border border-border group-hover:border-accent/40 group-hover:text-accent transition-colors shadow-2xs">
-                        {displayPO}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={(e) => handleCopyCode(e, displayPO)}
-                        title="Copy PO Code"
-                        className="opacity-0 group-hover:opacity-100 p-1 rounded text-text-secondary hover:text-text hover:bg-bg-subtle transition-all"
-                      >
-                        {copiedCode === displayPO ? (
-                          <Check className="h-3 w-3 text-status-active-text" />
-                        ) : (
-                          <Copy className="h-3 w-3" />
-                        )}
-                      </button>
-                    </div>
-                    <span className="text-[11px] text-text-secondary block font-medium mt-0.5">
-                      {poDate} · <span className="opacity-80">{formatRelativeTime(lot.createdAt)}</span>
+                {/* PO Number & Date */}
+                <td className="px-3 sm:px-4 py-3.5 whitespace-nowrap align-middle">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono text-xs font-bold text-text bg-bg-subtle/80 px-2 py-0.5 rounded-md border border-border group-hover:border-accent/40 group-hover:text-accent transition-colors shadow-2xs">
+                      {displayPO}
                     </span>
-                  </td>
+                    <button
+                      type="button"
+                      onClick={(e) => handleCopyCode(e, displayPO)}
+                      title="Copy PO Code"
+                      className="opacity-0 group-hover:opacity-100 p-1 rounded text-text-secondary hover:text-text hover:bg-bg-subtle transition-all"
+                    >
+                      {copiedCode === displayPO ? (
+                        <Check className="h-3 w-3 text-status-active-text" />
+                      ) : (
+                        <Copy className="h-3 w-3" />
+                      )}
+                    </button>
+                  </div>
+                  <span className="text-[11px] text-text-secondary block font-medium mt-0.5">
+                    {poDate} · <span className="opacity-80">{formatRelativeTime(lot.createdAt)}</span>
+                  </span>
+                </td>
 
-                  {/* Status Badge */}
-                  <td className="px-4 py-3.5 whitespace-nowrap">
-                    <StatusBadge status={lot.status} />
-                  </td>
-
-                  {/* Description & Type */}
-                  <td className="px-4 py-3.5">
-                    <span className="font-semibold text-text block max-w-xs truncate group-hover:text-accent transition-colors">
-                      {lot.itemName}
+                {/* Status Badge */}
+                <td className="px-3 sm:px-4 py-3.5 whitespace-nowrap align-middle">
+                  <StatusBadge status={lot.status} />
+                  {/* On small mobile screens (< sm), show inline quantity badge here */}
+                  <div className="sm:hidden mt-1 font-mono text-[11px] text-text-secondary font-medium">
+                    {lot.quantity}{" "}
+                    <span className="font-normal">
+                      {lot.itemType === "asset" ? (lot.quantity === 1 ? "unit" : "units") : "pcs"}
                     </span>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="font-mono text-[10px] text-text-secondary bg-bg-subtle/60 px-1.5 py-0.2 rounded border border-border/60">
-                        {lot.itemCode}
-                      </span>
-                      <ItemTypeBadge itemType={lot.itemType} />
-                    </div>
-                  </td>
+                  </div>
+                </td>
 
-                  {/* Quantity & Stock Intake */}
-                  <td className="px-4 py-3.5 whitespace-nowrap">
-                    <div className="font-mono font-bold text-text text-sm">
-                      {lot.quantity}{" "}
-                      <span className="text-[10px] font-normal text-text-secondary">
-                        {lot.itemType === "asset" ? (lot.quantity === 1 ? "unit" : "units") : "pcs"}
-                      </span>
-                    </div>
-                    {lot.status === "delivered" && lot.itemType === "consumable" && (
-                      <div className="mt-1">
-                        {isDepleted ? (
-                          <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
-                            Depleted
-                          </span>
-                        ) : lot.quantityRemaining < lot.quantity ? (
-                          <span
-                            className={cn(
-                              "inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold border",
-                              isLowStock
-                                ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30"
-                                : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25"
-                            )}
-                          >
-                            {lot.quantityRemaining} in stock
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
-                            In Stock
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </td>
-
-                  {/* Supplier */}
-                  <td className="px-4 py-3.5 text-text font-medium whitespace-nowrap max-w-40 truncate text-xs">
-                    <span className="text-text-secondary font-normal">By: </span>
-                    <span className="font-semibold text-text">{lot.supplierName || "Internal / Direct"}</span>
-                  </td>
-
-                  {/* Cost */}
-                  <td className="px-4 py-3.5 whitespace-nowrap">
-                    <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 block text-sm">
-                      ₱
-                      {Number(lot.totalCost).toLocaleString("en-US", {
-                        minimumFractionDigits: 2,
-                      })}
+                {/* Description & Type */}
+                <td className="px-3 sm:px-4 py-3.5 align-middle min-w-40 sm:min-w-48">
+                  <span className="font-semibold text-text block max-w-xs truncate group-hover:text-accent transition-colors">
+                    {lot.itemName}
+                  </span>
+                  <div className="flex items-center gap-2 mt-1 flex-wrap">
+                    <span className="font-mono text-[10px] text-text-secondary bg-bg-subtle/60 px-1.5 py-0.2 rounded border border-border/60">
+                      {lot.itemCode}
                     </span>
-                    <span className="font-mono text-[10px] text-text-secondary block">
-                      @ ₱{Number(lot.unitCost).toFixed(2)} / unit
+                    <ItemTypeBadge itemType={lot.itemType} />
+                    {/* On screens < lg where Dealer/Supplier column is hidden, show inline */}
+                    <span className="lg:hidden text-[10px] text-text-secondary truncate max-w-36">
+                      • {lot.supplierName || "Internal / Direct"}
                     </span>
-                  </td>
+                  </div>
+                  {/* On screens < md where Total Cost column is hidden, show inline */}
+                  <div className="md:hidden mt-1 flex items-center gap-1.5 text-[11px]">
+                    <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                      ₱{Number(lot.totalCost).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                    </span>
+                    <span className="text-[10px] text-text-secondary">
+                      (@ ₱{Number(lot.unitCost).toFixed(2)})
+                    </span>
+                  </div>
+                </td>
 
-                  {/* Action Buttons */}
-                  <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                    <div className="flex items-center justify-end gap-1.5">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onPrintSlip(lot);
-                        }}
-                        title="Print Official Form Slip"
-                        className="p-1.5 rounded-lg border border-border bg-bg hover:bg-bg-subtle text-text-secondary hover:text-text hover:border-accent/40 transition-colors cursor-pointer shadow-2xs"
-                      >
-                        <FileText className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onSelectLot(lot);
-                        }}
-                        className="px-2.5 py-1 text-[11px] font-semibold rounded-lg border border-border bg-bg hover:bg-bg-subtle text-text hover:border-primary/40 transition-colors cursor-pointer shadow-2xs"
-                      >
-                        Details
-                      </button>
-                      {onDelete && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onDelete(lot);
-                          }}
-                          title="Delete Purchase Order"
-                          aria-label="Delete Purchase Order"
-                          className="p-1.5 rounded-lg border border-destructive/25 bg-destructive/10 hover:bg-destructive text-destructive hover:text-white transition-all cursor-pointer shadow-2xs"
+                {/* Quantity & Stock Intake */}
+                <td className="px-3 sm:px-4 py-3.5 whitespace-nowrap hidden sm:table-cell align-middle">
+                  <div className="font-mono font-bold text-text text-sm">
+                    {lot.quantity}{" "}
+                    <span className="text-[10px] font-normal text-text-secondary">
+                      {lot.itemType === "asset" ? (lot.quantity === 1 ? "unit" : "units") : "pcs"}
+                    </span>
+                  </div>
+                  {lot.status === "delivered" && lot.itemType === "consumable" && (
+                    <div className="mt-1">
+                      {isDepleted ? (
+                        <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                          Depleted
+                        </span>
+                      ) : lot.quantityRemaining < lot.quantity ? (
+                        <span
+                          className={cn(
+                            "inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold border",
+                            isLowStock
+                              ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                              : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25"
+                          )}
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                          {lot.quantityRemaining} in stock
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
+                          In Stock
+                        </span>
                       )}
                     </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    );
-  }
+                  )}
+                </td>
+
+                {/* Supplier */}
+                <td className="px-3 sm:px-4 py-3.5 text-text font-medium whitespace-nowrap max-w-40 truncate text-xs hidden lg:table-cell align-middle">
+                  <span className="text-text-secondary font-normal">By: </span>
+                  <span className="font-semibold text-text">{lot.supplierName || "Internal / Direct"}</span>
+                </td>
+
+                {/* Cost */}
+                <td className="px-3 sm:px-4 py-3.5 whitespace-nowrap hidden md:table-cell align-middle">
+                  <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 block text-sm">
+                    ₱
+                    {Number(lot.totalCost).toLocaleString("en-US", {
+                      minimumFractionDigits: 2,
+                    })}
+                  </span>
+                  <span className="font-mono text-[10px] text-text-secondary block">
+                    @ ₱{Number(lot.unitCost).toFixed(2)} / unit
+                  </span>
+                </td>
+
+                {/* Action Buttons */}
+                <td className="px-3 sm:px-4 py-3.5 text-right whitespace-nowrap align-middle">
+                  <div className="flex items-center justify-end gap-1.5">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onPrintSlip(lot);
+                      }}
+                      title="Print Official Form Slip"
+                      className="p-1.5 rounded-lg border border-border bg-bg hover:bg-bg-subtle text-text-secondary hover:text-text hover:border-accent/40 transition-colors cursor-pointer shadow-2xs"
+                    >
+                      <FileText className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectLot(lot);
+                      }}
+                      className="px-2 sm:px-2.5 py-1 text-[11px] font-semibold rounded-lg border border-border bg-bg hover:bg-bg-subtle text-text hover:border-primary/40 transition-colors cursor-pointer shadow-2xs"
+                    >
+                      Details
+                    </button>
+                    {onDelete && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDelete(lot);
+                        }}
+                        title="Delete Purchase Order"
+                        aria-label="Delete Purchase Order"
+                        className="p-1.5 rounded-lg border border-destructive/25 bg-destructive/10 hover:bg-destructive text-destructive hover:text-white transition-all cursor-pointer shadow-2xs"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
