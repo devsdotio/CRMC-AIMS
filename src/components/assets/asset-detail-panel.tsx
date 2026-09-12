@@ -454,8 +454,13 @@ function LifecycleDetailsSection({ item }: { item: Extract<UnifiedTimelineItem, 
           event.payload.condition ||
           event.payload.description ||
           event.payload.logCode ||
+          event.payload.maintenanceLogCode ||
           event.payload.requestCode ||
           event.payload.source ||
+          event.payload.repairCost != null ||
+          event.payload.resolutionNotes ||
+          event.payload.technician ||
+          event.payload.via ||
           event.payload.voided
       )) && (
         <div className="rounded bg-bg/80 p-2 border border-border/50 space-y-1">
@@ -464,6 +469,12 @@ function LifecycleDetailsSection({ item }: { item: Extract<UnifiedTimelineItem, 
               Issue voided (undo)
             </p>
           ) : null}
+          {event.payload.via != null && (
+            <p className="text-text leading-relaxed text-[11px]">
+              <strong className="text-text-secondary font-sans">Via:</strong>{" "}
+              {String(event.payload.via)}
+            </p>
+          )}
           {event.payload.source != null && (
             <p className="text-text leading-relaxed text-[11px]">
               <strong className="text-text-secondary font-sans">Source:</strong>{" "}
@@ -471,7 +482,11 @@ function LifecycleDetailsSection({ item }: { item: Extract<UnifiedTimelineItem, 
                 ? "Manual Issue"
                 : String(event.payload.source) === "project_legacy"
                   ? "Project Issue"
-                  : "Portal Request"}
+                  : String(event.payload.source) === "manual_flag" ||
+                      String(event.payload.source) === "return_checkout" ||
+                      String(event.payload.source) === "project_assignment"
+                    ? String(event.payload.source).replace(/_/g, " ")
+                    : "Portal Request"}
             </p>
           )}
           {event.payload.logCode != null && (
@@ -480,10 +495,32 @@ function LifecycleDetailsSection({ item }: { item: Extract<UnifiedTimelineItem, 
               {String(event.payload.logCode)}
             </p>
           )}
+          {event.payload.maintenanceLogCode != null && (
+            <p className="text-text leading-relaxed font-mono text-[11px]">
+              <strong className="text-text-secondary font-sans">Maintenance log:</strong>{" "}
+              {String(event.payload.maintenanceLogCode)}
+            </p>
+          )}
           {event.payload.requestCode != null && (
             <p className="text-text leading-relaxed font-mono text-[11px]">
               <strong className="text-text-secondary font-sans">Request:</strong>{" "}
               {String(event.payload.requestCode)}
+            </p>
+          )}
+          {event.payload.technician != null && (
+            <p className="text-text leading-relaxed text-[11px]">
+              <strong className="text-text-secondary font-sans">Technician:</strong>{" "}
+              {String(event.payload.technician)}
+            </p>
+          )}
+          {event.payload.repairCost != null && event.payload.repairCost !== "" && (
+            <p className="text-text leading-relaxed font-mono text-[11px]">
+              <strong className="text-text-secondary font-sans">Repair cost:</strong>{" "}
+              ₱
+              {Number(event.payload.repairCost).toLocaleString("en-PH", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
             </p>
           )}
           {event.payload.description && (
@@ -499,13 +536,15 @@ function LifecycleDetailsSection({ item }: { item: Extract<UnifiedTimelineItem, 
           {Boolean(
             event.payload.notes ||
               event.payload.conditionNotes ||
-              event.payload.returnNotes
+              event.payload.returnNotes ||
+              event.payload.resolutionNotes
           ) && (
             <div className="pt-1">
               <AuditNoteDisplay
                 action={event.payload.voided ? "voided" : event.eventType}
                 note={String(
-                  event.payload.notes ||
+                  event.payload.resolutionNotes ||
+                    event.payload.notes ||
                     event.payload.conditionNotes ||
                     event.payload.returnNotes
                 )}
@@ -650,8 +689,16 @@ function AssetHistoryTimeline({ asset }: { asset: Asset }) {
         title = "Asset Registered";
         statusLabel = "created";
       } else if (ev.eventType === "status_changed") {
-        title = `Status Changed: ${ev.fromStatus || "—"} → ${ev.toStatus || "—"}`;
-        statusLabel = ev.toStatus || "status_changed";
+        if (ev.payload?.via === "maintenance_resolved") {
+          title = "Marked Serviceable (Repair Resolved)";
+          statusLabel = "active";
+        } else if (ev.payload?.via === "flagged_maintenance") {
+          title = `Status Changed: ${ev.fromStatus || "—"} → ${ev.toStatus || "—"}`;
+          statusLabel = ev.toStatus || "needs_repair";
+        } else {
+          title = `Status Changed: ${ev.fromStatus || "—"} → ${ev.toStatus || "—"}`;
+          statusLabel = ev.toStatus || "status_changed";
+        }
       } else if (ev.eventType === "released") {
         const releaseSource = ev.payload?.source;
         const sourceTag =
@@ -684,6 +731,12 @@ function AssetHistoryTimeline({ asset }: { asset: Asset }) {
       } else if (ev.eventType === "flagged_maintenance") {
         title = "Flagged for Maintenance";
         statusLabel = "needs_repair";
+      } else if (
+        ev.eventType === "updated" &&
+        ev.payload?.via === "maintenance_resolved"
+      ) {
+        title = "Maintenance Log Resolved";
+        statusLabel = "maintenance";
       } else if (ev.eventType === "deleted") {
         title = "Asset Record Deleted";
         statusLabel = "deleted";
@@ -790,11 +843,16 @@ function AssetHistoryTimeline({ asset }: { asset: Asset }) {
                     item.event.payload.notes ||
                       item.event.payload.conditionNotes ||
                       item.event.payload.returnNotes ||
+                      item.event.payload.resolutionNotes ||
                       item.event.payload.description ||
                       item.event.payload.condition ||
                       item.event.payload.logCode ||
+                      item.event.payload.maintenanceLogCode ||
                       item.event.payload.requestCode ||
                       item.event.payload.source ||
+                      item.event.payload.repairCost != null ||
+                      item.event.payload.technician ||
+                      item.event.payload.via ||
                       item.event.payload.voided
                   ))) ||
               item.kind === "maintenance";

@@ -989,15 +989,24 @@ export class AssetService {
         throw new ConflictError("Retired assets cannot be flagged for maintenance.");
       }
 
-      if (existing.currentHolder) {
-        const projectOpen = await this.projectAssignments.findOpenByAssetId(id);
-        if (projectOpen) {
-          throw new ConflictError(
-            "Asset is on a project. Use Report damage on the project panel to flag repair or write off while in project custody."
-          );
-        }
+      if (existing.status === "missing") {
+        throw new ConflictError("Missing assets cannot be flagged for maintenance.");
+      }
+
+      const openBorrow = await this.borrowLogRepo.findActiveByAssetId(id, tx);
+      const projectOpen = await this.projectAssignments.findOpenByAssetId(id, tx);
+
+      if (projectOpen) {
         throw new ConflictError(
-          "Asset is currently released. Return it (with repair condition) instead of flagging in isolation."
+          "Asset is on a project. Use Report damage on the project panel to flag repair or write off while in project custody."
+        );
+      }
+
+      if (existing.currentHolder || openBorrow) {
+        throw new ConflictError(
+          existing.currentHolder
+            ? `Asset is currently in custody (${existing.currentHolder}). Return it (with repair condition) instead of flagging in isolation.`
+            : `Asset has an open borrow/release log (${openBorrow!.borrowerName}). Return it before flagging for maintenance.`
         );
       }
 
@@ -1034,6 +1043,7 @@ export class AssetService {
           resolutionNotes: null,
           resolvedByUserId: null,
           resolvedByName: null,
+          repairCost: null,
           relatedBorrowLogCode: null,
           scheduledDate: null,
         },
@@ -1051,6 +1061,7 @@ export class AssetService {
           fromHolder: existing.currentHolder,
           toHolder: next.currentHolder,
           payload: {
+            via: "manual_flag",
             description,
             notes: input.notes ?? null,
             maintenanceLogCode: mntCode,
