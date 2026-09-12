@@ -10,6 +10,7 @@ import {
 import type { ActorContext } from "@/server/shared/auth";
 import { generateOperationalCode, todayDateString } from "@/server/shared/codes";
 import { parseScanPayload } from "@/server/shared/qr";
+import { assetCategoryCodePrefix } from "@/lib/asset-category";
 import { withTransaction, type DbSession } from "@/server/db/transaction";
 import { BorrowLogService } from "@/server/modules/borrow-log/borrow-log.service";
 import { BorrowLogRepository } from "@/server/modules/borrow-log/borrow-log.repository";
@@ -92,6 +93,8 @@ function padSeq(n: number, width = 3): string {
   return String(n).padStart(width, "0");
 }
 
+const ASSET_CODE_ALLOC_ATTEMPTS = 12;
+
 /**
  * Maps a DB row → the frontend `Asset` contract (+ QR payload / model link).
  * Maintenance truth lives in `maintenance_logs` + lifecycle events — JSONB is unused.
@@ -171,6 +174,28 @@ export class AssetService {
       );
     }
     return found.name;
+  }
+
+  /** Next `{PREFIX}-{NNN}` from existing codes (including bulk-minted units). */
+  async peekNextAssetCode(categoryLabel: string): Promise<{
+    assetCode: string;
+    prefix: string;
+  }> {
+    const categoryName = await this.resolveAssetCategoryName(categoryLabel);
+    const prefix = assetCategoryCodePrefix(categoryName);
+    const assetCode = await this.nextAssetCodeForPrefix(prefix);
+    return { assetCode, prefix };
+  }
+
+  private async nextAssetCodeForPrefix(
+    prefix: string,
+    session?: DbSession
+  ): Promise<string> {
+    const max = await this.models.repository.maxUnitSequenceForPrefix(
+      prefix,
+      session
+    );
+    return `${prefix}-${padSeq(max + 1)}`;
   }
 
   async listAssets(rawQuery: unknown): Promise<AssetDTOWithMeta[]> {
@@ -313,6 +338,8 @@ export class AssetService {
   ): Promise<AssetDTOWithMeta> {
     const input: CreateAssetBody = createAssetSchema.parse(rawInput);
     const categoryName = await this.resolveAssetCategoryName(input.category);
+    const codePrefix = assetCategoryCodePrefix(categoryName);
+    const preferredCode = input.assetCode?.trim().toUpperCase() || null;
 
     if (input.supplierId) {
       const supplier = await this.suppliers.findById(input.supplierId);
@@ -325,92 +352,111 @@ export class AssetService {
       await this.models.requireModel(input.modelId);
     }
 
-    try {
-      return await withTransaction(async (tx) => {
-        const now = new Date();
-        const row = await this.assetRepository.create(
-          {
-            assetCode: input.assetCode,
-            name: input.name,
-            category: categoryName,
-            status: input.status ?? "active",
-            assignmentType: input.assignmentType ?? "borrowable",
-            modelId: input.modelId ?? null,
-            location: input.location,
-            serialNumber: input.serialNumber ?? null,
-            // Custody only via release / project assign — never invent a holder on create.
-            currentHolder: null,
-            department: input.department ?? null,
-            purchaseDate: input.purchaseDate ?? null,
-            value: input.value !== undefined ? input.value.toFixed(2) : null,
-            supplierId: input.supplierId ?? null,
-            imageUrl: input.imageUrl ?? null,
-            notes: input.notes ?? null,
-            isSandbox: input.isSandbox ?? false,
-            maintenanceHistory: [],
-            lastUpdated: now,
-          },
-          tx
-        );
+    let lastError: unknown;
+    for (let attempt = 0; attempt < ASSET_CODE_ALLOC_ATTEMPTS; attempt++) {
+      try {
+        return await withTransaction(async (tx) => {
+          const assetCode =
+            attempt === 0 && preferredCode
+              ? preferredCode
+              : await this.nextAssetCodeForPrefix(codePrefix, tx);
 
-        await this.lifecycleService.record(
-          {
-            assetId: row.id,
-            assetCode: row.assetCode,
-            eventType: "created",
-            actor,
-            toStatus: row.status,
-            toHolder: row.currentHolder,
-            payload: {
-              snapshot: {
-                name: row.name,
-                category: row.category,
-                location: row.location,
-                modelId: row.modelId,
-              },
-            },
-          },
-          tx
-        );
-
-        if (row.status === "needs_repair") {
-          await this.ensureOpenMaintenanceLogForAsset(row, actor, {
-            via: "asset_create",
-            fromStatus: row.status,
-            notes:
-              input.notes?.trim() ||
-              "Registered with needs_repair status.",
-          }, tx);
-        }
-
-        // Record acquisition cost history when unit value is known.
-        if (input.value !== undefined) {
-          await this.purchaseLots.recordLot(
+          const now = new Date();
+          const row = await this.assetRepository.create(
             {
-              itemType: "asset",
-              assetId: row.id,
-              itemCode: row.assetCode,
-              itemName: row.name,
+              assetCode,
+              name: input.name,
+              category: categoryName,
+              status: input.status ?? "active",
+              assignmentType: input.assignmentType ?? "borrowable",
+              modelId: input.modelId ?? null,
+              location: input.location,
+              serialNumber: input.serialNumber ?? null,
+              // Custody only via release / project assign — never invent a holder on create.
+              currentHolder: null,
+              department: input.department ?? null,
+              purchaseDate: input.purchaseDate ?? null,
+              value: input.value !== undefined ? input.value.toFixed(2) : null,
               supplierId: input.supplierId ?? null,
-              quantity: 1,
-              unitCost: input.value.toFixed(2),
-              purchasedOn: input.purchaseDate ?? todayDateString(),
+              imageUrl: input.imageUrl ?? null,
               notes: input.notes ?? null,
-              recordedByUserId: actor.userId,
-              recordedByName: actor.displayName,
+              isSandbox: input.isSandbox ?? false,
+              maintenanceHistory: [],
+              lastUpdated: now,
             },
             tx
           );
-        }
 
-        return toAssetDTO(row);
-      });
-    } catch (error) {
-      if (isPgUniqueViolation(error)) {
-        throw new ConflictError("Asset code already exists.");
+          await this.lifecycleService.record(
+            {
+              assetId: row.id,
+              assetCode: row.assetCode,
+              eventType: "created",
+              actor,
+              toStatus: row.status,
+              toHolder: row.currentHolder,
+              payload: {
+                snapshot: {
+                  name: row.name,
+                  category: row.category,
+                  location: row.location,
+                  modelId: row.modelId,
+                },
+              },
+            },
+            tx
+          );
+
+          if (row.status === "needs_repair") {
+            await this.ensureOpenMaintenanceLogForAsset(row, actor, {
+              via: "asset_create",
+              fromStatus: row.status,
+              notes:
+                input.notes?.trim() ||
+                "Registered with needs_repair status.",
+            }, tx);
+          }
+
+          // Record acquisition cost history when unit value is known.
+          if (input.value !== undefined) {
+            await this.purchaseLots.recordLot(
+              {
+                itemType: "asset",
+                assetId: row.id,
+                itemCode: row.assetCode,
+                itemName: row.name,
+                supplierId: input.supplierId ?? null,
+                quantity: 1,
+                unitCost: input.value.toFixed(2),
+                purchasedOn: input.purchaseDate ?? todayDateString(),
+                notes: input.notes ?? null,
+                recordedByUserId: actor.userId,
+                recordedByName: actor.displayName,
+              },
+              tx
+            );
+          }
+
+          return toAssetDTO(row);
+        });
+      } catch (error) {
+        lastError = error;
+        if (isPgUniqueViolation(error)) {
+          // Prefetch can go stale while the form is open — allocate the next free code.
+          continue;
+        }
+        throw error;
       }
-      throw error;
     }
+
+    if (isPgUniqueViolation(lastError)) {
+      throw new ConflictError(
+        "Could not allocate a unique asset code. Please try again."
+      );
+    }
+    throw lastError instanceof Error
+      ? lastError
+      : new ConflictError("Asset code already exists.");
   }
 
   /**
