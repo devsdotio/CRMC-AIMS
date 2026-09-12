@@ -176,7 +176,7 @@ export class AssetService {
     return found.name;
   }
 
-  /** Next `{PREFIX}-{NNN}` from existing codes (including bulk-minted units). */
+  /** Next `{PREFIX}-{NNN}` — first free slot from 001 upward. */
   async peekNextAssetCode(categoryLabel: string): Promise<{
     assetCode: string;
     prefix: string;
@@ -191,11 +191,11 @@ export class AssetService {
     prefix: string,
     session?: DbSession
   ): Promise<string> {
-    const max = await this.models.repository.maxUnitSequenceForPrefix(
+    const seq = await this.models.repository.firstAvailableSequenceForPrefix(
       prefix,
       session
     );
-    return `${prefix}-${padSeq(max + 1)}`;
+    return `${prefix}-${padSeq(seq)}`;
   }
 
   async listAssets(rawQuery: unknown): Promise<AssetDTOWithMeta[]> {
