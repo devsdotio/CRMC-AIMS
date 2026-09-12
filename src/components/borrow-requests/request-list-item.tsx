@@ -140,8 +140,14 @@ export function RequestListItem({
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-secondary">
           <span className="flex items-center gap-1 font-medium text-text">
             <User className="h-3.5 w-3.5 text-text-secondary/70 shrink-0" />
-            {request.requesterName}
+            {request.requestedByName || request.requesterName}
           </span>
+          {request.requestedByName &&
+            request.requestedByName !== request.requesterName && (
+              <span className="text-text-secondary/80">
+                via {request.requesterName}
+              </span>
+            )}
           <span className="flex items-center gap-1">
             <Building2 className="h-3.5 w-3.5 text-text-secondary/70 shrink-0" />
             {request.department}

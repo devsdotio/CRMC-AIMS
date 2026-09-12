@@ -135,8 +135,11 @@ export function SupplyRequestDetailPanel({
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-bold text-text">{request.requesterName}</p>
-                  {request.requestedByName && request.requestedByName !== request.requesterName && (
-                    <p className="text-xs text-text-secondary">On behalf of: <span className="font-medium">{request.requestedByName}</span></p>
+                  <p className="text-[10px] uppercase tracking-wide text-text-secondary mt-0.5">Department account</p>
+                  {request.requestedByName && (
+                    <p className="text-xs text-text-secondary mt-1.5">
+                      Requested by: <span className="font-semibold text-text">{request.requestedByName}</span>
+                    </p>
                   )}
                   <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1.5 text-xs text-text-secondary">
                     {request.requesterEmail && (

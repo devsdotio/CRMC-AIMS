@@ -87,7 +87,10 @@ export function RequisitionDetailPanel({
               </span>
             </div>
             <p className="text-xs text-text-secondary font-medium mt-0.5 truncate">
-              Requisition Slip • Requested by <strong className="text-text font-semibold">{request.requesterName}</strong>
+              Requisition Slip • Requested by{" "}
+              <strong className="text-text font-semibold">
+                {request.requestedByName || request.requesterName}
+              </strong>
             </p>
           </div>
 
@@ -177,8 +180,20 @@ export function RequisitionDetailPanel({
             <div className="p-4 rounded-lg border border-border bg-bg space-y-2.5 text-xs">
               <div className="flex items-center gap-2">
                 <User className="h-4 w-4 text-text-secondary shrink-0" />
-                <span className="font-bold text-text">{request.requesterName}</span>
+                <div className="min-w-0">
+                  <p className="text-[10px] uppercase tracking-wide text-text-secondary">Department account</p>
+                  <span className="font-bold text-text">{request.requesterName}</span>
+                </div>
               </div>
+              {request.requestedByName && (
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-accent shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-[10px] uppercase tracking-wide text-text-secondary">Requested by</p>
+                    <span className="font-bold text-text">{request.requestedByName}</span>
+                  </div>
+                </div>
+              )}
               <div className="flex items-center gap-2 text-text-secondary">
                 <Building2 className="h-4 w-4 shrink-0" />
                 <span>{request.department} Department</span>
