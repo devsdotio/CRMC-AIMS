@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { custodyBadgeLabel } from "@/lib/assets-custody";
+import Link from "next/link";
 
 function formatDisplayDate(dateStr?: string | null): string {
   if (!dateStr) return "Unrecorded";
@@ -1093,6 +1094,21 @@ export function AssetDetailPanel({
           </div>
 
           <div className="flex items-center justify-end gap-2.5 shrink-0">
+            {asset.status === "needs_repair" && (
+              <Link
+                href={`/maintenance-logs?assetCode=${encodeURIComponent(asset.assetCode)}`}
+                aria-label="Open maintenance log to mark serviceable"
+                className="relative group inline-flex items-center justify-center p-1.5 rounded-md bg-status-repair-bg hover:opacity-90 text-white transition-opacity cursor-pointer shadow-xs shrink-0"
+              >
+                <Wrench className="h-4 w-4" />
+                <span
+                  role="tooltip"
+                  className="pointer-events-none absolute top-full mt-1.5 left-1/2 -translate-x-1/2 z-50 whitespace-nowrap rounded-md bg-neutral-900/95 dark:bg-neutral-800/95 backdrop-blur-xs text-white px-2 py-0.5 text-[10px] font-semibold tracking-wide shadow-md border border-white/10 opacity-0 group-hover:opacity-100 translate-y-0.5 group-hover:translate-y-0 scale-95 group-hover:scale-100 transition-all duration-150"
+                >
+                  Mark Serviceable
+                </span>
+              </Link>
+            )}
             {onIssue && !asset.currentHolder && asset.status === "active" && (
               <button
                 type="button"
@@ -1217,6 +1233,22 @@ export function AssetDetailPanel({
                   </span>
                 </div>
               </div>
+
+              {asset.status === "needs_repair" && (
+                <div className="px-4 py-3 border-b border-status-repair-bg/25 bg-status-repair-bg/10 flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs text-status-repair-text">
+                    Open repair flag — resolve via Maintenance Logs to mark serviceable again.
+                  </p>
+                  <Link
+                    href={`/maintenance-logs?assetCode=${encodeURIComponent(asset.assetCode)}`}
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-status-repair-text hover:underline shrink-0"
+                  >
+                    <Wrench className="h-3.5 w-3.5" />
+                    Open maintenance log
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </Link>
+                </div>
+              )}
 
               {/* Grid Properties */}
               <div className="p-5 grid grid-cols-2 gap-4 text-xs">

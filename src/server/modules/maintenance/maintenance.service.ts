@@ -37,6 +37,7 @@ function toDTO(row: MaintenanceLogRow): MaintenanceLogDTO {
     resolutionDate: row.resolutionDate ?? undefined,
     resolutionNotes: row.resolutionNotes ?? undefined,
     resolvedBy: row.resolvedByName ?? undefined,
+    repairCost: row.repairCost ?? null,
     relatedBorrowLogCode: row.relatedBorrowLogCode ?? undefined,
     scheduledDate: row.scheduledDate ?? undefined,
   };
@@ -87,6 +88,7 @@ export class MaintenanceLogService {
           resolutionNotes: null,
           resolvedByUserId: null,
           resolvedByName: null,
+          repairCost: null,
           relatedBorrowLogCode: input.relatedBorrowLogCode ?? null,
           scheduledDate: input.scheduledDate ?? null,
         },
@@ -149,10 +151,11 @@ export class MaintenanceLogService {
         {
           isResolved: true,
           condition: "resolved",
-          resolutionDate: todayDateString(),
+          resolutionDate: input.resolutionDate ?? todayDateString(),
           resolutionNotes: input.resolutionNotes,
           resolvedByUserId: actor.userId,
-          resolvedByName: actor.displayName,
+          resolvedByName: input.technician?.trim() || actor.displayName,
+          repairCost: input.repairCost ?? null,
         },
         tx
       );
@@ -180,6 +183,9 @@ export class MaintenanceLogService {
                 payload: {
                   via: "maintenance_resolved",
                   maintenanceLogCode: existing.logCode,
+                  ...(input.repairCost != null
+                    ? { repairCost: input.repairCost }
+                    : {}),
                 },
               },
               tx

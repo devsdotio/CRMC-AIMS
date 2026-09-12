@@ -231,8 +231,6 @@ export default function Sidebar({
           name: "Maintenance Logs",
           href: "/maintenance-logs",
           icon: Wrench,
-          badgeText: "Soon",
-          disabled: true,
           roles: ["superadmin", "admin", "staff"],
         },
         {
