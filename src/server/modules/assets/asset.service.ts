@@ -373,6 +373,16 @@ export class AssetService {
           tx
         );
 
+        if (row.status === "needs_repair") {
+          await this.ensureOpenMaintenanceLogForAsset(row, actor, {
+            via: "asset_create",
+            fromStatus: row.status,
+            notes:
+              input.notes?.trim() ||
+              "Registered with needs_repair status.",
+          }, tx);
+        }
+
         // Record acquisition cost history when unit value is known.
         if (input.value !== undefined) {
           await this.purchaseLots.recordLot(
@@ -683,6 +693,22 @@ export class AssetService {
           );
         }
       }
+      if (input.status === "needs_repair") {
+        const open = await this.borrowLogRepo.findActiveByAssetId(id);
+        const openProject = await this.projectAssignments.findOpenByAssetId(id);
+        if (openProject) {
+          throw new ConflictError(
+            "Asset is on a project. Use Report damage on the project panel to flag repair while in project custody."
+          );
+        }
+        if (existing.currentHolder || open) {
+          throw new ConflictError(
+            existing.currentHolder
+              ? `Asset is currently in custody (${existing.currentHolder}). Return it with a repair condition instead of editing status.`
+              : `Asset has an open borrow/release log (${open!.borrowerName}). Return it before marking needs repair.`
+          );
+        }
+      }
       if (input.status === "active" && existing.status === "needs_repair") {
         const openMaint = await this.maintenanceRepo.countOpenByAssetId(id);
         if (openMaint > 0) {
@@ -751,15 +777,35 @@ export class AssetService {
             fromStatus: existing.status,
             toStatus: updated.status,
             payload: {
-              via: "update",
+              via:
+                updated.status === "needs_repair"
+                  ? "flagged_maintenance"
+                  : "update",
             },
           });
         }
       }
 
+      // Editing Condition → Needs Repair (or saving while already needs_repair
+      // with a missing open log) must open a Maintenance Logs entry.
+      if (updated.status === "needs_repair") {
+        await this.ensureOpenMaintenanceLogForAsset(updated, actor, {
+          via:
+            existing.status !== "needs_repair" ? "asset_edit" : "asset_edit_heal",
+          fromStatus: existing.status,
+          notes:
+            input.notes?.trim() ||
+            existing.notes?.trim() ||
+            "Marked needs repair via asset edit.",
+        });
+      }
+
       return toAssetDTO(updated);
     } catch (error) {
       if (error instanceof NotFoundError) {
+        throw error;
+      }
+      if (error instanceof ConflictError) {
         throw error;
       }
       if (isPgUniqueViolation(error)) {
@@ -969,7 +1015,74 @@ export class AssetService {
   }
 
   /**
-   * Flag maintenance: asset status + embedded history + first-class maintenance log + ledger (atomic).
+   * Ensure a needs_repair asset has an open maintenance log + lifecycle flag.
+   * Used by edit/create status paths so Maintenance Logs stays the repair hub.
+   */
+  private async ensureOpenMaintenanceLogForAsset(
+    asset: AssetRow,
+    actor: ActorContext,
+    opts: { via: string; fromStatus: string; notes: string },
+    session?: DbSession
+  ): Promise<void> {
+    const run = async (tx: DbSession) => {
+      const openCount = await this.maintenanceRepo.countOpenByAssetId(
+        asset.id,
+        tx
+      );
+      if (openCount > 0) return;
+
+      const mntCode = generateOperationalCode("MNT");
+      await this.maintenanceRepo.create(
+        {
+          logCode: mntCode,
+          assetId: asset.id,
+          assetCode: asset.assetCode,
+          assetName: asset.name,
+          category: asset.category,
+          condition: "needs_maintenance",
+          source: "manual_flag",
+          dateLogged: todayDateString(),
+          loggedByUserId: actor.userId,
+          loggedByName: actor.displayName,
+          notes: opts.notes,
+          isResolved: false,
+          resolutionDate: null,
+          resolutionNotes: null,
+          resolvedByUserId: null,
+          resolvedByName: null,
+          repairCost: null,
+          relatedBorrowLogCode: null,
+          scheduledDate: null,
+        },
+        tx
+      );
+
+      await this.lifecycleService.record(
+        {
+          assetId: asset.id,
+          assetCode: asset.assetCode,
+          eventType: "flagged_maintenance",
+          actor,
+          fromStatus: opts.fromStatus,
+          toStatus: "needs_repair",
+          fromHolder: asset.currentHolder,
+          toHolder: asset.currentHolder,
+          payload: {
+            via: opts.via,
+            maintenanceLogCode: mntCode,
+            notes: opts.notes,
+          },
+        },
+        tx
+      );
+    };
+
+    if (session) return run(session);
+    return withTransaction(run);
+  }
+
+  /**
+   * Flag maintenance: asset status + first-class maintenance log + ledger (atomic).
    */
   async flagForMaintenance(
     rawId: string,

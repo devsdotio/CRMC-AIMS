@@ -36,7 +36,7 @@ import {
   StickyNote,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { custodyBadgeLabel } from "@/lib/assets-custody";
+import { custodyBadgeLabel, isProjectCustody } from "@/lib/assets-custody";
 import Link from "next/link";
 
 function formatDisplayDate(dateStr?: string | null): string {
@@ -999,7 +999,7 @@ export interface AssetDetailPanelProps {
   onClose: () => void;
   onEdit?: (asset: Asset) => void;
   onIssue?: (asset: Asset) => void;
-  onReportMissing?: (asset: Asset) => void;
+  onFlagMaintenance?: (asset: Asset) => void;
   onDelete?: (asset: Asset) => void;
 }
 
@@ -1041,7 +1041,7 @@ export function AssetDetailPanel({
   onClose,
   onEdit,
   onIssue,
-  onReportMissing,
+  onFlagMaintenance,
   onDelete,
 }: AssetDetailPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
@@ -1106,6 +1106,21 @@ export function AssetDetailPanel({
 
   const categoryMeta = getCategoryStyle(asset.category);
   const statusMeta = STATUS_STYLES[asset.status];
+  const showMaintenanceAction =
+    asset.status !== "retired" &&
+    asset.status !== "missing" &&
+    (asset.status === "needs_repair" || Boolean(onFlagMaintenance));
+  const canFlagMaintenance =
+    Boolean(onFlagMaintenance) &&
+    !asset.currentHolder &&
+    asset.status === "active";
+  const maintenanceDisabledReason = asset.currentHolder
+    ? isProjectCustody(asset.currentHolder)
+      ? "On a project — use Report damage on the project panel"
+      : `In custody (${asset.currentHolder}) — return it first`
+    : asset.status !== "active" && asset.status !== "needs_repair"
+      ? "Only active assets can be flagged for maintenance"
+      : null;
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs transition-opacity duration-200">
@@ -1152,21 +1167,54 @@ export function AssetDetailPanel({
           </div>
 
           <div className="flex items-center justify-end gap-2.5 shrink-0">
-            {asset.status === "needs_repair" && (
-              <Link
-                href={`/maintenance-logs?assetCode=${encodeURIComponent(asset.assetCode)}`}
-                aria-label="Open maintenance log to mark serviceable"
-                className="relative group inline-flex items-center justify-center p-1.5 rounded-md bg-status-repair-bg hover:opacity-90 text-white transition-opacity cursor-pointer shadow-xs shrink-0"
-              >
-                <Wrench className="h-4 w-4" />
-                <span
-                  role="tooltip"
-                  className="pointer-events-none absolute top-full mt-1.5 left-1/2 -translate-x-1/2 z-50 whitespace-nowrap rounded-md bg-neutral-900/95 dark:bg-neutral-800/95 backdrop-blur-xs text-white px-2 py-0.5 text-[10px] font-semibold tracking-wide shadow-md border border-white/10 opacity-0 group-hover:opacity-100 translate-y-0.5 group-hover:translate-y-0 scale-95 group-hover:scale-100 transition-all duration-150"
+            {showMaintenanceAction &&
+              (asset.status === "needs_repair" ? (
+                <Link
+                  href={`/maintenance-logs?assetCode=${encodeURIComponent(asset.assetCode)}`}
+                  aria-label="Open maintenance log to mark serviceable"
+                  className="relative group inline-flex items-center justify-center p-1.5 rounded-md bg-status-repair-bg hover:opacity-90 text-white transition-opacity cursor-pointer shadow-xs shrink-0"
                 >
-                  Mark Serviceable
-                </span>
-              </Link>
-            )}
+                  <Wrench className="h-4 w-4" />
+                  <span
+                    role="tooltip"
+                    className="pointer-events-none absolute top-full mt-1.5 left-1/2 -translate-x-1/2 z-50 whitespace-nowrap rounded-md bg-neutral-900/95 dark:bg-neutral-800/95 backdrop-blur-xs text-white px-2 py-0.5 text-[10px] font-semibold tracking-wide shadow-md border border-white/10 opacity-0 group-hover:opacity-100 translate-y-0.5 group-hover:translate-y-0 scale-95 group-hover:scale-100 transition-all duration-150"
+                  >
+                    Mark Serviceable
+                  </span>
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (canFlagMaintenance && onFlagMaintenance) {
+                      onFlagMaintenance(asset);
+                    }
+                  }}
+                  disabled={!canFlagMaintenance}
+                  aria-label={
+                    canFlagMaintenance
+                      ? "Flag asset for maintenance"
+                      : maintenanceDisabledReason ??
+                        "Flag for maintenance unavailable"
+                  }
+                  className={cn(
+                    "relative group inline-flex items-center justify-center p-1.5 rounded-md text-white shadow-xs shrink-0",
+                    canFlagMaintenance
+                      ? "bg-status-repair-bg hover:opacity-90 cursor-pointer transition-opacity"
+                      : "bg-status-repair-bg/55 cursor-not-allowed"
+                  )}
+                >
+                  <Wrench className="h-4 w-4" />
+                  <span
+                    role="tooltip"
+                    className="pointer-events-none absolute top-full mt-1.5 left-1/2 -translate-x-1/2 z-50 max-w-56 whitespace-normal text-center rounded-md bg-neutral-900/95 dark:bg-neutral-800/95 backdrop-blur-xs text-white px-2 py-0.5 text-[10px] font-semibold tracking-wide shadow-md border border-white/10 opacity-0 group-hover:opacity-100 translate-y-0.5 group-hover:translate-y-0 scale-95 group-hover:scale-100 transition-all duration-150"
+                  >
+                    {canFlagMaintenance
+                      ? "Flag for Maintenance"
+                      : maintenanceDisabledReason ?? "Unavailable"}
+                  </span>
+                </button>
+              ))}
             {onIssue && !asset.currentHolder && asset.status === "active" && (
               <button
                 type="button"
@@ -1180,22 +1228,6 @@ export function AssetDetailPanel({
                   className="pointer-events-none absolute top-full mt-1.5 left-1/2 -translate-x-1/2 z-50 whitespace-nowrap rounded-md bg-neutral-900/95 dark:bg-neutral-800/95 backdrop-blur-xs text-white px-2 py-0.5 text-[10px] font-semibold tracking-wide shadow-md border border-white/10 opacity-0 group-hover:opacity-100 translate-y-0.5 group-hover:translate-y-0 scale-95 group-hover:scale-100 transition-all duration-150"
                 >
                   Issue Asset
-                </span>
-              </button>
-            )}
-            {onReportMissing && asset.status !== "missing" && asset.status !== "retired" && (
-              <button
-                type="button"
-                onClick={() => onReportMissing(asset)}
-                aria-label="Report asset as missing"
-                className="relative group inline-flex items-center justify-center p-1.5 rounded-md bg-amber-500 hover:bg-amber-600 text-white transition-colors cursor-pointer shadow-xs shrink-0"
-              >
-                <AlertCircle className="h-4 w-4" />
-                <span
-                  role="tooltip"
-                  className="pointer-events-none absolute top-full mt-1.5 left-1/2 -translate-x-1/2 z-50 whitespace-nowrap rounded-md bg-neutral-900/95 dark:bg-neutral-800/95 backdrop-blur-xs text-white px-2 py-0.5 text-[10px] font-semibold tracking-wide shadow-md border border-white/10 opacity-0 group-hover:opacity-100 translate-y-0.5 group-hover:translate-y-0 scale-95 group-hover:scale-100 transition-all duration-150"
-                >
-                  Report Missing
                 </span>
               </button>
             )}

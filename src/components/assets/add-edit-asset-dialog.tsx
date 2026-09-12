@@ -300,11 +300,23 @@ function AddEditAssetDialogForm({
                     className="w-full h-9 px-3 text-xs bg-bg border border-border rounded-lg text-text font-medium focus:outline-none focus:ring-2 focus:ring-accent"
                   >
                     <option value="active">Active (Serviceable)</option>
-                    <option value="needs_repair">Needs Repair</option>
+                    <option
+                      value="needs_repair"
+                      disabled={Boolean(initialAsset?.currentHolder)}
+                    >
+                      Needs Repair
+                    </option>
                     <option value="out_of_service">Out of Service</option>
                     <option value="retired">Retired</option>
                     <option value="missing">Missing</option>
                   </select>
+                  {status === "needs_repair" && (
+                    <p className="text-[11px] text-text-secondary leading-relaxed">
+                      {initialAsset?.currentHolder
+                        ? "This asset is in custody — return it with a repair condition instead of editing status here."
+                        : "This opens a Maintenance Logs entry so the asset can be marked serviceable again after repair."}
+                    </p>
+                  )}
                 </div>
               </div>
 

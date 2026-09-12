@@ -54,10 +54,91 @@ export class MaintenanceLogService {
     private readonly projectAssignments = new ProjectAssetAssignmentRepository()
   ) {}
 
-  async list(rawQuery: unknown): Promise<MaintenanceLogDTO[]> {
+  async list(rawQuery: unknown, actor?: ActorContext): Promise<MaintenanceLogDTO[]> {
     const filters = listMaintenanceQuerySchema.parse(rawQuery ?? {});
+    if (actor) {
+      await this.syncOrphanNeedsRepairFlags(actor, filters.includeSandbox === true);
+    }
     const rows = await this.repo.list(filters);
     return rows.map(toDTO);
+  }
+
+  /**
+   * Backfill open maintenance logs for assets already marked needs_repair
+   * without a corresponding open log (status-only edits, legacy data).
+   */
+  private async syncOrphanNeedsRepairFlags(
+    actor: ActorContext,
+    includeSandbox: boolean
+  ): Promise<void> {
+    const orphans = await this.repo.findNeedsRepairWithoutOpenLog({
+      includeSandbox,
+    });
+    if (orphans.length === 0) return;
+
+    for (const asset of orphans) {
+      // Skip in-custody orphans — they must go through return / project damage.
+      if (asset.currentHolder) continue;
+
+      await withTransaction(async (tx) => {
+        const stillOpen = await this.repo.countOpenByAssetId(asset.id, tx);
+        if (stillOpen > 0) return;
+
+        const openBorrow = await this.borrowLogs.findActiveByAssetId(asset.id, tx);
+        const openProject = await this.projectAssignments.findOpenByAssetId(
+          asset.id,
+          tx
+        );
+        if (openBorrow || openProject) return;
+
+        const logCode = generateOperationalCode("MNT");
+        await this.repo.create(
+          {
+            logCode,
+            assetId: asset.id,
+            assetCode: asset.assetCode,
+            assetName: asset.name,
+            category: asset.category,
+            condition: "needs_maintenance",
+            source: "manual_flag",
+            dateLogged: todayDateString(),
+            loggedByUserId: actor.userId,
+            loggedByName: actor.displayName,
+            notes:
+              asset.notes?.trim() ||
+              "Backfilled from needs_repair status (no prior maintenance log).",
+            isResolved: false,
+            resolutionDate: null,
+            resolutionNotes: null,
+            resolvedByUserId: null,
+            resolvedByName: null,
+            repairCost: null,
+            relatedBorrowLogCode: null,
+            scheduledDate: null,
+          },
+          tx
+        );
+
+        await this.lifecycle.record(
+          {
+            assetId: asset.id,
+            assetCode: asset.assetCode,
+            eventType: "flagged_maintenance",
+            actor,
+            fromStatus: asset.status,
+            toStatus: "needs_repair",
+            fromHolder: asset.currentHolder,
+            toHolder: asset.currentHolder,
+            payload: {
+              via: "orphan_sync",
+              maintenanceLogCode: logCode,
+              notes: "Opened maintenance log for existing needs_repair status.",
+            },
+          },
+          tx
+        );
+      });
+    }
   }
 
   async getById(rawId: string): Promise<MaintenanceLogDTO> {
