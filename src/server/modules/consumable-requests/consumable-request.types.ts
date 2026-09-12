@@ -73,6 +73,7 @@ export type ListConsumableRequestFilters = PaginationParams & {
   requesterUserId?: string;
   startDate?: string;
   endDate?: string;
+  includeSandbox?: boolean;
 };
 
 export interface IConsumableRequestRepository {

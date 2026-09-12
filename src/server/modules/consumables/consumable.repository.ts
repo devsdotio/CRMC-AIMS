@@ -29,6 +29,7 @@ const consumableListColumns = {
   supplier: consumables.supplier,
   lastRestocked: consumables.lastRestocked,
   notes: consumables.notes,
+  isSandbox: consumables.isSandbox,
   createdAt: consumables.createdAt,
   updatedAt: consumables.updatedAt,
 } as const;
@@ -100,6 +101,9 @@ export class ConsumableRepository implements IConsumableRepository {
         )!
       );
     }
+    if (!filters.includeSandbox) {
+      conditions.push(eq(consumables.isSandbox, false));
+    }
 
     if (filters.stockLevel === "critical") {
       conditions.push(
@@ -154,7 +158,10 @@ export class ConsumableRepository implements IConsumableRepository {
       .select({ value: count() })
       .from(consumables)
       .where(
-        sql`${consumables.currentQty} <= ceil(${consumables.minThreshold} * 1.2)`
+        and(
+          eq(consumables.isSandbox, false),
+          sql`${consumables.currentQty} <= ceil(${consumables.minThreshold} * 1.2)`
+        )
       );
     return Number(row?.value ?? 0);
   }
@@ -165,7 +172,10 @@ export class ConsumableRepository implements IConsumableRepository {
       .select(consumableListColumns)
       .from(consumables)
       .where(
-        sql`${consumables.currentQty} <= ceil(${consumables.minThreshold} * 1.2)`
+        and(
+          eq(consumables.isSandbox, false),
+          sql`${consumables.currentQty} <= ceil(${consumables.minThreshold} * 1.2)`
+        )
       )
       .orderBy(asc(consumables.currentQty))
       .limit(limit);

@@ -13,17 +13,27 @@ const departmentCodeSchema = z
 
 export const listDepartmentsQuerySchema = z.object({
   search: z.string().trim().max(200).optional(),
+  includeSandbox: z
+    .union([z.boolean(), z.enum(["true", "false", "1", "0"])])
+    .optional()
+    .transform((v) => {
+      if (v === undefined) return undefined;
+      if (typeof v === "boolean") return v;
+      return v === "true" || v === "1";
+    }),
 });
 
 export const createDepartmentSchema = z.object({
   code: departmentCodeSchema,
   name: z.string().trim().min(1, "Department name is required.").max(120),
+  isSandbox: z.boolean().optional(),
 });
 
 export const updateDepartmentSchema = z
   .object({
     code: departmentCodeSchema.optional(),
     name: z.string().trim().min(1).max(120).optional(),
+    isSandbox: z.boolean().optional(),
   })
   .refine((body) => Object.keys(body).length > 0, {
     message: "At least one field is required to update a department.",

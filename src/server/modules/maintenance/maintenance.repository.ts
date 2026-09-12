@@ -3,6 +3,7 @@ import { and, count, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { getDb } from "@/server/db";
 import type { DbSession } from "@/server/db/transaction";
 import {
+  assets,
   maintenanceLogs,
   type MaintenanceLogRow,
   type NewMaintenanceLogRow,
@@ -50,6 +51,15 @@ export class MaintenanceRepository implements IMaintenanceRepository {
           ilike(maintenanceLogs.logCode, q),
           ilike(maintenanceLogs.notes, q)
         )!
+      );
+    }
+    if (!filters.includeSandbox) {
+      conditions.push(
+        sql`(${maintenanceLogs.assetId} is null OR not exists (
+          select 1 from ${assets}
+          where ${assets.id} = ${maintenanceLogs.assetId}
+            and ${assets.isSandbox} = true
+        ))`
       );
     }
 

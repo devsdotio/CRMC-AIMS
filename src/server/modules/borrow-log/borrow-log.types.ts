@@ -38,6 +38,7 @@ export type ListBorrowLogFilters = {
   borrowerUserId?: string;
   borrowerEmail?: string;
   custodyKind?: "borrow" | "assignment" | "all";
+  includeSandbox?: boolean;
 };
 
 export interface IBorrowLogRepository {

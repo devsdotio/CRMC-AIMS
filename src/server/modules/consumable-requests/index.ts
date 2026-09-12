@@ -14,6 +14,7 @@ export class ConsumableRequestController {
     try {
       const session = await requireActor();
       const url = new URL(request.url);
+      const { parseIncludeSandbox } = await import("@/server/shared/sandbox");
       return ok(
         await this.service.list(
           {
@@ -28,6 +29,10 @@ export class ConsumableRequestController {
             limit: url.searchParams.has("limit")
               ? Number(url.searchParams.get("limit"))
               : undefined,
+            includeSandbox: parseIncludeSandbox(
+              url.searchParams.get("includeSandbox"),
+              session.role
+            ),
           },
           session
         )

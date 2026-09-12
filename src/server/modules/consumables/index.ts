@@ -13,9 +13,10 @@ export class ConsumableController {
 
   async list(request: NextRequest | Request) {
     try {
-      await requireActor();
+      const session = await requireActor();
       const url = new URL(request.url);
-      
+      const { parseIncludeSandbox } = await import("@/server/shared/sandbox");
+
       const pageParam = url.searchParams.get("page");
       const limitParam = url.searchParams.get("limit");
 
@@ -26,6 +27,10 @@ export class ConsumableController {
           search: url.searchParams.get("search") ?? undefined,
           page: pageParam ? parseInt(pageParam, 10) : undefined,
           limit: limitParam ? parseInt(limitParam, 10) : undefined,
+          includeSandbox: parseIncludeSandbox(
+            url.searchParams.get("includeSandbox"),
+            session.role
+          ),
         })
       );
     } catch (error) {

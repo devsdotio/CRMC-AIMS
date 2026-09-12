@@ -28,9 +28,11 @@ import {
   Tags,
   Building2,
   Receipt,
+  FlaskConical,
 } from "lucide-react";
 import { performSignOut } from "@/lib/auth/sign-out-client";
 import { cn } from "@/lib/utils";
+import { useSandboxVisibility } from "@/components/providers/sandbox-visibility-context";
 
 interface NavItem {
   name: string;
@@ -77,6 +79,7 @@ export default function Sidebar({
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
+  const { canToggle, preference, setShowSandbox } = useSandboxVisibility();
 
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
@@ -532,7 +535,7 @@ export default function Sidebar({
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-3 space-y-4 overflow-y-auto overflow-x-hidden min-h-0">
+      <nav className="flex-1 px-3 py-3 space-y-4 overflow-y-auto overflow-x-hidden min-h-0 no-scrollbar">
         {sections.map((section, index) => (
           <div key={section.label}>
             {!isCollapsed ? (
@@ -639,6 +642,37 @@ export default function Sidebar({
 
               {/* Action buttons */}
               <div className="space-y-0.5">
+                {canToggle && (
+                  <button
+                    type="button"
+                    onClick={() => setShowSandbox(!preference)}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-white/80 hover:bg-white/10 hover:text-white transition-colors cursor-pointer group"
+                    aria-pressed={preference}
+                  >
+                    <FlaskConical
+                      className={cn(
+                        "w-4 h-4 transition-colors",
+                        preference
+                          ? "text-amber-300"
+                          : "text-white/50 group-hover:text-white"
+                      )}
+                    />
+                    <span className="font-medium flex-1 text-left">
+                      Show sandbox data
+                    </span>
+                    <span
+                      className={cn(
+                        "text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded",
+                        preference
+                          ? "bg-amber-500/20 text-amber-300"
+                          : "bg-white/10 text-white/40"
+                      )}
+                    >
+                      {preference ? "On" : "Off"}
+                    </span>
+                  </button>
+                )}
+
                 <button
                   type="button"
                   onClick={handleNavigateProfile}

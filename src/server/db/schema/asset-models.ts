@@ -1,4 +1,5 @@
 import {
+  boolean,
   index,
   numeric,
   pgTable,
@@ -39,6 +40,8 @@ export const assetModels = pgTable(
     }),
     imageUrl: text("image_url"),
     notes: text("notes"),
+    /** Testing-only row; hidden from non-superadmin lists unless opted in. */
+    isSandbox: boolean("is_sandbox").notNull().default(false),
 
     createdByUserId: uuid("created_by_user_id").notNull(),
     createdByName: text("created_by_name").notNull(),
@@ -53,6 +56,7 @@ export const assetModels = pgTable(
   (table) => [
     index("asset_models_category_idx").on(table.category),
     index("asset_models_name_idx").on(table.name),
+    index("asset_models_is_sandbox_idx").on(table.isSandbox),
   ]
 );
 

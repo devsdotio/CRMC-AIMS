@@ -160,6 +160,7 @@ export default function ConsumablesPage() {
     supplierId?: string | null;
     unitCost?: string | number;
     notes?: string;
+    isSandbox?: boolean;
   }) => {
     try {
       if (addEditState.item) {
@@ -176,6 +177,7 @@ export default function ConsumablesPage() {
                 ? undefined
                 : itemData.supplier || null,
             notes: itemData.notes,
+            isSandbox: itemData.isSandbox,
           },
         });
         toast.success("Item updated successfully.");
@@ -192,6 +194,7 @@ export default function ConsumablesPage() {
           supplierId: itemData.supplierId ?? undefined,
           unitCost: itemData.unitCost,
           notes: itemData.notes,
+          isSandbox: itemData.isSandbox,
         });
         setSelectedId(created.id);
         toast.success("Item created successfully.");

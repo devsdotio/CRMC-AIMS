@@ -377,7 +377,7 @@ export function RequestDetailSheet({
               <div className="flex items-center gap-2">
                 <User className="h-4 w-4 text-text-secondary shrink-0" />
                 <div>
-                  <p className="text-[10px] text-text-secondary uppercase tracking-wide">Name</p>
+                  <p className="text-[10px] text-text-secondary uppercase tracking-wide">Department account</p>
                   <p className="font-bold text-text mt-0.5">{request.requesterName}</p>
                 </div>
               </div>
@@ -389,6 +389,16 @@ export function RequestDetailSheet({
                   <p className="font-bold text-text mt-0.5">{request.department}</p>
                 </div>
               </div>
+
+              {request.requestedByName && (
+                <div className="col-span-2 flex items-center gap-2 pt-1 border-t border-border/50">
+                  <User className="h-4 w-4 text-accent shrink-0" />
+                  <div>
+                    <p className="text-[10px] text-text-secondary uppercase tracking-wide">Requested By</p>
+                    <p className="font-bold text-text mt-0.5">{request.requestedByName}</p>
+                  </div>
+                </div>
+              )}
 
               <div className="col-span-2 flex items-center gap-2 pt-1 border-t border-border/50">
                 <Mail className="h-4 w-4 text-text-secondary shrink-0" />

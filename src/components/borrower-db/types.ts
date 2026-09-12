@@ -68,6 +68,8 @@ export interface WizardFormValues {
   quantities: Record<string, number>;
   purpose: string;
   notes: string;
+  /** Person the request is for; defaults to department account name, overridable. */
+  requestedByName: string;
 }
 
 // ─── Tabs ─────────────────────────────────────────────────────────────────────

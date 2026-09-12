@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import type { ConsumableItem } from "@/types/inventory";
 import { StockLevelBar } from "./stock-level-bar";
 import { useCategoryStyleMap } from "@/features/categories/client/use-categories";
+import { SandboxBadge } from "@/components/shared/sandbox-badge";
 
 export interface ConsumableCardProps {
   item: ConsumableItem;
@@ -59,6 +60,11 @@ export function ConsumableCard({
       <div className="p-4 flex flex-col gap-3 flex-1">
         <h3 className="text-sm font-bold text-text leading-snug line-clamp-2 group-hover:text-accent transition-colors">
           {item.name}
+          {item.isSandbox ? (
+            <span className="ml-2 align-middle">
+              <SandboxBadge />
+            </span>
+          ) : null}
         </h3>
 
         {/* Stock Level Bar Component */}

@@ -79,6 +79,7 @@ function toDTO(row: ConsumableRow): ConsumableDTO {
         : String(row.lastRestocked).slice(0, 10)
       : "—",
     notes: row.notes ?? undefined,
+    isSandbox: row.isSandbox,
     // Stock ledger is stock_movements (Issue History). Do not grow JSONB history.
     history: [],
   };
@@ -215,6 +216,7 @@ export class ConsumableService {
       location: input.location,
       supplier: input.supplier ?? null,
       notes: input.notes ?? null,
+      isSandbox: input.isSandbox ?? false,
     };
 
     if (input.currentQty <= 0) {
@@ -316,6 +318,7 @@ export class ConsumableService {
       ...(input.location !== undefined ? { location: input.location } : {}),
       ...(input.supplier !== undefined ? { supplier: input.supplier } : {}),
       ...(input.notes !== undefined ? { notes: input.notes } : {}),
+      ...(input.isSandbox !== undefined ? { isSandbox: input.isSandbox } : {}),
     });
     if (!updated) throw new NotFoundError("Consumable", id);
     return toDTO(updated);

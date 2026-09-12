@@ -18,6 +18,7 @@ import {
   FileCheck2,
   FileText,
   StickyNote,
+  User,
   Minus,
   Plus,
   Laptop,
@@ -1210,6 +1211,43 @@ function StepDetails({
         </div>
       </section>
 
+      {/* ── Requested By ── */}
+      <section aria-label="Requested By" className="rounded-xl border border-border bg-card p-4 shadow-xs space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <User className="h-3.5 w-3.5 text-accent" />
+            <label htmlFor="requestedByName" className="text-[11px] font-bold uppercase tracking-wider text-text">
+              Requested By <span className="text-status-outofservice-bg">*</span>
+            </label>
+          </div>
+          <span className="text-[10px] text-text-secondary font-medium">Defaults to department account</span>
+        </div>
+
+        <input
+          id="requestedByName"
+          type="text"
+          value={values.requestedByName}
+          onChange={(e) => onChange({ requestedByName: e.target.value })}
+          placeholder="Name of the person this request is for…"
+          className={cn(
+            "w-full h-10 rounded-xl border bg-bg-subtle/50 px-3 text-sm font-medium text-text placeholder:text-text-secondary transition-all",
+            "focus:outline-none focus:bg-card focus:border-accent focus:ring-2 focus:ring-accent/20",
+            errors.requestedByName ? "border-status-outofservice-bg bg-status-outofservice-bg/5" : "border-border"
+          )}
+          aria-describedby={errors.requestedByName ? "requested-by-err" : "requested-by-hint"}
+        />
+        {errors.requestedByName ? (
+          <p id="requested-by-err" className="text-[11px] font-medium text-status-outofservice-bg flex items-center gap-1">
+            <AlertCircle className="h-3 w-3 shrink-0" />
+            {errors.requestedByName}
+          </p>
+        ) : (
+          <p id="requested-by-hint" className="text-[11px] text-text-secondary">
+            Auto-filled from your department account. Override if someone else needs the items.
+          </p>
+        )}
+      </section>
+
       {/* ── Purpose Input Card ── */}
       <section aria-label="Purpose" className="rounded-xl border border-border bg-card p-4 shadow-xs space-y-2">
         <div className="flex items-center justify-between">
@@ -1230,7 +1268,7 @@ function StepDetails({
           placeholder="Briefly state the reason, project name, or clinical task for this request…"
           className={cn(
             "w-full rounded-xl border bg-bg-subtle/50 p-3 text-sm text-text placeholder:text-text-secondary transition-all resize-none",
-            "focus:outline-none focus-bg focus:border-accent focus:ring-2 focus:ring-accent/20",
+            "focus:outline-none focus:bg-card focus:border-accent focus:ring-2 focus:ring-accent/20",
             errors.purpose ? "border-status-outofservice-bg bg-status-outofservice-bg/5" : "border-border"
           )}
           aria-describedby={errors.purpose ? "purpose-err" : undefined}
@@ -1314,6 +1352,12 @@ function StepReview({ values, me }: { values: WizardFormValues, me?: MeProfile }
         </h3>
         <div className="rounded-lg border border-border bg-card p-3 grid grid-cols-2 gap-y-3 gap-x-4 text-sm">
           <div>
+            <p className="text-[10px] uppercase tracking-wider text-text-secondary font-semibold">Requested By</p>
+            <p className="font-medium text-text mt-0.5">
+              {values.requestedByName.trim() || requester.name}
+            </p>
+          </div>
+          <div>
             <p className="text-[10px] uppercase tracking-wider text-text-secondary font-semibold">Department account</p>
             <p className="font-medium text-text mt-0.5">{requester.name}</p>
           </div>
@@ -1321,7 +1365,7 @@ function StepReview({ values, me }: { values: WizardFormValues, me?: MeProfile }
             <p className="text-[10px] uppercase tracking-wider text-text-secondary font-semibold">Department</p>
             <p className="font-medium text-text mt-0.5">{requester.department}</p>
           </div>
-          <div className="col-span-2">
+          <div>
             <p className="text-[10px] uppercase tracking-wider text-text-secondary font-semibold">Email Address</p>
             <p className="font-medium text-text mt-0.5">{requester.email}</p>
           </div>
@@ -1438,6 +1482,7 @@ export function NewBorrowRequestWizard({
     quantities: {},
     purpose: "",
     notes: "",
+    requestedByName: "",
   });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [errorMessage, setErrorMessage] = useState("");
@@ -1463,11 +1508,23 @@ export function NewBorrowRequestWizard({
       quantities: {},
       purpose: "",
       notes: "",
+      requestedByName: me?.name ?? "",
     });
     setFieldErrors({});
     setErrorMessage("");
     resetMutation();
+    // Intentionally omit me?.name: profile may load after open; seeded below without wiping other fields.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, prefilledItems, resetMutation, initialType]);
+
+  // Seed Requested By from department account when profile arrives after the wizard opens.
+  useEffect(() => {
+    if (!open || !me?.name) return;
+    setValues((prev) => {
+      if (prev.requestedByName.trim()) return prev;
+      return { ...prev, requestedByName: me.name };
+    });
+  }, [open, me?.name]);
 
   const patchValues = useCallback(
     (patch: Partial<WizardFormValues>) => setValues((p) => ({ ...p, ...patch })),
@@ -1486,6 +1543,7 @@ export function NewBorrowRequestWizard({
       else if (values.dateTo < values.dateFrom) errs.dateTo = "End date must be on or after start date.";
     }
     if (!values.purpose.trim()) errs.purpose = "Purpose is required.";
+    if (!values.requestedByName.trim()) errs.requestedByName = "Requested by is required.";
     values.selectedItems.forEach((item) => {
       const q = values.quantities[item.id] || 1;
       if (q < 1) errs[`qty_${item.id}`] = "Quantity must be at least 1.";
@@ -1562,6 +1620,7 @@ export function NewBorrowRequestWizard({
           requesterName: me.name,
           requesterEmail: me.email,
           departmentId: me.departmentId,
+          requestedByName: values.requestedByName.trim() || me.name,
           purpose: values.purpose,
           notes: values.notes || undefined,
           lines: supplyLines.map((item) => ({
@@ -1577,6 +1636,7 @@ export function NewBorrowRequestWizard({
           requesterEmail: created.requesterEmail,
           requesterPhone: created.requesterPhone,
           department: created.department,
+          requestedByName: created.requestedByName,
           items: created.lines.map((line) => ({
             itemDescription: line.itemName,
             consumableId: line.consumableId,
@@ -1628,6 +1688,7 @@ export function NewBorrowRequestWizard({
             ? values.dateTo
             : undefined,
         notes: values.notes || undefined,
+        requestedByName: values.requestedByName.trim() || me.name,
       });
 
       toast.success(
@@ -1734,7 +1795,15 @@ export function NewBorrowRequestWizard({
           {step === "details" && values.selectedItems.length > 0 && (
             <StepDetails
               items={values.selectedItems}
-              values={{ requestType: values.requestType, dateFrom: values.dateFrom, dateTo: values.dateTo, quantities: values.quantities, purpose: values.purpose, notes: values.notes }}
+              values={{
+                requestType: values.requestType,
+                dateFrom: values.dateFrom,
+                dateTo: values.dateTo,
+                quantities: values.quantities,
+                purpose: values.purpose,
+                notes: values.notes,
+                requestedByName: values.requestedByName,
+              }}
               onChange={patchValues}
               errors={fieldErrors}
             />

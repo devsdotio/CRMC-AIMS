@@ -14,6 +14,7 @@ export class BorrowRequestController {
     try {
       const session = await requireActor();
       const url = new URL(request.url);
+      const { parseIncludeSandbox } = await import("@/server/shared/sandbox");
       const data = await this.service.list({
         status: url.searchParams.get("status") ?? undefined,
         department: url.searchParams.get("department") ?? undefined,
@@ -24,6 +25,10 @@ export class BorrowRequestController {
         assetId: url.searchParams.get("assetId") ?? undefined,
         page: url.searchParams.has("page") ? Number(url.searchParams.get("page")) : undefined,
         limit: url.searchParams.has("limit") ? Number(url.searchParams.get("limit")) : undefined,
+        includeSandbox: parseIncludeSandbox(
+          url.searchParams.get("includeSandbox"),
+          session.role
+        ),
       }, session);
       return ok(data);
     } catch (error) {

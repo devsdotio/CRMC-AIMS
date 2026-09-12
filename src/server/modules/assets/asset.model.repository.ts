@@ -14,6 +14,7 @@ import {
 export type ListAssetModelFilters = {
   category?: string;
   search?: string;
+  includeSandbox?: boolean;
 };
 
 export class AssetModelRepository {
@@ -66,6 +67,9 @@ export class AssetModelRepository {
           ilike(assetModels.manufacturer, q)
         )!
       );
+    }
+    if (!filters.includeSandbox) {
+      conditions.push(eq(assetModels.isSandbox, false));
     }
 
     const base = db

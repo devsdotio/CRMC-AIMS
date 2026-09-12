@@ -29,6 +29,7 @@ export const createAssetModelSchema = z.object({
   defaultUnitValue: z.number().nonnegative().optional(),
   imageUrl: z.string().trim().max(2048).optional(),
   notes: z.string().trim().max(4000).optional(),
+  isSandbox: z.boolean().optional(),
 });
 
 export const updateAssetModelSchema = createAssetModelSchema
@@ -110,6 +111,14 @@ export const bulkCreateAssetsSchema = createAssetModelSchema
 export const listAssetModelsQuerySchema = z.object({
   category: categoryLabelSchema.optional(),
   search: z.string().trim().max(200).optional(),
+  includeSandbox: z
+    .union([z.boolean(), z.enum(["true", "false", "1", "0"])])
+    .optional()
+    .transform((v) => {
+      if (v === undefined) return undefined;
+      if (typeof v === "boolean") return v;
+      return v === "true" || v === "1";
+    }),
 });
 
 /** Operator scanner: release by QR payload or bare asset code. */

@@ -12,13 +12,18 @@ export class MaintenanceController {
 
   async list(request: NextRequest | Request) {
     try {
-      await requireActor();
+      const session = await requireActor();
       const url = new URL(request.url);
+      const { parseIncludeSandbox } = await import("@/server/shared/sandbox");
       return ok(
         await this.service.list({
           openOnly: url.searchParams.get("openOnly") ?? undefined,
           search: url.searchParams.get("search") ?? undefined,
           condition: url.searchParams.get("condition") ?? undefined,
+          includeSandbox: parseIncludeSandbox(
+            url.searchParams.get("includeSandbox"),
+            session.role
+          ),
         })
       );
     } catch (error) {

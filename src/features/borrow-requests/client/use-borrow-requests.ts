@@ -18,6 +18,7 @@ import type {
 } from "./borrow-requests-api";
 import { borrowRequestsApi } from "./borrow-requests-api";
 import { borrowRequestQueryKeys } from "./query-keys";
+import { useSandboxVisibility } from "@/components/providers/sandbox-visibility-context";
 import { dashboardQueryKeys } from "@/features/dashboard/client/query-keys";
 import {
   CUSTODY_DOMAINS,
@@ -84,10 +85,12 @@ export function useBorrowRequests(filters?: {
   requestType?: "borrowable" | "assignable";
   enabled?: boolean;
 }): UseQueryResult<PaginatedResponse<BorrowRequest[]>, Error> {
+  const { includeSandbox } = useSandboxVisibility();
   const { enabled = true, ...listFilters } = filters ?? {};
+  const withSandbox = { ...listFilters, includeSandbox };
   return useQuery({
-    queryKey: borrowRequestQueryKeys.list(listFilters),
-    queryFn: () => borrowRequestsApi.list(listFilters),
+    queryKey: borrowRequestQueryKeys.list(withSandbox),
+    queryFn: () => borrowRequestsApi.list(withSandbox),
     enabled,
     placeholderData: keepPreviousData,
   });

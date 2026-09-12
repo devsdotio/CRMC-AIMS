@@ -1,4 +1,5 @@
 import type { MaintenanceLogDTO } from "@/server/modules/maintenance/maintenance.types";
+import { appendIncludeSandbox } from "@/components/providers/sandbox-visibility-context";
 import { fetchJson, type ApiResponse } from "@/features/shared/fetch-json";
 
 export type MaintenanceLog = MaintenanceLogDTO;
@@ -20,11 +21,13 @@ export const maintenanceLogsApi = {
     openOnly?: boolean;
     search?: string;
     condition?: MaintenanceLog["condition"];
+    includeSandbox?: boolean;
   }): Promise<MaintenanceLog[]> {
     const sp = new URLSearchParams();
     if (params?.openOnly) sp.set("openOnly", "true");
     if (params?.search) sp.set("search", params.search);
     if (params?.condition) sp.set("condition", params.condition);
+    appendIncludeSandbox(sp, params?.includeSandbox);
     const qs = sp.toString();
     const res = await fetchJson<ApiResponse<MaintenanceLog[]>>(
       qs ? `/api/maintenance-logs?${qs}` : "/api/maintenance-logs"

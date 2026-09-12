@@ -1,4 +1,5 @@
 import type { ConsumableRow, StockHistoryEntry } from "@/server/db/schema";
+import type { PaginationParams, PaginatedResponse } from "@/types/filters";
 
 export type ConsumableDTO = {
   id: string;
@@ -14,15 +15,15 @@ export type ConsumableDTO = {
   supplier?: string;
   lastRestocked: string;
   notes?: string;
+  isSandbox?: boolean;
   history: StockHistoryEntry[];
 };
-
-import type { PaginationParams, PaginatedResponse } from "@/types/filters";
 
 export type ListConsumableFilters = PaginationParams & {
   category?: ConsumableDTO["category"];
   stockLevel?: "all" | "healthy" | "low" | "critical";
   search?: string;
+  includeSandbox?: boolean;
 };
 
 export interface IConsumableRepository {

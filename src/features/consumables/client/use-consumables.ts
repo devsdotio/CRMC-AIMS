@@ -8,6 +8,14 @@ import {
   type UseQueryResult,
 } from "@tanstack/react-query";
 
+import { useSandboxVisibility } from "@/components/providers/sandbox-visibility-context";
+import {
+  STOCK_DOMAINS,
+  invalidateDomains,
+} from "@/features/shared/cache-invalidation";
+import type { PaginatedResponse } from "@/types/filters";
+import type { StockHistoryEntry } from "@/types/inventory";
+
 import {
   consumablesApi,
   type CreateConsumablePayload,
@@ -16,15 +24,9 @@ import {
   type StockAdjustPayload,
   type UpdateConsumablePayload,
 } from "./consumables-api";
+import { consumableQueryKeys } from "./query-keys";
 
 export type { StockAdjustPayload };
-import { consumableQueryKeys } from "./query-keys";
-import {
-  STOCK_DOMAINS,
-  invalidateDomains,
-} from "@/features/shared/cache-invalidation";
-import type { PaginatedResponse } from "@/types/filters";
-import type { StockHistoryEntry } from "@/types/inventory";
 
 function invalidate(qc: ReturnType<typeof useQueryClient>, id?: string) {
   void invalidateDomains(qc, STOCK_DOMAINS);
@@ -43,11 +45,13 @@ export function useConsumablesQuery(filters?: {
   PaginatedResponse<ConsumableItem>,
   Error
 > {
+  const { includeSandbox } = useSandboxVisibility();
+  const listFilters = { ...filters, includeSandbox };
   return useQuery({
     // Stock levels move with every issue and restock, so this rides the global
     // 30s stale window instead of holding a five-minute snapshot.
-    queryKey: consumableQueryKeys.list(filters),
-    queryFn: () => consumablesApi.list(filters),
+    queryKey: consumableQueryKeys.list(listFilters),
+    queryFn: () => consumablesApi.list(listFilters),
   });
 }
 

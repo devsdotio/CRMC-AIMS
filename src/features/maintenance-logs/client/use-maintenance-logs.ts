@@ -13,16 +13,18 @@ import {
   type UseQueryResult,
 } from "@tanstack/react-query";
 
+import { useSandboxVisibility } from "@/components/providers/sandbox-visibility-context";
+import {
+  invalidateDomains,
+  type CacheDomain,
+} from "@/features/shared/cache-invalidation";
+
 import {
   maintenanceLogsApi,
   type CreateMaintenancePayload,
   type MaintenanceLog,
 } from "./maintenance-logs-api";
 import { maintenanceQueryKeys } from "./query-keys";
-import {
-  invalidateDomains,
-  type CacheDomain,
-} from "@/features/shared/cache-invalidation";
 
 /** Flagging or resolving a log also flips asset status and lifecycle history. */
 const MAINTENANCE_DOMAINS = [
@@ -37,9 +39,11 @@ export function useMaintenanceLogsQuery(filters?: {
   search?: string;
   condition?: MaintenanceLog["condition"];
 }): UseQueryResult<MaintenanceLog[], Error> {
+  const { includeSandbox } = useSandboxVisibility();
+  const listFilters = { ...filters, includeSandbox };
   return useQuery({
-    queryKey: maintenanceQueryKeys.list(filters),
-    queryFn: () => maintenanceLogsApi.list(filters),
+    queryKey: maintenanceQueryKeys.list(listFilters),
+    queryFn: () => maintenanceLogsApi.list(listFilters),
   });
 }
 

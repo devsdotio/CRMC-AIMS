@@ -1,4 +1,5 @@
 import type { BorrowLogDTO } from "@/server/modules/borrow-log/borrow-log.types";
+import { appendIncludeSandbox } from "@/components/providers/sandbox-visibility-context";
 import { fetchJson, type ApiResponse } from "@/features/shared/fetch-json";
 
 export type BorrowLogRecord = BorrowLogDTO;
@@ -32,12 +33,14 @@ export const borrowLogApi = {
     department?: string;
     search?: string;
     custodyKind?: "borrow" | "assignment" | "all";
+    includeSandbox?: boolean;
   }): Promise<BorrowLogRecord[]> {
     const sp = new URLSearchParams();
     if (params?.status) sp.set("status", params.status);
     if (params?.department) sp.set("department", params.department);
     if (params?.search) sp.set("search", params.search);
     if (params?.custodyKind) sp.set("custodyKind", params.custodyKind);
+    appendIncludeSandbox(sp, params?.includeSandbox);
     const qs = sp.toString();
     const res = await fetchJson<ApiResponse<BorrowLogRecord[]>>(
       qs ? `/api/borrow-log?${qs}` : "/api/borrow-log"

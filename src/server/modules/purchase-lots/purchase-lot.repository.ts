@@ -1,8 +1,10 @@
-import { and, asc, desc, eq, gt, ilike, or } from "drizzle-orm";
+import { and, asc, desc, eq, gt, ilike, or, sql } from "drizzle-orm";
 
 import { getDb } from "@/server/db";
 import type { DbSession } from "@/server/db/transaction";
 import {
+  assets,
+  consumables,
   purchaseLots,
   type NewPurchaseLotRow,
   type PurchaseLotRow,
@@ -110,6 +112,21 @@ export class PurchaseLotRepository implements IPurchaseLotRepository {
           ilike(purchaseLots.reference, q),
           ilike(purchaseLots.notes, q)
         )!
+      );
+    }
+    if (!filters.includeSandbox) {
+      conditions.push(
+        sql`(
+          (${purchaseLots.assetId} is null OR not exists (
+            select 1 from ${assets}
+            where ${assets.id} = ${purchaseLots.assetId} and ${assets.isSandbox} = true
+          ))
+          AND
+          (${purchaseLots.consumableId} is null OR not exists (
+            select 1 from ${consumables}
+            where ${consumables.id} = ${purchaseLots.consumableId} and ${consumables.isSandbox} = true
+          ))
+        )`
       );
     }
 

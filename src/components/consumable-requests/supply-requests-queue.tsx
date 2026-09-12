@@ -448,8 +448,14 @@ export function SupplyRequestsQueue({
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-secondary">
                       <span className="flex items-center gap-1 font-medium text-text">
                         <User className="h-3.5 w-3.5 text-text-secondary/70 shrink-0" />
-                        {row.requesterName}
+                        {row.requestedByName || row.requesterName}
                       </span>
+                      {row.requestedByName &&
+                        row.requestedByName !== row.requesterName && (
+                          <span className="text-text-secondary/80">
+                            via {row.requesterName}
+                          </span>
+                        )}
                       <span className="flex items-center gap-1">
                         <Building2 className="h-3.5 w-3.5 text-text-secondary/70 shrink-0" />
                         {row.department}

@@ -97,6 +97,14 @@ export type StockMovementDTO = {
 export const listStockMovementsQuerySchema = z.object({
   reason: z.enum(["restock", "issue", "adjust"]).optional(),
   limit: z.coerce.number().int().min(1).max(500).optional().default(100),
+  includeSandbox: z
+    .union([z.boolean(), z.enum(["true", "false", "1", "0"])])
+    .optional()
+    .transform((v) => {
+      if (v === undefined) return undefined;
+      if (typeof v === "boolean") return v;
+      return v === "true" || v === "1";
+    }),
 });
 
 export const voidStockMovementSchema = z.object({
@@ -267,6 +275,7 @@ export class StockMovementService {
     const rows = await this.repo.listRecent({
       reason: query.reason,
       limit: query.limit,
+      includeSandbox: query.includeSandbox,
     });
     const labels = await destinationLabelsFor(rows);
     const issueIds = rows

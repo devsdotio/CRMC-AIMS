@@ -1,4 +1,5 @@
 import type { ConsumableRequestDTO } from "@/server/modules/consumable-requests/consumable-request.types";
+import { appendIncludeSandbox } from "@/components/providers/sandbox-visibility-context";
 import { fetchJson, type ApiResponse, type PaginatedResponse } from "@/features/shared/fetch-json";
 
 export type ConsumableRequest = ConsumableRequestDTO;
@@ -68,6 +69,7 @@ export const consumableRequestsApi = {
     limit?: number;
     startDate?: string;
     endDate?: string;
+    includeSandbox?: boolean;
   }): Promise<PaginatedResponse<ConsumableRequest[]>> {
     const sp = new URLSearchParams();
     if (params?.status) sp.set("status", params.status);
@@ -77,6 +79,7 @@ export const consumableRequestsApi = {
     if (params?.endDate) sp.set("endDate", params.endDate);
     if (params?.page) sp.set("page", params.page.toString());
     if (params?.limit) sp.set("limit", params.limit.toString());
+    appendIncludeSandbox(sp, params?.includeSandbox);
     const qs = sp.toString();
     const res = await fetchJson<ApiResponse<PaginatedResponse<ConsumableRequest[]>>>(
       qs ? `/api/consumable-requests?${qs}` : "/api/consumable-requests"

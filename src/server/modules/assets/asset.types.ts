@@ -31,6 +31,8 @@ export interface ListAssetsFilters extends PaginationParams {
   assignmentType?: "borrowable" | "assignable";
   /** When true, only units with no current holder and no approved reservation. */
   availableOnly?: boolean;
+  /** Superadmin-only: include sandbox/testing catalog rows. */
+  includeSandbox?: boolean;
 }
 
 /**

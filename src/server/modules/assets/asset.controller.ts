@@ -19,8 +19,9 @@ export class AssetController {
 
   async listAssets(request: NextRequest | Request) {
     try {
-      await requireActor();
+      const session = await requireActor();
       const url = new URL(request.url);
+      const { parseIncludeSandbox } = await import("@/server/shared/sandbox");
       const data = await this.assetService.listAssets({
         status: url.searchParams.get("status") ?? undefined,
         modelId: url.searchParams.get("modelId") ?? undefined,
@@ -29,6 +30,10 @@ export class AssetController {
         assignmentType: url.searchParams.get("assignmentType") ?? undefined,
         availableOnly:
           url.searchParams.get("availableOnly") ?? undefined,
+        includeSandbox: parseIncludeSandbox(
+          url.searchParams.get("includeSandbox"),
+          session.role
+        ),
       });
       return ok(data);
     } catch (error) {
@@ -221,12 +226,17 @@ export class AssetController {
 
   async listModels(request: NextRequest | Request) {
     try {
-      await requireActor();
+      const session = await requireActor();
       const url = new URL(request.url);
+      const { parseIncludeSandbox } = await import("@/server/shared/sandbox");
       return ok(
         await this.modelService.list({
           category: url.searchParams.get("category") ?? undefined,
           search: url.searchParams.get("search") ?? undefined,
+          includeSandbox: parseIncludeSandbox(
+            url.searchParams.get("includeSandbox"),
+            session.role
+          ),
         })
       );
     } catch (error) {

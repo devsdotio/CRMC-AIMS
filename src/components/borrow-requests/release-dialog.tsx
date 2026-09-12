@@ -22,6 +22,7 @@ import {
 
 import { cn } from "@/lib/utils";
 import { formatAssetCodeDisplay, formatItemDescription } from "@/lib/sanitize-display";
+import { useSandboxVisibility } from "@/components/providers/sandbox-visibility-context";
 import { useCategoryStyleResolver } from "@/features/categories/client/use-category-style";
 import { assetsApi } from "@/features/assets/client/assets-api";
 import type { BorrowRequest } from "@/types/borrow-requests";
@@ -83,16 +84,18 @@ function ReleaseLineAssetPicker({
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const resolveCategoryStyle = useCategoryStyleResolver();
+  const { includeSandbox } = useSandboxVisibility();
   const assignmentType = requestType === "assignable" ? "assignable" : "borrowable";
   const catStyle = resolveCategoryStyle(item.category);
 
   const { data: assets = [], isLoading } = useQuery({
-    queryKey: ["assets", "release-picker", item.category, assignmentType],
+    queryKey: ["assets", "release-picker", item.category, assignmentType, includeSandbox],
     queryFn: () =>
       assetsApi.listAssets(undefined, {
         category: item.category,
         availableOnly: true,
         assignmentType,
+        includeSandbox,
       }),
     enabled: Boolean(item.category),
   });

@@ -49,6 +49,8 @@ export interface ConsumableItem {
   supplier?: string | null;
   lastRestocked: string;
   notes?: string;
+  /** Testing-only catalog row; hidden unless superadmin opts in. */
+  isSandbox?: boolean;
   history: StockHistoryEntry[];
 }
 

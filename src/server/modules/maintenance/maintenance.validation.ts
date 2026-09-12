@@ -24,6 +24,14 @@ export const listMaintenanceQuerySchema = z.object({
     .transform((v) => v === true || v === "true"),
   search: z.string().trim().max(200).optional(),
   condition: conditionSchema.optional(),
+  includeSandbox: z
+    .union([z.boolean(), z.enum(["true", "false", "1", "0"])])
+    .optional()
+    .transform((v) => {
+      if (v === undefined) return undefined;
+      if (typeof v === "boolean") return v;
+      return v === "true" || v === "1";
+    }),
 });
 
 export const createMaintenanceSchema = z.object({

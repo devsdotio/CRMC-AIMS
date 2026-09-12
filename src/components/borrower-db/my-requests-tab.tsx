@@ -107,6 +107,7 @@ export function MyRequestsTab() {
       requesterEmail: row.requesterEmail,
       requesterPhone: row.requesterPhone,
       department: row.department,
+      requestedByName: row.requestedByName,
       items: row.lines.map((line) => ({
         itemDescription: line.itemName,
         consumableId: line.consumableId,

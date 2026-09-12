@@ -48,6 +48,7 @@ export type ListPurchaseLotFilters = {
   itemType?: PurchaseLotItemType;
   status?: PurchaseOrderStatus;
   search?: string;
+  includeSandbox?: boolean;
 };
 
 export type CreatePurchaseLotInput = {

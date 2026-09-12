@@ -17,6 +17,14 @@ export const listPurchaseLotsQuerySchema = z.object({
   itemType: purchaseLotItemTypeSchema.optional(),
   status: purchaseOrderStatusSchema.optional(),
   search: z.string().trim().max(200).optional(),
+  includeSandbox: z
+    .union([z.boolean(), z.enum(["true", "false", "1", "0"])])
+    .optional()
+    .transform((v) => {
+      if (v === undefined) return undefined;
+      if (typeof v === "boolean") return v;
+      return v === "true" || v === "1";
+    }),
 });
 
 export const purchaseLotIdSchema = z.string().uuid("Invalid purchase lot id.");

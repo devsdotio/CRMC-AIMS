@@ -168,6 +168,7 @@ export default function AssetsPage() {
                 ? undefined
                 : assetData.supplierId || null,
             notes: assetData.notes,
+            isSandbox: assetData.isSandbox,
           },
         });
         if (selectedAsset?.id === addEditState.asset.id) {
@@ -191,6 +192,7 @@ export default function AssetsPage() {
           value: assetData.value,
           supplierId: assetData.supplierId || undefined,
           notes: assetData.notes,
+          isSandbox: assetData.isSandbox,
         });
         toast.success("Asset created successfully.");
       }
