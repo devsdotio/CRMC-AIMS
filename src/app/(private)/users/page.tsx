@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { UserPlus, AlertCircle } from "lucide-react";
+import { UserPlus, AlertCircle, Users, UserCheck, Building2, Shield } from "lucide-react";
 import type { UserAccount, UserFilterState, UserRole } from "@/types/users";
 
+import { StatMetricCard } from "@/components/ui/stat-metric-card";
 import { UserFilters } from "@/components/users/user-filters";
 import { UserTable } from "@/components/users/user-table";
 import { UserDetailPanel } from "@/components/users/user-detail-panel";
@@ -78,6 +79,26 @@ export default function UsersPage() {
       return true;
     });
   }, [users, filters]);
+
+  const totalUsersCount = users.length;
+  const activeUsersCount = useMemo(
+    () => users.filter((u) => u.status === "active").length,
+    [users],
+  );
+  const departmentLoginsCount = useMemo(
+    () => users.filter((u) => u.role === "borrower").length,
+    [users],
+  );
+  const adminStaffCount = useMemo(
+    () =>
+      users.filter(
+        (u) =>
+          u.role === "admin" ||
+          u.role === "superadmin" ||
+          u.role === "staff",
+      ).length,
+    [users],
+  );
 
   const selectedSynced = useMemo(() => {
     if (!selectedUser) return null;
@@ -212,6 +233,45 @@ export default function UsersPage() {
             Create User
           </button>
         </div>
+      </div>
+
+      {/* ── KPI Metric Cards ────────────────────────────────────────── */}
+      <div className="px-4 md:px-6 pt-4 pb-1 shrink-0 grid grid-cols-2 md:grid-cols-4 gap-3 bg-bg">
+        <StatMetricCard
+          title="Total Accounts"
+          value={totalUsersCount}
+          subtitle="system users"
+          description="Total user accounts created in the system."
+          icon={Users}
+          tone="blue"
+        />
+
+        <StatMetricCard
+          title="Active Users"
+          value={activeUsersCount}
+          subtitle="can log in"
+          description="Users who can log in and use the app."
+          icon={UserCheck}
+          tone="emerald"
+        />
+
+        <StatMetricCard
+          title="Department Logins"
+          value={departmentLoginsCount}
+          subtitle="borrower accounts"
+          description="Accounts used by offices to request items."
+          icon={Building2}
+          tone="purple"
+        />
+
+        <StatMetricCard
+          title="Admin & Staff"
+          value={adminStaffCount}
+          subtitle="managers"
+          description="Users who can approve requests and manage items."
+          icon={Shield}
+          tone="amber"
+        />
       </div>
 
       {loadError && (

@@ -87,7 +87,7 @@ export function BackupStatusCard({ backupStatus }: BackupStatusCardProps) {
             Backup Storage
           </span>
           <span className="text-text font-medium">
-            Managed centrally by hospital IT infrastructure — contact IT Operations for backup retrieval and retention policy details.
+            Managed centrally by school IT infrastructure — contact IT Operations for backup retrieval and retention policy details.
           </span>
         </div>
       </div>

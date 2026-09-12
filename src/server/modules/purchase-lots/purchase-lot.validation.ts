@@ -41,6 +41,7 @@ export const createPurchaseOrderItemSchema = z.object({
 });
 
 export const createPurchaseOrderSchema = z.object({
+  poNumber: z.string().trim().max(100).optional(),
   poDate: z.string().min(1, "Order date is required."),
   requestedBy: z.string().trim().min(1, "Requested by is required."),
   supplierId: z.string().uuid().optional(),
@@ -62,6 +63,7 @@ export const updatePurchaseOrderStatusSchema = z.object({
 });
 
 export const updatePurchaseOrderSchema = z.object({
+  poNumber: z.string().trim().max(100).nullable().optional(),
   supplierId: z.string().uuid().nullable().optional(),
   supplierName: z.string().trim().nullable().optional(),
   reference: z.string().trim().nullable().optional(),

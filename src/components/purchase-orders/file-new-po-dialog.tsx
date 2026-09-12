@@ -138,6 +138,8 @@ export function FileNewPODialog({
 
   // Step 1 states
   const [poType, setPoType] = useState<POType>("consumable");
+  const [poNumberMode, setPoNumberMode] = useState<"auto" | "manual">("auto");
+  const [customPoNumber, setCustomPoNumber] = useState("");
   const [poDate, setPoDate] = useState(() => new Date().toISOString().split("T")[0]);
   const accountRequesterName = me?.name || me?.email || "Authorized Staff";
   const [targetDepartment, setTargetDepartment] = useState("");
@@ -156,6 +158,8 @@ export function FileNewPODialog({
     if (isOpen) {
       setCurrentStep("details");
       setPoType("consumable");
+      setPoNumberMode("auto");
+      setCustomPoNumber("");
       setPoDate(new Date().toISOString().split("T")[0]);
       setItems([generateInitialRow("consumable", false)]);
       setCatalogSearch("");
@@ -170,6 +174,7 @@ export function FileNewPODialog({
   // Safe Close Guard to prevent accidental data loss
   const handleSafeClose = () => {
     const hasData =
+      Boolean(customPoNumber.trim()) ||
       Boolean(generalPurpose.trim()) ||
       Boolean(generalNotes.trim()) ||
       Boolean(targetDepartment.trim() && targetDepartment !== (me?.department || "")) ||
@@ -204,7 +209,19 @@ export function FileNewPODialog({
   const handleRemoveItem = (id: string) => {
     if (items.length > 1) {
       setItems((prev) => prev.filter((item) => item.id !== id));
+    } else {
+      setItems([generateInitialRow(poType, false)]);
+      toast.info("Cleared line item inputs");
     }
+  };
+
+  const handleClearCatalogItem = (id: string) => {
+    if (items.length > 1) {
+      setItems((prev) => prev.filter((it) => it.id !== id));
+    } else {
+      setItems([generateInitialRow(poType, false)]);
+    }
+    toast.info("Unselected item and erased inputs");
   };
 
   const handleToggleItemNew = (id: string, isNew: boolean) => {
@@ -228,7 +245,7 @@ export function FileNewPODialog({
     );
   };
 
-  // Quick-Add from Catalog Cards
+  // Quick-Add & Quick-Unselect from Catalog Cards
   const handleQuickAddConsumable = (c: (typeof consumables)[number]) => {
     const matchedSup = suppliers.find(
       (s) =>
@@ -238,7 +255,12 @@ export function FileNewPODialog({
 
     const existingIdx = items.findIndex((it) => !it.isNew && it.consumableId === c.id);
     if (existingIdx >= 0) {
-      toast.info(`"${c.name}" is already in your line items list.`);
+      if (items.length > 1) {
+        setItems((prev) => prev.filter((_, idx) => idx !== existingIdx));
+      } else {
+        setItems([generateInitialRow(poType, false)]);
+      }
+      toast.info(`Unselected "${c.name}" and erased inputs`);
       return;
     }
 
@@ -277,7 +299,12 @@ export function FileNewPODialog({
   const handleQuickAddAsset = (a: (typeof assetsList)[number]) => {
     const existingIdx = items.findIndex((it) => !it.isNew && it.assetId === a.id);
     if (existingIdx >= 0) {
-      toast.info(`"${a.name}" is already in your line items list.`);
+      if (items.length > 1) {
+        setItems((prev) => prev.filter((_, idx) => idx !== existingIdx));
+      } else {
+        setItems([generateInitialRow(poType, false)]);
+      }
+      toast.info(`Unselected "${a.name}" and erased inputs`);
       return;
     }
 
@@ -445,6 +472,10 @@ export function FileNewPODialog({
   // Step 1 Validation
   const validateStep1 = (): boolean => {
     setErrorMessage(null);
+    if (poNumberMode === "manual" && !customPoNumber.trim()) {
+      setErrorMessage("Please enter a manual PO Number or switch to Auto-generate.");
+      return false;
+    }
     if (!poDate) {
       setErrorMessage("Order date is required.");
       return false;
@@ -551,6 +582,7 @@ export function FileNewPODialog({
       const combinedPurpose = `[${targetDepartment.trim()}] ${generalPurpose.trim()}`;
 
       await createPOMutation.mutateAsync({
+        poNumber: poNumberMode === "manual" ? customPoNumber.trim() : undefined,
         poDate,
         requestedBy: accountRequesterName,
         supplierId: masterSupplierId,
@@ -589,7 +621,7 @@ export function FileNewPODialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="new-po-title"
-        className="relative w-full max-w-4xl h-170 max-h-[90vh] rounded-2xl border border-border bg-bg shadow-2xl z-10 overflow-hidden flex flex-col animate-in zoom-in-95 duration-200"
+        className="relative w-full max-w-4xl h-[92vh] max-h-[820px] min-h-[640px] rounded-2xl border border-border bg-bg shadow-2xl z-10 overflow-hidden flex flex-col animate-in zoom-in-95 duration-200"
       >
         {/* Header with Title */}
         <div className="flex items-center justify-between px-6 py-3.5 border-b border-border bg-bg-subtle/50 shrink-0">
@@ -682,7 +714,7 @@ export function FileNewPODialog({
         </div>
 
         {/* Form Body Area */}
-        <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5 text-xs">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3.5 text-xs">
           {errorMessage && (
             <div className="p-3 rounded-xl bg-status-outofservice-bg/10 border border-status-outofservice-bg/30 text-status-outofservice-text flex items-start gap-2 animate-in fade-in duration-150">
               <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
@@ -692,9 +724,9 @@ export function FileNewPODialog({
 
           {/* ================= STEP 1: PO DETAILS & ITEM TYPE ================= */}
           {currentStep === "details" && (
-            <div className="space-y-4 animate-in fade-in duration-200">
+            <div className="space-y-3 animate-in fade-in duration-200">
               {/* 1. Item Classification Selector (Consumables vs Assets) */}
-              <div className="p-4 rounded-xl border border-border bg-card space-y-3 shadow-2xs">
+              <div className="p-3.5 rounded-xl border border-border bg-card space-y-2.5 shadow-2xs">
                 <div className="flex items-center justify-between border-b border-border pb-2">
                   <span className="font-bold text-text uppercase tracking-wider text-[11px] flex items-center gap-1.5">
                     <Tag className="h-3.5 w-3.5 text-accent" />
@@ -710,7 +742,7 @@ export function FileNewPODialog({
                     type="button"
                     onClick={() => handlePoTypeChange("consumable")}
                     className={cn(
-                      "p-3.5 rounded-xl border text-left transition-all cursor-pointer flex items-start gap-3",
+                      "p-3 rounded-xl border text-left transition-all cursor-pointer flex items-start gap-2.5",
                       poType === "consumable"
                         ? "border-emerald-500/60 bg-emerald-500/10 shadow-xs ring-2 ring-emerald-500/20"
                         : "border-border bg-card hover:bg-bg-subtle/50 hover:border-border"
@@ -736,7 +768,7 @@ export function FileNewPODialog({
                     type="button"
                     onClick={() => handlePoTypeChange("asset")}
                     className={cn(
-                      "p-3.5 rounded-xl border text-left transition-all cursor-pointer flex items-start gap-3",
+                      "p-3 rounded-xl border text-left transition-all cursor-pointer flex items-start gap-2.5",
                       poType === "asset"
                         ? "border-blue-500/60 bg-blue-500/10 shadow-xs ring-2 ring-blue-500/20"
                         : "border-border bg-card hover:bg-bg-subtle/50 hover:border-border"
@@ -761,7 +793,7 @@ export function FileNewPODialog({
               </div>
 
               {/* 2. Master Metadata Form */}
-              <div className="p-4 rounded-xl border border-border bg-card space-y-4 shadow-2xs">
+              <div className="p-3.5 sm:p-4 rounded-xl border border-border bg-card space-y-3 shadow-2xs">
                 <div className="flex items-center justify-between border-b border-border pb-2">
                   <span className="font-bold text-text uppercase tracking-wider text-[11px] flex items-center gap-1.5">
                     <Building2 className="h-3.5 w-3.5 text-accent" />
@@ -770,6 +802,68 @@ export function FileNewPODialog({
                   <span className="text-[10px] text-text-secondary">
                     Cebu Roosevelt Memorial Colleges, Inc.
                   </span>
+                </div>
+
+                {/* PO Numbering Configuration: Auto vs Manual */}
+                <div className="p-3.5 rounded-xl border border-border bg-bg-subtle/50 space-y-2.5">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <label className="font-semibold text-text flex items-center gap-1.5 text-xs">
+                      <FileText className="h-3.5 w-3.5 text-accent" />
+                      <span>Purchase Order (P.O.) Number</span>
+                    </label>
+                    <div className="flex items-center gap-1 bg-bg p-0.5 rounded-lg border border-border">
+                      <button
+                        type="button"
+                        onClick={() => setPoNumberMode("auto")}
+                        className={cn(
+                          "px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer",
+                          poNumberMode === "auto"
+                            ? "bg-accent text-accent-foreground shadow-2xs"
+                            : "text-text-secondary hover:text-text"
+                        )}
+                      >
+                        Auto-generate
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPoNumberMode("manual")}
+                        className={cn(
+                          "px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer",
+                          poNumberMode === "manual"
+                            ? "bg-accent text-accent-foreground shadow-2xs"
+                            : "text-text-secondary hover:text-text"
+                        )}
+                      >
+                        Manual Input
+                      </button>
+                    </div>
+                  </div>
+
+                  {poNumberMode === "auto" ? (
+                    <div className="flex items-center justify-between text-xs text-text-secondary bg-bg px-3 py-2 rounded-lg border border-dashed border-border">
+                      <span>System will auto-generate an official operational tracking code:</span>
+                      <span className="font-mono font-bold text-text bg-bg-subtle px-2 py-0.5 rounded border border-border">
+                        PO-{new Date().getFullYear()}-XXXX
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="space-y-1 animate-in fade-in duration-150">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-text-secondary font-medium">Enter custom / voucher P.O. Number:</span>
+                        <span className="text-rose-500 font-bold">* Required</span>
+                      </div>
+                      <input
+                        type="text"
+                        value={customPoNumber}
+                        onChange={(e) => setCustomPoNumber(e.target.value)}
+                        placeholder="e.g. PO-2026-0042, CRMC-PO-101, or voucher reference..."
+                        className="w-full h-9 px-3 font-mono font-bold rounded-lg border border-border bg-bg text-text text-xs focus:ring-2 focus:ring-accent/20 focus:border-accent focus:outline-hidden"
+                      />
+                      <p className="text-[10px] text-text-secondary">
+                        Matches physical procurement forms, custodian vouchers, or official accounting documents.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Row 1: Date, Requester, and Target Department in 3 columns */}
@@ -846,7 +940,7 @@ export function FileNewPODialog({
                       onChange={(e) => setGeneralPurpose(e.target.value)}
                       placeholder="e.g. Replenishment of registrar office stocks, paper reams, and semester exam supplies..."
                       required
-                      rows={3}
+                      rows={2}
                       className="w-full p-2.5 rounded-lg border border-border bg-bg text-text text-xs focus:ring-2 focus:ring-accent/20 focus:border-accent focus:outline-hidden resize-none leading-relaxed"
                     />
                   </div>
@@ -860,7 +954,7 @@ export function FileNewPODialog({
                       value={generalNotes}
                       onChange={(e) => setGeneralNotes(e.target.value)}
                       placeholder="e.g. Approved under Semester 1 Supply Budget Allocation / Urgently required for midterm examinations..."
-                      rows={3}
+                      rows={2}
                       className="w-full p-2.5 rounded-lg border border-border bg-bg text-text text-xs focus:ring-2 focus:ring-accent/20 focus:border-accent focus:outline-hidden resize-none leading-relaxed"
                     />
                   </div>
@@ -939,12 +1033,12 @@ export function FileNewPODialog({
                   </div>
                 </div>
 
-                {/* Clickable Catalog Items Non-scrollable 6-Column Grid (Max 6) */}
+                {/* Clickable Catalog Items Non-scrollable 5-Column Grid (Max 10 - 2 Rows) */}
                 <div className="p-1 rounded-xl bg-bg-subtle/40 border border-border/60">
                   {poType === "consumable" ? (
                     filteredConsumableCatalog.length > 0 ? (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 p-1">
-                        {filteredConsumableCatalog.slice(0, 6).map((c) => {
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 p-1">
+                        {filteredConsumableCatalog.slice(0, 10).map((c) => {
                           const existingInPO = items.find(
                             (it) => !it.isNew && it.consumableId === c.id
                           );
@@ -954,10 +1048,11 @@ export function FileNewPODialog({
                               key={c.id}
                               type="button"
                               onClick={() => handleQuickAddConsumable(c)}
+                              title={existingInPO ? "Click to unselect and erase inputs" : "Click to add to PO"}
                               className={cn(
                                 "p-2 rounded-lg border text-left transition-all cursor-pointer flex flex-col justify-between gap-1 group relative hover:shadow-xs min-h-16",
                                 existingInPO
-                                  ? "border-accent/60 bg-accent/5 ring-1 ring-accent/30"
+                                  ? "border-accent/60 bg-accent/5 ring-1 ring-accent/30 hover:border-rose-400 hover:ring-rose-300"
                                   : "border-border bg-bg hover:border-accent/40 hover:bg-card"
                               )}
                             >
@@ -966,9 +1061,11 @@ export function FileNewPODialog({
                                   {c.itemCode}
                                 </span>
                                 {existingInPO ? (
-                                  <span className="px-1 py-0.2 rounded-full text-[8px] font-bold bg-accent text-accent-foreground shrink-0 flex items-center gap-0.5">
-                                    <Check className="h-2 w-2" />
-                                    <span>Added</span>
+                                  <span className="px-1 py-0.2 rounded-full text-[8px] font-bold bg-accent text-accent-foreground shrink-0 flex items-center gap-0.5 group-hover:bg-rose-500 group-hover:text-white transition-colors">
+                                    <Check className="h-2 w-2 group-hover:hidden" />
+                                    <X className="h-2 w-2 hidden group-hover:inline" />
+                                    <span className="group-hover:hidden">Added</span>
+                                    <span className="hidden group-hover:inline">Unselect</span>
                                   </span>
                                 ) : (
                                   <span className="text-[9px] text-accent font-semibold opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
@@ -1008,8 +1105,8 @@ export function FileNewPODialog({
                       </div>
                     )
                   ) : filteredAssetCatalog.length > 0 ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 p-1">
-                      {filteredAssetCatalog.slice(0, 6).map((a) => {
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 p-1">
+                      {filteredAssetCatalog.slice(0, 10).map((a) => {
                         const existingInPO = items.find(
                           (it) => !it.isNew && it.assetId === a.id
                         );
@@ -1019,11 +1116,12 @@ export function FileNewPODialog({
                             key={a.id}
                             type="button"
                             onClick={() => handleQuickAddAsset(a)}
+                            title={existingInPO ? "Click to unselect and erase inputs" : "Click to add to PO"}
                             className={cn(
                               "p-2 rounded-lg border text-left transition-all cursor-pointer flex flex-col justify-between gap-1 group relative hover:shadow-xs min-h-16",
                               existingInPO
-                                  ? "border-accent/60 bg-accent/5 ring-1 ring-accent/30"
-                                  : "border-border bg-bg hover:border-accent/40 hover:bg-card"
+                                ? "border-accent/60 bg-accent/5 ring-1 ring-accent/30 hover:border-rose-400 hover:ring-rose-300"
+                                : "border-border bg-bg hover:border-accent/40 hover:bg-card"
                             )}
                           >
                             <div className="flex items-start justify-between gap-1">
@@ -1031,9 +1129,11 @@ export function FileNewPODialog({
                                 {a.assetCode}
                               </span>
                               {existingInPO ? (
-                                <span className="px-1 py-0.2 rounded-full text-[8px] font-bold bg-accent text-accent-foreground shrink-0 flex items-center gap-0.5">
-                                  <Check className="h-2 w-2" />
-                                  <span>Added</span>
+                                <span className="px-1 py-0.2 rounded-full text-[8px] font-bold bg-accent text-accent-foreground shrink-0 flex items-center gap-0.5 group-hover:bg-rose-500 group-hover:text-white transition-colors">
+                                  <Check className="h-2 w-2 group-hover:hidden" />
+                                  <X className="h-2 w-2 hidden group-hover:inline" />
+                                  <span className="group-hover:hidden">Added</span>
+                                  <span className="hidden group-hover:inline">Unselect</span>
                                 </span>
                               ) : (
                                 <span className="text-[9px] text-accent font-semibold opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
@@ -1144,8 +1244,8 @@ export function FileNewPODialog({
                           <button
                             type="button"
                             onClick={() => handleRemoveItem(item.id)}
-                            disabled={items.length <= 1}
-                            title="Remove Line Item"
+                            disabled={items.length <= 1 && !item.name && !item.consumableId && !item.assetId}
+                            title={items.length <= 1 ? "Clear Line Item" : "Remove Line Item"}
                             className="p-1 rounded-md text-text-secondary hover:text-status-outofservice-text hover:bg-status-outofservice-bg/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -1174,9 +1274,19 @@ export function FileNewPODialog({
                                   <span className="font-bold text-text truncate">
                                     {item.name}
                                   </span>
-                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-accent/15 text-accent border border-accent/25 shrink-0 ml-2">
-                                    Catalog Stock
-                                  </span>
+                                  <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-accent/15 text-accent border border-accent/25">
+                                      Catalog Stock
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleClearCatalogItem(item.id)}
+                                      title="Unselect and erase inputs"
+                                      className="p-1 rounded text-text-secondary hover:text-rose-500 hover:bg-rose-500/10 cursor-pointer transition-colors"
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </button>
+                                  </div>
                                 </div>
                               ) : (
                                 <input
@@ -1370,7 +1480,17 @@ export function FileNewPODialog({
                   </button>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                  <div>
+                    <span className="text-[10px] text-text-secondary font-medium block">P.O. Number</span>
+                    <span className="font-mono font-bold text-text">
+                      {poNumberMode === "manual" && customPoNumber.trim() ? (
+                        <span className="text-accent">{customPoNumber.trim()}</span>
+                      ) : (
+                        <span className="text-text-secondary italic">Auto-generated on filing</span>
+                      )}
+                    </span>
+                  </div>
                   <div>
                     <span className="text-[10px] text-text-secondary font-medium block">Order Classification</span>
                     <span
