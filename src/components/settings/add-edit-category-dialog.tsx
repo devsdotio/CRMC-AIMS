@@ -107,7 +107,7 @@ export function AddEditCategoryDialog({
                 {isEditing ? `Edit ${type === "asset" ? "Asset" : "Consumable"} Category` : `Add New ${type === "asset" ? "Asset" : "Consumable"} Category`}
               </h3>
               <p className="text-xs text-text-secondary mt-0.5">
-                Configure taxonomy label & badge palette styling
+                Configure category label & badge palette styling
               </p>
             </div>
           </div>

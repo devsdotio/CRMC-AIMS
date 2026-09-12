@@ -76,7 +76,9 @@ export function useCreatePurchaseOrderMutation(): UseMutationResult<
 
       // 3. Construct optimistic PurchaseLot items
       const optimisticBatchId = `optimistic-${Date.now()}`;
-      const poNum = `PO-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+      const poNum =
+        newPO.poNumber?.trim() ||
+        `PO-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
       const optimisticLots: PurchaseLot[] = newPO.items.map((item, idx) => {
         const qty = Number(item.quantity) || 1;

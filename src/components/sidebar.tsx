@@ -18,13 +18,16 @@ import {
   Settings,
   LogOut,
   User,
-  ChevronsUpDown,
   History,
   PanelLeftClose,
-  PanelLeftOpen,
   FolderKanban,
   Truck,
   ShoppingCart,
+  Wrench,
+  FileText,
+  Tags,
+  Building2,
+  Receipt,
 } from "lucide-react";
 import { performSignOut } from "@/lib/auth/sign-out-client";
 import { cn } from "@/lib/utils";
@@ -35,6 +38,8 @@ interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
   badge?: number;
   badgeTone?: "accent" | "warning";
+  badgeText?: string;
+  disabled?: boolean;
   roles?: UserRole[];
 }
 
@@ -98,6 +103,16 @@ export default function Sidebar({
     }
   };
 
+  const handleNavigateProfile = () => {
+    setUserMenuOpen(false);
+    router.push("/profile");
+  };
+
+  // Close user menu on route change
+  useEffect(() => {
+    setUserMenuOpen(false);
+  }, [pathname]);
+
   // Close the user menu on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -133,29 +148,127 @@ export default function Sidebar({
     {
       label: "Operations",
       items: [
-        { name: "Assets", href: "/assets", icon: Package, roles: ["superadmin", "admin", "staff"] },
-        { name: "Inventory", href: "/consumables", icon: Boxes, badge: lowStockCount, badgeTone: "warning", roles: ["superadmin", "admin", "staff"] },
-        { name: "Requests", href: "/borrow-requests", icon: ClipboardList, badge: pendingCount, badgeTone: "accent", roles: ["superadmin", "admin", "staff"] },
-        { name: "Purchase Orders", href: "/purchase-orders", icon: ShoppingCart, roles: ["superadmin", "admin", "staff"] },
-        { name: "Suppliers", href: "/suppliers", icon: Truck, roles: ["superadmin", "admin", "staff"] },
-        { name: "Projects", href: "/projects", icon: FolderKanban, roles: ["superadmin", "admin"] },
-        
-        { name: "My Requests", href: "/borrower-db/requests", icon: ClipboardList, badge: pendingCount, badgeTone: "accent", roles: ["borrower"] },
+        {
+          name: "Assets",
+          href: "/assets",
+          icon: Package,
+          roles: ["superadmin", "admin", "staff"],
+        },
+        {
+          name: "Inventory",
+          href: "/consumables",
+          icon: Boxes,
+          badge: lowStockCount,
+          badgeTone: "warning",
+          roles: ["superadmin", "admin", "staff"],
+        },
+        {
+          name: "Requests",
+          href: "/borrow-requests",
+          icon: ClipboardList,
+          badge: pendingCount,
+          badgeTone: "accent",
+          roles: ["superadmin", "admin", "staff"],
+        },
+        {
+          name: "Purchase Orders",
+          href: "/purchase-orders",
+          icon: ShoppingCart,
+          roles: ["superadmin", "admin", "staff"],
+        },
+        {
+          name: "Vouchers",
+          href: "/vouchers",
+          icon: Receipt,
+          badgeText: "Soon",
+          disabled: true,
+          roles: ["superadmin", "admin", "staff"],
+        },
+        {
+          name: "Suppliers",
+          href: "/suppliers",
+          icon: Truck,
+          roles: ["superadmin", "admin", "staff"],
+        },
+        {
+          name: "Projects",
+          href: "/projects",
+          icon: FolderKanban,
+          roles: ["superadmin", "admin"],
+        },
+
+        {
+          name: "My Requests",
+          href: "/borrower-db/requests",
+          icon: ClipboardList,
+          badge: pendingCount,
+          badgeTone: "accent",
+          roles: ["borrower"],
+        },
       ],
     },
     {
       label: "Logs & History",
       items: [
-        { name: "Custody Log", href: "/borrow-log", icon: Repeat, badge: overdueCount, badgeTone: "warning", roles: ["superadmin", "admin", "staff"] },
-        { name: "Issue History", href: "/issue-history", icon: History, roles: ["superadmin", "admin", "staff"] },
-        { name: "Borrow History", href: "/borrower-db/history", icon: History, roles: ["borrower"] },
+        {
+          name: "Custody Log",
+          href: "/borrow-log",
+          icon: Repeat,
+          badge: overdueCount,
+          badgeTone: "warning",
+          roles: ["superadmin", "admin", "staff"],
+        },
+        {
+          name: "Issue History",
+          href: "/issue-history",
+          icon: History,
+          roles: ["superadmin", "admin", "staff"],
+        },
+        {
+          name: "Maintenance Logs",
+          href: "/maintenance-logs",
+          icon: Wrench,
+          badgeText: "Soon",
+          disabled: true,
+          roles: ["superadmin", "admin", "staff"],
+        },
+        {
+          name: "Borrow History",
+          href: "/borrower-db/history",
+          icon: History,
+          roles: ["borrower"],
+        },
       ],
     },
     {
       label: "Administration",
       items: [
-        { name: "Users & Departments", href: "/users", icon: Users, roles: ["superadmin", "admin"] },
-        { name: "Settings", href: "/settings", icon: Settings, roles: ["superadmin", "admin"] },
+        {
+          name: "Reports",
+          href: "/reports",
+          icon: FileText,
+          badgeText: "Soon",
+          disabled: true,
+          roles: ["superadmin", "admin", "staff"],
+        },
+        {
+          name: "Users",
+          href: "/users",
+          icon: Users,
+          roles: ["superadmin", "admin"],
+        },
+        {
+          name: "Categories",
+          href: "/categories",
+          icon: Tags,
+          roles: ["superadmin", "admin"],
+        },
+        {
+          name: "Departments",
+          href: "/departments",
+          icon: Building2,
+          roles: ["superadmin", "admin"],
+        },
       ],
     },
   ];
@@ -177,13 +290,71 @@ export default function Sidebar({
   };
 
   const renderNavItem = (item: NavItem) => {
-    const isActive = pathname === item.href;
+    const isDisabled = Boolean(item.disabled || item.badgeText === "Soon");
+    const isActive = !isDisabled && pathname === item.href;
     const Icon = item.icon;
     const hasBadge = (item.badge ?? 0) > 0;
+    const hasBadgeText = Boolean(item.badgeText);
     const badgeClass =
       item.badgeTone === "accent"
         ? "bg-blue-100 text-primary"
         : "bg-status-repair-bg text-status-repair-text";
+
+    if (isDisabled) {
+      return (
+        <div
+          key={item.href}
+          role="button"
+          aria-disabled="true"
+          tabIndex={-1}
+          title={`${item.name} (Coming Soon)`}
+          className={cn(
+            "relative flex items-center rounded-lg text-sm font-medium select-none cursor-not-allowed opacity-50",
+            isCollapsed
+              ? "justify-center px-0 py-2.5 h-10 w-full"
+              : "justify-between px-3 py-2.5",
+            "text-white/40 hover:bg-transparent transition-colors group",
+          )}
+        >
+          <span
+            className={cn(
+              "relative flex items-center min-w-0",
+              isCollapsed ? "justify-center" : "gap-3",
+            )}
+          >
+            <Icon className="w-4.5 h-4.5 shrink-0 text-white/30" />
+            {!isCollapsed && <span className="truncate text-white/40">{item.name}</span>}
+          </span>
+
+          {!isCollapsed && hasBadgeText && (
+            <span className="relative flex items-center justify-center px-1.5 py-0.5 text-[10px] font-semibold tracking-wider uppercase rounded-md shrink-0 bg-accent/15 text-accent border border-accent/25">
+              {item.badgeText}
+            </span>
+          )}
+
+          {/* Collapsed-state tooltip */}
+          {isCollapsed && (
+            <div
+              role="tooltip"
+              className={cn(
+                "pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-3 z-50",
+                "flex items-center gap-2 whitespace-nowrap rounded-md border border-white/10 bg-[#0F1329]",
+                "px-2.5 py-1.5 text-xs text-white shadow-lg shadow-black/30",
+                "opacity-0 scale-95 origin-left transition-all duration-150",
+                "group-hover:opacity-100 group-hover:scale-100",
+              )}
+            >
+              {item.name}
+              {hasBadgeText && (
+                <span className="flex items-center justify-center px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded bg-accent/20 text-accent">
+                  {item.badgeText}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
 
     return (
       <Link
@@ -191,9 +362,12 @@ export default function Sidebar({
         href={item.href}
         aria-current={isActive ? "page" : undefined}
         className={cn(
-          "relative flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium",
+          "relative flex items-center rounded-lg text-sm font-medium",
           "outline-none focus-visible:ring-2 focus-visible:ring-accent/70 focus-visible:ring-offset-2 focus-visible:ring-offset-primary",
           "transition-colors duration-150 group",
+          isCollapsed
+            ? "justify-center px-0 py-2.5 h-10 w-full"
+            : "justify-between px-3 py-2.5",
           isActive
             ? "text-white font-semibold"
             : "text-white/60 hover:text-white hover:bg-white/6",
@@ -208,7 +382,12 @@ export default function Sidebar({
           />
         )}
 
-        <span className="relative flex items-center gap-3 min-w-0">
+        <span
+          className={cn(
+            "relative flex items-center min-w-0",
+            isCollapsed ? "justify-center" : "gap-3",
+          )}
+        >
           <Icon
             className={cn(
               "w-4.5 h-4.5 shrink-0 transition-transform duration-150 group-hover:scale-110",
@@ -227,6 +406,22 @@ export default function Sidebar({
           >
             {item.badge! > 99 ? "99+" : item.badge}
           </span>
+        )}
+
+        {!isCollapsed && hasBadgeText && (
+          <span className="relative flex items-center justify-center px-1.5 py-0.5 text-[10px] font-semibold tracking-wider uppercase rounded-md shrink-0 bg-accent/15 text-accent border border-accent/25">
+            {item.badgeText}
+          </span>
+        )}
+
+        {/* Indicator dot when collapsed */}
+        {isCollapsed && hasBadge && (
+          <span
+            className={cn(
+              "absolute top-2 right-2 w-2 h-2 rounded-full",
+              item.badgeTone === "accent" ? "bg-accent" : "bg-amber-400",
+            )}
+          />
         )}
 
         {/* Left accent bar on active item */}
@@ -257,23 +452,36 @@ export default function Sidebar({
                 {item.badge}
               </span>
             )}
+            {hasBadgeText && (
+              <span className="flex items-center justify-center px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded bg-accent/20 text-accent">
+                {item.badgeText}
+              </span>
+            )}
           </div>
         )}
       </Link>
     );
   };
 
+  const handleAsideClick = (e: React.MouseEvent) => {
+    if (!isCollapsed) return;
+    const target = e.target as HTMLElement;
+    // Don't toggle if clicking an interactive element (nav links, profile button, menu)
+    const interactive = target.closest(
+      "a, button, [role='button'], input, [role='dialog'], [role='tooltip']",
+    );
+    if (!interactive) {
+      handleToggle();
+    }
+  };
+
   return (
     <aside
-      onClick={() => {
-        if (isCollapsed) {
-          handleToggle();
-        }
-      }}
+      onClick={handleAsideClick}
       className={cn(
         "relative flex flex-col h-full bg-primary border-r border-white/10",
         "transition-[width] duration-300 ease-in-out z-30",
-        isCollapsed ? "w-19 cursor-pointer hover:bg-primary/90" : "w-64",
+        isCollapsed ? "w-19 cursor-pointer" : "w-64",
         className,
       )}
     >
@@ -281,59 +489,58 @@ export default function Sidebar({
       <div
         className={cn(
           "flex items-center h-16 border-b border-white/10 shrink-0",
-          isCollapsed ? "justify-center" : "justify-between px-4",
+          isCollapsed ? "justify-center px-2" : "justify-between px-4",
         )}
       >
-        <Link
-          href="/dashboard"
-          className="flex items-center gap-2 overflow-hidden select-none"
-          onClick={(e) => {
-            // Prevent navigation if we're just clicking to expand the sidebar
-            if (isCollapsed) e.preventDefault();
-          }}
-        >
-          <div className="flex items-center justify-center w-7 h-7 rounded-full shrink-0 ">
+        {isCollapsed ? (
+          <button
+            type="button"
+            onClick={handleToggle}
+            aria-label="Expand sidebar"
+            title="Expand sidebar"
+            className="flex items-center justify-center w-10 h-10 rounded-xl hover:bg-white/10 active:scale-95 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+          >
             <Image
               src="/aims-logo-white.svg"
               alt="AIMS"
               width={28}
               height={28}
-              className="w-full h-full object-contain"
+              className="w-7 h-7 object-contain"
               priority
             />
-          </div>
-          {!isCollapsed && (
+          </button>
+        ) : (
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-2 overflow-hidden select-none"
+          >
+            <div className="flex items-center justify-center w-7 h-7 rounded-full shrink-0">
+              <Image
+                src="/aims-logo-white.svg"
+                alt="AIMS"
+                width={28}
+                height={28}
+                className="w-full h-full object-contain"
+                priority
+              />
+            </div>
             <span className="text-lg font-bold tracking-wider text-white whitespace-nowrap">
               <span className="text-accent">AIMS</span>
             </span>
-          )}
-        </Link>
-
-        {!isCollapsed && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation(); // prevent clicking the aside
-              handleToggle();
-            }}
-            aria-label="Collapse sidebar"
-            className={cn(
-              "hidden md:flex items-center justify-center rounded-md text-white/50 hover:text-white hover:bg-white/10 transition-colors",
-              "w-8 h-8 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70",
-            )}
-          >
-            <PanelLeftClose className="w-5 h-5" />
-          </button>
+          </Link>
         )}
       </div>
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-3 space-y-4 overflow-y-auto overflow-x-hidden min-h-0">
-        {sections.map((section) => (
+        {sections.map((section, index) => (
           <div key={section.label}>
-            {!isCollapsed && (
+            {!isCollapsed ? (
               <p className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/30">
                 {section.label}
               </p>
+            ) : (
+              index > 0 && <div className="h-px bg-white/10 my-2 mx-1" />
             )}
             <div className="space-y-1">{section.items.map(renderNavItem)}</div>
           </div>
@@ -345,52 +552,114 @@ export default function Sidebar({
         className="relative border-t border-white/10 p-3 shrink-0"
         ref={userMenuRef}
       >
-        <button
-          type="button"
-          onClick={() => setUserMenuOpen((v) => !v)}
-          className={cn(
-            "flex w-full items-center gap-3 rounded-lg p-2 text-left transition-colors",
-            "hover:bg-white/6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70",
-          )}
-        >
-          <div className="relative flex items-center justify-center w-9 h-9 rounded-full bg-white/10 text-white shrink-0">
-            <User className="w-4.5 h-4.5" />
-            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-status-active-bg ring-2 ring-primary" />
-          </div>
-          {!isCollapsed && (
-            <>
+        <div className="flex items-center justify-between w-full gap-1">
+          <button
+            type="button"
+            onClick={() => setUserMenuOpen((v) => !v)}
+            className={cn(
+              "flex flex-1 items-center rounded-lg transition-colors cursor-pointer min-w-0",
+              isCollapsed
+                ? "justify-center p-2"
+                : "gap-3 p-2 text-left hover:bg-white/6",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70",
+              userMenuOpen && "bg-white/10",
+            )}
+            title={isCollapsed ? userName : undefined}
+            aria-expanded={userMenuOpen}
+            aria-haspopup="dialog"
+          >
+            <div className="relative flex items-center justify-center w-9 h-9 rounded-full bg-white/10 text-white shrink-0">
+              <User className="w-4.5 h-4.5" />
+              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-status-active-bg ring-2 ring-primary" />
+            </div>
+            {!isCollapsed && (
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-white truncate">
                   {userName}
                 </p>
                 <p className="text-xs text-white/40 truncate">{userEmail}</p>
               </div>
-              <ChevronsUpDown className="w-3.5 h-3.5 text-white/30 shrink-0" />
-            </>
+            )}
+          </button>
+
+          {!isCollapsed && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleToggle();
+              }}
+              aria-label="Collapse sidebar"
+              title="Collapse sidebar"
+              className={cn(
+                "hidden md:flex items-center justify-center rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition-colors",
+                "w-8 h-8 shrink-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70",
+              )}
+            >
+              <PanelLeftClose className="w-4.5 h-4.5" />
+            </button>
           )}
-        </button>
+        </div>
 
         <AnimatePresence>
           {userMenuOpen && (
             <motion.div
-              initial={{ opacity: 0, y: 6, scale: 0.97 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 6, scale: 0.97 }}
+              onClick={(e) => e.stopPropagation()}
+              initial={{ opacity: 0, scale: 0.95, y: isCollapsed ? 0 : 6 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: isCollapsed ? 0 : 6 }}
               transition={{ duration: 0.14 }}
               className={cn(
-                "absolute bottom-full mb-2 rounded-lg border border-white/10 bg-[#0F1329] shadow-lg shadow-black/40 p-1 z-50",
-                isCollapsed ? "left-full ml-2 w-44" : "left-3 right-3",
+                "rounded-xl border border-white/15 bg-[#2a3260] p-2 z-50",
+                isCollapsed
+                  ? "absolute left-full bottom-3 ml-3 w-64 shadow-none"
+                  : "absolute bottom-full left-3 right-3 mb-3.5 shadow-[0_0_12px_rgba(0,0,0,0.25)]",
               )}
             >
-              <button
-                type="button"
-                onClick={handleLogout}
-                disabled={isLoggingOut}
-                className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm text-white/70 hover:bg-white/6 hover:text-white transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <LogOut className="w-4 h-4" />
-                {isLoggingOut ? "Signing out..." : "Log out"}
-              </button>
+              {/* User Identity Header */}
+              <div className="flex items-center gap-3 p-2 rounded-lg bg-white/5 border border-white/5 mb-1.5">
+                <div className="relative flex items-center justify-center w-9 h-9 rounded-full bg-white/10 text-white shrink-0">
+                  <User className="w-4.5 h-4.5" />
+                  <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-status-active-bg ring-2 ring-[#2a3260]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-white truncate">
+                    {userName}
+                  </p>
+                  <p className="text-xs text-white/50 truncate">{userEmail}</p>
+                  {userRole && (
+                    <span className="inline-block mt-1 text-[10px] font-semibold uppercase tracking-wider text-accent bg-accent/10 px-1.5 py-0.5 rounded">
+                      {userRole}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="h-px bg-white/10 my-1" />
+
+              {/* Action buttons */}
+              <div className="space-y-0.5">
+                <button
+                  type="button"
+                  onClick={handleNavigateProfile}
+                  className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-white/80 hover:bg-white/10 hover:text-white transition-colors cursor-pointer group"
+                >
+                  <User className="w-4 h-4 text-white/50 group-hover:text-white transition-colors" />
+                  <span className="font-medium">Profile</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  disabled={isLoggingOut}
+                  className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed group"
+                >
+                  <LogOut className="w-4 h-4 text-red-400/80 group-hover:text-red-300 transition-colors" />
+                  <span className="font-medium">
+                    {isLoggingOut ? "Signing out..." : "Log out"}
+                  </span>
+                </button>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>

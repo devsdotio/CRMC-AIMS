@@ -87,7 +87,7 @@ export function ProfileForm({
 
         <div className="space-y-1.5">
           <label htmlFor="profile-email" className="block text-xs font-bold text-text">
-            Official Hospital Email Address
+            Official School Email Address
           </label>
           <input
             id="profile-email"

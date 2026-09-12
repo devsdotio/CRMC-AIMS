@@ -22,11 +22,15 @@ import {
   Loader2,
   Trash2,
   X,
+  Edit3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { PurchaseLot, PurchaseOrderStatus } from "@/types/purchase-lots";
 import { formatPhp } from "@/components/projects/format-money";
-import { useUpdatePOStatusMutation } from "@/features/purchase-lots/client";
+import {
+  useUpdatePOStatusMutation,
+  useUpdatePurchaseOrderMutation,
+} from "@/features/purchase-lots/client";
 import { useAuditLogsQuery } from "@/features/audit-logs/client";
 import { formatDateTime, formatRelativeTime } from "@/components/audit-logs/audit-log-utils";
 import { useToast } from "@/components/providers/toast-context";
@@ -91,8 +95,11 @@ export function PurchaseOrderDetailSheet({
   const [statusNote, setStatusNote] = useState("");
   const [receivedQuantity, setReceivedQuantity] = useState("");
   const [showStatusModal, setShowStatusModal] = useState<PurchaseOrderStatus | null>(null);
+  const [isEditingPoNumber, setIsEditingPoNumber] = useState(false);
+  const [editablePoNumber, setEditablePoNumber] = useState("");
 
   const updateStatusMutation = useUpdatePOStatusMutation();
+  const updatePOMutation = useUpdatePurchaseOrderMutation();
   const toast = useToast();
 
   const entityCode = lot ? lot.poNumber || lot.lotCode : "";
@@ -172,6 +179,24 @@ export function PurchaseOrderDetailSheet({
     }
   };
 
+  const handleSavePoNumber = async () => {
+    const trimmed = editablePoNumber.trim();
+    if (!trimmed) {
+      toast.error("PO Number cannot be empty.");
+      return;
+    }
+    try {
+      await updatePOMutation.mutateAsync({
+        id: lot.id,
+        payload: { poNumber: trimmed },
+      });
+      toast.success(`Purchase Order number updated to "${trimmed}".`);
+      setIsEditingPoNumber(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update PO number.");
+    }
+  };
+
   const canRelease =
     canOperate &&
     lot.status === "delivered" &&
@@ -197,21 +222,74 @@ export function PurchaseOrderDetailSheet({
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-bg-subtle/50 shrink-0">
           <div className="min-w-0 flex-1 pr-3">
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 id="po-detail-heading" className="font-mono text-lg font-bold tracking-tight text-text">
-                {lot.poNumber || lot.lotCode}
-              </h2>
-              <button
-                type="button"
-                onClick={handleCopyCode}
-                title="Copy PO Code"
-                className="p-1 rounded text-text-secondary hover:text-text hover:bg-border/60 transition-colors cursor-pointer"
-              >
-                {copiedCode ? (
-                  <Check className="h-3.5 w-3.5 text-status-active-text" />
-                ) : (
-                  <Copy className="h-3.5 w-3.5" />
-                )}
-              </button>
+              {isEditingPoNumber ? (
+                <div className="flex items-center gap-1.5 animate-in fade-in duration-150">
+                  <input
+                    type="text"
+                    value={editablePoNumber}
+                    onChange={(e) => setEditablePoNumber(e.target.value)}
+                    placeholder="Enter PO Number..."
+                    className="h-8 px-2.5 text-xs font-mono font-bold rounded-lg border border-accent bg-bg text-text focus:outline-hidden ring-2 ring-accent/20"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void handleSavePoNumber();
+                      if (e.key === "Escape") setIsEditingPoNumber(false);
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSavePoNumber}
+                    disabled={updatePOMutation.isPending}
+                    title="Save PO Number"
+                    className="p-1.5 rounded-lg bg-accent text-accent-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-2xs"
+                  >
+                    {updatePOMutation.isPending ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Check className="h-3.5 w-3.5" />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingPoNumber(false)}
+                    title="Cancel"
+                    className="p-1.5 rounded-lg border border-border text-text-secondary hover:text-text hover:bg-bg transition-colors cursor-pointer"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <h2 id="po-detail-heading" className="font-mono text-lg font-bold tracking-tight text-text">
+                    {lot.poNumber || lot.lotCode}
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={handleCopyCode}
+                    title="Copy PO Code"
+                    className="p-1 rounded text-text-secondary hover:text-text hover:bg-border/60 transition-colors cursor-pointer"
+                  >
+                    {copiedCode ? (
+                      <Check className="h-3.5 w-3.5 text-status-active-text" />
+                    ) : (
+                      <Copy className="h-3.5 w-3.5" />
+                    )}
+                  </button>
+                  {canOperate && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditablePoNumber(lot.poNumber || lot.lotCode);
+                        setIsEditingPoNumber(true);
+                      }}
+                      title="Edit PO Number"
+                      className="p-1 rounded text-text-secondary hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
+                    >
+                      <Edit3 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </>
+              )}
 
               <span
                 className={cn(

@@ -89,6 +89,7 @@ export type CreatePurchaseOrderItemInput = {
 };
 
 export type CreatePurchaseOrderInput = {
+  poNumber?: string;
   poDate: string;
   requestedBy: string;
   supplierId?: string;
@@ -100,6 +101,7 @@ export type CreatePurchaseOrderInput = {
 };
 
 export type UpdatePurchaseOrderInput = {
+  poNumber?: string | null;
   supplierId?: string | null;
   supplierName?: string | null;
   reference?: string | null;

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
-export default function MaintenanceLogsPage() {
+export default function VouchersPage() {
   redirect("/dashboard");
 }
