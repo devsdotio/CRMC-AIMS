@@ -208,6 +208,12 @@ export default function Sidebar({
           badgeTone: "accent",
           roles: ["borrower"],
         },
+        {
+          name: "My Inventory",
+          href: "/borrower-db/inventory",
+          icon: Package,
+          roles: ["borrower"],
+        },
       ],
     },
     {
