@@ -8,26 +8,30 @@ import {
   type UseQueryResult,
 } from "@tanstack/react-query";
 
+import { useSandboxVisibility } from "@/components/providers/sandbox-visibility-context";
+import {
+  STOCK_DOMAINS,
+  invalidateDomains,
+} from "@/features/shared/cache-invalidation";
+
 import {
   stockMovementsApi,
   type StockMovement,
   type VoidStockMovementPayload,
 } from "./stock-movements-api";
 import { stockMovementQueryKeys } from "./query-keys";
-import {
-  STOCK_DOMAINS,
-  invalidateDomains,
-} from "@/features/shared/cache-invalidation";
 
 export function useStockMovementsQuery(filters?: {
   reason?: StockMovement["reason"];
   limit?: number;
   enabled?: boolean;
 }): UseQueryResult<StockMovement[], Error> {
+  const { includeSandbox } = useSandboxVisibility();
   const { enabled = true, ...params } = filters ?? {};
+  const listFilters = { ...params, includeSandbox };
   return useQuery({
-    queryKey: stockMovementQueryKeys.list(params),
-    queryFn: () => stockMovementsApi.list(params),
+    queryKey: stockMovementQueryKeys.list(listFilters),
+    queryFn: () => stockMovementsApi.list(listFilters),
     enabled,
   });
 }

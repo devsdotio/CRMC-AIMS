@@ -4,6 +4,7 @@ import { getDb } from "@/server/db";
 import type { DbSession } from "@/server/db/transaction";
 import {
   assets,
+  assetModels,
   borrowTransactions,
   projectAssetAssignments,
   type AssetRow,
@@ -32,11 +33,12 @@ const assetListColumns = {
   value: assets.value,
   supplierId: assets.supplierId,
   imageUrl: assets.imageUrl,
-  notes: assets.notes,
-  lastUpdated: assets.lastUpdated,
-  createdAt: assets.createdAt,
-  updatedAt: assets.updatedAt,
-} as const;
+    notes: assets.notes,
+    isSandbox: assets.isSandbox,
+    lastUpdated: assets.lastUpdated,
+    createdAt: assets.createdAt,
+    updatedAt: assets.updatedAt,
+  } as const;
 
 function withEmptyMaintenanceHistory(
   row: Omit<AssetRow, "maintenanceHistory">
@@ -152,6 +154,16 @@ export class AssetRepository implements IAssetRepository {
           ilike(assets.location, q),
           ilike(assets.currentHolder, q)
         )!
+      );
+    }
+    if (!filters?.includeSandbox) {
+      conditions.push(eq(assets.isSandbox, false));
+      conditions.push(
+        sql`not exists (
+          select 1 from ${assetModels}
+          where ${assetModels.id} = ${assets.modelId}
+            and ${assetModels.isSandbox} = true
+        )`
       );
     }
 

@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   jsonb,
   numeric,
   pgEnum,
@@ -79,6 +80,8 @@ export const assets = pgTable(
     supplierId: uuid("supplier_id"),
     imageUrl: text("image_url"),
     notes: text("notes"),
+    /** Testing-only row; hidden from non-superadmin lists unless opted in. */
+    isSandbox: boolean("is_sandbox").notNull().default(false),
 
     lastUpdated: timestamp("last_updated", { withTimezone: true })
       .notNull()
@@ -103,6 +106,7 @@ export const assets = pgTable(
     index("assets_supplier_id_idx").on(table.supplierId),
     index("assets_model_id_idx").on(table.modelId),
     index("assets_reserved_for_request_id_idx").on(table.reservedForRequestId),
+    index("assets_is_sandbox_idx").on(table.isSandbox),
   ]
 );
 

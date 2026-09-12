@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { useMeQuery } from "@/features/users/client";
 import { useDashboardSidebarSummaryQuery } from "@/features/dashboard/client/use-dashboard";
 import { ROLE_DEFINITIONS } from "@/constants/roles";
+import { SandboxVisibilityProvider } from "@/components/providers/sandbox-visibility-context";
 
 import type { UserRole } from "@/types/users";
 
@@ -58,6 +59,7 @@ export default function DashboardLayout({
   const lowStockCount = summary?.lowStockItems ?? 0;
 
   return (
+    <SandboxVisibilityProvider role={currentRole}>
     <div className="flex h-full w-full overflow-hidden bg-[#F2F3F7] text-[#1B2140]">
       <div className="hidden md:block h-full shrink-0">
         <Sidebar
@@ -116,5 +118,6 @@ export default function DashboardLayout({
         </main>
       </div>
     </div>
+    </SandboxVisibilityProvider>
   );
 }

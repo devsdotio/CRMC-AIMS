@@ -5,6 +5,7 @@ export type DepartmentDTO = {
   id: string;
   code: string;
   name: string;
+  isSandbox: boolean;
   /** Borrower account linked to this department, if any. */
   accountUserId: string | null;
   accountEmail: string | null;
@@ -15,6 +16,7 @@ export type DepartmentDTO = {
 
 export type ListDepartmentFilters = {
   search?: string;
+  includeSandbox?: boolean;
 };
 
 export type DepartmentListRow = Department & {
@@ -33,7 +35,7 @@ export interface IDepartmentRepository {
   ): Promise<Department>;
   update(
     id: string,
-    data: Partial<Pick<Department, "code" | "name">>
+    data: Partial<Pick<Department, "code" | "name" | "isSandbox">>
   ): Promise<Department | null>;
   delete(id: string): Promise<boolean>;
   countLinkedProfiles(id: string): Promise<number>;

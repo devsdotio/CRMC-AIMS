@@ -1,4 +1,5 @@
 import type { ConsumableDTO } from "@/server/modules/consumables/consumable.types";
+import { appendIncludeSandbox } from "@/components/providers/sandbox-visibility-context";
 import { fetchJson, type ApiResponse } from "@/features/shared/fetch-json";
 
 export type ConsumableItem = ConsumableDTO;
@@ -16,6 +17,7 @@ export type CreateConsumablePayload = {
   /** Required when currentQty > 0. */
   unitCost?: string | number;
   notes?: string;
+  isSandbox?: boolean;
 };
 
 export type UpdateConsumablePayload = {
@@ -26,6 +28,7 @@ export type UpdateConsumablePayload = {
   location?: string;
   supplier?: string | null;
   notes?: string | null;
+  isSandbox?: boolean;
 };
 
 export type StockMovementPayload = {
@@ -67,6 +70,7 @@ export const consumablesApi = {
     search?: string;
     page?: number;
     limit?: number;
+    includeSandbox?: boolean;
   }): Promise<import("@/types/filters").PaginatedResponse<ConsumableItem>> {
     const sp = new URLSearchParams();
     if (params?.category) sp.set("category", params.category);
@@ -74,6 +78,7 @@ export const consumablesApi = {
     if (params?.search) sp.set("search", params.search);
     if (params?.page) sp.set("page", params.page.toString());
     if (params?.limit) sp.set("limit", params.limit.toString());
+    appendIncludeSandbox(sp, params?.includeSandbox);
     const qs = sp.toString();
     const res = await fetchJson<ApiResponse<import("@/types/filters").PaginatedResponse<ConsumableItem>>>(
       qs ? `/api/consumables?${qs}` : "/api/consumables"

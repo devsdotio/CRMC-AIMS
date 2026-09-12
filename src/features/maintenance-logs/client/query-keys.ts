@@ -5,6 +5,7 @@ export const maintenanceQueryKeys = {
     openOnly?: boolean;
     search?: string;
     condition?: string;
+    includeSandbox?: boolean;
   }) => [...maintenanceQueryKeys.lists(), filters ?? {}] as const,
   detail: (id: string) =>
     [...maintenanceQueryKeys.all, "detail", id] as const,

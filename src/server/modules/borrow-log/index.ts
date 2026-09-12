@@ -12,6 +12,7 @@ export class BorrowLogController {
     try {
       const session = await requireActor();
       const url = new URL(request.url);
+      const { parseIncludeSandbox } = await import("@/server/shared/sandbox");
       return ok(
         await this.service.list({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -20,6 +21,10 @@ export class BorrowLogController {
           search: url.searchParams.get("search") ?? undefined,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
           custodyKind: (url.searchParams.get("custodyKind") || url.searchParams.get("custody") || url.searchParams.get("type")) as any ?? undefined,
+          includeSandbox: parseIncludeSandbox(
+            url.searchParams.get("includeSandbox"),
+            session.role
+          ),
         }, session)
       );
     } catch (error) {

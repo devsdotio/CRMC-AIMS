@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   index,
   integer,
   jsonb,
@@ -71,6 +72,8 @@ export const consumables = pgTable(
     supplier: text("supplier"),
     lastRestocked: timestamp("last_restocked", { withTimezone: true }),
     notes: text("notes"),
+    /** Testing-only row; hidden from non-superadmin lists unless opted in. */
+    isSandbox: boolean("is_sandbox").notNull().default(false),
 
     /** Legacy JSON trail. Stock events go to stock_movements; this stays empty. */
     history: jsonb("history")
@@ -89,6 +92,7 @@ export const consumables = pgTable(
     index("consumables_category_idx").on(table.category),
     index("consumables_location_idx").on(table.location),
     index("consumables_current_qty_idx").on(table.currentQty),
+    index("consumables_is_sandbox_idx").on(table.isSandbox),
   ]
 );
 

@@ -12,10 +12,15 @@ export class DepartmentController {
 
   async list(request: NextRequest | Request) {
     try {
-      await requireUserManager();
+      const session = await requireUserManager();
       const url = new URL(request.url);
+      const { parseIncludeSandbox } = await import("@/server/shared/sandbox");
       const data = await this.service.list({
         search: url.searchParams.get("search") ?? undefined,
+        includeSandbox: parseIncludeSandbox(
+          url.searchParams.get("includeSandbox"),
+          session.actor.role
+        ),
       });
       return okWithEtag(request, data, {
         cacheControl: { maxAge: 60, staleWhileRevalidate: 300 },

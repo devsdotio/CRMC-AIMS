@@ -15,6 +15,14 @@ export const listConsumablesQuerySchema = z.object({
   search: z.string().trim().max(200).optional(),
   page: z.coerce.number().int().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
+  includeSandbox: z
+    .union([z.boolean(), z.enum(["true", "false", "1", "0"])])
+    .optional()
+    .transform((v) => {
+      if (v === undefined) return undefined;
+      if (typeof v === "boolean") return v;
+      return v === "true" || v === "1";
+    }),
 });
 
 export const createConsumableSchema = z
@@ -31,6 +39,7 @@ export const createConsumableSchema = z
     /** Required when currentQty > 0 — opening lot must have a real unit cost. */
     unitCost: z.union([z.string(), z.number()]).optional(),
     notes: z.string().trim().max(2000).optional(),
+    isSandbox: z.boolean().optional(),
   })
   .superRefine((data, ctx) => {
     if ((data.currentQty ?? 0) <= 0) return;
@@ -71,6 +80,7 @@ export const updateConsumableSchema = z
     location: z.string().trim().min(1).max(120).optional(),
     supplier: z.string().trim().max(255).nullable().optional(),
     notes: z.string().trim().max(2000).nullable().optional(),
+    isSandbox: z.boolean().optional(),
   })
   .refine((d) => Object.keys(d).length > 0, {
     message: "At least one field is required.",

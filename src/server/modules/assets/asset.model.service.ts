@@ -40,6 +40,7 @@ export type AssetModelDTO = {
   defaultUnitValue?: number;
   imageUrl?: string;
   notes?: string;
+  isSandbox: boolean;
   unitCount: number;
   availableCount: number;
   createdByUserId: string;
@@ -71,6 +72,7 @@ export function toAssetModelDTO(
     defaultUnitValue: parseValue(row.defaultUnitValue),
     imageUrl: row.imageUrl ?? undefined,
     notes: row.notes ?? undefined,
+    isSandbox: row.isSandbox,
     unitCount,
     availableCount,
     createdByUserId: row.createdByUserId,
@@ -143,6 +145,7 @@ export class AssetModelService {
           : null,
       imageUrl: input.imageUrl ?? null,
       notes: input.notes ?? null,
+      isSandbox: input.isSandbox ?? false,
       createdByUserId: actor.userId,
       createdByName: actor.displayName,
     });
@@ -199,6 +202,7 @@ export class AssetModelService {
         : {}),
       ...(input.imageUrl !== undefined ? { imageUrl: input.imageUrl } : {}),
       ...(input.notes !== undefined ? { notes: input.notes } : {}),
+      ...(input.isSandbox !== undefined ? { isSandbox: input.isSandbox } : {}),
     });
 
     if (!updated) throw new NotFoundError("Asset model", id);
@@ -262,6 +266,7 @@ export class AssetModelService {
           : null,
       imageUrl: input.imageUrl ?? null,
       notes: input.notes ?? null,
+      isSandbox: input.isSandbox ?? false,
       createdByUserId: actor.userId,
       createdByName: actor.displayName,
     });

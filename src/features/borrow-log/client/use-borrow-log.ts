@@ -14,6 +14,12 @@ import {
 } from "@tanstack/react-query";
 
 import {
+  CUSTODY_DOMAINS,
+  invalidateDomains,
+} from "@/features/shared/cache-invalidation";
+import { useSandboxVisibility } from "@/components/providers/sandbox-visibility-context";
+
+import {
   borrowLogApi,
   type BorrowLogRecord,
   type ReleaseBorrowPayload,
@@ -21,10 +27,6 @@ import {
   type VoidBorrowPayload,
 } from "./borrow-log-api";
 import { borrowLogQueryKeys } from "./query-keys";
-import {
-  CUSTODY_DOMAINS,
-  invalidateDomains,
-} from "@/features/shared/cache-invalidation";
 
 export function useBorrowLogQuery(filters?: {
   status?: BorrowLogRecord["status"];
@@ -32,9 +34,11 @@ export function useBorrowLogQuery(filters?: {
   search?: string;
   custodyKind?: "borrow" | "assignment" | "all";
 }): UseQueryResult<BorrowLogRecord[], Error> {
+  const { includeSandbox } = useSandboxVisibility();
+  const listFilters = { ...filters, includeSandbox };
   return useQuery({
-    queryKey: borrowLogQueryKeys.list(filters),
-    queryFn: () => borrowLogApi.list(filters),
+    queryKey: borrowLogQueryKeys.list(listFilters),
+    queryFn: () => borrowLogApi.list(listFilters),
   });
 }
 

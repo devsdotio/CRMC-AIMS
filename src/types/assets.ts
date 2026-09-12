@@ -40,6 +40,8 @@ export interface Asset {
   supplierId?: string | null;
   imageUrl?: string;
   notes?: string;
+  /** Testing-only catalog row; hidden unless superadmin opts in. */
+  isSandbox?: boolean;
   lastUpdated: string;
   maintenanceHistory: MaintenanceLogEntry[];
   /** Canonical QR payload (`CRMC-AIMS:{assetCode}`) for printers / scanners. */
@@ -74,6 +76,7 @@ export type CreateAssetInput = Pick<
       | "supplierId"
       | "imageUrl"
       | "notes"
+      | "isSandbox"
       | "lastUpdated"
       | "maintenanceHistory"
     >

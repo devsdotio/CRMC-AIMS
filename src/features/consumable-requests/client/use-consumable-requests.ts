@@ -14,6 +14,8 @@ import {
   STOCK_DOMAINS,
   invalidateDomains,
 } from "@/features/shared/cache-invalidation";
+import { useSandboxVisibility } from "@/components/providers/sandbox-visibility-context";
+import { dashboardQueryKeys } from "@/features/dashboard/client/query-keys";
 
 import {
   consumableRequestsApi,
@@ -24,7 +26,6 @@ import {
   type UpdateConsumableRequestPayload,
 } from "./consumable-requests-api";
 import { consumableRequestQueryKeys } from "./query-keys";
-import { dashboardQueryKeys } from "@/features/dashboard/client/query-keys";
 
 /**
  * Every requisition decision either reserves, frees or issues stock, so the
@@ -41,9 +42,11 @@ export function useConsumableRequests(filters?: {
   page?: number;
   limit?: number;
 }): UseQueryResult<PaginatedResponse<ConsumableRequest[]>, Error> {
+  const { includeSandbox } = useSandboxVisibility();
+  const listFilters = { ...filters, includeSandbox };
   return useQuery({
-    queryKey: consumableRequestQueryKeys.list(filters),
-    queryFn: () => consumableRequestsApi.list(filters),
+    queryKey: consumableRequestQueryKeys.list(listFilters),
+    queryFn: () => consumableRequestsApi.list(listFilters),
     placeholderData: keepPreviousData,
   });
 }

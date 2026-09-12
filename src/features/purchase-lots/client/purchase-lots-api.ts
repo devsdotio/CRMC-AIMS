@@ -1,5 +1,6 @@
 import type { PurchaseLot, PurchaseOrderStatus } from "@/types/purchase-lots";
 import type { ConsumableItem } from "@/features/consumables/client/consumables-api";
+import { appendIncludeSandbox } from "@/components/providers/sandbox-visibility-context";
 import { fetchJson, type ApiResponse } from "@/features/shared/fetch-json";
 
 export type LotReleaseResult = {
@@ -72,6 +73,7 @@ export const purchaseLotsApi = {
     itemType?: "consumable" | "asset";
     status?: PurchaseOrderStatus;
     search?: string;
+    includeSandbox?: boolean;
   }): Promise<PurchaseLot[]> {
     const sp = new URLSearchParams();
     if (params?.consumableId) sp.set("consumableId", params.consumableId);
@@ -80,6 +82,7 @@ export const purchaseLotsApi = {
     if (params?.itemType) sp.set("itemType", params.itemType);
     if (params?.status) sp.set("status", params.status);
     if (params?.search) sp.set("search", params.search);
+    appendIncludeSandbox(sp, params?.includeSandbox);
     const qs = sp.toString();
     const res = await fetchJson<ApiResponse<PurchaseLot[]>>(
       qs ? `/api/purchase-lots?${qs}` : "/api/purchase-lots"

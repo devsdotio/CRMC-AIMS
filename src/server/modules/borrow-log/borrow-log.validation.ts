@@ -25,6 +25,14 @@ export const listBorrowLogQuerySchema = z.object({
   borrowerUserId: z.string().uuid().optional(),
   borrowerEmail: z.string().trim().max(320).optional(),
   custodyKind: z.enum(["borrow", "assignment", "all"]).optional(),
+  includeSandbox: z
+    .union([z.boolean(), z.enum(["true", "false", "1", "0"])])
+    .optional()
+    .transform((v) => {
+      if (v === undefined) return undefined;
+      if (typeof v === "boolean") return v;
+      return v === "true" || v === "1";
+    }),
 });
 
 export const releaseBorrowSchema = z

@@ -34,6 +34,7 @@ export const createAssetSchema = z.object({
   supplierId: z.string().uuid().optional().nullable(),
   imageUrl: z.string().trim().max(2048).optional(),
   notes: z.string().trim().max(4000).optional(),
+  isSandbox: z.boolean().optional(),
 });
 
 export const updateAssetSchema = createAssetSchema
@@ -121,6 +122,14 @@ export const listAssetsQuerySchema = z.object({
   search: z.string().trim().max(200).optional(),
   assignmentType: assetAssignmentTypeSchema.optional(),
   availableOnly: z
+    .union([z.boolean(), z.enum(["true", "false", "1", "0"])])
+    .optional()
+    .transform((v) => {
+      if (v === undefined) return undefined;
+      if (typeof v === "boolean") return v;
+      return v === "true" || v === "1";
+    }),
+  includeSandbox: z
     .union([z.boolean(), z.enum(["true", "false", "1", "0"])])
     .optional()
     .transform((v) => {

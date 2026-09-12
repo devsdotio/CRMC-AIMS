@@ -68,6 +68,9 @@ export class DepartmentRepository implements IDepartmentRepository {
         or(ilike(departments.name, q), ilike(departments.code, q))!
       );
     }
+    if (!filters.includeSandbox) {
+      conditions.push(eq(departments.isSandbox, false));
+    }
 
     const borrowerJoin = and(
       eq(profiles.departmentId, departments.id),
@@ -79,6 +82,7 @@ export class DepartmentRepository implements IDepartmentRepository {
         id: departments.id,
         code: departments.code,
         name: departments.name,
+        isSandbox: departments.isSandbox,
         createdAt: departments.createdAt,
         updatedAt: departments.updatedAt,
         accountUserId: profiles.userId,
@@ -105,7 +109,7 @@ export class DepartmentRepository implements IDepartmentRepository {
 
   async update(
     id: string,
-    data: Partial<Pick<Department, "code" | "name">>,
+    data: Partial<Pick<Department, "code" | "name" | "isSandbox">>,
     session?: DbSession
   ): Promise<Department | null> {
     const db = this.db(session);

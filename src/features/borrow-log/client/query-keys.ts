@@ -8,6 +8,7 @@ export const borrowLogQueryKeys = {
     department?: string;
     search?: string;
     custodyKind?: "borrow" | "assignment" | "all";
+    includeSandbox?: boolean;
   }) => [...borrowLogQueryKeys.lists(), filters ?? {}] as const,
   detail: (id: string) => [...borrowLogQueryKeys.all, "detail", id] as const,
 };

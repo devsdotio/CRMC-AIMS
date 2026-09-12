@@ -115,6 +115,7 @@ export function toAssetDTO(row: AssetRow): AssetDTOWithMeta {
     supplierId: row.supplierId ?? undefined,
     imageUrl: row.imageUrl ?? undefined,
     notes: row.notes ?? undefined,
+    isSandbox: row.isSandbox,
     lastUpdated: toDateString(row.lastUpdated),
     maintenanceHistory: [],
   };
@@ -345,6 +346,7 @@ export class AssetService {
             supplierId: input.supplierId ?? null,
             imageUrl: input.imageUrl ?? null,
             notes: input.notes ?? null,
+            isSandbox: input.isSandbox ?? false,
             maintenanceHistory: [],
             lastUpdated: now,
           },
@@ -713,6 +715,7 @@ export class AssetService {
           : {}),
         ...(input.imageUrl !== undefined ? { imageUrl: input.imageUrl } : {}),
         ...(input.notes !== undefined ? { notes: input.notes } : {}),
+        ...(input.isSandbox !== undefined ? { isSandbox: input.isSandbox } : {}),
         lastUpdated: new Date(),
       });
 

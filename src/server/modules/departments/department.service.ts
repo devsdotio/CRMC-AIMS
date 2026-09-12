@@ -22,6 +22,7 @@ function toDTO(row: Department | DepartmentListRow): DepartmentDTO {
     id: row.id,
     code: row.code,
     name: row.name,
+    isSandbox: row.isSandbox,
     accountUserId: listed.accountUserId ?? null,
     accountEmail: listed.accountEmail ?? null,
     accountStatus: listed.accountStatus ?? null,
@@ -49,10 +50,12 @@ export class DepartmentService {
 
   async getById(rawId: string): Promise<DepartmentDTO> {
     const id = departmentIdSchema.parse(rawId);
-    const rows = await this.list({});
+    // By-id fetch must not apply list sandbox filters — mutations (e.g. toggling
+    // isSandbox) would otherwise 404 after a successful write.
+    const rows = await this.repo.list({ includeSandbox: true });
     const match = rows.find((row) => row.id === id);
     if (!match) throw new NotFoundError("Department", id);
-    return match;
+    return toDTO(match);
   }
 
   async create(rawInput: unknown): Promise<DepartmentDTO> {
@@ -76,6 +79,7 @@ export class DepartmentService {
       const row = await this.repo.create({
         code: input.code,
         name: input.name,
+        isSandbox: input.isSandbox ?? false,
       });
       serverCache.invalidateTag("departments");
       return toDTO({
@@ -122,6 +126,9 @@ export class DepartmentService {
       updated = await this.repo.update(id, {
         ...(input.code !== undefined ? { code: input.code } : {}),
         ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.isSandbox !== undefined
+          ? { isSandbox: input.isSandbox }
+          : {}),
       });
     } catch (error) {
       if (isUniqueViolation(error)) {

@@ -151,6 +151,14 @@ export class BorrowLogRepository implements IBorrowLogRepository {
         )!
       );
     }
+    if (!filters.includeSandbox) {
+      conditions.push(
+        sql`not exists (select 1 from assets a where a.id = ${borrowTransactions.assetId} and a.is_sandbox = true)`
+      );
+      conditions.push(
+        sql`(${borrowTransactions.departmentId} is null OR not exists (select 1 from departments d where d.id = ${borrowTransactions.departmentId} and d.is_sandbox = true))`
+      );
+    }
 
     const base = db
       .select()
@@ -170,6 +178,8 @@ export class BorrowLogRepository implements IBorrowLogRepository {
     const conditions = [
       eq(borrowTransactions.status, "active"),
       eq(borrowTransactions.custodyKind, custodyKind),
+      // Dashboard counts always exclude sandbox assets
+      sql`not exists (select 1 from assets a where a.id = ${borrowTransactions.assetId} and a.is_sandbox = true)`,
     ];
     if (userId) conditions.push(eq(borrowTransactions.borrowerUserId, userId));
     const [row] = await db
@@ -198,6 +208,8 @@ export class BorrowLogRepository implements IBorrowLogRepository {
       eq(borrowTransactions.custodyKind, "borrow"),
       isNotNull(borrowTransactions.dueDate),
       lt(borrowTransactions.dueDate, today),
+      // Dashboard counts always exclude sandbox assets
+      sql`not exists (select 1 from assets a where a.id = ${borrowTransactions.assetId} and a.is_sandbox = true)`,
     ];
     if (userId) conditions.push(eq(borrowTransactions.borrowerUserId, userId));
     const [row] = await db

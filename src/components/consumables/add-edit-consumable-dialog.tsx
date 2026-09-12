@@ -91,6 +91,7 @@ function AddEditConsumableDialogForm({
   /** Prefer registry id; free-text legacy names resolve on supplier list load. */
   const [supplierId, setSupplierId] = useState("");
   const [notes, setNotes] = useState(() => initialItem?.notes ?? "");
+  const [isSandbox, setIsSandbox] = useState(() => initialItem?.isSandbox ?? false);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -179,6 +180,7 @@ function AddEditConsumableDialogForm({
         supplierId: needsOpeningLot ? supplierId : supplierId || null,
         unitCost: needsOpeningLot ? unitCost : undefined,
         notes: notes.trim() || undefined,
+        isSandbox,
         lastRestocked: new Date().toISOString().split("T")[0],
       });
       onClose();
@@ -509,6 +511,24 @@ function AddEditConsumableDialogForm({
               className="w-full p-2.5 text-xs bg-bg border border-border rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-accent"
             />
           </div>
+
+          <label className="flex items-start gap-2.5 rounded-lg border border-border bg-bg-subtle/50 p-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={isSandbox}
+              onChange={(e) => setIsSandbox(e.target.checked)}
+              disabled={isSubmitting}
+              className="mt-0.5 h-4 w-4 rounded border-border"
+            />
+            <span>
+              <span className="block text-xs font-semibold text-text">
+                Sandbox (testing only)
+              </span>
+              <span className="block text-[11px] text-text-secondary mt-0.5">
+                Hidden from normal users unless a superadmin turns on sandbox visibility.
+              </span>
+            </span>
+          </label>
 
           <div className="flex justify-end gap-2 pt-2 border-t border-border">
             <button

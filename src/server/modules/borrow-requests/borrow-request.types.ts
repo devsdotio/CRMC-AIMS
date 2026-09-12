@@ -45,6 +45,7 @@ export type ListBorrowRequestFilters = {
   startDate?: string;
   endDate?: string;
   assetId?: string;
+  includeSandbox?: boolean;
 };
 
 export interface IBorrowRequestRepository {

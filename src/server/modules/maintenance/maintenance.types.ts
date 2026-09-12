@@ -23,6 +23,7 @@ export type ListMaintenanceFilters = {
   openOnly?: boolean;
   search?: string;
   condition?: MaintenanceLogDTO["condition"];
+  includeSandbox?: boolean;
 };
 
 export interface IMaintenanceRepository {

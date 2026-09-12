@@ -1,4 +1,4 @@
-import { desc, eq, ilike, or } from "drizzle-orm";
+import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
 
 import { getDb } from "@/server/db";
 import type { DbSession } from "@/server/db/transaction";
@@ -155,6 +155,7 @@ export class StockMovementRepository {
   async listRecent(filters: {
     reason?: StockMovementRow["reason"];
     limit?: number;
+    includeSandbox?: boolean;
   }): Promise<StockMovementListRow[]> {
     const db = this.db();
     const columns = {
@@ -180,14 +181,26 @@ export class StockMovementRepository {
       unit: consumables.unit,
     };
 
+    const conditions = [];
+    if (filters.reason) {
+      conditions.push(eq(stockMovements.reason, filters.reason));
+    }
+    if (!filters.includeSandbox) {
+      conditions.push(eq(consumables.isSandbox, false));
+      conditions.push(
+        sql`(${stockMovements.departmentId} is null OR not exists (
+          select 1 from departments d where d.id = ${stockMovements.departmentId} and d.is_sandbox = true
+        ))`
+      );
+    }
+
     const base = db
       .select(columns)
       .from(stockMovements)
       .innerJoin(consumables, eq(stockMovements.consumableId, consumables.id));
 
-    const filtered = filters.reason
-      ? base.where(eq(stockMovements.reason, filters.reason))
-      : base;
+    const filtered =
+      conditions.length > 0 ? base.where(and(...conditions)) : base;
 
     return filtered
       .orderBy(desc(stockMovements.createdAt))
